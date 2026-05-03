@@ -1,27 +1,27 @@
-﻿/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   Feed The Bear â€” App Logic
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+/* ════════════════════════════════════════════════════════════
+   Feed The Bear — App Logic
+   ════════════════════════════════════════════════════════════ */
 
 'use strict';
 
-/* â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Constants ───────────────────────────────────────────── */
 const STORAGE_KEY   = 'ftb_restaurants_v2';
 const SETTINGS_KEY  = 'ftb_settings_v1';
-const ALERT_RADIUS  = 500;   // metres â€” show proximity alert
-const NOTIFY_RADIUS = 800;   // metres â€” browser notification
+const ALERT_RADIUS  = 500;   // metres — show proximity alert
+const NOTIFY_RADIUS = 800;   // metres — browser notification
 const NOTIFY_COOLDOWN = 10 * 60 * 1000; // 10 min between alerts for same place
 
-/* â”€â”€ Cuisine â†’ emoji map â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Cuisine → emoji map ──────────────────────────────────── */
 const CUISINE_EMOJI = {
-  american:'ðŸ”',bbq:'ðŸ–',breakfast:'ðŸ¥ž',brunch:'ðŸ¥‚',burgers:'ðŸ”',cafe:'â˜•',
-  chinese:'ðŸ¥¢',desserts:'ðŸ°',french:'ðŸ¥',greek:'ðŸ«’',indian:'ðŸ›',italian:'ðŸ',
-  japanese:'ðŸ£',korean:'ðŸœ',mediterranean:'ðŸ¥™',mexican:'ðŸŒ®',pizza:'ðŸ•',
-  seafood:'ðŸ¦ž',steakhouse:'ðŸ¥©',sushi:'ðŸ£',thai:'ðŸœ',vegan:'ðŸ¥—',
-  vietnamese:'ðŸœ',default:'ðŸ½ï¸'
+  american:'🍔',bbq:'🍖',breakfast:'🥞',brunch:'🥂',burgers:'🍔',cafe:'☕',
+  chinese:'🥢',desserts:'🍰',french:'🥐',greek:'🫒',indian:'🍛',italian:'🍝',
+  japanese:'🍣',korean:'🍜',mediterranean:'🥙',mexican:'🌮',pizza:'🍕',
+  seafood:'🦞',steakhouse:'🥩',sushi:'🍣',thai:'🍜',vegan:'🥗',
+  vietnamese:'🍜',default:'🍽️'
 };
 const cuisineEmoji = c => CUISINE_EMOJI[(c||'').toLowerCase()] || CUISINE_EMOJI.default;
 
-/* â”€â”€ Cuisine â†’ gradient map â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Cuisine → gradient map ───────────────────────────────── */
 const CUISINE_GRAD = {
   italian:   ['#E74C3C','#C0392B'],
   japanese:  ['#3498DB','#1A5276'],
@@ -44,8 +44,8 @@ const CUISINE_GRAD = {
 };
 const cuisineGrad = c => CUISINE_GRAD[(c||'').toLowerCase()] || CUISINE_GRAD.default;
 
-/* â”€â”€ Cuisine â†’ Unsplash photo map â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-// Curated Unsplash photo IDs â€” free, no API key needed
+/* ── Cuisine → Unsplash photo map ────────────────────────── */
+// Curated Unsplash photo IDs — free, no API key needed
 const CUISINE_PHOTOS = {
   italian:       'photo-1555396273-367ea4eb4db5',
   pizza:         'photo-1565299624946-b28f40a0ae38',
@@ -81,14 +81,14 @@ function getCuisinePhoto (cuisine, w = 600, h = 400) {
   return `https://images.unsplash.com/${id}?w=${w}&h=${h}&fit=crop&crop=center&q=80&auto=format`;
 }
 
-/* â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── State ───────────────────────────────────────────────── */
 let state = {
   restaurants: [],
   userLat: null,
   userLng: null,
   locationEnabled: false,
   watchId: null,
-  notifiedAt: {},          // id â†’ timestamp
+  notifiedAt: {},          // id → timestamp
   currentView: 'all',
   filter: { search:'', cuisine:'', price:'', sort:'date-desc', tag:'', collection:'' },
   settings: {},
@@ -102,9 +102,9 @@ let state = {
   selectedIds: new Set(),
 };
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════════════════════
    STORAGE
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ════════════════════════════════════════════════════════════ */
 function loadData () {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -154,9 +154,9 @@ function saveData () {
   setTimeout(renderWeeklyGoal, 0);
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════════════════════
    EXPORT / IMPORT
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ════════════════════════════════════════════════════════════ */
 function exportData () {
   const json = JSON.stringify(state.restaurants, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
@@ -166,7 +166,7 @@ function exportData () {
   a.download = `feed-the-bear-${iso()}.json`;
   a.click();
   URL.revokeObjectURL(url);
-  showToast('Exported! ðŸ“¥', `${state.restaurants.length} restaurants saved to file.`, 'success');
+  showToast('Exported! 📥', `${state.restaurants.length} restaurants saved to file.`, 'success');
 }
 
 function importData (file) {
@@ -188,7 +188,7 @@ function importData (file) {
       });
       saveData();
       renderAll();
-      showToast('Imported! ðŸ“¤', `${added} new restaurant${added !== 1 ? 's' : ''} added.`, 'success');
+      showToast('Imported! 📤', `${added} new restaurant${added !== 1 ? 's' : ''} added.`, 'success');
     } catch {
       showToast('Import Error', 'Invalid file. Please use a Feed The Bear export file.', 'error');
     }
@@ -196,7 +196,7 @@ function importData (file) {
   reader.readAsText(file);
 }
 
-/* â”€â”€ Seed restaurants so the app looks populated on first run */
+/* ── Seed restaurants so the app looks populated on first run */
 function seedData () {
   return [];
 }
@@ -210,9 +210,9 @@ function iso (offsetDays = 0) {
   return d.toISOString().split('T')[0];
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════════════════════
    GEOLOCATION
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ════════════════════════════════════════════════════════════ */
 function enableLocation () {
   if (!navigator.geolocation) {
     showToast('Location', 'Geolocation is not supported by your browser.', 'error');
@@ -226,7 +226,7 @@ function enableLocation () {
       updateLocationBtn();
       hideBanner('location-banner');
       renderCards();
-      showToast('ðŸ“ Location On', 'You\'ll get alerts when near restaurants on your list!', 'success');
+      showToast('📍 Location On', 'You\'ll get alerts when near restaurants on your list!', 'success');
       // Request notification permission
       if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
@@ -292,7 +292,7 @@ function disableLocation () {
   state.userLng = null;
   updateLocationBtn();
   renderCards();
-  showToast('ðŸ“ Location Off', 'Location tracking disabled.', 'info');
+  showToast('📍 Location Off', 'Location tracking disabled.', 'info');
 }
 
 function updateLocationBtn () {
@@ -344,7 +344,7 @@ function showProximityAlert (r, distM) {
   document.getElementById('proximity-icon').textContent = cuisineEmoji(r.cuisine);
   document.getElementById('proximity-name').textContent = r.name;
   document.getElementById('proximity-msg').textContent =
-    `${r.status === 'want-to-try' ? 'ðŸ”– On your want-to-try list!' : 'âœ… You\'ve been here!'} â€” ${fmtDist(distM)} away`;
+    `${r.status === 'want-to-try' ? '🔖 On your want-to-try list!' : '✅ You\'ve been here!'} — ${fmtDist(distM)} away`;
 
   const dirBtn = document.getElementById('proximity-directions');
   dirBtn.onclick = () => openDirections(r);
@@ -357,8 +357,8 @@ function showProximityAlert (r, distM) {
 function sendBrowserNotification (r, distM) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   const tag = `ftb-${r.id}`;
-  const n = new Notification(`ðŸ» Feed The Bear â€” ${r.name}`, {
-    body: `${r.status === 'want-to-try' ? 'ðŸ”– On your list!' : 'âœ… You\'ve been here!'} ${fmtDist(distM)} away`,
+  const n = new Notification(`🐻 Feed The Bear — ${r.name}`, {
+    body: `${r.status === 'want-to-try' ? '🔖 On your list!' : '✅ You\'ve been here!'} ${fmtDist(distM)} away`,
     tag,
     icon: 'https://raw.githubusercontent.com/cmc-creator/Feed-The-Bear/main/bear-icon.png',
     badge: 'https://raw.githubusercontent.com/cmc-creator/Feed-The-Bear/main/bear-icon.png'
@@ -366,9 +366,9 @@ function sendBrowserNotification (r, distM) {
   n.onclick = () => { window.focus(); n.close(); };
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════════════════════
    RENDERING
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ════════════════════════════════════════════════════════════ */
 function getFiltered () {
   let list = [...state.restaurants];
 
@@ -450,8 +450,8 @@ function renderStats () {
   document.getElementById('stat-total').textContent   = all.length;
   document.getElementById('stat-visited').textContent = visited.length;
   document.getElementById('stat-want').textContent    = want.length;
-  document.getElementById('stat-avg').textContent     = avg || 'â€”';
-  document.getElementById('stat-avg-stars').textContent = avg ? 'â˜…' : '';
+  document.getElementById('stat-avg').textContent     = avg || '—';
+  document.getElementById('stat-avg-stars').textContent = avg ? '★' : '';
 }
 
 function renderCuisineFilter () {
@@ -536,14 +536,14 @@ function buildCard (r) {
         ${r.status === 'want-to-try' ? 'Want to Try' : 'Visited'}
       </span>
       ${r.priceRange ? `<span class="card-price-badge">${priceDollars(r.priceRange)}</span>` : ''}
-      ${distStr ? `<span class="card-distance-badge">ðŸ“ ${distStr}</span>` : ''}
+      ${distStr ? `<span class="card-distance-badge">📍 ${distStr}</span>` : ''}
     </div>
     <div class="card-body">
       ${r.cuisine ? `<div class="card-cuisine">${escHtml(r.cuisine.toUpperCase())}</div>` : ''}
       <div class="card-name">${escHtml(r.name)}</div>
       <div class="card-rating-row">
         ${r.googleRating ? googleStarsHtml(r.googleRating, r.googleReviews) : ''}
-        ${r.myRating ? `<span class="my-rating-row"><span class="my-stars">${'â˜…'.repeat(r.myRating)}${'â˜†'.repeat(5-r.myRating)}</span> My Rating</span>` : ''}
+        ${r.myRating ? `<span class="my-rating-row"><span class="my-stars">${'★'.repeat(r.myRating)}${'☆'.repeat(5-r.myRating)}</span> My Rating</span>` : ''}
       </div>
       ${r.address ? `
         <div class="card-address">
@@ -564,7 +564,7 @@ function buildCard (r) {
             Website
           </button>` : ''}
         <button class="card-action-btn edit-card" data-action="edit" aria-label="Edit ${escHtml(r.name)}">
-          âœï¸ Edit
+          ✏️ Edit
         </button>
       </div>
     </div>`;
@@ -601,16 +601,16 @@ function buildCard (r) {
   return card;
 }
 
-/* â”€â”€ Stars HTML â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Stars HTML ──────────────────────────────────────────── */
 function googleStarsHtml (rating, reviews) {
   let stars = '';
   for (let i = 1; i <= 5; i++) {
     if (rating >= i) {
-      stars += `<span class="g-star">â˜…</span>`;
+      stars += `<span class="g-star">★</span>`;
     } else if (rating >= i - 0.75) {
-      stars += `<span class="g-star half">â˜…</span>`;
+      stars += `<span class="g-star half">★</span>`;
     } else {
-      stars += `<span class="g-star empty">â˜…</span>`;
+      stars += `<span class="g-star empty">★</span>`;
     }
   }
   const count = reviews ? `<span class="g-review-count">(${reviews.toLocaleString()})</span>` : '';
@@ -625,11 +625,11 @@ function googleStarsLgHtml (rating, reviews) {
   let stars = '';
   for (let i = 1; i <= 5; i++) {
     if (rating >= i) {
-      stars += `<span class="g-star-lg">â˜…</span>`;
+      stars += `<span class="g-star-lg">★</span>`;
     } else if (rating >= i - 0.75) {
-      stars += `<span class="g-star-lg half">â˜…</span>`;
+      stars += `<span class="g-star-lg half">★</span>`;
     } else {
-      stars += `<span class="g-star-lg empty">â˜…</span>`;
+      stars += `<span class="g-star-lg empty">★</span>`;
     }
   }
   const count = reviews
@@ -649,7 +649,7 @@ function myRatingHtml (rating) {
   if (!rating) {
     return `<label>My Rating</label><div style="color:var(--text-dim);font-size:.85rem">Not rated yet</div>`;
   }
-  const stars = 'â˜…'.repeat(rating) + 'â˜†'.repeat(5 - rating);
+  const stars = '★'.repeat(rating) + '☆'.repeat(5 - rating);
   return `<label>My Rating</label>
     <div style="font-size:1.5rem;color:var(--gold);letter-spacing:2px">${stars}</div>`;
 }
@@ -658,7 +658,7 @@ function priceDollars (n) {
   return n ? '$'.repeat(n) : '';
 }
 
-/* â”€â”€ Detail Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Detail Modal ─────────────────────────────────────────── */
 function openDetailModal (id) {
   const r = state.restaurants.find(x => x.id === id);
   if (!r) return;
@@ -702,11 +702,11 @@ function openDetailModal (id) {
 
   const dist = distOf(r);
   const meta = [];
-  if (dist < Infinity) meta.push(`ðŸ“ ${fmtDist(dist)} away`);
-  meta.push(`ðŸ”– Added ${fmtDate(r.dateAdded)}`);
-  if (r.dateVisited) meta.push(`âœ… Visited ${fmtDate(r.dateVisited)}`);
+  if (dist < Infinity) meta.push(`📍 ${fmtDist(dist)} away`);
+  meta.push(`🔖 Added ${fmtDate(r.dateAdded)}`);
+  if (r.dateVisited) meta.push(`✅ Visited ${fmtDate(r.dateVisited)}`);
   meta.push(`<span style="padding:3px 8px;border-radius:12px;font-size:.72rem;background:${r.status==='visited'?'rgba(46,204,113,.15)':'rgba(74,144,217,.15)'};color:${r.status==='visited'?'var(--green)':'var(--blue-lt)'};font-weight:600">
-    ${r.status==='visited'?'âœ… Visited':'ðŸ”– Want to Try'}</span>`);
+    ${r.status==='visited'?'✅ Visited':'🔖 Want to Try'}</span>`);
   document.getElementById('detail-meta').innerHTML = meta.join('<span style="color:var(--border)">|</span>');
 
   // Tags display
@@ -724,7 +724,7 @@ function openDetailModal (id) {
         document.querySelector('.nav-btn[data-view="all"]')?.classList.add('active');
         document.querySelector('.mobile-nav-btn[data-view="all"]')?.classList.add('active');
         renderCards();
-        showToast('Filtered ðŸ·ï¸', `Showing: ${el.dataset.tag}`, 'info');
+        showToast('Filtered 🏷️', `Showing: ${el.dataset.tag}`, 'info');
       });
     });
     tagsWrap.classList.remove('hidden');
@@ -760,7 +760,7 @@ function openDetailModal (id) {
       saveData();
       renderAll();
       openDetailModal(id);
-      showToast('âœ… Checked In!', `Visit logged for ${state.restaurants[idx].name}`, 'success');
+      showToast('✅ Checked In!', `Visit logged for ${state.restaurants[idx].name}`, 'success');
     }
   };
 
@@ -768,7 +768,7 @@ function openDetailModal (id) {
   const reminderStatus = document.getElementById('detail-reminder-status');
   const storedReminder = state.settings[`reminder_${id}`];
   reminderStatus.textContent = storedReminder
-    ? `ðŸ”” Reminder set for ${new Date(storedReminder).toLocaleString()}`
+    ? `🔔 Reminder set for ${new Date(storedReminder).toLocaleString()}`
     : '';
   document.getElementById('detail-set-reminder-btn').onclick = () => scheduleReminder(r);
 
@@ -791,7 +791,7 @@ function openDetailModal (id) {
 
   document.getElementById('detail-overlay').classList.remove('hidden');
   document.getElementById('ui-overlay').classList.remove('hidden');
-  // Phase 9 â€” load cuisine photo + hide stale AI summary
+  // Phase 9 — load cuisine photo + hide stale AI summary
   loadDetailPhoto(r);
   const aiSumEl = document.getElementById('detail-ai-summary');
   if (aiSumEl) aiSumEl.classList.add('hidden');
@@ -802,7 +802,7 @@ function closeDetailModal () {
   maybeHideOverlay();
 }
 
-/* â”€â”€ Add / Edit Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Add / Edit Modal ────────────────────────────────────── */
 function openAddModal () {
   state.editingId = null;
   state.formRating = 0;
@@ -881,7 +881,7 @@ function markVisited (id) {
   state.restaurants[idx].dateVisited = state.restaurants[idx].dateVisited || iso();
   saveData();
   renderAll();
-  showToast('âœ… Visited!', `"${state.restaurants[idx].name}" marked as visited.`, 'success');
+  showToast('✅ Visited!', `"${state.restaurants[idx].name}" marked as visited.`, 'success');
 }
 
 function setFormStars (n) {
@@ -936,11 +936,11 @@ function handleFormSubmit (e) {
     entry.lng = orig?.lng || null;
     entry.visits = orig?.visits || [];
     state.restaurants = state.restaurants.map(r => r.id === state.editingId ? entry : r);
-    showToast('Updated! âœï¸', `"${name}" has been updated.`, 'success');
+    showToast('Updated! ✏️', `"${name}" has been updated.`, 'success');
   } else {
     entry.visits = [];
     state.restaurants.unshift(entry);
-    showToast('Added! ðŸ½ï¸', `"${name}" added to your list.`, 'success');
+    showToast('Added! 🍽️', `"${name}" added to your list.`, 'success');
   }
 
   // Geocode in background if address provided
@@ -951,7 +951,7 @@ function handleFormSubmit (e) {
   closeModal();
 }
 
-/* â”€â”€ Geocode via Nominatim (free, no API key) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Geocode via Nominatim (free, no API key) ─────────────── */
 async function geocodeAddress (id, address) {
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
@@ -966,10 +966,10 @@ async function geocodeAddress (id, address) {
         renderCards();
       }
     }
-  } catch { /* silent â€” geocoding is best-effort */ }
+  } catch { /* silent — geocoding is best-effort */ }
 }
 
-/* â”€â”€ External links â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── External links ──────────────────────────────────────── */
 function openDirections (r) {
   if (r.address) {
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(r.address)}`, '_blank', 'noopener');
@@ -989,7 +989,7 @@ function openMapsSearch (r) {
   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`, '_blank', 'noopener');
 }
 
-/* â”€â”€ Reminder scheduling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Reminder scheduling ──────────────────────────────────── */
 async function scheduleReminder (r) {
   const dateVal = document.getElementById('detail-reminder-date').value;
   const timeVal = document.getElementById('detail-reminder-time').value || '12:00';
@@ -1007,38 +1007,38 @@ async function scheduleReminder (r) {
   if (swReg) {
     swReg.active.postMessage({
       type: 'SCHEDULE_REMINDER',
-      title: `ðŸ» Time to visit ${r.name}!`,
-      body: `${r.cuisine ? cuisineEmoji(r.cuisine)+' '+r.cuisine+' Â· ' : ''}${r.address || ''}`,
+      title: `🐻 Time to visit ${r.name}!`,
+      body: `${r.cuisine ? cuisineEmoji(r.cuisine)+' '+r.cuisine+' · ' : ''}${r.address || ''}`,
       delay,
     });
   } else {
     setTimeout(() => {
       if (Notification.permission === 'granted') {
-        new Notification(`ðŸ» Time to visit ${r.name}!`, { body: r.address || r.cuisine || '' });
+        new Notification(`🐻 Time to visit ${r.name}!`, { body: r.address || r.cuisine || '' });
       }
     }, delay);
   }
 
   state.settings[`reminder_${r.id}`] = when.toISOString();
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
-  document.getElementById('detail-reminder-status').textContent = `ðŸ”” Reminder set for ${when.toLocaleString()}`;
-  showToast('ðŸ”” Reminder Set!', `We'll remind you on ${when.toLocaleDateString()} at ${when.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`, 'success');
+  document.getElementById('detail-reminder-status').textContent = `🔔 Reminder set for ${when.toLocaleString()}`;
+  showToast('🔔 Reminder Set!', `We'll remind you on ${when.toLocaleDateString()} at ${when.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`, 'success');
 }
 
-/* â”€â”€ Share via SMS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Share via SMS ─────────────────────────────────────── */
 function shareViaSMS (r) {
-  const lines = [`ðŸ» ${r.name}`];
+  const lines = [`🐻 ${r.name}`];
   if (r.cuisine) lines.push(`${cuisineEmoji(r.cuisine)} ${r.cuisine}`);
-  if (r.address) lines.push(`ðŸ“ ${r.address}`);
-  if (r.googleRating) lines.push(`â­ ${r.googleRating}/5`);
-  if (r.website) lines.push(`ðŸŒ ${r.website}`);
-  lines.push('\nâ€” via Feed The Bear');
+  if (r.address) lines.push(`📍 ${r.address}`);
+  if (r.googleRating) lines.push(`⭐ ${r.googleRating}/5`);
+  if (r.website) lines.push(`🌐 ${r.website}`);
+  lines.push('\n— via Feed The Bear');
   window.open(`sms:?body=${encodeURIComponent(lines.join('\n'))}`);
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════════════════════
    MAP VIEW (Leaflet + OpenStreetMap)
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ════════════════════════════════════════════════════════════ */
 function initMap () {
   if (state.mapLeaflet) return;
   const container = document.getElementById('map-container');
@@ -1076,7 +1076,7 @@ function renderMap () {
     const popup = `<div style="min-width:180px;font-family:system-ui,sans-serif">
       <div style="font-weight:700;font-size:.92rem;margin-bottom:3px">${escHtml(r.name)}</div>
       <div style="font-size:.77rem;color:#aaa;margin-bottom:6px">${r.cuisine ? escHtml(r.cuisine)+'&nbsp;&middot;&nbsp;' : ''}${priceDollars(r.priceRange)||''}</div>
-      ${r.googleRating ? `<div style="font-size:.8rem;margin-bottom:6px">â­ ${r.googleRating}/5</div>` : ''}
+      ${r.googleRating ? `<div style="font-size:.8rem;margin-bottom:6px">⭐ ${r.googleRating}/5</div>` : ''}
       <div style="display:flex;gap:6px;margin-top:8px">
         <button onclick="window.__ftbOpenDetail('${r.id}')" style="flex:1;padding:5px 8px;background:#FF6B35;color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:600;cursor:pointer">Details</button>
         ${r.address ? `<button onclick="window.__ftbDirections('${r.id}')" style="flex:1;padding:5px 8px;background:#4A90D9;color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:600;cursor:pointer">Directions</button>` : ''}
@@ -1109,9 +1109,9 @@ function hideMapView () {
   document.getElementById('main-content').classList.remove('hidden');
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════════════════════
    STATS / ANALYTICS VIEW
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ════════════════════════════════════════════════════════════ */
 function showStatsView () {
   document.getElementById('stats-view').classList.remove('hidden');
   document.getElementById('main-content').classList.add('hidden');
@@ -1148,7 +1148,7 @@ function renderStatsView () {
     { label: 'Places Visited',    value: visited.length,   color: 'var(--green)' },
     { label: 'Want to Try',       value: want.length,      color: 'var(--blue)' },
     { label: 'Total Check-ins',   value: allVisits.length, color: 'var(--purple, #9B59B6)' },
-    { label: 'Avg My Rating',     value: avgMy ? `${avgMy} â˜…` : 'â€”', color: 'var(--gold)' },
+    { label: 'Avg My Rating',     value: avgMy ? `${avgMy} ★` : '—', color: 'var(--gold)' },
   ].map(k => `
     <div class="kpi-card">
       <div class="kpi-value" style="color:${k.color}">${k.value}</div>
@@ -1232,7 +1232,7 @@ function renderStatsView () {
   renderTasteDna();
 }
 
-/* â”€â”€ Full render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Full render ──────────────────────────────────────────── */
 function renderAll () {
   renderStats();
   renderCuisineFilter();
@@ -1259,9 +1259,9 @@ function updateLocationBanner () {
   }
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════════════════════
    TOAST NOTIFICATIONS
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ════════════════════════════════════════════════════════════ */
 function showToast (title, msg, type = 'default') {
   const container = document.getElementById('toast-container');
   const toast = document.createElement('div');
@@ -1271,7 +1271,7 @@ function showToast (title, msg, type = 'default') {
       <div class="toast-title">${escHtml(title)}</div>
       ${msg ? `<div class="toast-msg">${escHtml(msg)}</div>` : ''}
     </div>
-    <button class="toast-close" aria-label="Dismiss">âœ•</button>`;
+    <button class="toast-close" aria-label="Dismiss">✕</button>`;
 
   const dismiss = () => {
     toast.classList.add('removing');
@@ -1282,32 +1282,32 @@ function showToast (title, msg, type = 'default') {
   setTimeout(dismiss, 5000);
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   CHAT BUDDY â€” BYTE CUB
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+/* ════════════════════════════════════════════════════════════
+   CHAT BUDDY — BYTE CUB
+   ════════════════════════════════════════════════════════════ */
 const GREETINGS = [
-  'Hey foodie! ðŸ» I\'m Byte Cub, your personal restaurant strategist. What should we plan first?',
-  'Welcome back, hungry adventurer. ðŸ» Want a recommendation, a surprise pick, or your next list idea?',
-  'Roar and ready. ðŸ» I can help you discover, organize, and decide where to eat next.',
+  'Hey foodie! 🐻 I\'m Byte Cub, your personal restaurant strategist. What should we plan first?',
+  'Welcome back, hungry adventurer. 🐻 Want a recommendation, a surprise pick, or your next list idea?',
+  'Roar and ready. 🐻 I can help you discover, organize, and decide where to eat next.',
 ];
 
 const FOOD_TIPS = [
-  'Pro tip: Always check if a restaurant takes reservations before you go â€” nothing worse than a long wait when you\'re starving! ðŸ½ï¸',
-  'Foodie fact: The best time to try a new restaurant is often a Tuesday or Wednesday â€” quieter, and the kitchen isn\'t overwhelmed!',
-  'Hot tip: Follow your favorite restaurants on social media. They often post flash specials and secret menu items! ðŸ“±',
-  'Did you know? Lunch menus at upscale restaurants often have the same great food at half the dinner price! ðŸ’°',
-  'Sneak peek strategy: Check a restaurant\'s Google rating AND Yelp â€” two perspectives are better than one! â­',
-  'The best restaurant in any city is usually NOT on the main tourist street. Wander a few blocks away! ðŸš¶',
-  'When in doubt, order what the table next to you is having â€” if it looks amazing, it probably is! ðŸ‘€',
+  'Pro tip: Always check if a restaurant takes reservations before you go — nothing worse than a long wait when you\'re starving! 🍽️',
+  'Foodie fact: The best time to try a new restaurant is often a Tuesday or Wednesday — quieter, and the kitchen isn\'t overwhelmed!',
+  'Hot tip: Follow your favorite restaurants on social media. They often post flash specials and secret menu items! 📱',
+  'Did you know? Lunch menus at upscale restaurants often have the same great food at half the dinner price! 💰',
+  'Sneak peek strategy: Check a restaurant\'s Google rating AND Yelp — two perspectives are better than one! ⭐',
+  'The best restaurant in any city is usually NOT on the main tourist street. Wander a few blocks away! 🚶',
+  'When in doubt, order what the table next to you is having — if it looks amazing, it probably is! 👀',
 ];
 
 const GENERAL_RESPONSES = [
   (q) => q.match(/\b(hi|hello|hey|yo|sup)\b/i) && randomFrom([
-    'Hey! ðŸ» What foodie adventure shall we plan today?',
-    'Hello, fellow food lover! ðŸ½ï¸ What can I help you find?',
-    'Hi there! Ready to discover something delicious? ðŸ˜‹',
+    'Hey! 🐻 What foodie adventure shall we plan today?',
+    'Hello, fellow food lover! 🍽️ What can I help you find?',
+    'Hi there! Ready to discover something delicious? 😋',
   ]),
-  (q) => q.match(/\b(help|how|what can)\b/i) && `Here's how I can help:\n\nâ€¢ **Find** restaurants by cuisine, rating, tags, or status\nâ€¢ **Recommend** high-rated spots you still need to try\nâ€¢ **Nearby** discovery based on your live location\nâ€¢ **Surprise me** for instant decision relief\nâ€¢ **Top cuisine** insights from your visit history\nâ€¢ **Collections** to organize date nights, lunch spots, and more\nâ€¢ **Share cards** so your picks look great on social\n\nSay what you're craving and I'll do the rest. ðŸ»`,
+  (q) => q.match(/\b(help|how|what can)\b/i) && `Here's how I can help:\n\n• **Find** restaurants by cuisine, rating, tags, or status\n• **Recommend** high-rated spots you still need to try\n• **Nearby** discovery based on your live location\n• **Surprise me** for instant decision relief\n• **Top cuisine** insights from your visit history\n• **Collections** to organize date nights, lunch spots, and more\n• **Share cards** so your picks look great on social\n\nSay what you're craving and I'll do the rest. 🐻`,
   (q) => q.match(/\b(nearby|close|near me|around me|area)\b/i) && nearbyResponse(),
   (q) => q.match(/\b(surprise|random|anything|don.?t care|pick for me|choose for me)\b/i) && surpriseMeResponse(),
   (q) => q.match(/\b(recommend|suggest|best|top|favorite|favourite)\b/i) && recommendResponse(),
@@ -1315,17 +1315,17 @@ const GENERAL_RESPONSES = [
   (q) => q.match(/\b(visited|been|went|tried|already)\b/i) && visitedResponse(),
   (q) => q.match(/\b(tip|advice|hack|secret|trick|pro tip)\b/i) && randomFrom(FOOD_TIPS),
   (q) => q.match(/\b(note|notes|reminder|remember)\b/i) && notesResponse(),
-  (q) => q.match(/\b(direction|navigate|how to get|get there)\b/i) && `To get directions, just click the **Directions** button on any restaurant card â€” it'll open Google Maps and route you right to the door! ðŸ—ºï¸`,
-  (q) => q.match(/\b(rate|rating|star|review)\b/i) && `You can rate any restaurant from 1â€“5 stars when you add or edit it. I also show the **Google rating** and review count so you know what others think! â­`,
-  (q) => q.match(/\b(add|new restaurant|save)\b/i) && `Click **ï¼‹ Add Restaurant** in the header to add a new spot. You can even paste a Google Maps link and I'll auto-fill the details instantly! ðŸ“`,
-  (q) => q.match(/\b(notification|alert|remind|ping)\b/i) && `Enable location tracking (the ðŸ“ button in the header) and I'll alert you whenever you're within walking distance of a restaurant on your list! ðŸ””`,
+  (q) => q.match(/\b(direction|navigate|how to get|get there)\b/i) && `To get directions, just click the **Directions** button on any restaurant card — it'll open Google Maps and route you right to the door! 🗺️`,
+  (q) => q.match(/\b(rate|rating|star|review)\b/i) && `You can rate any restaurant from 1–5 stars when you add or edit it. I also show the **Google rating** and review count so you know what others think! ⭐`,
+  (q) => q.match(/\b(add|new restaurant|save)\b/i) && `Click **＋ Add Restaurant** in the header to add a new spot. You can even paste a Google Maps link and I'll auto-fill the details instantly! 📍`,
+  (q) => q.match(/\b(notification|alert|remind|ping)\b/i) && `Enable location tracking (the 📍 button in the header) and I'll alert you whenever you're within walking distance of a restaurant on your list! 🔔`,
   (q) => q.match(/\b(cheap|budget|affordable|\$[^$])/i) && budgetResponse(),
   (q) => q.match(/\b(expensive|fancy|upscale|fine dining|\$\$\$\$)/i) && fancyResponse(),
   (q) => q.match(/\b(collection|list|group|category)\b/i) && collectionsResponse(),
   (q) => q.match(/\b(tag|tagged|#)\b/i) && tagQueryResponse(q),
   (q) => q.match(/\b(most|history|pattern|cuisine breakdown|eating most|ate most)\b/i) && topCuisineResponse(),
   (q) => cuisineFromQuery(q) && cuisineResponse(cuisineFromQuery(q)),
-  // Phase 11 â€” enhanced responses
+  // Phase 11 — enhanced responses
   (q) => q.match(/\b(taste|dna|profile|personality|my style|what am i|who am i|flavor|flavour)\b/i) && tasteDnaResponse(),
   (q) => q.match(/\b(never tried|new cuisine|never been|haven.?t been|exotic|different cuisine)\b/i) && neverTriedCuisineResponse(),
   (q) => q.match(/\b(breakfast|brunch|lunch|dinner|tonight|this evening|morning|noon|supper)\b/i) && timeBasedResponse(q),
@@ -1348,15 +1348,15 @@ function chatResponse (userText) {
 
   // Generic fallback
   return randomFrom([
-    `Try asking "surprise me", "what's nearby", or "top cuisine breakdown" and I'll pull your best options. ðŸ»`,
-    `Ask me for "date night ideas", "best rated", or "my collections" and I'll curate from your list. ðŸ½ï¸`,
-    `Tell me a cuisine like "Thai" or "Sushi", and I'll instantly surface your top choices. ðŸ»`,
+    `Try asking "surprise me", "what's nearby", or "top cuisine breakdown" and I'll pull your best options. 🐻`,
+    `Ask me for "date night ideas", "best rated", or "my collections" and I'll curate from your list. 🍽️`,
+    `Tell me a cuisine like "Thai" or "Sushi", and I'll instantly surface your top choices. 🐻`,
   ]);
 }
 
 function nearbyResponse () {
   if (!state.locationEnabled) {
-    return `Enable location tracking first (click the ðŸ“ button in the header) and I'll tell you exactly what's nearby! ðŸ—ºï¸`;
+    return `Enable location tracking first (click the 📍 button in the header) and I'll tell you exactly what's nearby! 🗺️`;
   }
   const nearby = state.restaurants
     .filter(r => r.lat && r.lng)
@@ -1365,69 +1365,69 @@ function nearbyResponse () {
     .sort((a,b) => a.dist - b.dist)
     .slice(0, 5);
 
-  if (!nearby.length) return `No saved restaurants within 5km of your current location. Try adding some nearby spots! ðŸ—ºï¸`;
+  if (!nearby.length) return `No saved restaurants within 5km of your current location. Try adding some nearby spots! 🗺️`;
   const list = nearby.map(r =>
     `<span class="chip-link" data-id="${r.id}">${cuisineEmoji(r.cuisine)} ${r.name} (${fmtDist(r.dist)})</span>`
   ).join('');
-  return `Here's what's close to you right now! ðŸ“\n${list}`;
+  return `Here's what's close to you right now! 📍\n${list}`;
 }
 
 function recommendResponse () {
   const unvisited = state.restaurants.filter(r => r.status === 'want-to-try' && r.googleRating > 0);
   if (!unvisited.length) {
     const top = [...state.restaurants].sort((a,b) => (b.googleRating||0) - (a.googleRating||0)).slice(0,3);
-    if (!top.length) return `Your list is empty! Click **ï¼‹ Add Restaurant** to start building your foodie bucket list ðŸ»`;
-    const list = top.map(r => `<span class="chip-link" data-id="${r.id}">${cuisineEmoji(r.cuisine)} ${r.name} â­${r.googleRating}</span>`).join('');
+    if (!top.length) return `Your list is empty! Click **＋ Add Restaurant** to start building your foodie bucket list 🐻`;
+    const list = top.map(r => `<span class="chip-link" data-id="${r.id}">${cuisineEmoji(r.cuisine)} ${r.name} ⭐${r.googleRating}</span>`).join('');
     return `Your top-rated spots:\n${list}`;
   }
   const top = unvisited.sort((a,b) => b.googleRating - a.googleRating).slice(0, 3);
   const list = top.map(r =>
-    `<span class="chip-link" data-id="${r.id}">${cuisineEmoji(r.cuisine)} ${r.name} â€” â­${r.googleRating}</span>`
+    `<span class="chip-link" data-id="${r.id}">${cuisineEmoji(r.cuisine)} ${r.name} — ⭐${r.googleRating}</span>`
   ).join('');
-  return `Here are your highest-rated spots you haven't tried yet! ðŸŒŸ\n${list}\n\nGet out there and eat! ðŸ»`;
+  return `Here are your highest-rated spots you haven't tried yet! 🌟\n${list}\n\nGet out there and eat! 🐻`;
 }
 
 function wantToTryResponse () {
   const list = state.restaurants.filter(r => r.status === 'want-to-try');
-  if (!list.length) return `Your want-to-try list is empty. Start adding restaurants you've been eyeing! ðŸ”–`;
+  if (!list.length) return `Your want-to-try list is empty. Start adding restaurants you've been eyeing! 🔖`;
   const items = list.slice(0,5).map(r =>
     `<span class="chip-link" data-id="${r.id}">${cuisineEmoji(r.cuisine)} ${r.name}</span>`
   ).join('');
-  return `You've got **${list.length}** restaurants on your want-to-try list! ðŸ”–\n${items}${list.length > 5 ? `\nâ€¦and ${list.length-5} more!` : ''}`;
+  return `You've got **${list.length}** restaurants on your want-to-try list! 🔖\n${items}${list.length > 5 ? `\n…and ${list.length-5} more!` : ''}`;
 }
 
 function visitedResponse () {
   const list = state.restaurants.filter(r => r.status === 'visited');
-  if (!list.length) return `You haven't marked any restaurants as visited yet. Go eat something! ðŸ½ï¸`;
+  if (!list.length) return `You haven't marked any restaurants as visited yet. Go eat something! 🍽️`;
   const items = list.slice(0,5).map(r =>
-    `<span class="chip-link" data-id="${r.id}">${cuisineEmoji(r.cuisine)} ${r.name}${r.myRating ? ` ${'â˜…'.repeat(r.myRating)}` : ''}</span>`
+    `<span class="chip-link" data-id="${r.id}">${cuisineEmoji(r.cuisine)} ${r.name}${r.myRating ? ` ${'★'.repeat(r.myRating)}` : ''}</span>`
   ).join('');
-  return `You've visited **${list.length}** place${list.length>1?'s':''}! ðŸ†\n${items}`;
+  return `You've visited **${list.length}** place${list.length>1?'s':''}! 🏆\n${items}`;
 }
 
 function notesResponse () {
   const withNotes = state.restaurants.filter(r => r.notes);
-  if (!withNotes.length) return `No notes saved yet. When you add or edit a restaurant, you can jot down must-try dishes, tips, or reminders! ðŸ“`;
+  if (!withNotes.length) return `No notes saved yet. When you add or edit a restaurant, you can jot down must-try dishes, tips, or reminders! 📝`;
   const item = randomFrom(withNotes);
-  return `Here's a note from **${item.name}**: *"${item.notes.slice(0,120)}${item.notes.length>120?'â€¦':''}"* ðŸ“`;
+  return `Here's a note from **${item.name}**: *"${item.notes.slice(0,120)}${item.notes.length>120?'…':''}"* 📝`;
 }
 
 function budgetResponse () {
   const cheap = state.restaurants.filter(r => r.priceRange === 1);
-  if (!cheap.length) return `No budget spots on your list yet. Add some $ restaurants and I'll help you find a bargain! ðŸ’°`;
+  if (!cheap.length) return `No budget spots on your list yet. Add some $ restaurants and I'll help you find a bargain! 💰`;
   const items = cheap.slice(0,4).map(r =>
     `<span class="chip-link" data-id="${r.id}">${cuisineEmoji(r.cuisine)} ${r.name} ($)</span>`
   ).join('');
-  return `Budget eats on your list! ðŸ’°\n${items}`;
+  return `Budget eats on your list! 💰\n${items}`;
 }
 
 function fancyResponse () {
   const fancy = state.restaurants.filter(r => r.priceRange >= 3);
-  if (!fancy.length) return `No fine dining spots on your list yet. Time to live a little! ðŸ¥‚`;
+  if (!fancy.length) return `No fine dining spots on your list yet. Time to live a little! 🥂`;
   const items = fancy.slice(0,4).map(r =>
     `<span class="chip-link" data-id="${r.id}">${cuisineEmoji(r.cuisine)} ${r.name} (${priceDollars(r.priceRange)})</span>`
   ).join('');
-  return `Your fancy picks! ðŸ¥‚\n${items}`;
+  return `Your fancy picks! 🥂\n${items}`;
 }
 
 function cuisineFromQuery (q) {
@@ -1439,53 +1439,53 @@ function cuisineResponse (cuisine) {
   const list = state.restaurants.filter(r =>
     (r.cuisine||'').toLowerCase() === cuisine.toLowerCase()
   );
-  if (!list.length) return `No ${cuisine} restaurants on your list yet! Add one ðŸ½ï¸`;
+  if (!list.length) return `No ${cuisine} restaurants on your list yet! Add one 🍽️`;
   const items = list.slice(0,5).map(r =>
-    `<span class="chip-link" data-id="${r.id}">${r.name}${r.googleRating ? ` â­${r.googleRating}` : ''}</span>`
+    `<span class="chip-link" data-id="${r.id}">${r.name}${r.googleRating ? ` ⭐${r.googleRating}` : ''}</span>`
   ).join('');
   return `Your **${cuisine}** spots (${list.length} total):\n${items}`;
 }
 
 function restaurantDetailResponse (r) {
   const dist = distOf(r);
-  const distStr = dist < Infinity ? ` â€” ${fmtDist(dist)} away` : '';
+  const distStr = dist < Infinity ? ` — ${fmtDist(dist)} away` : '';
   return `Here's what I know about **${r.name}**:\n\n` +
-    (r.googleRating ? `â­ Google: ${r.googleRating}/5\n` : '') +
-    (r.myRating ? `â­ Your rating: ${r.myRating}/5\n` : '') +
-    (r.address ? `ðŸ“ ${r.address}${distStr}\n` : '') +
-    (r.priceRange ? `ðŸ’° ${priceDollars(r.priceRange)}\n` : '') +
-    (r.tags?.length ? `ðŸ·ï¸ Tags: ${r.tags.join(', ')}\n` : '') +
-    (r.notes ? `\nðŸ“ "${r.notes}"` : '') +
+    (r.googleRating ? `⭐ Google: ${r.googleRating}/5\n` : '') +
+    (r.myRating ? `⭐ Your rating: ${r.myRating}/5\n` : '') +
+    (r.address ? `📍 ${r.address}${distStr}\n` : '') +
+    (r.priceRange ? `💰 ${priceDollars(r.priceRange)}\n` : '') +
+    (r.tags?.length ? `🏷️ Tags: ${r.tags.join(', ')}\n` : '') +
+    (r.notes ? `\n📝 "${r.notes}"` : '') +
     `\n\n<span class="chip-link" data-id="${r.id}">View full details</span>`;
 }
 
 function surpriseMeResponse () {
   const unvisited = state.restaurants.filter(r => r.status === 'want-to-try');
   const pool = unvisited.length ? unvisited : state.restaurants;
-  if (!pool.length) return `Your list is empty! Add some restaurants first ðŸ»`;
+  if (!pool.length) return `Your list is empty! Add some restaurants first 🐻`;
   const r = randomFrom(pool);
-  return `ðŸŽ² How aboutâ€¦ **${r.name}**? ${r.cuisine ? `${cuisineEmoji(r.cuisine)} ${r.cuisine} vibes.` : ''} ${r.googleRating ? `Rated â­${r.googleRating}.` : ''} ${r.address ? `ðŸ“ ${r.address}` : ''}\n\n<span class="chip-link" data-id="${r.id}">View details</span>`;
+  return `🎲 How about… **${r.name}**? ${r.cuisine ? `${cuisineEmoji(r.cuisine)} ${r.cuisine} vibes.` : ''} ${r.googleRating ? `Rated ⭐${r.googleRating}.` : ''} ${r.address ? `📍 ${r.address}` : ''}\n\n<span class="chip-link" data-id="${r.id}">View details</span>`;
 }
 
 function topCuisineResponse () {
   const visited = state.restaurants.filter(r => r.status === 'visited');
-  if (!visited.length) return `No visited restaurants yet! Mark some as visited to see your cuisine breakdown ðŸ“Š`;
+  if (!visited.length) return `No visited restaurants yet! Mark some as visited to see your cuisine breakdown 📊`;
   const counts = {};
   visited.forEach(r => { const c = r.cuisine || 'Other'; counts[c] = (counts[c]||0)+1; });
   const sorted = Object.entries(counts).sort(([,a],[,b]) => b-a).slice(0,5);
   const total = visited.length;
-  const lines = sorted.map(([c,n]) => `${cuisineEmoji(c)} **${c}** â€” ${n} visit${n>1?'s':''} (${Math.round(n/total*100)}%)`).join('\n');
-  return `Your foodie habits revealed! ðŸ”\n\n${lines}\n\n*Total: ${total} restaurants visited* ðŸ»`;
+  const lines = sorted.map(([c,n]) => `${cuisineEmoji(c)} **${c}** — ${n} visit${n>1?'s':''} (${Math.round(n/total*100)}%)`).join('\n');
+  return `Your foodie habits revealed! 🔍\n\n${lines}\n\n*Total: ${total} restaurants visited* 🐻`;
 }
 
 function collectionsResponse () {
   const cols = state.settings.collections || [];
-  if (!cols.length) return `You haven't created any custom lists yet. Tap the ðŸ“ button to create lists like "Date Night", "Lunch Spots", or "Hidden Gems"! ðŸ—‚ï¸`;
+  if (!cols.length) return `You haven't created any custom lists yet. Tap the 📁 button to create lists like "Date Night", "Lunch Spots", or "Hidden Gems"! 🗂️`;
   const lines = cols.map(c => {
     const count = state.restaurants.filter(r => r.collectionId === c.id).length;
-    return `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c.color};margin-right:4px"></span> **${c.name}** â€” ${count} restaurant${count!==1?'s':''}`;
+    return `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c.color};margin-right:4px"></span> **${c.name}** — ${count} restaurant${count!==1?'s':''}`;
   }).join('\n');
-  return `Your custom lists ðŸ“\n\n${lines}`;
+  return `Your custom lists 📁\n\n${lines}`;
 }
 
 function tagQueryResponse (q) {
@@ -1497,24 +1497,24 @@ function tagQueryResponse (q) {
     const items = matches.slice(0,5).map(r => `<span class="chip-link" data-id="${r.id}">${cuisineEmoji(r.cuisine)} ${r.name}</span>`).join('');
     return `Restaurants tagged **#${matched}** (${matches.length}):\n${items}`;
   }
-  if (!allTags.length) return `No tags yet! Add tags to your restaurants when you save or edit them to quickly filter by vibe, occasion, or food type. ðŸ·ï¸`;
+  if (!allTags.length) return `No tags yet! Add tags to your restaurants when you save or edit them to quickly filter by vibe, occasion, or food type. 🏷️`;
   return `Your tags: ${allTags.map(t=>`**#${t}**`).join(', ')}\n\nAsk me about a specific tag!`;
 }
 
 const QUICK_REPLIES = [
-  'Recommend something ðŸŒŸ',
-  'Surprise me! ðŸŽ²',
-  'What\'s nearby? ðŸ“',
-  'Date night ideas ðŸ’«',
-  'Top cuisine breakdown ðŸ“Š',
-  'Want to try list ðŸ”–',
-  'My collections ðŸ“',
-  'Food tip! ðŸ’¡',
+  'Recommend something 🌟',
+  'Surprise me! 🎲',
+  'What\'s nearby? 📍',
+  'Date night ideas 💫',
+  'Top cuisine breakdown 📊',
+  'Want to try list 🔖',
+  'My collections 📁',
+  'Food tip! 💡',
 ];
 
 function randomFrom (arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
-/* â”€â”€ Chat UI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Chat UI ──────────────────────────────────────────────── */
 function addChatMsg (text, role = 'bot') {
   const messages = document.getElementById('chat-messages');
   const div = document.createElement('div');
@@ -1522,7 +1522,7 @@ function addChatMsg (text, role = 'bot') {
 
   const avatar = document.createElement('div');
   avatar.className = 'chat-msg-avatar';
-  avatar.textContent = role === 'bot' ? 'ðŸ»' : 'ðŸ˜‹';
+  avatar.textContent = role === 'bot' ? '🐻' : '😋';
 
   const bubble = document.createElement('div');
   bubble.className = 'chat-bubble';
@@ -1558,7 +1558,7 @@ function showTyping () {
 
   const avatar = document.createElement('div');
   avatar.className = 'chat-msg-avatar';
-  avatar.textContent = 'ðŸ»';
+  avatar.textContent = '🐻';
 
   const bubble = document.createElement('div');
   bubble.className = 'chat-typing';
@@ -1625,9 +1625,9 @@ function renderQuickReplies () {
   });
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════════════════════
    HELPER UTILS
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ════════════════════════════════════════════════════════════ */
 function escHtml (s) {
   return String(s)
     .replace(/&/g, '&amp;')
@@ -1675,9 +1675,9 @@ function hasActiveFilters () {
   return !!(state.filter.search || state.filter.cuisine || state.filter.price || state.filter.tag || state.filter.collection);
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════════════════════
    PWA INSTALL PROMPT
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ════════════════════════════════════════════════════════════ */
 let _pwaPromptEvent = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
@@ -1701,9 +1701,9 @@ function initPwa () {
   });
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════════════════════
    LIGHT / DARK THEME TOGGLE
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ════════════════════════════════════════════════════════════ */
 function initTheme () {
   if (state.settings.theme === 'light') document.body.classList.add('light-mode');
   document.getElementById('theme-toggle-btn').addEventListener('click', () => {
@@ -1714,15 +1714,15 @@ function initTheme () {
   });
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════════════════════
    ONBOARDING TOUR
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ════════════════════════════════════════════════════════════ */
 const ONBOARDING_STEPS = [
-  { icon: 'ðŸ»', title: 'Welcome to Feed The Bear', desc: 'Build your personal restaurant HQ: save spots, track visits, and keep every great find in one place.' },
-  { icon: 'âž•', title: 'Capture Places Instantly', desc: 'Add restaurants in seconds, or paste a Google Maps URL to auto-fill details and move faster.' },
-  { icon: 'ðŸ—ºï¸', title: 'Discover Around You', desc: 'Use Map view and Nearby Discovery to find what\'s close now, then save your favorites with one tap.' },
-  { icon: 'ðŸ“Š', title: 'See Your Food Story', desc: 'Stats turns your history into insights: top cuisines, ratings, trends, and your best-performing picks.' },
-  { icon: 'ðŸ»', title: 'Let Byte Cub Curate', desc: 'Ask for smart recommendations, random picks, tag-based suggestions, and ready-to-share cards.' },
+  { icon: '🐻', title: 'Welcome to Feed The Bear', desc: 'Build your personal restaurant HQ: save spots, track visits, and keep every great find in one place.' },
+  { icon: '➕', title: 'Capture Places Instantly', desc: 'Add restaurants in seconds, or paste a Google Maps URL to auto-fill details and move faster.' },
+  { icon: '🗺️', title: 'Discover Around You', desc: 'Use Map view and Nearby Discovery to find what\'s close now, then save your favorites with one tap.' },
+  { icon: '📊', title: 'See Your Food Story', desc: 'Stats turns your history into insights: top cuisines, ratings, trends, and your best-performing picks.' },
+  { icon: '🐻', title: 'Let Byte Cub Curate', desc: 'Ask for smart recommendations, random picks, tag-based suggestions, and ready-to-share cards.' },
 ];
 let _onboardingStep = 0;
 function showOnboarding () {
@@ -1737,7 +1737,7 @@ function renderOnboardingStep () {
   document.getElementById('onboarding-title').textContent = step.title;
   document.getElementById('onboarding-desc').textContent = step.desc;
   const isLast = _onboardingStep === ONBOARDING_STEPS.length - 1;
-  document.getElementById('onboarding-next-btn').textContent = isLast ? 'Get Started! ðŸ»' : 'Next â†’';
+  document.getElementById('onboarding-next-btn').textContent = isLast ? 'Get Started! 🐻' : 'Next →';
   document.getElementById('onboarding-dots').innerHTML = ONBOARDING_STEPS.map((_,i) =>
     `<div class="onboarding-dot ${i === _onboardingStep ? 'active' : ''}"></div>`
   ).join('');
@@ -1748,9 +1748,9 @@ function dismissOnboarding () {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════════════════════
    QUICK-ADD FROM GOOGLE MAPS URL
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ════════════════════════════════════════════════════════════ */
 function parseMapsUrl (raw) {
   if (!raw?.trim()) { showToast('No URL', 'Paste a Google Maps link first.', 'error'); return; }
   try {
@@ -1767,22 +1767,22 @@ function parseMapsUrl (raw) {
     if (addr && addr !== name) document.getElementById('form-address').value = addr;
     if (!name && !addr) throw new Error('no data');
     document.getElementById('form-maps-url').value = '';
-    showToast('âœ“ Pre-filled!', 'Review the details, add notes, and save.', 'success');
+    showToast('✓ Pre-filled!', 'Review the details, add notes, and save.', 'success');
     document.getElementById('form-name').focus();
   } catch {
     showToast('Could not parse', 'Copy the full Google Maps URL from your browser address bar.', 'error');
   }
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   NEARBY DISCOVERY â€” Overpass API
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+/* ════════════════════════════════════════════════════════════
+   NEARBY DISCOVERY — Overpass API
+   ════════════════════════════════════════════════════════════ */
 async function discoverNearby () {
   if (!(await ensureLocationForDiscovery())) return;
   const overlay = document.getElementById('nearby-overlay');
   overlay.classList.remove('hidden');
   document.getElementById('ui-overlay').classList.remove('hidden');
-  document.getElementById('nearby-results').innerHTML = '<div class="nearby-loading">ðŸ» Sniffing out restaurants near youâ€¦</div>';
+  document.getElementById('nearby-results').innerHTML = '<div class="nearby-loading">🐻 Sniffing out restaurants near you…</div>';
   try {
     const { userLat: lat, userLng: lng } = state;
     const query = `[out:json][timeout:15];(node["amenity"="restaurant"](around:1000,${lat},${lng});way["amenity"="restaurant"](around:1000,${lat},${lng}););out center 20;`;
@@ -1800,9 +1800,9 @@ async function discoverNearby () {
       return `<div class="nearby-item">
         <div class="nearby-item-info">
           <div class="nearby-item-name">${escHtml(name)}</div>
-          <div class="nearby-item-meta">${cuisine ? `${cuisineEmoji(cuisine)} ${escHtml(cuisine)} Â· ` : ''}${dist ? fmtDist(dist)+' away' : ''}</div>
+          <div class="nearby-item-meta">${cuisine ? `${cuisineEmoji(cuisine)} ${escHtml(cuisine)} · ` : ''}${dist ? fmtDist(dist)+' away' : ''}</div>
         </div>
-        ${saved ? '<span class="nearby-saved-badge">âœ“ Saved</span>' :
+        ${saved ? '<span class="nearby-saved-badge">✓ Saved</span>' :
           `<button class="btn-sm btn-orange nearby-add-btn" data-name="${escHtml(name)}" data-cuisine="${escHtml(cuisine)}" data-lat="${elLat||''}" data-lng="${elLon||''}">+ Add</button>`}
       </div>`;
     }).join('');
@@ -1817,13 +1817,13 @@ async function discoverNearby () {
       });
     });
   } catch {
-    document.getElementById('nearby-results').innerHTML = '<div class="nearby-empty">Could not fetch â€” check your connection.</div>';
+    document.getElementById('nearby-results').innerHTML = '<div class="nearby-empty">Could not fetch — check your connection.</div>';
   }
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   SHAREABLE RESTAURANT CARD â€” Canvas API
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+/* ════════════════════════════════════════════════════════════
+   SHAREABLE RESTAURANT CARD — Canvas API
+   ════════════════════════════════════════════════════════════ */
 function ftbRoundRect (ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
@@ -1847,7 +1847,7 @@ function shareCard (r) {
   ctx.globalAlpha = .07; ctx.font = '220px serif'; ctx.fillStyle = '#FFF';
   ctx.fillText(cuisineEmoji(r.cuisine), W-260, H-10); ctx.globalAlpha = 1;
   ctx.fillStyle = '#FFF'; ctx.font = 'bold 40px system-ui,sans-serif';
-  ctx.fillText(r.name.length>30 ? r.name.slice(0,30)+'â€¦' : r.name, 50, 130);
+  ctx.fillText(r.name.length>30 ? r.name.slice(0,30)+'…' : r.name, 50, 130);
   if (r.cuisine) {
     ctx.font = '15px system-ui,sans-serif';
     const badge = `${cuisineEmoji(r.cuisine)} ${r.cuisine}`;
@@ -1857,34 +1857,34 @@ function shareCard (r) {
   }
   if (r.googleRating) {
     ctx.fillStyle = '#F4C430'; ctx.font = 'bold 26px system-ui,sans-serif';
-    ctx.fillText(`â˜… ${r.googleRating}`, 50, 225);
+    ctx.fillText(`★ ${r.googleRating}`, 50, 225);
     if (r.googleReviews) { ctx.fillStyle = '#888'; ctx.font = '14px system-ui,sans-serif'; ctx.fillText(`(${r.googleReviews.toLocaleString()} reviews)`, 50, 248); }
   }
-  if (r.myRating) { ctx.fillStyle = '#F4C430'; ctx.font = '18px system-ui,sans-serif'; ctx.fillText('â˜…'.repeat(r.myRating)+'â˜†'.repeat(5-r.myRating)+' My Rating', 50, r.googleRating ? 278 : 225); }
-  if (r.address) { ctx.fillStyle = '#AAA'; ctx.font = '17px system-ui,sans-serif'; ctx.fillText(`ðŸ“ ${r.address.length>55?r.address.slice(0,55)+'â€¦':r.address}`, 50, 318); }
-  if (r.notes) { ctx.fillStyle = '#777'; ctx.font = 'italic 15px system-ui,sans-serif'; ctx.fillText(`"${r.notes.length>72?r.notes.slice(0,72)+'â€¦':r.notes}"`, 50, 356); }
+  if (r.myRating) { ctx.fillStyle = '#F4C430'; ctx.font = '18px system-ui,sans-serif'; ctx.fillText('★'.repeat(r.myRating)+'☆'.repeat(5-r.myRating)+' My Rating', 50, r.googleRating ? 278 : 225); }
+  if (r.address) { ctx.fillStyle = '#AAA'; ctx.font = '17px system-ui,sans-serif'; ctx.fillText(`📍 ${r.address.length>55?r.address.slice(0,55)+'…':r.address}`, 50, 318); }
+  if (r.notes) { ctx.fillStyle = '#777'; ctx.font = 'italic 15px system-ui,sans-serif'; ctx.fillText(`"${r.notes.length>72?r.notes.slice(0,72)+'…':r.notes}"`, 50, 356); }
   if (r.priceRange) { ctx.fillStyle = '#F4C430'; ctx.font = 'bold 20px monospace'; ctx.fillText(priceDollars(r.priceRange), 50, 408); }
   const bc = r.status==='visited' ? '#2ECC71' : '#4A90D9';
   ctx.fillStyle = bc+'33'; ftbRoundRect(ctx, r.priceRange?110:50, 390, 130, 28, 8); ctx.fill();
   ctx.fillStyle = bc; ctx.font = 'bold 13px system-ui,sans-serif';
-  ctx.fillText(r.status==='visited'?'âœ… Visited':'ðŸ”– Want to Try', r.priceRange?122:62, 409);
+  ctx.fillText(r.status==='visited'?'✅ Visited':'🔖 Want to Try', r.priceRange?122:62, 409);
   ctx.fillStyle = '#FF6B35'; ctx.font = 'bold 15px system-ui,sans-serif';
-  ctx.fillText('ðŸ» Feed The Bear', W-195, H-18);
+  ctx.fillText('🐻 Feed The Bear', W-195, H-18);
   canvas.toBlob(blob => {
     const file = new File([blob], `${r.name.replace(/[^a-z0-9]/gi,'_')}-ftb.png`, {type:'image/png'});
     if (navigator.share && navigator.canShare?.({files:[file]})) {
-      navigator.share({title:r.name, text:`Check out ${r.name} on Feed The Bear ðŸ»`, files:[file]}).catch(()=>{});
+      navigator.share({title:r.name, text:`Check out ${r.name} on Feed The Bear 🐻`, files:[file]}).catch(()=>{});
     } else {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href=url; a.download=file.name; a.click(); URL.revokeObjectURL(url);
     }
-    showToast('ðŸ“¤ Card Ready!', `"${r.name}" card saved!`, 'success');
+    showToast('📤 Card Ready!', `"${r.name}" card saved!`, 'success');
   }, 'image/png');
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════════════════════
    BULK SELECT & ACTIONS
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ════════════════════════════════════════════════════════════ */
 function toggleBulkMode () {
   state.bulkMode = !state.bulkMode;
   state.selectedIds.clear();
@@ -1906,7 +1906,7 @@ function bulkDelete () {
   if (!n || !confirm(`Delete ${n} restaurant${n>1?'s':''}? This cannot be undone.`)) return;
   state.restaurants = state.restaurants.filter(r => !state.selectedIds.has(r.id));
   saveData(); toggleBulkMode(); renderAll();
-  showToast('ðŸ—‘ï¸ Deleted', `${n} restaurant${n>1?'s':''} removed.`, 'info');
+  showToast('🗑️ Deleted', `${n} restaurant${n>1?'s':''} removed.`, 'info');
 }
 function bulkTag () {
   if (!state.selectedIds.size) return;
@@ -1918,7 +1918,7 @@ function bulkTag () {
     if (idx !== -1) { if (!state.restaurants[idx].tags) state.restaurants[idx].tags = []; if (!state.restaurants[idx].tags.includes(t)) state.restaurants[idx].tags.push(t); }
   });
   saveData(); toggleBulkMode(); renderAll();
-  showToast('ðŸ·ï¸ Tagged!', `"${t}" added to ${state.selectedIds.size} restaurants.`, 'success');
+  showToast('🏷️ Tagged!', `"${t}" added to ${state.selectedIds.size} restaurants.`, 'success');
 }
 function bulkExport () {
   const sel = state.restaurants.filter(r => state.selectedIds.has(r.id));
@@ -1926,12 +1926,12 @@ function bulkExport () {
   const blob = new Blob([JSON.stringify(sel, null, 2)], {type:'application/json'});
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a'); a.href=url; a.download=`ftb-export-${iso()}.json`; a.click(); URL.revokeObjectURL(url);
-  showToast('ðŸ“¥ Exported!', `${sel.length} restaurants saved.`, 'success');
+  showToast('📥 Exported!', `${sel.length} restaurants saved.`, 'success');
 }
 function bulkMoveToCollection () {
   if (!state.selectedIds.size) return;
   const cols = state.settings.collections || [];
-  if (!cols.length) { showToast('No Lists', 'Create a list first via the ðŸ“ button.', 'info'); return; }
+  if (!cols.length) { showToast('No Lists', 'Create a list first via the 📁 button.', 'info'); return; }
   const names = cols.map((c,i) => `${i+1}. ${c.name}`).join('\n');
   const choice = prompt(`Move to which list?\n\n${names}\n\n(Enter number, or 0 to remove from all):`);
   const num = parseInt(choice);
@@ -1939,12 +1939,12 @@ function bulkMoveToCollection () {
   const col = num===0 ? null : cols[num-1];
   state.selectedIds.forEach(id => { const idx = state.restaurants.findIndex(r=>r.id===id); if (idx!==-1) state.restaurants[idx].collectionId = col?.id||null; });
   saveData(); toggleBulkMode(); renderAll();
-  showToast('ðŸ“ Moved!', col ? `Added to "${col.name}".` : 'Removed from all lists.', 'success');
+  showToast('📁 Moved!', col ? `Added to "${col.name}".` : 'Removed from all lists.', 'success');
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════════════════════
    CUSTOM LISTS / COLLECTIONS
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ════════════════════════════════════════════════════════════ */
 const COLLECTION_COLORS = ['#FF6B35','#E74C3C','#9B59B6','#3498DB','#2ECC71','#F39C12','#1ABC9C','#E91E63'];
 let _newCollectionColor = COLLECTION_COLORS[0];
 function initCollections () {
@@ -1976,7 +1976,7 @@ function initCollections () {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
     document.getElementById('new-collection-name').value = '';
     renderCollectionsList(); renderCollectionFilter();
-    showToast('ðŸ“ List Created!', `"${name}" ready.`, 'success');
+    showToast('📁 List Created!', `"${name}" ready.`, 'success');
   });
   renderCollectionFilter();
 }
@@ -1990,7 +1990,7 @@ function renderCollectionsList () {
       <div class="collection-dot" style="background:${c.color}"></div>
       <div class="collection-item-name">${escHtml(c.name)}</div>
       <div class="collection-item-count">${count}</div>
-      <button class="collection-item-del" data-del="${c.id}" title="Delete">âœ•</button>
+      <button class="collection-item-del" data-del="${c.id}" title="Delete">✕</button>
     </div>`;
   }).join('');
   list.querySelectorAll('.collection-item-del').forEach(btn => {
@@ -2008,7 +2008,7 @@ function renderCollectionFilter () {
   const sel = document.getElementById('filter-collection'); if (!sel) return;
   const cur = sel.value;
   while (sel.options.length > 1) sel.remove(1);
-  (state.settings.collections||[]).forEach(c => { const o=document.createElement('option'); o.value=c.id; o.textContent=`ðŸ“ ${c.name}`; sel.appendChild(o); });
+  (state.settings.collections||[]).forEach(c => { const o=document.createElement('option'); o.value=c.id; o.textContent=`📁 ${c.name}`; sel.appendChild(o); });
   sel.value = cur;
 }
 function populateFormCollections () {
@@ -2017,18 +2017,18 @@ function populateFormCollections () {
   (state.settings.collections||[]).forEach(c => { const o=document.createElement('option'); o.value=c.id; o.textContent=c.name; sel.appendChild(o); });
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════════════════════
    TAG AUTOCOMPLETE
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ════════════════════════════════════════════════════════════ */
 function updateTagSuggestions () {
   const dl = document.getElementById('tag-suggestions'); if (!dl) return;
   const allTags = [...new Set(state.restaurants.flatMap(r => r.tags||[]))].sort();
   dl.innerHTML = allTags.map(t => `<option value="${escHtml(t)}">`).join('');
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════════════════════
    EVENT LISTENERS
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ════════════════════════════════════════════════════════════ */
 function setupEvents () {
   // Nav buttons
   document.getElementById('main-nav').addEventListener('click', e => {
@@ -2144,7 +2144,7 @@ function setupEvents () {
     closeChat();
   });
 
-  // Status radio â†’ show/hide date-visited field
+  // Status radio → show/hide date-visited field
   document.querySelectorAll('input[name="form-status"]').forEach(radio => {
     radio.addEventListener('change', () => {
       const isVisited = document.querySelector('input[name="form-status"]:checked')?.value === 'visited';
@@ -2153,7 +2153,7 @@ function setupEvents () {
     });
   });
 
-  // Photo file upload â†’ read as data URL into URL field
+  // Photo file upload → read as data URL into URL field
   document.getElementById('form-photo-file').addEventListener('change', e => {
     const file = e.target.files[0];
     if (!file) return;
@@ -2164,7 +2164,7 @@ function setupEvents () {
     const reader = new FileReader();
     reader.onload = ev => {
       document.getElementById('form-photo').value = ev.target.result;
-      showToast('Photo Added ðŸ“·', 'Image loaded successfully.', 'success');
+      showToast('Photo Added 📷', 'Image loaded successfully.', 'success');
     };
     reader.readAsDataURL(file);
   });
@@ -2322,7 +2322,7 @@ function setupEvents () {
   // AI Photo Fill
   document.getElementById('ai-photo-btn').addEventListener('click', aiPhotoFill);
 
-  // Phase 6 â€” Wrap
+  // Phase 6 — Wrap
   document.getElementById('wrap-btn').addEventListener('click', () => showWrap(0));
   document.getElementById('wrap-close-btn').addEventListener('click', closeWrap);
   document.getElementById('wrap-prev-btn').addEventListener('click', () => showWrap(_wrapOffset - 1));
@@ -2332,7 +2332,7 @@ function setupEvents () {
     if (e.target === document.getElementById('wrap-overlay')) closeWrap();
   });
 
-  // Phase 6 â€” Import Bookmarks
+  // Phase 6 — Import Bookmarks
   document.getElementById('import-bookmarks-btn').addEventListener('click', showImportBookmarks);
   document.getElementById('import-close-btn').addEventListener('click', closeImportBookmarks);
   document.getElementById('import-overlay').addEventListener('click', e => {
@@ -2341,16 +2341,16 @@ function setupEvents () {
   document.getElementById('import-parse-btn').addEventListener('click', parseImportText);
   document.getElementById('import-confirm-btn').addEventListener('click', confirmImport);
 
-  // Phase 6 â€” Add to Calendar
+  // Phase 6 — Add to Calendar
   document.getElementById('detail-calendar-btn').addEventListener('click', () => {
     if (state.detailId) addToGoogleCalendar(state.detailId);
   });
 
-  // Phase 7 â€” Voice
+  // Phase 7 — Voice
   document.getElementById('voice-btn').addEventListener('click', startVoiceAdd);
   document.getElementById('voice-cancel-btn').addEventListener('click', stopVoice);
 
-  // Phase 7 â€” Gallery
+  // Phase 7 — Gallery
   document.getElementById('gallery-btn').addEventListener('click', openGallery);
   document.getElementById('gallery-close-btn').addEventListener('click', closeGallery);
   document.getElementById('gallery-overlay').addEventListener('click', e => {
@@ -2360,7 +2360,7 @@ function setupEvents () {
   document.getElementById('lightbox-prev').addEventListener('click', () => { if (_lightboxIdx > 0) { _lightboxIdx--; renderLightbox(); } });
   document.getElementById('lightbox-next').addEventListener('click', () => { if (_lightboxIdx < _galleryPhotos.length-1) { _lightboxIdx++; renderLightbox(); } });
 
-  // Phase 7 â€” Compare
+  // Phase 7 — Compare
   document.getElementById('compare-btn').addEventListener('click', toggleCompareMode);
   document.getElementById('compare-now-btn').addEventListener('click', showCompare);
   document.getElementById('compare-cancel-btn').addEventListener('click', cancelCompare);
@@ -2369,7 +2369,7 @@ function setupEvents () {
     if (e.target === document.getElementById('compare-overlay')) closeCompare();
   });
 
-  // Phase 7 â€” Budget
+  // Phase 7 — Budget
   document.getElementById('budget-btn').addEventListener('click', openBudget);
   document.getElementById('budget-close-btn').addEventListener('click', closeBudget);
   document.getElementById('budget-save-btn').addEventListener('click', saveBudget);
@@ -2377,7 +2377,7 @@ function setupEvents () {
     if (e.target === document.getElementById('budget-overlay')) closeBudget();
   });
 
-  // Phase 7 â€” Profile
+  // Phase 7 — Profile
   document.getElementById('profile-btn').addEventListener('click', openFoodieProfile);
   document.getElementById('profile-close-btn').addEventListener('click', closeFoodieProfile);
   document.getElementById('profile-copy-btn').addEventListener('click', copyProfileLink);
@@ -2386,24 +2386,24 @@ function setupEvents () {
     if (e.target === document.getElementById('profile-overlay')) closeFoodieProfile();
   });
 
-  // Phase 7 â€” Reservation Reminders
+  // Phase 7 — Reservation Reminders
   document.getElementById('detail-set-reminder-btn').addEventListener('click', () => {
     if (state.detailId) setReminder(state.detailId);
   });
 
-  // Phase 7 â€” Auto-Tags (form field hooks)
+  // Phase 7 — Auto-Tags (form field hooks)
   ['form-name','form-cuisine','form-notes'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('input', computeAutoTags);
   });
 
-  // Phase 7 â€” Escape closes new modals (comment only â€” actual close calls below in Escape handler)
+  // Phase 7 — Escape closes new modals (comment only — actual close calls below in Escape handler)
   document.getElementById('form-name').addEventListener('input', computeAutoTags);
 
-  // Phase 8 â€” â‹¯ More Menu
+  // Phase 8 — ⋯ More Menu
   initMoreMenu();
 
-  // Phase 8 â€” Craving Engine
+  // Phase 8 — Craving Engine
   document.getElementById('craving-btn').addEventListener('click', openCravingEngine);
   document.getElementById('craving-close-btn').addEventListener('click', closeCravingEngine);
   document.getElementById('craving-go-btn').addEventListener('click', runCravingEngine);
@@ -2416,7 +2416,7 @@ function setupEvents () {
     if (_cravingMoods.has(mood)) _cravingMoods.delete(mood); else _cravingMoods.add(mood);
   });
 
-  // Phase 8 â€” Dish Tracker
+  // Phase 8 — Dish Tracker
   document.getElementById('dish-close-btn').addEventListener('click', closeDishTracker);
   document.getElementById('dish-overlay').addEventListener('click', e => { if (e.target === document.getElementById('dish-overlay')) closeDishTracker(); });
   document.getElementById('dish-add-btn').addEventListener('click', addDish);
@@ -2428,13 +2428,13 @@ function setupEvents () {
   });
   document.getElementById('detail-dishes-btn').addEventListener('click', () => { if (state.detailId) openDishTracker(state.detailId); });
 
-  // Phase 8 â€” Visit Debrief
+  // Phase 8 — Visit Debrief
   document.getElementById('detail-debrief-btn').addEventListener('click', () => { if (state.detailId) openVisitDebrief(state.detailId); });
   document.getElementById('debrief-save-btn').addEventListener('click', saveDebrief);
   document.getElementById('debrief-skip-btn').addEventListener('click', closeDebrief);
   document.getElementById('debrief-overlay').addEventListener('click', e => { if (e.target === document.getElementById('debrief-overlay')) closeDebrief(); });
 
-  // Phase 8 â€” Year in Review
+  // Phase 8 — Year in Review
   document.getElementById('review-close-btn').addEventListener('click', closeYearReview);
   document.getElementById('review-close-btn2').addEventListener('click', closeYearReview);
   document.getElementById('review-share-btn').addEventListener('click', shareYearReview);
@@ -2442,30 +2442,30 @@ function setupEvents () {
   document.getElementById('review-prev-year').addEventListener('click', () => { _reviewYear--; document.getElementById('review-year-label').textContent = _reviewYear; renderYearReview(); });
   document.getElementById('review-next-year').addEventListener('click', () => { _reviewYear++; document.getElementById('review-year-label').textContent = _reviewYear; renderYearReview(); });
 
-  // Phase 8 â€” Foodie Friends
+  // Phase 8 — Foodie Friends
   document.getElementById('friends-close-btn').addEventListener('click', closeFoodieFriends);
   document.getElementById('friends-overlay').addEventListener('click', e => { if (e.target === document.getElementById('friends-overlay')) closeFoodieFriends(); });
   document.getElementById('friends-load-btn').addEventListener('click', loadFriendProfile);
   document.getElementById('friends-link-input').addEventListener('keydown', e => { if (e.key === 'Enter') loadFriendProfile(); });
   document.getElementById('friends-copy-btn').addEventListener('click', () => { navigator.clipboard?.writeText(document.getElementById('friends-my-link-input').value); showToast('Copied!', 'Profile link copied.', 'success'); });
 
-  // Phase 8 â€” Smart Discovery
+  // Phase 8 — Smart Discovery
   document.getElementById('discover-close-btn').addEventListener('click', closeDiscover);
   document.getElementById('discover-overlay').addEventListener('click', e => { if (e.target === document.getElementById('discover-overlay')) closeDiscover(); });
   document.getElementById('discover-search-btn').addEventListener('click', runDiscover);
 
-  // Phase 8 â€” Challenges
+  // Phase 8 — Challenges
   document.getElementById('challenges-close-btn').addEventListener('click', closeChallenges);
   document.getElementById('challenges-overlay').addEventListener('click', e => { if (e.target === document.getElementById('challenges-overlay')) closeChallenges(); });
   document.querySelectorAll('.chal-tab').forEach(tab => tab.addEventListener('click', () => switchChalTab(tab.dataset.tab)));
   document.getElementById('chal-create-btn').addEventListener('click', createChallenge);
   document.getElementById('chal-friend-load-btn').addEventListener('click', loadFriendChallenge);
 
-  // Phase 9 â€” Deep Stats
+  // Phase 9 — Deep Stats
   document.getElementById('stats2-close-btn').addEventListener('click', closeStats2);
   document.getElementById('stats2-overlay').addEventListener('click', e => { if (e.target === document.getElementById('stats2-overlay')) closeStats2(); });
 
-  // Phase 9 â€” AI Assistant
+  // Phase 9 — AI Assistant
   document.getElementById('ai-panel-close-btn').addEventListener('click', closeAiPanel);
   document.getElementById('ai-panel-overlay').addEventListener('click', e => { if (e.target === document.getElementById('ai-panel-overlay')) closeAiPanel(); });
   document.getElementById('ai-chat-send-btn').addEventListener('click', () => sendAiMessage(document.getElementById('ai-chat-input').value));
@@ -2477,35 +2477,35 @@ function setupEvents () {
   document.querySelectorAll('.ai-quick-btn').forEach(btn => btn.addEventListener('click', () => handleAiQuickBtn(btn.dataset.prompt)));
   document.getElementById('detail-ai-btn').addEventListener('click', () => { if (state.detailId) getAiDetailSummary(state.detailId); });
 
-  // Phase 9 â€” Route Planner
+  // Phase 9 — Route Planner
   document.getElementById('route-close-btn').addEventListener('click', closeRoutePlanner);
   document.getElementById('route-overlay').addEventListener('click', e => { if (e.target === document.getElementById('route-overlay')) closeRoutePlanner(); });
   document.getElementById('route-go-btn').addEventListener('click', launchRoute);
   document.getElementById('detail-route-btn').addEventListener('click', openRoutePlanner);
 
-  // Phase 9 â€” Export v2
+  // Phase 9 — Export v2
   document.getElementById('export2-close-btn').addEventListener('click', closeExport2);
   document.getElementById('export2-overlay').addEventListener('click', e => { if (e.target === document.getElementById('export2-overlay')) closeExport2(); });
   document.getElementById('export2-passport-btn').addEventListener('click', exportPassport);
   document.getElementById('export2-page-btn').addEventListener('click', exportShareablePage);
   document.getElementById('export2-csv-btn').addEventListener('click', exportCSV);
 
-  // Phase 10 â€” Achievements
+  // Phase 10 — Achievements
   document.getElementById('ach-close-btn').addEventListener('click', closeAchievements);
   document.getElementById('achievements-overlay').addEventListener('click', e => { if (e.target === document.getElementById('achievements-overlay')) closeAchievements(); });
 
-  // Phase 10 â€” Swipe Deck
+  // Phase 10 — Swipe Deck
   document.getElementById('swipe-close-btn').addEventListener('click', closeSwipeDeck);
   document.getElementById('swipe-overlay').addEventListener('click', e => { if (e.target === document.getElementById('swipe-overlay')) closeSwipeDeck(); });
   document.getElementById('swipe-pick-btn').addEventListener('click', swipePick);
   document.getElementById('swipe-skip-btn').addEventListener('click', swipeSkip);
 
-  // Phase 10 â€” Spin Wheel
+  // Phase 10 — Spin Wheel
   document.getElementById('spin-close-btn').addEventListener('click', closeSpinWheel);
   document.getElementById('spin-overlay').addEventListener('click', e => { if (e.target === document.getElementById('spin-overlay')) closeSpinWheel(); });
   document.getElementById('spin-btn').addEventListener('click', spinWheel);
 
-  // Phase 10 â€” Travel Mode
+  // Phase 10 — Travel Mode
   document.getElementById('travel-close-btn').addEventListener('click', closeTravelMode);
   document.getElementById('travel-overlay').addEventListener('click', e => { if (e.target === document.getElementById('travel-overlay')) closeTravelMode(); });
   document.getElementById('travel-deactivate-btn').addEventListener('click', clearTravelMode);
@@ -2520,7 +2520,7 @@ function setupEvents () {
     btn.addEventListener('click', () => activateTravelCity(btn.dataset.city, btn.dataset.lat, btn.dataset.lng));
   });
 
-  // Phase 10 â€” Monthly Digest
+  // Phase 10 — Monthly Digest
   document.getElementById('digest-close-btn').addEventListener('click', closeMonthlyDigest);
   document.getElementById('digest-overlay').addEventListener('click', e => { if (e.target === document.getElementById('digest-overlay')) closeMonthlyDigest(); });
   document.getElementById('digest-share-btn').addEventListener('click', shareDigest);
@@ -2531,12 +2531,12 @@ function setupEvents () {
     _digestMonth++; if (_digestMonth > 11) { _digestMonth = 0; _digestYear++; } _renderDigest();
   });
 
-  // Phase 10 â€” Open Now
+  // Phase 10 — Open Now
   document.getElementById('open-now-close-btn').addEventListener('click', closeOpenNow);
   document.getElementById('open-now-overlay').addEventListener('click', e => { if (e.target === document.getElementById('open-now-overlay')) closeOpenNow(); });
   document.getElementById('open-now-search-btn').addEventListener('click', runOpenNowSearch);
 
-  // Phase 11 â€” Weekly Goal
+  // Phase 11 — Weekly Goal
   const wgBtn = document.getElementById('wg-set-btn');
   if (wgBtn) wgBtn.addEventListener('click', setWeeklyGoal);
 }
@@ -2565,9 +2565,9 @@ function clearFilters () {
   renderCards();
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════════════════════
    INIT
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ════════════════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', () => {
   loadData();
   setupEvents();
@@ -2597,7 +2597,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (_compareMode) addCompareCheckboxes();
 });
 /* ------------------------------------------------------------
-   PHASE 5 â€¢ STREAK TRACKER
+   PHASE 5 • STREAK TRACKER
    ------------------------------------------------------------ */
 
 function calcStreaks () {
@@ -2645,11 +2645,11 @@ function renderStreaks () {
     + '<div class="streak-mini"><div class="sm-val">' + totalVisited + '</div><div class="sm-lbl">Visited</div></div>'
     + '<div class="streak-mini"><div class="sm-val">' + allVisits.length + '</div><div class="sm-lbl">Check-ins</div></div>'
     + '</div>'
-    + '<div class="streak-msg">' + (currentStreak >= 5 ? 'ðŸ”¥ðŸ”¥ ' : currentStreak >= 3 ? 'ðŸ”¥ ' : currentStreak > 0 ? 'âœ¨ ' : '') + escHtml(msg) + '</div>';
+    + '<div class="streak-msg">' + (currentStreak >= 5 ? '🔥🔥 ' : currentStreak >= 3 ? '🔥 ' : currentStreak > 0 ? '✨ ' : '') + escHtml(msg) + '</div>';
 }
 
 /* ------------------------------------------------------------
-   PHASE 5 â€¢ VISIT HEATMAP
+   PHASE 5 • VISIT HEATMAP
    ------------------------------------------------------------ */
 
 function renderHeatmap () {
@@ -2694,7 +2694,7 @@ function renderHeatmap () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 5 â€¢ TONIGHT'S PICK
+   PHASE 5 • TONIGHT'S PICK
    ------------------------------------------------------------ */
 
 function showTonightsPick () {
@@ -2733,21 +2733,21 @@ function runTonightsPick () {
   const p = scored[0].r;
   const stars = p.myRating > 0 ? '?'.repeat(p.myRating) : '';
   const price = p.priceRange ? '$'.repeat(p.priceRange) : '';
-  const status = p.status === 'visited' ? 'âœ… Visited' : 'ðŸ”– Want to Try';
+  const status = p.status === 'visited' ? '✅ Visited' : '🔖 Want to Try';
   const vc = (p.visits||[]).length;
   const res = document.getElementById('tonight-result');
   res.innerHTML = '<div class="pick-name">' + escHtml(p.name) + '</div>'
-    + '<div class="pick-meta">' + escHtml(p.cuisine||'Restaurant') + (price ? ' Â· '+price : '') + (stars ? ' Â· '+stars : '') + ' Â· ' + status + (vc > 0 ? ' Â· '+vc+' visit'+(vc>1?'s':'') : '') + '</div>'
-    + (p.address ? '<div class="pick-address">ðŸ“ ' + escHtml(p.address) + '</div>' : '')
+    + '<div class="pick-meta">' + escHtml(p.cuisine||'Restaurant') + (price ? ' · '+price : '') + (stars ? ' · '+stars : '') + ' · ' + status + (vc > 0 ? ' · '+vc+' visit'+(vc>1?'s':'') : '') + '</div>'
+    + (p.address ? '<div class="pick-address">📍 ' + escHtml(p.address) + '</div>' : '')
     + '<div class="pick-actions">'
     + '<button class="btn-sm btn-orange" onclick="openDetailModal(\'' + p.id + '\');closeTonightsPick()">View Details</button>'
-    + (p.address ? '<a class="btn-sm btn-secondary" style="text-decoration:none;display:inline-flex;align-items:center" href="https://maps.google.com/?q=' + encodeURIComponent(p.address) + '" target="_blank" rel="noopener">ðŸ—º Directions</a>' : '')
+    + (p.address ? '<a class="btn-sm btn-secondary" style="text-decoration:none;display:inline-flex;align-items:center" href="https://maps.google.com/?q=' + encodeURIComponent(p.address) + '" target="_blank" rel="noopener">🗺 Directions</a>' : '')
     + '</div>';
   res.classList.remove('hidden');
 }
 
 /* ------------------------------------------------------------
-   PHASE 5 â€¢ OFFLINE INDICATOR
+   PHASE 5 • OFFLINE INDICATOR
    ------------------------------------------------------------ */
 
 function initOfflineIndicator () {
@@ -2760,7 +2760,7 @@ function initOfflineIndicator () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 5 â€¢ EXPORT PDF (FOODIE REPORT)
+   PHASE 5 • EXPORT PDF (FOODIE REPORT)
    ------------------------------------------------------------ */
 
 function exportFoodieReport () {
@@ -2769,7 +2769,7 @@ function exportFoodieReport () {
   const want      = all.filter(r => r.status === 'want-to-try');
   const allVisits = all.flatMap(r => r.visits || []);
   const rated     = visited.filter(r => r.myRating > 0);
-  const avgRating = rated.length ? (rated.reduce((s,r)=>s+r.myRating,0)/rated.length).toFixed(1) : 'â€”';
+  const avgRating = rated.length ? (rated.reduce((s,r)=>s+r.myRating,0)/rated.length).toFixed(1) : '—';
   const topPicks  = [...visited].filter(r=>r.myRating>0).sort((a,b)=>b.myRating-a.myRating).slice(0,10);
   const wantTop   = want.slice(0,8);
   const { currentStreak, longestStreak } = calcStreaks();
@@ -2784,7 +2784,7 @@ function exportFoodieReport () {
     + '<div class="pr-stat"><div class="val">'+visited.length+'</div><div class="lbl">Visited</div></div>'
     + '<div class="pr-stat"><div class="val">'+want.length+'</div><div class="lbl">Want to Try</div></div>'
     + '<div class="pr-stat"><div class="val">'+allVisits.length+'</div><div class="lbl">Check-ins</div></div>'
-    + '<div class="pr-stat"><div class="val">'+avgRating+(avgRating!=='â€”'?' ?':'')+'</div><div class="lbl">Avg Rating</div></div>'
+    + '<div class="pr-stat"><div class="val">'+avgRating+(avgRating!=='—'?' ?':'')+'</div><div class="lbl">Avg Rating</div></div>'
     + '<div class="pr-stat"><div class="val">'+currentStreak+' wk</div><div class="lbl">Current Streak</div></div>'
     + '<div class="pr-stat"><div class="val">'+longestStreak+' wk</div><div class="lbl">Best Streak</div></div>'
     + '</div></div>'
@@ -2798,7 +2798,7 @@ function exportFoodieReport () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 5 â€¢ FRIEND CHALLENGE
+   PHASE 5 • FRIEND CHALLENGE
    ------------------------------------------------------------ */
 
 function openChallengeModal () {
@@ -2847,7 +2847,7 @@ function checkIncomingChallenge () {
       + picks.map((p,i) => '<div class="challenge-pick-item"><span class="cp-rank">#'+(i+1)+'</span><span class="cp-name">'+escHtml(p.n)+'</span><span class="cp-stars">'+'?'.repeat(p.s)+'</span></div>').join('')
       + '<div class="challenge-reaction-row" id="cr-row"></div>';
     const row = document.getElementById('cr-row');
-    [['Been there','âœ…','var(--green)'],['Want to try','ðŸ”–','var(--blue)'],['Never heard of it','ðŸ¤·','var(--text-dim)']].forEach(([lbl,em,col]) => {
+    [['Been there','✅','var(--green)'],['Want to try','🔖','var(--blue)'],['Never heard of it','🤷','var(--text-dim)']].forEach(([lbl,em,col]) => {
       const btn = document.createElement('button');
       btn.className = 'reaction-btn';
       btn.textContent = em + ' ' + lbl;
@@ -2865,7 +2865,7 @@ function checkIncomingChallenge () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 5 â€¢ AI PHOTO RECOGNITION STUB
+   PHASE 5 • AI PHOTO RECOGNITION STUB
    ------------------------------------------------------------ */
 
 async function aiPhotoFill () {
@@ -2914,7 +2914,7 @@ async function aiPhotoFill () {
   input.click();
 }
 /* ------------------------------------------------------------
-   PHASE 6 â€¢ SMART DUPLICATE DETECTOR
+   PHASE 6 • SMART DUPLICATE DETECTOR
    ------------------------------------------------------------ */
 
 function normalizeName (s) {
@@ -2950,14 +2950,14 @@ function checkDuplicate () {
   const warn = document.createElement('div');
   warn.id = 'duplicate-warning';
   warn.className = 'duplicate-warning';
-  warn.innerHTML = 'âš  Possible duplicate: '
+  warn.innerHTML = '⚠ Possible duplicate: '
     + dupes.map(r => '<a onclick="openDetailModal(\'' + r.id + '\');closeModal()">' + escHtml(r.name) + '</a>').join(', ')
     + ' already in your list.';
   document.getElementById('form-name').after(warn);
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 â€¢ ANIMATED CONFETTI
+   PHASE 6 • ANIMATED CONFETTI
    ------------------------------------------------------------ */
 
 const CONFETTI_COLORS = ['#FF6B35','#FFD700','#2ED573','#3498DB','#9B59B6','#FF69B4','#00CEC9'];
@@ -3015,20 +3015,20 @@ function checkConfettiMilestones (prev, next) {
   const hit = milestones.find(m => prevTotal < m && nextTotal >= m);
   if (hit) {
     launchConfetti(3000);
-    showToast('ðŸ† Milestone!', 'You have ' + hit + ' total check-in' + (hit>1?'s':'') + '! Keep exploring!', 'success');
+    showToast('🏆 Milestone!', 'You have ' + hit + ' total check-in' + (hit>1?'s':'') + '! Keep exploring!', 'success');
   }
   // streak milestone
   if (next.length > prev.length) {
     const { currentStreak } = calcStreaks();
     if ([3,5,10,20].includes(currentStreak)) {
       launchConfetti(2500);
-      showToast('ðŸ”¥ Streak ' + currentStreak + '!', currentStreak + '-week streak! You are a foodie legend.', 'success');
+      showToast('🔥 Streak ' + currentStreak + '!', currentStreak + '-week streak! You are a foodie legend.', 'success');
     }
   }
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 â€¢ AUTO DARK / LIGHT MODE
+   PHASE 6 • AUTO DARK / LIGHT MODE
    ------------------------------------------------------------ */
 
 function initAutoTheme () {
@@ -3048,7 +3048,7 @@ function initAutoTheme () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 â€¢ SWIPE GESTURES (MOBILE)
+   PHASE 6 • SWIPE GESTURES (MOBILE)
    ------------------------------------------------------------ */
 
 function initSwipeGestures () {
@@ -3098,13 +3098,13 @@ function initSwipeGestures () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 â€¢ LEADERBOARD
+   PHASE 6 • LEADERBOARD
    ------------------------------------------------------------ */
 
 function renderLeaderboard () {
   const el = document.getElementById('chart-leaderboard');
   if (!el) return;
-  const medals = ['ðŸ¥‡','ðŸ¥ˆ','ðŸ¥‰','4th','5th','6th','7th','8th'];
+  const medals = ['🥇','🥈','🥉','4th','5th','6th','7th','8th'];
   const top = [...state.restaurants]
     .filter(r => r.myRating > 0)
     .sort((a,b) => {
@@ -3118,7 +3118,7 @@ function renderLeaderboard () {
       + '<span class="lb-medal">' + (medals[i]||'') + '</span>'
       + '<span class="lb-name">' + escHtml(r.name) + '</span>'
       + '<div><div class="lb-stars">' + '?'.repeat(r.myRating) + '</div>'
-      + '<div class="lb-meta">' + escHtml(r.cuisine||'') + (visits ? ' Â· ' + visits + ' visit' + (visits>1?'s':'') : '') + '</div></div>'
+      + '<div class="lb-meta">' + escHtml(r.cuisine||'') + (visits ? ' · ' + visits + ' visit' + (visits>1?'s':'') : '') + '</div></div>'
       + '</div>';
   }).join('');
   el.querySelectorAll('.lb-item[data-id]').forEach(el2 =>
@@ -3126,7 +3126,7 @@ function renderLeaderboard () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 â€¢ PRICE TREND
+   PHASE 6 • PRICE TREND
    ------------------------------------------------------------ */
 
 function renderPriceTrend () {
@@ -3162,19 +3162,19 @@ function renderPriceTrend () {
   let insight = '';
   if (trend6.length >= 2) {
     const first = trend6[0].avg, last = trend6[trend6.length-1].avg;
-    if (last > first + 0.3) insight = 'ðŸ“ˆ Trending upscale lately';
-    else if (last < first - 0.3) insight = 'ðŸ“‰ More budget-friendly recently';
-    else insight = 'ðŸ“Š Spending has been consistent';
+    if (last > first + 0.3) insight = '📈 Trending upscale lately';
+    else if (last < first - 0.3) insight = '📉 More budget-friendly recently';
+    else insight = '📊 Spending has been consistent';
   }
 
   el.innerHTML = (insight ? '<div style="font-size:.75rem;color:var(--text-dim);margin-bottom:8px">' + insight + '</div>' : '')
     + trendData.map(d => {
     const pct = d.avg > 0 ? (d.avg/maxAvg*100).toFixed(0) : 0;
-    const label = d.avg > 0 ? ['','$','$$','$$$','$$$$'][Math.round(d.avg)]||'' : 'â€”';
+    const label = d.avg > 0 ? ['','$','$$','$$$','$$$$'][Math.round(d.avg)]||'' : '—';
     return '<div class="bar-row">'
       + '<div class="bar-label">' + d.label + '</div>'
       + '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:var(--gold)"></div></div>'
-      + '<div class="bar-count">' + (d.count > 0 ? label : 'â€”') + '</div>'
+      + '<div class="bar-count">' + (d.count > 0 ? label : '—') + '</div>'
       + '</div>';
   }).join('');
 
@@ -3186,16 +3186,16 @@ function renderPriceTrend () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 â€¢ CUISINE PASSPORT
+   PHASE 6 • CUISINE PASSPORT
    ------------------------------------------------------------ */
 
 const ALL_CUISINES = [
-  ['Italian','ðŸ'],['Japanese','ðŸ£'],['Mexican','ðŸŒ®'],['Chinese','ðŸ¥¢'],['Indian','ðŸ›'],
-  ['American','ðŸ”'],['Thai','ðŸœ'],['French','ðŸ¥'],['Mediterranean','ðŸ¥™'],['Korean','ðŸœ'],
-  ['Vietnamese','ðŸœ'],['Greek','ðŸ«’'],['Spanish','ðŸ¥˜'],['Brazilian','ðŸ¥©'],['Ethiopian','ðŸ²'],
-  ['Turkish','ðŸ¥™'],['Middle Eastern','ðŸ§†'],['Caribbean','ðŸ¥¥'],['Peruvian','ðŸ²'],['Sushi','ðŸ£'],
-  ['Pizza','ðŸ•'],['Burgers','ðŸ”'],['Seafood','ðŸ¦'],['Steakhouse','ðŸ¥©'],['Vegan','ðŸ¥—'],
-  ['BBQ','ðŸ–'],['Dim Sum','ðŸ¥Ÿ'],['Tapas','ðŸ¥–'],['Ramen','ðŸœ'],['Breakfast','ðŸ¥ž'],
+  ['Italian','🍝'],['Japanese','🍣'],['Mexican','🌮'],['Chinese','🥢'],['Indian','🍛'],
+  ['American','🍔'],['Thai','🍜'],['French','🥐'],['Mediterranean','🥙'],['Korean','🍜'],
+  ['Vietnamese','🍜'],['Greek','🫒'],['Spanish','🥘'],['Brazilian','🥩'],['Ethiopian','🍲'],
+  ['Turkish','🥙'],['Middle Eastern','🧆'],['Caribbean','🥥'],['Peruvian','🍲'],['Sushi','🍣'],
+  ['Pizza','🍕'],['Burgers','🍔'],['Seafood','🦐'],['Steakhouse','🥩'],['Vegan','🥗'],
+  ['BBQ','🍖'],['Dim Sum','🥟'],['Tapas','🥖'],['Ramen','🍜'],['Breakfast','🥞'],
 ];
 function renderPassport () {
   const el = document.getElementById('chart-passport');
@@ -3213,7 +3213,7 @@ function renderPassport () {
     const isNew = unlocked && !prevUnlocked.has(key);
     if (isNew) newUnlocks++;
     html += '<div class="passport-stamp ' + (unlocked ? 'unlocked' : 'locked') + (isNew ? ' new-unlock' : '') + '" title="' + (count > 0 ? count + ' visit' + (count>1?'s':'') : 'Not tried yet') + '">'
-      + '<span class="ps-emoji">' + (unlocked ? emoji : 'ðŸ”’') + '</span>'
+      + '<span class="ps-emoji">' + (unlocked ? emoji : '🔒') + '</span>'
       + '<span>' + escHtml(name) + '</span>'
       + (count > 0 ? '<span class="ps-count">' + count + 'x</span>' : '')
       + '</div>';
@@ -3227,12 +3227,12 @@ function renderPassport () {
     state.settings.passportUnlocked = [...new Set([...(state.settings.passportUnlocked||[]), ...Array.from(triedSet)])];
     saveData();
     launchConfetti(2000);
-    showToast('ðŸŒ Passport Stamped!', newUnlocks + ' new cuisine' + (newUnlocks>1?'s':'') + ' unlocked!', 'success');
+    showToast('🌍 Passport Stamped!', newUnlocks + ' new cuisine' + (newUnlocks>1?'s':'') + ' unlocked!', 'success');
   }
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 â€¢ MONTHLY WRAP
+   PHASE 6 • MONTHLY WRAP
    ------------------------------------------------------------ */
 
 let _wrapOffset = 0; // 0 = current month, -1 = last month, etc.
@@ -3288,11 +3288,11 @@ function renderWrapContent () {
     + '<div class="wrap-stat-grid">'
     + '<div class="wrap-stat"><div class="ws-val">' + totalVisits + '</div><div class="ws-lbl">Meals Out</div></div>'
     + '<div class="wrap-stat"><div class="ws-val">' + addedThatMonth.length + '</div><div class="ws-lbl">Places Added</div></div>'
-    + '<div class="wrap-stat"><div class="ws-val">' + (ratedThatMonth.length > 0 ? (ratedThatMonth.reduce((s,v)=>s+(v.stars||0),0)/ratedThatMonth.length).toFixed(1)+' â˜…' : 'â€”') + '</div><div class="ws-lbl">Avg Rating</div></div>'
+    + '<div class="wrap-stat"><div class="ws-val">' + (ratedThatMonth.length > 0 ? (ratedThatMonth.reduce((s,v)=>s+(v.stars||0),0)/ratedThatMonth.length).toFixed(1)+' ★' : '—') + '</div><div class="ws-lbl">Avg Rating</div></div>'
     + '</div>'
     + (topCuisine ? '<div class="wrap-top"><h4>Top Cuisine</h4><div class="wrap-top-item">' + cuisineEmoji(topCuisine[0]) + ' ' + escHtml(topCuisine[0]) + '<span class="wrap-badge">' + topCuisine[1] + 'x</span></div></div>' : '')
     + (bestVisit ? '<div class="wrap-top"><h4>Best Visit</h4><div class="wrap-top-item">' + cuisineEmoji(bestVisit.r.cuisine) + ' ' + escHtml(bestVisit.r.name) + ' <span class="wrap-badge">?'.repeat(bestVisit.stars||0) + '</span></div></div>' : '')
-    + (totalVisits === 0 ? '<div style="text-align:center;padding:20px;color:var(--text-dim)">No visits logged this month. Time to get out there! ðŸ”¥</div>' : '');
+    + (totalVisits === 0 ? '<div style="text-align:center;padding:20px;color:var(--text-dim)">No visits logged this month. Time to get out there! 🔥</div>' : '');
 
   // Disable next if we're at current month
   const nextBtn = document.getElementById('wrap-next-btn');
@@ -3305,13 +3305,13 @@ function shareWrap () {
   const all = state.restaurants;
   const monthKey = new Date(d.getFullYear(), d.getMonth()+_wrapOffset, 1).toISOString().slice(0,7);
   const total = all.flatMap(r=>(r.visits||[]).filter(v=>(v.date||'').slice(0,7)===monthKey)).length;
-  const text = 'My ' + month + ' foodie wrap: ' + total + ' meals out! Track yours with Feed The Bear ðŸ»';
+  const text = 'My ' + month + ' foodie wrap: ' + total + ' meals out! Track yours with Feed The Bear 🐻';
   if (navigator.share) { navigator.share({ title: 'My Foodie Wrap', text }).catch(()=>{}); }
   else { navigator.clipboard?.writeText(text); showToast('Copied!','Wrap text copied to clipboard','success'); }
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 â€¢ GOOGLE CALENDAR SYNC
+   PHASE 6 • GOOGLE CALENDAR SYNC
    ------------------------------------------------------------ */
 
 function addToGoogleCalendar (restaurantId) {
@@ -3324,7 +3324,7 @@ function addToGoogleCalendar (restaurantId) {
   const fmt = d => d.toISOString().replace(/[-:]/g,'').slice(0,15) + 'Z';
   const title  = encodeURIComponent('Dinner at ' + r.name);
   const loc    = encodeURIComponent(r.address || r.name);
-  const detail = encodeURIComponent((r.cuisine ? r.cuisine + ' Â· ' : '') + (r.website || '') + '\n\nAdded via Feed The Bear ðŸ»');
+  const detail = encodeURIComponent((r.cuisine ? r.cuisine + ' · ' : '') + (r.website || '') + '\n\nAdded via Feed The Bear 🐻');
   const url = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
     + '&text=' + title
     + '&dates=' + fmt(start) + '/' + fmt(end)
@@ -3334,7 +3334,7 @@ function addToGoogleCalendar (restaurantId) {
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 â€¢ IMPORT FROM YELP / GOOGLE MAPS
+   PHASE 6 • IMPORT FROM YELP / GOOGLE MAPS
    ------------------------------------------------------------ */
 
 let _importParsed = [];
@@ -3414,7 +3414,7 @@ function confirmImport () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 â€¢ AI WEEKLY SUGGESTION
+   PHASE 6 • AI WEEKLY SUGGESTION
    ------------------------------------------------------------ */
 
 function checkWeeklySuggestion () {
@@ -3447,12 +3447,12 @@ function checkWeeklySuggestion () {
   if (!main) return;
   const banner = document.createElement('div');
   banner.className = 'weekly-suggest-banner';
-  banner.innerHTML = '<div class="wsb-icon">âœ¨</div>'
+  banner.innerHTML = '<div class="wsb-icon">✨</div>'
     + '<div class="wsb-body">'
     + '<div class="wsb-title">Byte Cub\'s Pick of the Week</div>'
     + '<div class="wsb-text">How about <strong>' + escHtml(suggestion.name) + '</strong>'
     + (suggestion.cuisine ? ' (' + escHtml(suggestion.cuisine) + ')' : '')
-    + (favCuisine ? ' Â· you love ' + escHtml(favCuisine) + '!' : '') + '</div>'
+    + (favCuisine ? ' · you love ' + escHtml(favCuisine) + '!' : '') + '</div>'
     + '</div>'
     + '<button class="btn-sm btn-orange" onclick="openDetailModal(\'' + suggestion.id + '\');this.closest(\'.weekly-suggest-banner\').remove()">View</button>'
     + '<button class="wsb-dismiss" onclick="this.closest(\'.weekly-suggest-banner\').remove()" aria-label="Dismiss">?</button>';
@@ -3460,7 +3460,7 @@ function checkWeeklySuggestion () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 â€¢ REFERRAL SHARE COUNT
+   PHASE 6 • REFERRAL SHARE COUNT
    ------------------------------------------------------------ */
 
 function trackReferralOpen () {
@@ -3485,7 +3485,7 @@ function updateChallengeBtnBadge () {
   btn.querySelector('.referral-badge').textContent = count;
 }
 /* ------------------------------------------------------------
-   PHASE 7 â€¢ VOICE ADD
+   PHASE 7 • VOICE ADD
    ------------------------------------------------------------ */
 
 let _voiceRecognition = null;
@@ -3545,11 +3545,11 @@ function parseVoiceInput (text) {
   openAddModal();
   document.getElementById('form-name').value = name;
   if (address) document.getElementById('form-address').value = address;
-  showToast('ðŸŽ¤ Voice Captured!', '"' + name + '"' + (address ? ' at ' + address : '') + ' Â· review and save.', 'success');
+  showToast('🎤 Voice Captured!', '"' + name + '"' + (address ? ' at ' + address : '') + ' · review and save.', 'success');
 }
 
 /* ------------------------------------------------------------
-   PHASE 7 â€¢ SMART AUTO-TAGS
+   PHASE 7 • SMART AUTO-TAGS
    ------------------------------------------------------------ */
 
 const TAG_RULES = [
@@ -3607,7 +3607,7 @@ function computeAutoTags () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 7 â€¢ RESERVATION REMINDERS
+   PHASE 7 • RESERVATION REMINDERS
    ------------------------------------------------------------ */
 
 function initReminders () {
@@ -3633,12 +3633,12 @@ function initReminders () {
 }
 function fireReminder (r) {
   if (Notification.permission === 'granted') {
-    new Notification('ðŸ» Feed The Bear Reminder', {
+    new Notification('🐻 Feed The Bear Reminder', {
       body: 'Time for your visit to ' + r.name + '!',
       icon: './icon-192.png',
     });
   }
-  showToast('ðŸ”” Reminder!', 'Time for your visit to "' + r.name + '"!', 'success');
+  showToast('🔔 Reminder!', 'Time for your visit to "' + r.name + '"!', 'success');
 }
 function setReminder (restaurantId) {
   const r = state.restaurants.find(x => x.id === restaurantId);
@@ -3669,7 +3669,7 @@ function setReminder (restaurantId) {
   }
 }
 /* ------------------------------------------------------------
-   PHASE 7 â€¢ PHOTO GALLERY + LIGHTBOX
+   PHASE 7 • PHOTO GALLERY + LIGHTBOX
    ------------------------------------------------------------ */
 
 let _galleryPhotos = []; // [{src, name, id}]
@@ -3719,7 +3719,7 @@ function renderLightbox () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 7 â€¢ COMPARE MODE
+   PHASE 7 • COMPARE MODE
    ------------------------------------------------------------ */
 
 let _compareMode = false;
@@ -3750,7 +3750,7 @@ function updateCompareBar () {
   const n = _compareIds.size;
   document.getElementById('compare-count').textContent =
     n === 0 ? 'Tap restaurants to compare (2-3)'
-    : n === 1 ? '1 selected Â· pick 1 or 2 more'
+    : n === 1 ? '1 selected · pick 1 or 2 more'
     : n + ' selected';
   document.getElementById('compare-now-btn').disabled = n < 2;
 }
@@ -3760,13 +3760,13 @@ function showCompare () {
   if (restaurants.length < 2) return;
   const cols = restaurants.length + 1;
   const FIELDS = [
-    { label: 'Cuisine',   fn: r => escHtml(r.cuisine||'â€”') },
+    { label: 'Cuisine',   fn: r => escHtml(r.cuisine||'—') },
     { label: 'Price',     fn: r => ['Free','$','$$','$$$','$$$$'][r.priceRange||0] },
-    { label: 'My Rating', fn: r => r.myRating ? '?'.repeat(r.myRating) : 'â€”', num: r => r.myRating||0 },
-    { label: 'Google ?',  fn: r => r.googleRating ? r.googleRating + ' / 5' : 'â€”', num: r => r.googleRating||0 },
+    { label: 'My Rating', fn: r => r.myRating ? '?'.repeat(r.myRating) : '—', num: r => r.myRating||0 },
+    { label: 'Google ?',  fn: r => r.googleRating ? r.googleRating + ' / 5' : '—', num: r => r.googleRating||0 },
     { label: 'Visits',    fn: r => String((r.visits||[]).length || (r.dateVisited?1:0)), num: r => (r.visits||[]).length||(r.dateVisited?1:0) },
-    { label: 'Status',    fn: r => r.status === 'visited' ? 'âœ… Visited' : 'ðŸ”– Want to Try' },
-    { label: 'Address',   fn: r => escHtml((r.address||'â€”').slice(0,40)) },
+    { label: 'Status',    fn: r => r.status === 'visited' ? '✅ Visited' : '🔖 Want to Try' },
+    { label: 'Address',   fn: r => escHtml((r.address||'—').slice(0,40)) },
   ];
   let html = '<div class="compare-grid" style="grid-template-columns: 100px ' + restaurants.map(()=>'1fr').join(' ') + '">';
   // Header row
@@ -3802,7 +3802,7 @@ function closeCompare () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 7 â€¢ BUDGET TRACKER
+   PHASE 7 • BUDGET TRACKER
    ------------------------------------------------------------ */
 
 function openBudget () {
@@ -3821,7 +3821,7 @@ function saveBudget () {
   state.settings.avgSpend      = parseFloat(document.getElementById('budget-avg-input').value) || 35;
   saveData();
   closeBudget();
-  showToast('ðŸ’° Budget Saved!', 'Monthly budget set to $' + state.settings.monthlyBudget, 'success');
+  showToast('💰 Budget Saved!', 'Monthly budget set to $' + state.settings.monthlyBudget, 'success');
   if (state.currentView === 'stats') renderBudgetChart();
 }
 function renderBudgetChart () {
@@ -3852,14 +3852,14 @@ function renderBudgetChart () {
     + '<div class="budget-gauge-track"><div class="budget-gauge-fill' + (over?' over':'') + '" style="width:' + Math.min(pct,100) + '%"></div></div>'
     + '</div>'
     + '<div class="budget-insight">'
-    + visitsThisMonth + ' visit' + (visitsThisMonth!==1?'s':'') + ' Â· $' + avgSpend + '/avg = ~$' + estimated.toFixed(0)
-    + (over ? ' Â· <span style="color:#e74c3c">$' + (estimated-monthlyBudget).toFixed(0) + ' over budget âŒ</span>'
-             : ' Â· <span style="color:var(--green)">$' + remaining.toFixed(0) + ' remaining ?</span>')
+    + visitsThisMonth + ' visit' + (visitsThisMonth!==1?'s':'') + ' · $' + avgSpend + '/avg = ~$' + estimated.toFixed(0)
+    + (over ? ' · <span style="color:#e74c3c">$' + (estimated-monthlyBudget).toFixed(0) + ' over budget ❌</span>'
+             : ' · <span style="color:var(--green)">$' + remaining.toFixed(0) + ' remaining ?</span>')
     + '</div>';
 }
 
 /* ------------------------------------------------------------
-   PHASE 7 â€¢ VISIT CALENDAR
+   PHASE 7 • VISIT CALENDAR
    ------------------------------------------------------------ */
 
 let _calOffset = 0; // months from now
@@ -3916,12 +3916,12 @@ function renderVisitCalendar () {
         (r.dateVisited?.slice(0,10)===date && !(r.visits||[]).length)
       );
       if (visited.length === 1) openDetailModal(visited[0].id);
-      else showToast('ðŸ“… ' + date, visited.map(r=>r.name).join(', '), 'success');
+      else showToast('📅 ' + date, visited.map(r=>r.name).join(', '), 'success');
     });
   });
 }
 /* ------------------------------------------------------------
-   PHASE 7 â€¢ PUBLIC FOODIE PROFILE + QR CODE
+   PHASE 7 • PUBLIC FOODIE PROFILE + QR CODE
    ------------------------------------------------------------ */
 
 function buildProfileData () {
@@ -3964,7 +3964,7 @@ function openFoodieProfile () {
   }
 
   // Profile preview
-  const medals = ['ðŸ¥‡','ðŸ¥ˆ','ðŸ¥‰'];
+  const medals = ['🥇','🥈','🥉'];
   document.getElementById('profile-preview').innerHTML = data.picks.map((p,i) =>
     '<div class="profile-preview-item">'
     + '<span class="pp-rank">' + (medals[i]||'') + '</span>'
@@ -4006,14 +4006,14 @@ function checkGuestProfile () {
 function renderGuestProfile (data) {
   const overlay = document.getElementById('guest-profile-overlay');
   const list    = document.getElementById('guest-profile-list');
-  const medals  = ['ðŸ¥‡','ðŸ¥ˆ','ðŸ¥‰'];
+  const medals  = ['🥇','🥈','🥉'];
   const priceMap = ['','$','$$','$$$','$$$$'];
   list.innerHTML = data.picks.map((p,i) =>
     '<div class="guest-item">'
-    + '<div class="guest-item-photo">' + (p.p ? `<img src="${escHtml(p.p)}" alt="${escHtml(p.n)}" style="width:100%;height:100%;object-fit:cover;border-radius:10px" />` : (CUISINE_EMOJI[(p.c||'').toLowerCase()] || 'ðŸ½')) + '</div>'
+    + '<div class="guest-item-photo">' + (p.p ? `<img src="${escHtml(p.p)}" alt="${escHtml(p.n)}" style="width:100%;height:100%;object-fit:cover;border-radius:10px" />` : (CUISINE_EMOJI[(p.c||'').toLowerCase()] || '🍽')) + '</div>'
     + '<div class="guest-item-body">'
     + '<div class="guest-item-name">' + (medals[i]||'') + ' ' + escHtml(p.n) + '</div>'
-    + '<div class="guest-item-meta">' + escHtml(p.c||'Restaurant') + (p.a ? ' Â· ' + escHtml(p.a.slice(0,40)) : '') + '</div>'
+    + '<div class="guest-item-meta">' + escHtml(p.c||'Restaurant') + (p.a ? ' · ' + escHtml(p.a.slice(0,40)) : '') + '</div>'
     + '<div class="guest-item-stars">' + '?'.repeat(p.r) + '</div>'
     + '</div>'
     + '</div>'
@@ -4026,7 +4026,7 @@ function renderGuestProfile (data) {
 }
 
 /* ------------------------------------------------------------
-   PHASE 7 â€¢ WEB SHARE TARGET HANDLER
+   PHASE 7 • WEB SHARE TARGET HANDLER
    ------------------------------------------------------------ */
 
 function handleWebShareTarget () {
@@ -4050,11 +4050,11 @@ function handleWebShareTarget () {
       parseMapsUrl(url);
     }
   }
-  showToast('ðŸ“¤ Shared!', '"' + name + '" opened for review Â· fill in details and save!', 'success');
+  showToast('📤 Shared!', '"' + name + '" opened for review · fill in details and save!', 'success');
 }
 
 /* ------------------------------------------------------------
-   PHASE 7 â€¢ renderCards hook for compare mode
+   PHASE 7 • renderCards hook for compare mode
    ------------------------------------------------------------ */
 
 // Patch card rendering to show compare checkbox when _compareMode is on
@@ -4077,7 +4077,7 @@ function addCompareCheckboxes () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 8 â€¢ ? MORE MENU CONTROLLER
+   PHASE 8 • ? MORE MENU CONTROLLER
    ------------------------------------------------------------ */
 
 function initMoreMenu () {
@@ -4142,7 +4142,7 @@ function initMoreMenu () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 8 â€¢ ðŸŽ¯ CRAVING ENGINE
+   PHASE 8 • 🎯 CRAVING ENGINE
    ------------------------------------------------------------ */
 
 let _cravingMoods = new Set();
@@ -4217,7 +4217,7 @@ function runCravingEngine () {
   const priceMap = ['','$','$$','$$$','$$$$'];
   const cuisine = winner.cuisine || 'Restaurant';
   const price   = priceMap[winner.priceRange||0] || '';
-  const rating  = winner.myRating ? '?'.repeat(winner.myRating) : (winner.status === 'want-to-try' ? 'ðŸ”– Want to Try' : '');
+  const rating  = winner.myRating ? '?'.repeat(winner.myRating) : (winner.status === 'want-to-try' ? '🔖 Want to Try' : '');
 
   // Build why string
   const whyParts = [];
@@ -4233,20 +4233,20 @@ function runCravingEngine () {
 
   const resultEl = document.getElementById('craving-result');
   resultEl.innerHTML = `
-    <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--primary);margin-bottom:10px">ðŸŽ¯ Tonight's Match</div>
+    <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--primary);margin-bottom:10px">🎯 Tonight's Match</div>
     <div class="craving-match-name">${cuisineEmoji(winner.cuisine)} ${escHtml(winner.name)}</div>
-    <div class="craving-match-meta">${escHtml(cuisine)}${price ? ' Â· ' + price : ''}${rating ? ' Â· ' + rating : ''}</div>
+    <div class="craving-match-meta">${escHtml(cuisine)}${price ? ' · ' + price : ''}${rating ? ' · ' + rating : ''}</div>
     <div class="craving-match-why">${escHtml(why)}</div>
     <div class="craving-match-actions">
       <button class="btn-primary btn-sm" onclick="openDetailModal('${winner.id}');closeCravingEngine()">View ?</button>
-      ${runner ? `<button class="btn-ghost btn-sm" onclick="runCravingEngine()">ðŸŽ¯ Try Again</button>` : ''}
+      ${runner ? `<button class="btn-ghost btn-sm" onclick="runCravingEngine()">🎯 Try Again</button>` : ''}
     </div>
   `;
   resultEl.classList.remove('hidden');
 }
 
 /* ------------------------------------------------------------
-   PHASE 8 â€¢ ðŸ½ DISH TRACKER
+   PHASE 8 • 🍽 DISH TRACKER
    ------------------------------------------------------------ */
 
 let _dishRating = 0;
@@ -4261,7 +4261,7 @@ function openDishTracker (restaurantId) {
   const r = state.restaurants.find(x => x.id === restaurantId);
   if (!r) return;
   state.detailId = restaurantId;
-  document.getElementById('dish-title').textContent = 'ðŸ½ Dish Tracker';
+  document.getElementById('dish-title').textContent = '🍽 Dish Tracker';
   document.getElementById('dish-restaurant-name').textContent = r.name;
   document.getElementById('dish-name-input').value = '';
   _dishRating = 0;
@@ -4290,7 +4290,7 @@ function addDish () {
   document.getElementById('dish-name-input').value = '';
   _renderDishRatingPicker(0);
   renderDishList(state.detailId);
-  showToast('âœ… Dish saved!', name + ' added to your dish log.', 'success');
+  showToast('✅ Dish saved!', name + ' added to your dish log.', 'success');
 }
 function deleteDish (restaurantId, dishId) {
   const dishes = getDishes();
@@ -4309,7 +4309,7 @@ function renderDishList (restaurantId) {
   el.innerHTML = list.map(d => `
     <div class="dish-item">
       <div class="dish-item-name">${escHtml(d.name)}</div>
-      <div class="dish-item-stars">${d.rating ? '?'.repeat(d.rating) + '?'.repeat(5-d.rating) : 'â˜†'}</div>
+      <div class="dish-item-stars">${d.rating ? '?'.repeat(d.rating) + '?'.repeat(5-d.rating) : '☆'}</div>
       <div class="dish-item-date" style="font-size:.72rem;color:var(--text-dim)">${d.date||''}</div>
       <button class="dish-item-delete icon-btn" onclick="deleteDish('${restaurantId}','${d.id}')" title="Remove">?</button>
     </div>
@@ -4317,7 +4317,7 @@ function renderDishList (restaurantId) {
 }
 
 /* ------------------------------------------------------------
-   PHASE 8 â€¢ ðŸŽ‰ YEAR IN REVIEW
+   PHASE 8 • 🎉 YEAR IN REVIEW
    ------------------------------------------------------------ */
 
 let _reviewYear = new Date().getFullYear();
@@ -4378,18 +4378,18 @@ function renderYearReview () {
   const slides = [];
 
   if (!totalVisits) {
-    slides.push(`<div class="review-slide"><div class="review-slide-emoji">ðŸ˜”</div><div class="review-slide-title">No visits in ${yr}</div><div class="review-slide-value">0</div><div class="review-slide-sub">Start logging your visits!</div></div>`);
+    slides.push(`<div class="review-slide"><div class="review-slide-emoji">😔</div><div class="review-slide-title">No visits in ${yr}</div><div class="review-slide-value">0</div><div class="review-slide-sub">Start logging your visits!</div></div>`);
   } else {
-    slides.push(`<div class="review-slide"><div class="review-slide-emoji">ðŸ½</div><div class="review-slide-title">Meals Out in ${yr}</div><div class="review-slide-value">${totalVisits}</div><div class="review-slide-sub">across ${uniqueRestaurants} restaurant${uniqueRestaurants!==1?'s':''}</div></div>`);
-    if (topCuisine) slides.push(`<div class="review-slide"><div class="review-slide-emoji">${cuisineEmoji(topCuisine[0])}</div><div class="review-slide-title">Your #1 Cuisine</div><div class="review-slide-value">${escHtml(topCuisine[0])}</div><div class="review-slide-sub">${topCuisine[1]} visit${topCuisine[1]!==1?'s':''} Â· you really love it</div></div>`);
-    if (totalCuisines > 1) slides.push(`<div class="review-slide"><div class="review-slide-emoji">ðŸŒ</div><div class="review-slide-title">Cuisines Explored</div><div class="review-slide-value">${totalCuisines}</div><div class="review-slide-sub">You ate: ${Object.keys(cuisineMap).slice(0,5).join(', ')}</div></div>`);
-    if (mostVisited) slides.push(`<div class="review-slide"><div class="review-slide-emoji">ðŸ†</div><div class="review-slide-title">Your Go-To Spot</div><div class="review-slide-value" style="font-size:1.3rem">${escHtml(mostVisited.name)}</div><div class="review-slide-sub">${cuisineEmoji(mostVisited.cuisine)} ${mostVisited.cuisine||''}</div></div>`);
+    slides.push(`<div class="review-slide"><div class="review-slide-emoji">🍽</div><div class="review-slide-title">Meals Out in ${yr}</div><div class="review-slide-value">${totalVisits}</div><div class="review-slide-sub">across ${uniqueRestaurants} restaurant${uniqueRestaurants!==1?'s':''}</div></div>`);
+    if (topCuisine) slides.push(`<div class="review-slide"><div class="review-slide-emoji">${cuisineEmoji(topCuisine[0])}</div><div class="review-slide-title">Your #1 Cuisine</div><div class="review-slide-value">${escHtml(topCuisine[0])}</div><div class="review-slide-sub">${topCuisine[1]} visit${topCuisine[1]!==1?'s':''} · you really love it</div></div>`);
+    if (totalCuisines > 1) slides.push(`<div class="review-slide"><div class="review-slide-emoji">🌍</div><div class="review-slide-title">Cuisines Explored</div><div class="review-slide-value">${totalCuisines}</div><div class="review-slide-sub">You ate: ${Object.keys(cuisineMap).slice(0,5).join(', ')}</div></div>`);
+    if (mostVisited) slides.push(`<div class="review-slide"><div class="review-slide-emoji">🏆</div><div class="review-slide-title">Your Go-To Spot</div><div class="review-slide-value" style="font-size:1.3rem">${escHtml(mostVisited.name)}</div><div class="review-slide-sub">${cuisineEmoji(mostVisited.cuisine)} ${mostVisited.cuisine||''}</div></div>`);
     if (avgRating) slides.push(`<div class="review-slide"><div class="review-slide-emoji">?</div><div class="review-slide-title">Your Average Rating</div><div class="review-slide-value">${avgRating} / 5</div><div class="review-slide-sub">${avgRating>=4.5?'You have high standards!':avgRating>=3.5?'You eat well ?':'Room to discover better spots'}</div></div>`);
-    if (months[peakMonthIdx] > 0) slides.push(`<div class="review-slide"><div class="review-slide-emoji">ðŸ“…</div><div class="review-slide-title">Most Active Month</div><div class="review-slide-value">${MONTH_NAMES[peakMonthIdx]}</div><div class="review-slide-sub">${months[peakMonthIdx]} meal${months[peakMonthIdx]!==1?'s':''} out that month</div></div>`);
-    slides.push(`<div class="review-slide"><div class="review-slide-emoji">ðŸ’°</div><div class="review-slide-title">Estimated Dining Spend</div><div class="review-slide-value">~$${estimatedSpend.toLocaleString()}</div><div class="review-slide-sub">Based on ${totalVisits} visits Â· $${state.settings.avgSpend||35}/avg</div></div>`);
+    if (months[peakMonthIdx] > 0) slides.push(`<div class="review-slide"><div class="review-slide-emoji">📅</div><div class="review-slide-title">Most Active Month</div><div class="review-slide-value">${MONTH_NAMES[peakMonthIdx]}</div><div class="review-slide-sub">${months[peakMonthIdx]} meal${months[peakMonthIdx]!==1?'s':''} out that month</div></div>`);
+    slides.push(`<div class="review-slide"><div class="review-slide-emoji">💰</div><div class="review-slide-title">Estimated Dining Spend</div><div class="review-slide-value">~$${estimatedSpend.toLocaleString()}</div><div class="review-slide-sub">Based on ${totalVisits} visits · $${state.settings.avgSpend||35}/avg</div></div>`);
     if (topRated.length) {
       const topRatedHtml = topRated.map(r=>`<li><span>${escHtml(r.name)}</span><span>${'?'.repeat(r.myRating)}</span></li>`).join('');
-      slides.push(`<div class="review-slide" style="text-align:left"><div class="review-slide-emoji" style="text-align:center">â­</div><div class="review-slide-title" style="text-align:center">Your Top Rated</div><ul class="review-top-list">${topRatedHtml}</ul></div>`);
+      slides.push(`<div class="review-slide" style="text-align:left"><div class="review-slide-emoji" style="text-align:center">⭐</div><div class="review-slide-title" style="text-align:center">Your Top Rated</div><ul class="review-top-list">${topRatedHtml}</ul></div>`);
     }
   }
 
@@ -4404,13 +4404,13 @@ function shareYearReview () {
     (r.visits||[]).forEach(v => { if ((v.date||'').startsWith(yr)) yearVisits.push(r); });
     if (r.dateVisited?.startsWith(yr) && !(r.visits||[]).length) yearVisits.push(r);
   });
-  const text = `ðŸŽ‰ My ${yr} Foodie Year: ${yearVisits.length} meals out, ${new Set(yearVisits.map(r=>r.id)).size} restaurants. Track yours at Feed The Bear!`;
+  const text = `🎉 My ${yr} Foodie Year: ${yearVisits.length} meals out, ${new Set(yearVisits.map(r=>r.id)).size} restaurants. Track yours at Feed The Bear!`;
   if (navigator.share) navigator.share({ title: 'My Foodie Year ' + yr, text }).catch(()=>{});
   else { navigator.clipboard?.writeText(text); showToast('Copied!', 'Year in Review summary copied.', 'success'); }
 }
 
 /* ------------------------------------------------------------
-   PHASE 8 â€¢ â¤ FOODIE FRIENDS
+   PHASE 8 • ❤ FOODIE FRIENDS
    ------------------------------------------------------------ */
 
 function _buildFriendsMyLink () {
@@ -4472,11 +4472,11 @@ function renderFriendComparison (friendData) {
   // Overlap section
   if (overlap.length) {
     html += `<div class="friends-overlap">
-      <div class="friends-overlap-title">â¤ You both love these (${overlap.length})</div>
-      ${overlap.map(p => `<div class="friends-overlap-item">${cuisineEmoji(p.c)} ${escHtml(p.n)} Â· you: ${'?'.repeat(p.r)}</div>`).join('')}
+      <div class="friends-overlap-title">❤ You both love these (${overlap.length})</div>
+      ${overlap.map(p => `<div class="friends-overlap-item">${cuisineEmoji(p.c)} ${escHtml(p.n)} · you: ${'?'.repeat(p.r)}</div>`).join('')}
     </div>`;
   } else {
-    html += `<div class="friends-overlap"><div class="friends-overlap-title">Hmm, no direct overlap yet Â· time to branch out!</div></div>`;
+    html += `<div class="friends-overlap"><div class="friends-overlap-title">Hmm, no direct overlap yet · time to branch out!</div></div>`;
   }
 
   // Shared cuisines
@@ -4513,7 +4513,7 @@ function openAddModalPreFilled (name, cuisine) {
 }
 
 /* ------------------------------------------------------------
-   PHASE 8 â€¢ ðŸ” SMART DISCOVERY
+   PHASE 8 • 🔍 SMART DISCOVERY
    ------------------------------------------------------------ */
 
 function openDiscover () {
@@ -4529,7 +4529,7 @@ async function runDiscover () {
   if (!(await ensureLocationForDiscovery())) return;
   const radius = parseInt(document.getElementById('discover-radius').value) || 1000;
   const resultsEl = document.getElementById('discover-results');
-  resultsEl.innerHTML = '<div class="discover-loading">ðŸ” Searching nearby places...</div>';
+  resultsEl.innerHTML = '<div class="discover-loading">🔍 Searching nearby places...</div>';
 
   // Overpass API query: restaurants + cafes within radius
   const lat = state.userLat, lng = state.userLng;
@@ -4579,7 +4579,7 @@ async function runDiscover () {
     }
 
     // Cuisine emoji map helper
-    const amenityEmoji = t => ({ restaurant:'ðŸ½', cafe:'â˜•', fast_food:'ðŸŸ', bar:'ðŸº' }[t]||'ðŸ½');
+    const amenityEmoji = t => ({ restaurant:'🍽', cafe:'☕', fast_food:'🍟', bar:'🍺' }[t]||'🍽');
 
     resultsEl.innerHTML = ranked.map(el => {
       const tags = el.tags || {};
@@ -4597,8 +4597,8 @@ async function runDiscover () {
         <div class="discover-item-emoji">${emoji}</div>
         <div class="discover-item-body">
           <div class="discover-item-name">${name}</div>
-          <div class="discover-item-meta">${cuisine ? cuisine + ' Â· ' : ''}${escHtml(type)}</div>
-          ${address ? `<div class="discover-item-meta">ðŸ“ ${escHtml(address)}</div>` : ''}
+          <div class="discover-item-meta">${cuisine ? cuisine + ' · ' : ''}${escHtml(type)}</div>
+          ${address ? `<div class="discover-item-meta">📍 ${escHtml(address)}</div>` : ''}
           ${matchTag ? `<div class="discover-item-match">? ${escHtml(matchTag)}</div>` : ''}
         </div>
         <div class="discover-item-add">
@@ -4613,7 +4613,7 @@ async function runDiscover () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 8 â€¢ ðŸŽ¯ CUSTOM CHALLENGES
+   PHASE 8 • 🎯 CUSTOM CHALLENGES
    ------------------------------------------------------------ */
 
 const CHALLENGES_KEY = 'ftb_challenges_v1';
@@ -4687,7 +4687,7 @@ function renderChallengesList () {
       <div class="challenge-progress-track">
         <div class="challenge-progress-fill" style="width:${pct}%"></div>
       </div>
-      <div class="challenge-progress-label">${progress} / ${goal}${done?' âœ… Complete!':''}</div>
+      <div class="challenge-progress-label">${progress} / ${goal}${done?' ✅ Complete!':''}</div>
     </div>`;
   }).join('');
 }
@@ -4704,7 +4704,7 @@ function createChallenge () {
   document.getElementById('chal-name-input').value = '';
   document.getElementById('chal-goal-input').value = '';
   document.getElementById('chal-deadline-input').value = '';
-  showToast('ðŸ† Challenge created!', name, 'success');
+  showToast('🏆 Challenge created!', name, 'success');
   switchChalTab('active');
   renderChallengesList();
 }
@@ -4742,7 +4742,7 @@ function loadFriendChallenge () {
     const challenges = getChallenges();
     challenges.push({ id: uid(), name: ch.n + ' (from friend)', type: ch.t||'visit_count', goal: ch.g, deadline: ch.d||'', createdAt: iso() });
     saveChallenges(challenges);
-    showToast('ðŸŽ¯ Challenge joined!', ch.n, 'success');
+    showToast('🎯 Challenge joined!', ch.n, 'success');
     switchChalTab('active');
     renderChallengesList();
   } catch(_) {
@@ -4751,7 +4751,7 @@ function loadFriendChallenge () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 8 â€¢ âœ… VISIT DEBRIEF
+   PHASE 8 • ✅ VISIT DEBRIEF
    ------------------------------------------------------------ */
 
 let _debriefId = null;
@@ -4766,18 +4766,18 @@ function openVisitDebrief (restaurantId) {
     <div>
       <div class="debrief-q">Overall vibe?</div>
       <div class="debrief-emoji-row" id="debrief-vibe">
-        <button class="debrief-emoji-btn" data-val="amazing">ðŸ¤© Amazing</button>
-        <button class="debrief-emoji-btn" data-val="good">ðŸ˜Š Good</button>
-        <button class="debrief-emoji-btn" data-val="okay">ðŸ˜ Okay</button>
-        <button class="debrief-emoji-btn" data-val="disappointing">ðŸ˜ž Disappointing</button>
+        <button class="debrief-emoji-btn" data-val="amazing">🤩 Amazing</button>
+        <button class="debrief-emoji-btn" data-val="good">😊 Good</button>
+        <button class="debrief-emoji-btn" data-val="okay">😐 Okay</button>
+        <button class="debrief-emoji-btn" data-val="disappointing">😞 Disappointing</button>
       </div>
     </div>
     <div>
       <div class="debrief-q">Would you go back?</div>
       <div class="debrief-emoji-row" id="debrief-return">
-        <button class="debrief-emoji-btn" data-val="definitely">âœ… Definitely</button>
-        <button class="debrief-emoji-btn" data-val="maybe">ðŸ¤” Maybe</button>
-        <button class="debrief-emoji-btn" data-val="nope">âŒ Nope</button>
+        <button class="debrief-emoji-btn" data-val="definitely">✅ Definitely</button>
+        <button class="debrief-emoji-btn" data-val="maybe">🤔 Maybe</button>
+        <button class="debrief-emoji-btn" data-val="nope">❌ Nope</button>
       </div>
     </div>
     <div>
@@ -4816,7 +4816,7 @@ function saveDebrief () {
   const note   = document.getElementById('debrief-note')?.value.trim() || '';
 
   // Build note prefix
-  const vibeMap   = { amazing:'ðŸ¤© Amazing visit', good:'ðŸ˜Š Good visit', okay:'ðŸ˜ Okay visit', disappointing:'ðŸ˜ž Disappointing' };
+  const vibeMap   = { amazing:'🤩 Amazing visit', good:'😊 Good visit', okay:'😐 Okay visit', disappointing:'😞 Disappointing' };
   const returnMap = { definitely:'Would definitely return', maybe:'Might return', nope:'Wouldn\'t return' };
   const parts = [vibeMap[vibe], returnMap[goBack], note].filter(Boolean);
 
@@ -4827,13 +4827,13 @@ function saveDebrief () {
     // Update most recent visit note too
     if (r.visits?.length) r.visits[r.visits.length-1].note = parts.join('. ');
     saveData();
-    showToast('âœ… Debrief saved!', 'Notes updated for ' + r.name, 'success');
+    showToast('✅ Debrief saved!', 'Notes updated for ' + r.name, 'success');
   }
   closeDebrief();
 }
 
 /* ------------------------------------------------------------
-   PHASE 9 â€¢ ðŸ“Š DEEP STATS
+   PHASE 9 • 📊 DEEP STATS
    ------------------------------------------------------------ */
 
 function openStats2 () {
@@ -4888,7 +4888,7 @@ function renderStats2 () {
     }
   }
   document.getElementById('s2-streak-val').textContent = streak + ' wk' + (streak !== 1 ? 's' : '');
-  document.getElementById('s2-streak-sub').textContent = streak >= 4 ? 'ðŸ”¥ðŸ”¥ On fire!' : streak >= 2 ? 'ðŸ”¥ Nice rhythm' : 'Try something new this week!';
+  document.getElementById('s2-streak-sub').textContent = streak >= 4 ? '🔥🔥 On fire!' : streak >= 2 ? '🔥 Nice rhythm' : 'Try something new this week!';
 
   // -- Scatter: Price (x) vs Rating (y) --
   renderScatterPlot(visited);
@@ -4906,12 +4906,12 @@ function renderStats2 () {
         <div class="gem-item-emoji">${cuisineEmoji(r.cuisine)}</div>
         <div>
           <div class="gem-item-name">${escHtml(r.name)}</div>
-          <div class="gem-item-meta">${escHtml(r.cuisine||'')} Â· ${'$'.repeat(r.priceRange||1)}</div>
+          <div class="gem-item-meta">${escHtml(r.cuisine||'')} · ${'$'.repeat(r.priceRange||1)}</div>
         </div>
         <div class="gem-badge">?${r.myRating} Hidden Gem</div>
       </div>`).join('');
   } else {
-    gemsList.innerHTML = '<div style="font-size:.8rem;color:var(--text-dim)">No hidden gems yet Â· rate more cheap spots!</div>';
+    gemsList.innerHTML = '<div style="font-size:.8rem;color:var(--text-dim)">No hidden gems yet · rate more cheap spots!</div>';
   }
 
   // -- Visit heatmap (last 52 weeks) --
@@ -5017,7 +5017,7 @@ function renderVisitHeatmap (visited) {
 }
 
 /* ------------------------------------------------------------
-   PHASE 9 â€¢ ðŸ» AI ASSISTANT
+   PHASE 9 • 🐻 AI ASSISTANT
    ------------------------------------------------------------ */
 
 const _aiHistory = [];
@@ -5027,7 +5027,7 @@ function openAiPanel () {
   document.getElementById('ai-key-notice').classList.toggle('hidden', !!key);
   document.getElementById('ai-panel-overlay').classList.remove('hidden');
   document.body.classList.add('overlay-open');
-  if (!_aiHistory.length) _appendAiMsg('assistant', "Hi! I'm Byte Cub, your food AI. Ask me anything about your restaurant list, or tap a quick button above. ðŸ»");
+  if (!_aiHistory.length) _appendAiMsg('assistant', "Hi! I'm Byte Cub, your food AI. Ask me anything about your restaurant list, or tap a quick button above. 🐻");
 }
 function closeAiPanel () {
   document.getElementById('ai-panel-overlay').classList.add('hidden');
@@ -5039,7 +5039,7 @@ function _appendAiMsg (role, text) {
   const hist = document.getElementById('ai-chat-history');
   const div = document.createElement('div');
   div.className = 'ai-msg ' + role;
-  div.innerHTML = `<div class="ai-msg-avatar">${role === 'assistant' ? 'ðŸ»' : 'ðŸ‘¤'}</div><div class="ai-msg-bubble">${escHtml(text)}</div>`;
+  div.innerHTML = `<div class="ai-msg-avatar">${role === 'assistant' ? '🐻' : '👤'}</div><div class="ai-msg-bubble">${escHtml(text)}</div>`;
   hist.appendChild(div);
   hist.scrollTop = hist.scrollHeight;
 }
@@ -5049,7 +5049,7 @@ function _showAiThinking () {
   const div = document.createElement('div');
   div.className = 'ai-msg assistant';
   div.id = 'ai-thinking-bubble';
-  div.innerHTML = `<div class="ai-msg-avatar">ðŸ»</div><div class="ai-msg-bubble ai-thinking"><span></span><span></span><span></span></div>`;
+  div.innerHTML = `<div class="ai-msg-avatar">🐻</div><div class="ai-msg-bubble ai-thinking"><span></span><span></span><span></span></div>`;
   hist.appendChild(div);
   hist.scrollTop = hist.scrollHeight;
   return div;
@@ -5115,11 +5115,11 @@ async function getAiDetailSummary (restaurantId) {
   const el = document.getElementById('detail-ai-summary');
   if (!el) return;
   el.classList.remove('hidden');
-  el.textContent = 'ðŸ» Generating summaryâ€¦';
+  el.textContent = '🐻 Generating summary…';
 
   const key = state.settings.aiApiKey;
   if (!key) {
-    el.textContent = `ðŸ» ${r.name} Â· ${r.cuisine || 'restaurant'} Â· ?${r.myRating || '?'} Â· ${r.notes ? r.notes.slice(0,120) : 'No notes yet.'}`;
+    el.textContent = `🐻 ${r.name} · ${r.cuisine || 'restaurant'} · ?${r.myRating || '?'} · ${r.notes ? r.notes.slice(0,120) : 'No notes yet.'}`;
     return;
   }
 
@@ -5137,14 +5137,14 @@ async function getAiDetailSummary (restaurantId) {
       })
     });
     const data = await resp.json();
-    el.textContent = 'ðŸ» ' + (data.choices?.[0]?.message?.content || 'Could not generate summary.');
+    el.textContent = '🐻 ' + (data.choices?.[0]?.message?.content || 'Could not generate summary.');
   } catch (_) {
-    el.textContent = 'âš  Could not connect to AI.';
+    el.textContent = '⚠ Could not connect to AI.';
   }
 }
 
 /* ------------------------------------------------------------
-   PHASE 9 â€¢ ðŸ½ MAP UPGRADES (cluster + route)
+   PHASE 9 • 🍽 MAP UPGRADES (cluster + route)
    ------------------------------------------------------------ */
 
 // Route planner selected IDs
@@ -5165,7 +5165,7 @@ function openRoutePlanner () {
         <div class="route-pick-check" id="route-check-${r.id}"></div>
         <div>
           <div class="route-pick-name">${cuisineEmoji(r.cuisine)} ${escHtml(r.name)}</div>
-          <div class="route-pick-meta">${escHtml(r.cuisine||'')}${r.address ? ' Â· ' + escHtml(r.address) : ''}</div>
+          <div class="route-pick-meta">${escHtml(r.cuisine||'')}${r.address ? ' · ' + escHtml(r.address) : ''}</div>
         </div>
       </div>`).join('');
   }
@@ -5226,7 +5226,7 @@ function loadDetailPhoto (restaurant) {
 }
 
 /* ------------------------------------------------------------
-   PHASE 9 â€¢ ðŸ“¤ EXPORT v2
+   PHASE 9 • 📤 EXPORT v2
    ------------------------------------------------------------ */
 
 function openExport2 () {
@@ -5256,8 +5256,8 @@ function exportPassport () {
         </div>
         <div style="margin-left:auto;font-size:.9rem;color:#e63946">${ratingStr(r.myRating)}</div>
       </div>
-      ${r.address ? `<div style="font-size:.78rem;color:#888;margin-bottom:4px">ðŸ“ ${escHtml(r.address)}</div>` : ''}
-      ${r.dateVisited ? `<div style="font-size:.78rem;color:#888;margin-bottom:4px">ðŸ“… Visited: ${r.dateVisited}</div>` : ''}
+      ${r.address ? `<div style="font-size:.78rem;color:#888;margin-bottom:4px">📍 ${escHtml(r.address)}</div>` : ''}
+      ${r.dateVisited ? `<div style="font-size:.78rem;color:#888;margin-bottom:4px">📅 Visited: ${r.dateVisited}</div>` : ''}
       ${r.notes ? `<div style="font-size:.8rem;color:#444;border-top:1px solid #eee;padding-top:6px;margin-top:6px">${escHtml(r.notes.slice(0,200))}</div>` : ''}
     </div>`).join('');
 
@@ -5265,8 +5265,8 @@ function exportPassport () {
   <style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;padding:0 20px;color:#222}
   h1{font-size:1.8rem;border-bottom:2px solid #e63946;padding-bottom:8px;margin-bottom:24px}
   @media print{body{margin:0;padding:10px}}</style></head><body>
-  <h1>ðŸ—º My Restaurant Passport</h1>
-  <p style="color:#888;font-size:.85rem">Generated ${new Date().toLocaleDateString()} Â· ${visited.length} restaurants visited</p>
+  <h1>🗺 My Restaurant Passport</h1>
+  <p style="color:#888;font-size:.85rem">Generated ${new Date().toLocaleDateString()} · ${visited.length} restaurants visited</p>
   ${cards}
   </body></html>`;
 
@@ -5277,7 +5277,7 @@ function exportPassport () {
   a.click();
   URL.revokeObjectURL(a.href);
   closeExport2();
-  showToast('âœ… Passport downloaded!', 'Open the HTML file in any browser to print.', 'success');
+  showToast('✅ Passport downloaded!', 'Open the HTML file in any browser to print.', 'success');
 }
 
 /* Shareable standalone page */
@@ -5290,7 +5290,7 @@ function exportShareablePage () {
       <span style="font-size:1.6rem">${cuisineEmoji(r.cuisine)}</span>
       <div style="flex:1">
         <div style="font-weight:700;font-size:.95rem">${escHtml(r.name)}</div>
-        <div style="font-size:.78rem;color:#aaa">${escHtml(r.cuisine||'')}${r.priceRange ? ' Â· ' + '$'.repeat(r.priceRange) : ''}</div>
+        <div style="font-size:.78rem;color:#aaa">${escHtml(r.cuisine||'')}${r.priceRange ? ' · ' + '$'.repeat(r.priceRange) : ''}</div>
         ${r.myRating ? `<div style="color:#ff6b35;font-size:.82rem">${'?'.repeat(r.myRating)}</div>` : ''}
         ${r.notes ? `<div style="font-size:.75rem;color:#888;margin-top:4px">${escHtml(r.notes.slice(0,100))}</div>` : ''}
       </div>
@@ -5302,8 +5302,8 @@ function exportShareablePage () {
   <style>*{box-sizing:border-box}body{background:#0d0d1a;color:#e8e8f0;font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:20px}
   h1{font-size:1.5rem;margin-bottom:4px}p{color:#888;font-size:.82rem;margin-top:0 0 20px}
   .list{display:flex;flex-direction:column;gap:8px}</style></head><body>
-  <h1>ðŸ½ My Food List</h1>
-  <p>Shared from Feed The Bear Â· ${restaurants.length} places Â· ${new Date().toLocaleDateString()}</p>
+  <h1>🍽 My Food List</h1>
+  <p>Shared from Feed The Bear · ${restaurants.length} places · ${new Date().toLocaleDateString()}</p>
   <div class="list">${items}</div>
   </body></html>`;
 
@@ -5314,7 +5314,7 @@ function exportShareablePage () {
   a.click();
   URL.revokeObjectURL(a.href);
   closeExport2();
-  showToast('âœ… Page downloaded!', 'Share the HTML file Â· it works in any browser.', 'success');
+  showToast('✅ Page downloaded!', 'Share the HTML file · it works in any browser.', 'success');
 }
 
 /* CSV export */
@@ -5334,11 +5334,11 @@ function exportCSV () {
   a.click();
   URL.revokeObjectURL(a.href);
   closeExport2();
-  showToast('âœ… CSV downloaded!', '', 'success');
+  showToast('✅ CSV downloaded!', '', 'success');
 }
 
 /* ------------------------------------------------------------
-   PHASE 9 â€¢ âš™ PWA INSTALL PROMPT + APP BADGING
+   PHASE 9 • ⚙ PWA INSTALL PROMPT + APP BADGING
    ------------------------------------------------------------ */
 
 let _deferredInstallPrompt = null;
@@ -5355,7 +5355,7 @@ function initInstallPrompt () {
 
   window.addEventListener('appinstalled', () => {
     hideInstallBanner();
-    showToast('âœ… Installed!', 'Feed The Bear is now on your home screen.', 'success');
+    showToast('✅ Installed!', 'Feed The Bear is now on your home screen.', 'success');
   });
 
   document.getElementById('install-accept-btn').addEventListener('click', async () => {
@@ -5364,7 +5364,7 @@ function initInstallPrompt () {
     _deferredInstallPrompt.prompt();
     const { outcome } = await _deferredInstallPrompt.userChoice;
     _deferredInstallPrompt = null;
-    if (outcome === 'accepted') showToast('â³ Installingâ€¦', '', 'success');
+    if (outcome === 'accepted') showToast('⏳ Installing…', '', 'success');
   });
 
   document.getElementById('install-dismiss-btn').addEventListener('click', () => {
@@ -5390,7 +5390,7 @@ function updateAppBadge () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 9 â€¢ ðŸ”” PUSH NOTIFICATION NUDGES
+   PHASE 9 • 🔔 PUSH NOTIFICATION NUDGES
    ------------------------------------------------------------ */
 
 async function requestPushPermission () {
@@ -5400,7 +5400,7 @@ async function requestPushPermission () {
   }
   const perm = await Notification.requestPermission();
   if (perm === 'granted') {
-    showToast('ðŸ”” Notifications on!', 'You\'ll get nudges when you haven\'t visited anywhere in a while.', 'success');
+    showToast('🔔 Notifications on!', 'You\'ll get nudges when you haven\'t visited anywhere in a while.', 'success');
     localStorage.setItem('ftb_push_enabled', '1');
     schedulePushNudge();
   } else {
@@ -5425,7 +5425,7 @@ function schedulePushNudge () {
   const daysSince = Math.floor((Date.now() - new Date(last)) / 86400000);
   if (daysSince >= 14) {
     // Fire a nudge now (in a real app this would use Push API via server)
-    new Notification('ðŸ» Feed The Bear misses you!', {
+    new Notification('🐻 Feed The Bear misses you!', {
       body: `It's been ${daysSince} days since your last visit. Time to try somewhere new!`,
       icon: './icon-192.png',
       badge: './icon-192.png',
@@ -5441,7 +5441,7 @@ function checkAndNudge () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 10 â€¢ ðŸ† ACHIEVEMENTS & XP
+   PHASE 10 • 🏆 ACHIEVEMENTS & XP
    ------------------------------------------------------------ */
 
 const XP_KEY  = 'ftb_xp_v1';
@@ -5456,18 +5456,18 @@ const LEVELS = [
 ];
 
 const BADGE_DEFS = [
-  { id: 'first_visit',      icon: 'ðŸ½',  name: 'First Bite',       desc: 'Log your first visited restaurant',  xp: 20,  check: r => r.filter(x=>x.status==='visited').length >= 1 },
-  { id: 'visits_5',         icon: 'â­',  name: 'Regular',           desc: '5 restaurants visited',              xp: 30,  check: r => r.filter(x=>x.status==='visited').length >= 5 },
-  { id: 'visits_10',        icon: 'â­â­',  name: 'Foodie',            desc: '10 restaurants visited',             xp: 50,  check: r => r.filter(x=>x.status==='visited').length >= 10 },
-  { id: 'visits_25',        icon: 'ðŸ…',  name: 'Veteran',           desc: '25 restaurants visited',             xp: 100, check: r => r.filter(x=>x.status==='visited').length >= 25 },
-  { id: 'visits_50',        icon: 'ðŸ†',  name: 'Legend',            desc: '50 restaurants visited',             xp: 200, check: r => r.filter(x=>x.status==='visited').length >= 50 },
-  { id: 'cuisines_5',       icon: 'ðŸŒ',  name: 'Globe Trotter',     desc: '5 different cuisines explored',      xp: 40,  check: r => new Set(r.filter(x=>x.status==='visited').map(x=>(x.cuisine||'').toLowerCase()).filter(Boolean)).size >= 5 },
-  { id: 'cuisines_10',      icon: 'ðŸ—º', name: 'Culinary Tourist',  desc: '10 different cuisines explored',     xp: 80,  check: r => new Set(r.filter(x=>x.status==='visited').map(x=>(x.cuisine||'').toLowerCase()).filter(Boolean)).size >= 10 },
-  { id: 'wishlist_10',      icon: 'ðŸ”–',  name: 'Dream List',        desc: '10 places on your wishlist',         xp: 25,  check: r => r.filter(x=>x.status==='wishlist').length >= 10 },
-  { id: 'first_5star',      icon: 'â­',  name: 'Perfection',        desc: 'Give a restaurant 5 stars',          xp: 30,  check: r => r.some(x=>x.myRating >= 5) },
-  { id: 'photo_added',      icon: 'ðŸ“¸',  name: 'Shutterbug',        desc: 'Add a photo to a restaurant',        xp: 15,  check: r => r.some(x=>x.photo) },
-  { id: 'has_notes',        icon: 'ðŸ“',  name: 'Critic',            desc: 'Write notes on 5 restaurants',       xp: 20,  check: r => r.filter(x=>x.notes&&x.notes.length>10).length >= 5 },
-  { id: 'cheap_gem',        icon: 'ðŸ’Ž',  name: 'Bargain Hunter',    desc: 'Rate a $ restaurant 4+ stars',       xp: 25,  check: r => r.some(x=>x.priceRange===1&&x.myRating>=4) },
+  { id: 'first_visit',      icon: '🍽',  name: 'First Bite',       desc: 'Log your first visited restaurant',  xp: 20,  check: r => r.filter(x=>x.status==='visited').length >= 1 },
+  { id: 'visits_5',         icon: '⭐',  name: 'Regular',           desc: '5 restaurants visited',              xp: 30,  check: r => r.filter(x=>x.status==='visited').length >= 5 },
+  { id: 'visits_10',        icon: '⭐⭐',  name: 'Foodie',            desc: '10 restaurants visited',             xp: 50,  check: r => r.filter(x=>x.status==='visited').length >= 10 },
+  { id: 'visits_25',        icon: '🏅',  name: 'Veteran',           desc: '25 restaurants visited',             xp: 100, check: r => r.filter(x=>x.status==='visited').length >= 25 },
+  { id: 'visits_50',        icon: '🏆',  name: 'Legend',            desc: '50 restaurants visited',             xp: 200, check: r => r.filter(x=>x.status==='visited').length >= 50 },
+  { id: 'cuisines_5',       icon: '🌍',  name: 'Globe Trotter',     desc: '5 different cuisines explored',      xp: 40,  check: r => new Set(r.filter(x=>x.status==='visited').map(x=>(x.cuisine||'').toLowerCase()).filter(Boolean)).size >= 5 },
+  { id: 'cuisines_10',      icon: '🗺', name: 'Culinary Tourist',  desc: '10 different cuisines explored',     xp: 80,  check: r => new Set(r.filter(x=>x.status==='visited').map(x=>(x.cuisine||'').toLowerCase()).filter(Boolean)).size >= 10 },
+  { id: 'wishlist_10',      icon: '🔖',  name: 'Dream List',        desc: '10 places on your wishlist',         xp: 25,  check: r => r.filter(x=>x.status==='wishlist').length >= 10 },
+  { id: 'first_5star',      icon: '⭐',  name: 'Perfection',        desc: 'Give a restaurant 5 stars',          xp: 30,  check: r => r.some(x=>x.myRating >= 5) },
+  { id: 'photo_added',      icon: '📸',  name: 'Shutterbug',        desc: 'Add a photo to a restaurant',        xp: 15,  check: r => r.some(x=>x.photo) },
+  { id: 'has_notes',        icon: '📝',  name: 'Critic',            desc: 'Write notes on 5 restaurants',       xp: 20,  check: r => r.filter(x=>x.notes&&x.notes.length>10).length >= 5 },
+  { id: 'cheap_gem',        icon: '💎',  name: 'Bargain Hunter',    desc: 'Rate a $ restaurant 4+ stars',       xp: 25,  check: r => r.some(x=>x.priceRange===1&&x.myRating>=4) },
 ];
 
 function getXpData () {
@@ -5500,13 +5500,13 @@ function awardXp (amount, reason) {
   // XP toast
   const toast = document.createElement('div');
   toast.className = 'ach-xp-toast';
-  toast.textContent = '+' + amount + ' XP Â· ' + reason;
+  toast.textContent = '+' + amount + ' XP · ' + reason;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 2400);
 
   // Level up
   if (before.name !== after.name) {
-    setTimeout(() => showToast('â­ Level Up!', 'You are now: ' + after.name, 'success'), 400);
+    setTimeout(() => showToast('⭐ Level Up!', 'You are now: ' + after.name, 'success'), 400);
   }
 }
 
@@ -5526,7 +5526,7 @@ function checkAchievements () {
     saveXpData(data);
     newUnlocks.forEach((def, i) => {
       setTimeout(() => {
-        showToast('ðŸ… Badge Unlocked!', def.icon + ' ' + def.name, 'success');
+        showToast('🏅 Badge Unlocked!', def.icon + ' ' + def.name, 'success');
         awardXp(def.xp, def.name);
       }, i * 600);
     });
@@ -5540,7 +5540,7 @@ function openAchievements () {
   const next  = getNextLevel(data.xp);
 
   document.getElementById('ach-level-label').textContent = level.icon || '' + level.name;
-  document.getElementById('ach-xp-label').textContent    = data.xp + ' XP' + (next ? ' / ' + next.minXp : ' Â· MAX');
+  document.getElementById('ach-xp-label').textContent    = data.xp + ' XP' + (next ? ' / ' + next.minXp : ' · MAX');
 
   const pct = next
     ? Math.min(((data.xp - level.minXp) / (next.minXp - level.minXp)) * 100, 100)
@@ -5567,7 +5567,7 @@ function closeAchievements () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 10 â€¢ ðŸŽ² SWIPE TO DECIDE
+   PHASE 10 • 🎲 SWIPE TO DECIDE
    ------------------------------------------------------------ */
 
 let _swipeDeck = [];
@@ -5615,9 +5615,9 @@ function _renderSwipeDeck () {
       <div class="swipe-label no">SKIP ?</div>
       <div class="swipe-card-emoji">${cuisineEmoji(r.cuisine)}</div>
       <div class="swipe-card-name">${escHtml(r.name)}</div>
-      <div class="swipe-card-meta">${escHtml(r.cuisine||'')}${r.priceRange ? ' Â· ' + '$'.repeat(r.priceRange) : ''}</div>
+      <div class="swipe-card-meta">${escHtml(r.cuisine||'')}${r.priceRange ? ' · ' + '$'.repeat(r.priceRange) : ''}</div>
       ${r.myRating ? `<div class="swipe-card-rating">${'?'.repeat(r.myRating)}</div>` : ''}
-      ${r.address ? `<div class="swipe-card-meta" style="margin-top:4px">ðŸ“ ${escHtml(r.address)}</div>` : ''}
+      ${r.address ? `<div class="swipe-card-meta" style="margin-top:4px">📍 ${escHtml(r.address)}</div>` : ''}
     `;
     if (isTop) {
       _attachSwipeListeners(card, r);
@@ -5674,7 +5674,7 @@ function _completeSwipe (card, restaurant, picked) {
     _swipeIdx++;
     if (picked) {
       // Add to tonight's pick toast
-      showToast('ðŸŽ¯ ' + restaurant.name + ' picked!', 'Opening in Mapsâ€¦', 'success');
+      showToast('🎯 ' + restaurant.name + ' picked!', 'Opening in Maps…', 'success');
       setTimeout(() => openDirections(restaurant), 800);
       awardXp(5, 'Made a dinner decision');
     }
@@ -5686,7 +5686,7 @@ function swipePick ()  { if (_swipeCurrentCard) { const r = _swipeDeck[_swipeIdx
 function swipeSkip ()  { if (_swipeCurrentCard) { const r = _swipeDeck[_swipeIdx]; _completeSwipe(_swipeCurrentCard, r, false); } }
 
 /* ------------------------------------------------------------
-   PHASE 10 â€¢ ðŸŽ² SPIN THE WHEEL
+   PHASE 10 • 🎲 SPIN THE WHEEL
    ------------------------------------------------------------ */
 
 let _spinItems    = [];
@@ -5765,7 +5765,7 @@ function _drawWheel (highlightIdx = -1) {
   ctx.fillStyle = '#FF6B35';
   ctx.font = 'bold 14px Poppins';
   ctx.textAlign = 'center';
-  ctx.fillText('ðŸŽ²', cx, cy + 5);
+  ctx.fillText('🎲', cx, cy + 5);
 }
 
 function spinWheel () {
@@ -5799,7 +5799,7 @@ function spinWheel () {
       const resultEl = document.getElementById('spin-result');
       resultEl.innerHTML = `${cuisineEmoji(winner.cuisine)} <strong>${escHtml(winner.name)}</strong> wins the spin!`;
       resultEl.classList.remove('hidden');
-      showToast('ðŸŽ‰ The wheel chose!', winner.name, 'success');
+      showToast('🎉 The wheel chose!', winner.name, 'success');
       awardXp(5, 'Spun the wheel');
     }
   }
@@ -5807,7 +5807,7 @@ function spinWheel () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 10 â€¢ âœˆ TRAVEL MODE
+   PHASE 10 • ✈ TRAVEL MODE
    ------------------------------------------------------------ */
 
 const TRAVEL_KEY = 'ftb_travel_v1';
@@ -5860,7 +5860,7 @@ async function activateTravelCity (city, lat, lng) {
   if (lat !== undefined && lng !== undefined) {
     _saveTravelMode(city, parseFloat(lat), parseFloat(lng));
     _refreshTravelUI();
-    showToast('âœˆ Travel Mode!', 'Location set to ' + city, 'success');
+    showToast('✈ Travel Mode!', 'Location set to ' + city, 'success');
     awardXp(10, 'Activated Travel Mode');
     checkAchievements();
   } else {
@@ -5872,7 +5872,7 @@ async function activateTravelCity (city, lat, lng) {
       const displayCity = results[0].display_name.split(',')[0];
       _saveTravelMode(displayCity, parseFloat(results[0].lat), parseFloat(results[0].lon));
       _refreshTravelUI();
-      showToast('âœˆ Travel Mode!', 'Location set to ' + displayCity, 'success');
+      showToast('✈ Travel Mode!', 'Location set to ' + displayCity, 'success');
       awardXp(10, 'Activated Travel Mode');
       checkAchievements();
     } catch(e) {
@@ -5882,7 +5882,7 @@ async function activateTravelCity (city, lat, lng) {
 }
 
 /* ------------------------------------------------------------
-   PHASE 10 â€¢ ðŸ“Š MONTHLY DIGEST
+   PHASE 10 • 📊 MONTHLY DIGEST
    ------------------------------------------------------------ */
 
 let _digestMonth = 0;
@@ -5909,7 +5909,7 @@ function _renderDigest () {
   const added    = state.restaurants.filter(r => (r.dateAdded || '').startsWith(monthStr));
   const cuisines = new Set(visited.map(r => (r.cuisine || '').toLowerCase()).filter(Boolean));
   const rated    = visited.filter(r => r.myRating > 0);
-  const avgRating = rated.length ? (rated.reduce((s,r) => s + r.myRating, 0) / rated.length).toFixed(1) : 'â€”';
+  const avgRating = rated.length ? (rated.reduce((s,r) => s + r.myRating, 0) / rated.length).toFixed(1) : '—';
   const topRated  = rated.sort((a,b) => b.myRating - a.myRating)[0];
   const estSpend  = visited.filter(r => r.priceRange).reduce((s,r) => s + [0,12,25,45,75][r.priceRange || 0], 0);
 
@@ -5932,7 +5932,7 @@ function shareDigest () {
     const d = r.dateVisited || r.dateAdded || '';
     return r.status === 'visited' && d.startsWith(_digestYear + '-' + String(_digestMonth + 1).padStart(2,'0'));
   }).length;
-  const text = `ðŸ“Š Feed The Bear Â· ${_MONTH_NAMES[_digestMonth]} ${_digestYear} Digest\n` +
+  const text = `📊 Feed The Bear · ${_MONTH_NAMES[_digestMonth]} ${_digestYear} Digest\n` +
                `Visited: ${visitedCount} restaurant${visitedCount !== 1 ? 's' : ''}\n` +
                `Track yours at https://cmc-creator.github.io/Feed-The-Bear/`;
   if (navigator.share) {
@@ -5944,7 +5944,7 @@ function shareDigest () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 10 â€¢ ðŸŸ¢ OPEN NOW
+   PHASE 10 • 🟢 OPEN NOW
    ------------------------------------------------------------ */
 
 function openOpenNow () {
@@ -5970,7 +5970,7 @@ async function runOpenNowSearch () {
 
   const radius     = parseInt(document.getElementById('open-now-radius').value) || 1000;
   const resultsEl  = document.getElementById('open-now-results');
-  resultsEl.innerHTML = '<div class="open-now-loading">ðŸ” Searching nearby...</div>';
+  resultsEl.innerHTML = '<div class="open-now-loading">🔍 Searching nearby...</div>';
 
   const now        = new Date();
   const DAY_MAP    = { 0:'Su', 1:'Mo', 2:'Tu', 3:'We', 4:'Th', 5:'Fr', 6:'Sa' };
@@ -6022,7 +6022,7 @@ async function runOpenNowSearch () {
       } catch(_) { return null; }
     }
 
-    const TYPE_EMOJI = { restaurant:'ðŸ½', cafe:'â˜•', fast_food:'ðŸŸ', bar:'ðŸº', pub:'ðŸº' };
+    const TYPE_EMOJI = { restaurant:'🍽', cafe:'☕', fast_food:'🍟', bar:'🍺', pub:'🍺' };
     const savedNames = new Set(state.restaurants.map(r => normalizeName(r.name)));
 
     const items = elements.map(el => {
@@ -6041,15 +6041,15 @@ async function runOpenNowSearch () {
 
     resultsEl.innerHTML = items.map(({ tags, isOpen, alreadyIn }) => {
       const type = tags.amenity || 'restaurant';
-      const emoji = TYPE_EMOJI[type] || 'ðŸ½';
-      const badge = isOpen === true ? 'ðŸŸ¢ Open' : 'ðŸŸ¡ Maybe';
+      const emoji = TYPE_EMOJI[type] || '🍽';
+      const badge = isOpen === true ? '🟢 Open' : '🟡 Maybe';
       const safeName = tags.name.replace(/'/g, '\\\'').replace(/"/g, '&quot;');
       const safeCuisine = (tags.cuisine || '').replace(/'/g, '\\\'');
       return `<div class="open-now-item">
         <div class="open-now-item-emoji">${emoji}</div>
         <div style="flex:1;min-width:0">
           <div class="open-now-name">${escHtml(tags.name)}</div>
-          <div class="open-now-meta">${tags.cuisine ? escHtml(tags.cuisine.replace(/_/g,' ')) + ' Â· ' : ''}${tags.opening_hours ? escHtml(tags.opening_hours.slice(0,50)) : 'Hours vary'}</div>
+          <div class="open-now-meta">${tags.cuisine ? escHtml(tags.cuisine.replace(/_/g,' ')) + ' · ' : ''}${tags.opening_hours ? escHtml(tags.opening_hours.slice(0,50)) : 'Hours vary'}</div>
         </div>
         <div class="open-now-badge">${badge}</div>
         ${!alreadyIn ? `<button class="btn-sm btn-orange" onclick="openAddModalPreFilled('${safeName}','${safeCuisine}')">+</button>` : ''}
@@ -6061,11 +6061,11 @@ async function runOpenNowSearch () {
   }
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   PHASE 11 â€¢ TASTE DNA + WEEKLY GOAL + ENHANCEMENTS
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+/* ════════════════════════════════════════════════════════════
+   PHASE 11 • TASTE DNA + WEEKLY GOAL + ENHANCEMENTS
+   ════════════════════════════════════════════════════════════ */
 
-/* â”€â”€ Taste DNA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Taste DNA ─────────────────────────────────────────── */
 function renderTasteDna () {
   const el = document.getElementById('chart-taste-dna');
   if (!el) return;
@@ -6085,22 +6085,22 @@ function renderTasteDna () {
 
   const withPrice = visited.filter(r => r.priceRange > 0);
   const avgPrice = withPrice.length ? withPrice.reduce((s, r) => s + r.priceRange, 0) / withPrice.length : 0;
-  const priceLabel = avgPrice < 1.5 ? 'Budget Hunter ðŸ’°'
-    : avgPrice < 2.5 ? 'Value Seeker ðŸœ'
-    : avgPrice < 3.5 ? 'Upscale Diner ðŸ·'
-    : 'Fine Dining Connoisseur ðŸ¥‚';
+  const priceLabel = avgPrice < 1.5 ? 'Budget Hunter 💰'
+    : avgPrice < 2.5 ? 'Value Seeker 🍜'
+    : avgPrice < 3.5 ? 'Upscale Diner 🍷'
+    : 'Fine Dining Connoisseur 🥂';
 
   const uniqueCuisines = Object.keys(cuisineMap).length;
   const adventureScore = Math.min(Math.round((uniqueCuisines / Math.max(visited.length, 1)) * 100), 100);
-  const adventureLabel = adventureScore > 70 ? 'Adventurous Explorer ðŸŒ'
-    : adventureScore > 40 ? 'Curious Foodie ðŸ½ï¸'
-    : 'Comfort Loyalist ðŸ ';
+  const adventureLabel = adventureScore > 70 ? 'Adventurous Explorer 🌍'
+    : adventureScore > 40 ? 'Curious Foodie 🍽️'
+    : 'Comfort Loyalist 🏠';
 
   const signature = top5[0];
   const dnaColors = ['#FF6B35', '#3498DB', '#2ECC71', '#F39C12', '#9B59B6'];
 
   el.innerHTML = `
-    <div class="dna-personality">${adventureLabel} Â· ${priceLabel}</div>
+    <div class="dna-personality">${adventureLabel} · ${priceLabel}</div>
     <div class="dna-cuisines">
       ${top5.map(([c, score], i) => {
         const pct = Math.round(score / total * 100);
@@ -6114,9 +6114,9 @@ function renderTasteDna () {
     <div class="dna-stats-row">
       <div class="dna-stat"><div class="dna-stat-val">${uniqueCuisines}</div><div class="dna-stat-lbl">Cuisines</div></div>
       <div class="dna-stat"><div class="dna-stat-val">${adventureScore}%</div><div class="dna-stat-lbl">Variety</div></div>
-      <div class="dna-stat"><div class="dna-stat-val">${signature ? cuisineEmoji(signature[0]) : 'ðŸ½ï¸'}</div><div class="dna-stat-lbl">Signature</div></div>
+      <div class="dna-stat"><div class="dna-stat-val">${signature ? cuisineEmoji(signature[0]) : '🍽️'}</div><div class="dna-stat-lbl">Signature</div></div>
     </div>
-    <button class="btn-sm btn-orange" style="width:100%;margin-top:10px" onclick="shareTasteDna()">ðŸ“¤ Share My Taste DNA</button>
+    <button class="btn-sm btn-orange" style="width:100%;margin-top:10px" onclick="shareTasteDna()">📤 Share My Taste DNA</button>
   `;
 }
 
@@ -6143,10 +6143,10 @@ function shareTasteDna () {
   ctx.fillStyle = acc; ctx.fillRect(0, 0, 8, H);
 
   ctx.globalAlpha = .06; ctx.font = '200px serif'; ctx.fillStyle = '#FFF';
-  ctx.fillText('ðŸ§¬', W - 240, H - 10); ctx.globalAlpha = 1;
+  ctx.fillText('🧬', W - 240, H - 10); ctx.globalAlpha = 1;
 
   ctx.fillStyle = '#FFF'; ctx.font = 'bold 38px system-ui,sans-serif';
-  ctx.fillText('ðŸ§¬ My Taste DNA', 50, 75);
+  ctx.fillText('🧬 My Taste DNA', 50, 75);
   ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.font = '16px system-ui,sans-serif';
   ctx.fillText('Based on ' + total + ' restaurant' + (total !== 1 ? 's' : '') + ' visited', 50, 104);
 
@@ -6164,21 +6164,21 @@ function shareTasteDna () {
   });
 
   ctx.fillStyle = '#FF6B35'; ctx.font = 'bold 15px system-ui,sans-serif';
-  ctx.fillText('ðŸ» Feed The Bear', W - 195, H - 18);
+  ctx.fillText('🐻 Feed The Bear', W - 195, H - 18);
 
   canvas.toBlob(blob => {
     const file = new File([blob], 'taste-dna-ftb.png', { type: 'image/png' });
     if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      navigator.share({ title: 'My Taste DNA', text: 'My foodie personality on Feed The Bear ðŸ»ðŸ§¬', files: [file] }).catch(() => {});
+      navigator.share({ title: 'My Taste DNA', text: 'My foodie personality on Feed The Bear 🐻🧬', files: [file] }).catch(() => {});
     } else {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = file.name; a.click(); URL.revokeObjectURL(url);
     }
-    showToast('ðŸ§¬ Taste DNA!', 'Your flavor profile card is ready!', 'success');
+    showToast('🧬 Taste DNA!', 'Your flavor profile card is ready!', 'success');
   }, 'image/png');
 }
 
-/* â”€â”€ Weekly Dining Goal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Weekly Dining Goal ────────────────────────────────── */
 function renderWeeklyGoal () {
   const widget = document.getElementById('weekly-goal-widget');
   if (!widget) return;
@@ -6207,7 +6207,7 @@ function renderWeeklyGoal () {
   fill.classList.toggle('complete', done);
   const label = document.getElementById('wg-label');
   if (label) {
-    label.textContent = done ? 'ðŸŽ‰ Goal crushed! You\'re on fire!'
+    label.textContent = done ? '🎉 Goal crushed! You\'re on fire!'
       : count === 0 ? 'Get out and eat this week!'
       : (goal - count) + ' more meal' + ((goal - count) !== 1 ? 's' : '') + ' to hit your goal!';
   }
@@ -6229,13 +6229,13 @@ function setWeeklyGoal () {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
   renderWeeklyGoal();
   if (n > 0) {
-    showToast('ðŸŽ¯ Weekly Goal Set!', n + ' meal' + (n !== 1 ? 's' : '') + ' per week. Let\'s eat!', 'success');
+    showToast('🎯 Weekly Goal Set!', n + ' meal' + (n !== 1 ? 's' : '') + ' per week. Let\'s eat!', 'success');
   } else {
     showToast('Goal Cleared', 'Weekly goal widget hidden.', 'info');
   }
 }
 
-/* â”€â”€ Gallery with Visit Photos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Gallery with Visit Photos ─────────────────────────── */
 // Override the original openGallery to include visit photos
 (function _patchGallery () {
   const _origOpenGallery = openGallery;
@@ -6244,7 +6244,7 @@ function setWeeklyGoal () {
     state.restaurants.forEach(r => {
       if (r.photo) allPhotos.push({ src: r.photo, name: r.name, id: r.id, type: 'cover' });
       (r.visits || []).forEach(v => {
-        if (v.photo) allPhotos.push({ src: v.photo, name: r.name + ' â€” ' + fmtDate(v.date), id: r.id, type: 'visit' });
+        if (v.photo) allPhotos.push({ src: v.photo, name: r.name + ' — ' + fmtDate(v.date), id: r.id, type: 'visit' });
       });
     });
     _galleryPhotos = allPhotos;
@@ -6269,7 +6269,7 @@ function setWeeklyGoal () {
   };
 })();
 
-/* â”€â”€ Visit Photo Support in Check-In â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Visit Photo Support in Check-In ───────────────────── */
 // Enhance detail modal checkin to support photos
 function openCheckinWithPhoto (id) {
   const r = state.restaurants.find(x => x.id === id);
@@ -6290,7 +6290,7 @@ function openCheckinWithPhoto (id) {
   if (rating) state.restaurants[idx].myRating = rating;
 
   // Offer photo upload
-  const wantPhoto = confirm('Add a photo from this visit? ðŸ“·');
+  const wantPhoto = confirm('Add a photo from this visit? 📷');
   if (wantPhoto) {
     const input = document.createElement('input');
     input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
@@ -6304,7 +6304,7 @@ function openCheckinWithPhoto (id) {
         saveData();
         renderAll();
         openDetailModal(id);
-        showToast('ðŸ“· Photo Added!', 'Visit photo saved to gallery.', 'success');
+        showToast('📷 Photo Added!', 'Visit photo saved to gallery.', 'success');
       };
       reader.readAsDataURL(file);
     };
@@ -6314,30 +6314,30 @@ function openCheckinWithPhoto (id) {
   saveData();
   renderAll();
   openDetailModal(id);
-  showToast('âœ… Checked In!', 'Visit logged for ' + r.name, 'success');
+  showToast('✅ Checked In!', 'Visit logged for ' + r.name, 'success');
   checkConfettiMilestones(state.restaurants, state.restaurants);
 }
 
-/* â”€â”€ Priority Badge Helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Priority Badge Helper ──────────────────────────────── */
 function priorityBadgeHtml (r) {
   if (!r.priority || r.status !== 'want-to-try') return '';
-  if (r.priority === 'hot')    return '<span class="priority-badge hot">ðŸ”¥ Must Go!</span>';
-  if (r.priority === 'next')   return '<span class="priority-badge next">â­ Up Next</span>';
-  if (r.priority === 'someday') return '<span class="priority-badge someday">ðŸ“Œ Someday</span>';
+  if (r.priority === 'hot')    return '<span class="priority-badge hot">🔥 Must Go!</span>';
+  if (r.priority === 'next')   return '<span class="priority-badge next">⭐ Up Next</span>';
+  if (r.priority === 'someday') return '<span class="priority-badge someday">📌 Someday</span>';
   return '';
 }
 
-/* â”€â”€ Smarter Byte Cub Responses â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Smarter Byte Cub Responses ─────────────────────────── */
 function tasteDnaResponse () {
   const visited = state.restaurants.filter(r => r.status === 'visited');
-  if (!visited.length) return 'Visit some restaurants first and I\'ll reveal your Taste DNA! ðŸ§¬';
+  if (!visited.length) return 'Visit some restaurants first and I\'ll reveal your Taste DNA! 🧬';
   const cuisineMap = {};
   visited.forEach(r => { const c = r.cuisine || 'Other'; cuisineMap[c] = (cuisineMap[c] || 0) + 1; });
   const top3 = Object.entries(cuisineMap).sort(([, a], [, b]) => b - a).slice(0, 3);
   const uniqueCount = Object.keys(cuisineMap).length;
-  const adventureLabel = uniqueCount > 7 ? 'an Adventurous Explorer ðŸŒ' : uniqueCount > 4 ? 'a Curious Foodie ðŸ½ï¸' : 'a Comfort Loyalist ðŸ ';
+  const adventureLabel = uniqueCount > 7 ? 'an Adventurous Explorer 🌍' : uniqueCount > 4 ? 'a Curious Foodie 🍽️' : 'a Comfort Loyalist 🏠';
   const topStr = top3.map(([c, n]) => `${cuisineEmoji(c)} **${c}** (${n}x)`).join(', ');
-  return `ðŸ§¬ Your Taste DNA:\n\nYou\'re **${adventureLabel}** who loves ${topStr}.\n\nHead to **Stats** for your full flavor breakdown and a shareable Taste DNA card!`;
+  return `🧬 Your Taste DNA:\n\nYou\'re **${adventureLabel}** who loves ${topStr}.\n\nHead to **Stats** for your full flavor breakdown and a shareable Taste DNA card!`;
 }
 
 function neverTriedCuisineResponse () {
@@ -6346,9 +6346,9 @@ function neverTriedCuisineResponse () {
   );
   const allKnown = ['Italian','Japanese','Mexican','Chinese','Indian','Thai','French','Mediterranean','Korean','Vietnamese','Greek','Spanish','Brazilian','Ethiopian','Turkish','Caribbean','Peruvian','Lebanese'];
   const notTried = allKnown.filter(c => !triedCuisines.has(c.toLowerCase()));
-  if (!notTried.length) return 'Wow, you\'ve explored every cuisine on my list! You\'re a true global foodie ðŸŒðŸ†';
+  if (!notTried.length) return 'Wow, you\'ve explored every cuisine on my list! You\'re a true global foodie 🌍🏆';
   const pick = notTried[Math.floor(Math.random() * notTried.length)];
-  return `You haven\'t tried **${pick}** yet! ${cuisineEmoji(pick.toLowerCase()) || 'ðŸ½ï¸'}\n\nPerfect time to branch out â€” ask me to "discover nearby" to find a ${pick} spot near you! ðŸ”`;
+  return `You haven\'t tried **${pick}** yet! ${cuisineEmoji(pick.toLowerCase()) || '🍽️'}\n\nPerfect time to branch out — ask me to "discover nearby" to find a ${pick} spot near you! 🔍`;
 }
 
 function timeBasedResponse (q) {
@@ -6362,25 +6362,25 @@ function timeBasedResponse (q) {
     const brunch = want.filter(r => ['Breakfast','Brunch','Cafe','American'].includes(r.cuisine));
     if (brunch.length) {
       const pick = brunch[Math.floor(Math.random() * brunch.length)];
-      return `Good morning! â˜€ï¸ How about this for breakfast:\n<span class="chip-link" data-id="${pick.id}">${cuisineEmoji(pick.cuisine)} ${pick.name}</span>\n\nPerfect way to start the day! â˜•`;
+      return `Good morning! ☀️ How about this for breakfast:\n<span class="chip-link" data-id="${pick.id}">${cuisineEmoji(pick.cuisine)} ${pick.name}</span>\n\nPerfect way to start the day! ☕`;
     }
-    return `Good morning! â˜• Add some breakfast or cafÃ© spots to your list and I\'ll have morning recommendations ready!`;
+    return `Good morning! ☕ Add some breakfast or café spots to your list and I\'ll have morning recommendations ready!`;
   }
   if (q.match(/lunch|noon/) || (isLunch && q.match(/eat|food|hungry/))) {
     const quick = want.filter(r => r.priceRange <= 2 || ['Cafe','American','Mexican','Japanese','Korean'].includes(r.cuisine));
     if (quick.length) {
       const pick = quick[Math.floor(Math.random() * quick.length)];
-      return `Lunchtime! ðŸ± A quick and delicious option:\n<span class="chip-link" data-id="${pick.id}">${cuisineEmoji(pick.cuisine)} ${pick.name} ${priceDollars(pick.priceRange) || ''}</span>`;
+      return `Lunchtime! 🍱 A quick and delicious option:\n<span class="chip-link" data-id="${pick.id}">${cuisineEmoji(pick.cuisine)} ${pick.name} ${priceDollars(pick.priceRange) || ''}</span>`;
     }
   }
   if (q.match(/dinner|tonight|evening/) || (isDinner && q.match(/eat|food|hungry/))) {
     const topDinner = [...want].sort((a, b) => (b.googleRating || 0) - (a.googleRating || 0)).slice(0, 3);
     if (topDinner.length) {
       const pick = topDinner[Math.floor(Math.random() * topDinner.length)];
-      return `For dinner tonight ðŸŒ™, how about:\n<span class="chip-link" data-id="${pick.id}">${cuisineEmoji(pick.cuisine)} ${pick.name}${pick.googleRating ? ' â­' + pick.googleRating : ''}</span>\n\nOr ask for "Tonight\'s Pick" to get a mood-matched recommendation! ðŸŽ¯`;
+      return `For dinner tonight 🌙, how about:\n<span class="chip-link" data-id="${pick.id}">${cuisineEmoji(pick.cuisine)} ${pick.name}${pick.googleRating ? ' ⭐' + pick.googleRating : ''}</span>\n\nOr ask for "Tonight\'s Pick" to get a mood-matched recommendation! 🎯`;
     }
   }
-  return `Tell me more about your mood or craving and I\'ll find the perfect match! ðŸ»`;
+  return `Tell me more about your mood or craving and I\'ll find the perfect match! 🐻`;
 }
 
 function myStatsResponse () {
@@ -6391,21 +6391,21 @@ function myStatsResponse () {
   const cuisineMap = {};
   visited.forEach(r => { const c = r.cuisine || 'Other'; cuisineMap[c] = (cuisineMap[c] || 0) + 1; });
   const topCuisine = Object.entries(cuisineMap).sort(([, a], [, b]) => b - a)[0];
-  return `ðŸ“Š **Your Foodie Stats:**\n\nðŸ½ï¸ ${all.length} restaurants saved\nâœ… ${visited.length} visited Â· ðŸ”– ${want.length} to try\n${currentStreak > 0 ? `ðŸ”¥ ${currentStreak}-week streak!\n` : ''}${topCuisine ? `â¤ï¸ Favourite cuisine: **${topCuisine[0]}** (${topCuisine[1]}x)\n` : ''}\nCheck the **Stats** tab for the full breakdown!`;
+  return `📊 **Your Foodie Stats:**\n\n🍽️ ${all.length} restaurants saved\n✅ ${visited.length} visited · 🔖 ${want.length} to try\n${currentStreak > 0 ? `🔥 ${currentStreak}-week streak!\n` : ''}${topCuisine ? `❤️ Favourite cuisine: **${topCuisine[0]}** (${topCuisine[1]}x)\n` : ''}\nCheck the **Stats** tab for the full breakdown!`;
 }
 
 function funnyNoteResponse () {
   const withNotes = state.restaurants.filter(r => r.notes);
-  if (!withNotes.length) return 'No notes saved yet! Add personal notes when saving restaurants â€” best dishes, funny moments, must-order items. ðŸ“';
+  if (!withNotes.length) return 'No notes saved yet! Add personal notes when saving restaurants — best dishes, funny moments, must-order items. 📝';
   const item = withNotes[Math.floor(Math.random() * Math.min(withNotes.length, 8))];
-  return `Here\'s a gem from your notes for **${item.name}**:\n\n*"${item.notes.slice(0, 180)}${item.notes.length > 180 ? 'â€¦' : ''}"* ðŸ—’ï¸\n\n<span class="chip-link" data-id="${item.id}">View restaurant</span>`;
+  return `Here\'s a gem from your notes for **${item.name}**:\n\n*"${item.notes.slice(0, 180)}${item.notes.length > 180 ? '…' : ''}"* 🗒️\n\n<span class="chip-link" data-id="${item.id}">View restaurant</span>`;
 }
 
 function goingTonightResponse () {
   const want = state.restaurants.filter(r => r.status === 'want-to-try');
   const hot  = want.filter(r => r.priority === 'hot');
   const pool = hot.length ? hot : want;
-  if (!pool.length) return `Your want-to-try list is empty â€” add some spots and come back! ðŸ”–`;
+  if (!pool.length) return `Your want-to-try list is empty — add some spots and come back! 🔖`;
   const pick = pool[Math.floor(Math.random() * pool.length)];
-  return `ðŸŽ¯ **Going tonight?** Here\'s my top pick:\n\n<span class="chip-link" data-id="${pick.id}">${cuisineEmoji(pick.cuisine)} **${pick.name}**</span>\n${pick.address ? 'ðŸ“ ' + pick.address + '\n' : ''}${pick.googleRating ? 'â­ ' + pick.googleRating + '/5\n' : ''}\nSay "directions" to get there, or ask for another pick!`;
+  return `🎯 **Going tonight?** Here\'s my top pick:\n\n<span class="chip-link" data-id="${pick.id}">${cuisineEmoji(pick.cuisine)} **${pick.name}**</span>\n${pick.address ? '📍 ' + pick.address + '\n' : ''}${pick.googleRating ? '⭐ ' + pick.googleRating + '/5\n' : ''}\nSay "directions" to get there, or ask for another pick!`;
 }
