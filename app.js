@@ -613,6 +613,7 @@ function buildCard (r) {
     if (action === 'website')       { e.stopPropagation(); openWebsite(r);         return; }
     if (action === 'edit')          { e.stopPropagation(); openEditModal(r.id);    return; }
     if (action === 'mark-visited')  { e.stopPropagation(); markVisited(r.id);      return; }
+    if (_compareMode)               { e.stopPropagation(); toggleCompareCard(r.id); return; }
     openDetailModal(r.id);
   });
   card.addEventListener('keydown', e => {
@@ -1134,6 +1135,8 @@ function showStatsView () {
   renderLeaderboard();
   renderPriceTrend();
   renderPassport();
+  renderBudgetChart();
+  renderVisitCalendar();
 }
 
 function hideStatsView () {
@@ -2270,6 +2273,10 @@ function setupEvents () {
       closeChallengeModal();
       closeWrap();
       closeImportBookmarks();
+      closeGallery();
+      closeCompare();
+      closeBudget();
+      closeFoodieProfile();
       document.getElementById('nearby-overlay').classList.add('hidden');
       document.getElementById('collections-panel').classList.remove('open');
       maybeHideOverlay();
@@ -2327,8 +2334,59 @@ function setupEvents () {
     if (state.detailId) addToGoogleCalendar(state.detailId);
   });
 
-  // Phase 6 — Duplicate check on name input
-  document.getElementById('form-name').addEventListener('input', checkDuplicate);
+  // Phase 7 — Voice
+  document.getElementById('voice-btn').addEventListener('click', startVoiceAdd);
+  document.getElementById('voice-cancel-btn').addEventListener('click', stopVoice);
+
+  // Phase 7 — Gallery
+  document.getElementById('gallery-btn').addEventListener('click', openGallery);
+  document.getElementById('gallery-close-btn').addEventListener('click', closeGallery);
+  document.getElementById('gallery-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('gallery-overlay')) closeGallery();
+  });
+  document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
+  document.getElementById('lightbox-prev').addEventListener('click', () => { if (_lightboxIdx > 0) { _lightboxIdx--; renderLightbox(); } });
+  document.getElementById('lightbox-next').addEventListener('click', () => { if (_lightboxIdx < _galleryPhotos.length-1) { _lightboxIdx++; renderLightbox(); } });
+
+  // Phase 7 — Compare
+  document.getElementById('compare-btn').addEventListener('click', toggleCompareMode);
+  document.getElementById('compare-now-btn').addEventListener('click', showCompare);
+  document.getElementById('compare-cancel-btn').addEventListener('click', cancelCompare);
+  document.getElementById('compare-close-btn').addEventListener('click', closeCompare);
+  document.getElementById('compare-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('compare-overlay')) closeCompare();
+  });
+
+  // Phase 7 — Budget
+  document.getElementById('budget-btn').addEventListener('click', openBudget);
+  document.getElementById('budget-close-btn').addEventListener('click', closeBudget);
+  document.getElementById('budget-save-btn').addEventListener('click', saveBudget);
+  document.getElementById('budget-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('budget-overlay')) closeBudget();
+  });
+
+  // Phase 7 — Profile
+  document.getElementById('profile-btn').addEventListener('click', openFoodieProfile);
+  document.getElementById('profile-close-btn').addEventListener('click', closeFoodieProfile);
+  document.getElementById('profile-copy-btn').addEventListener('click', copyProfileLink);
+  document.getElementById('profile-share-btn').addEventListener('click', shareProfile);
+  document.getElementById('profile-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('profile-overlay')) closeFoodieProfile();
+  });
+
+  // Phase 7 — Reservation Reminders
+  document.getElementById('detail-set-reminder-btn').addEventListener('click', () => {
+    if (state.detailId) setReminder(state.detailId);
+  });
+
+  // Phase 7 — Auto-Tags (form field hooks)
+  ['form-name','form-cuisine','form-notes'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', computeAutoTags);
+  });
+
+  // Phase 7 — Escape closes new modals
+  document.getElementById('form-name').addEventListener('input', computeAutoTags);
 }
 
 function updateClearBtn () {
@@ -2367,6 +2425,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCollections();
   initOfflineIndicator();
   initSwipeGestures();
+  initReminders();
   updateTagSuggestions();
   renderAll();
   showOnboarding();
@@ -2374,6 +2433,10 @@ document.addEventListener('DOMContentLoaded', () => {
   trackReferralOpen();
   updateChallengeBtnBadge();
   checkWeeklySuggestion();
+  checkGuestProfile();
+  handleWebShareTarget();
+  // Post-render: add compare checkboxes if mode was active
+  if (_compareMode) addCompareCheckboxes();
 });
 /* ------------------------------------------------------------
    PHASE 5 � STREAK TRACKER
@@ -3262,4 +3325,595 @@ function updateChallengeBtnBadge () {
     btn.appendChild(badge);
   }
   btn.querySelector('.referral-badge').textContent = count;
+}
+/* ------------------------------------------------------------
+   PHASE 7 � VOICE ADD
+   ------------------------------------------------------------ */
+
+let _voiceRecognition = null;
+
+function startVoiceAdd () {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    showToast('Not Supported', 'Voice input is not supported in this browser. Try Chrome.', 'error');
+    return;
+  }
+  const overlay = document.getElementById('voice-overlay');
+  const status = document.getElementById('voice-status');
+  const transcript = document.getElementById('voice-transcript');
+  overlay.classList.remove('hidden');
+  document.getElementById('voice-btn').classList.add('listening');
+  status.textContent = 'Listening�';
+  transcript.textContent = 'Say: "Add [name] on [address]" or just "[name]"';
+
+  _voiceRecognition = new SpeechRecognition();
+  _voiceRecognition.lang = 'en-US';
+  _voiceRecognition.interimResults = true;
+  _voiceRecognition.maxAlternatives = 1;
+
+  _voiceRecognition.onresult = e => {
+    const text = Array.from(e.results).map(r => r[0].transcript).join('');
+    transcript.textContent = '"' + text + '"';
+    if (e.results[e.results.length - 1].isFinal) {
+      parseVoiceInput(text);
+      stopVoice();
+    }
+  };
+  _voiceRecognition.onerror = e => {
+    status.textContent = 'Error: ' + e.error;
+    setTimeout(stopVoice, 1200);
+  };
+  _voiceRecognition.onend = () => stopVoice();
+  _voiceRecognition.start();
+}
+function stopVoice () {
+  if (_voiceRecognition) { try { _voiceRecognition.stop(); } catch(_){} _voiceRecognition = null; }
+  document.getElementById('voice-overlay').classList.add('hidden');
+  document.getElementById('voice-btn').classList.remove('listening');
+}
+function parseVoiceInput (text) {
+  text = text.trim();
+  // "add nobu on 105 hudson street"
+  const addMatch = text.match(/^add\s+(.+?)(?:\s+(?:on|at|in)\s+(.+))?$/i);
+  let name = '', address = '';
+  if (addMatch) {
+    name    = addMatch[1].trim();
+    address = (addMatch[2] || '').trim();
+  } else {
+    name = text;
+  }
+  if (!name) { showToast('Couldn\'t parse', 'Please try again.', 'error'); return; }
+  // Open add modal pre-filled
+  openAddModal();
+  document.getElementById('form-name').value = name;
+  if (address) document.getElementById('form-address').value = address;
+  showToast('??? Voice Captured!', '"' + name + '"' + (address ? ' at ' + address : '') + ' � review and save.', 'success');
+}
+
+/* ------------------------------------------------------------
+   PHASE 7 � SMART AUTO-TAGS
+   ------------------------------------------------------------ */
+
+const TAG_RULES = [
+  { keywords: ['pasta','pizza','lasagna','risotto','tiramisu','italian'], tags: ['italian','date-night'] },
+  { keywords: ['sushi','ramen','udon','tempura','japanese','bento'], tags: ['japanese','asian'] },
+  { keywords: ['taco','burrito','enchilada','guacamole','mexican'], tags: ['mexican'] },
+  { keywords: ['curry','naan','biryani','tikka','indian','masala'], tags: ['indian','spicy'] },
+  { keywords: ['rooftop','romantic','candlelit','intimate','anniversary'], tags: ['date-night','romantic'] },
+  { keywords: ['brunch','breakfast','eggs','pancake','mimosa','waffles'], tags: ['brunch','weekend'] },
+  { keywords: ['takeout','delivery','grab','quick','fast'], tags: ['quick-bite','takeout'] },
+  { keywords: ['kids','family','child','toddler'], tags: ['family-friendly'] },
+  { keywords: ['vegan','vegetarian','plant-based','dairy-free'], tags: ['vegan','healthy'] },
+  { keywords: ['burger','fries','wings','bbq','grill'], tags: ['casual','comfort-food'] },
+  { keywords: ['cheap','budget','affordable','inexpensive'], tags: ['budget-friendly'] },
+  { keywords: ['fancy','fine dining','tasting menu','reservation','michelin'], tags: ['special-occasion','fine-dining'] },
+  { keywords: ['bar','cocktail','wine','beer','happy hour'], tags: ['drinks','bar'] },
+  { keywords: ['seafood','fish','lobster','oyster','crab','shrimp'], tags: ['seafood'] },
+  { keywords: ['outdoor','patio','terrace','al fresco'], tags: ['outdoor-seating'] },
+];
+
+function computeAutoTags () {
+  const name    = (document.getElementById('form-name').value || '').toLowerCase();
+  const cuisine = (document.getElementById('form-cuisine').value || '').toLowerCase();
+  const notes   = (document.getElementById('form-notes').value || '').toLowerCase();
+  const combined = name + ' ' + cuisine + ' ' + notes;
+  const suggested = new Set();
+  TAG_RULES.forEach(rule => {
+    if (rule.keywords.some(k => combined.includes(k))) {
+      rule.tags.forEach(t => suggested.add(t));
+    }
+  });
+  // Remove tags already present in the field
+  const existing = document.getElementById('form-tags').value
+    .split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+  existing.forEach(t => suggested.delete(t));
+
+  const container = document.getElementById('form-auto-tags');
+  if (!container) return;
+  if (!suggested.size) { container.classList.add('hidden'); return; }
+  container.classList.remove('hidden');
+  container.innerHTML = '<span class="auto-tag-chip-label">Suggested: </span>'
+    + [...suggested].map(tag =>
+      '<button type="button" class="auto-tag-chip" data-tag="' + tag + '">+ ' + tag + '</button>'
+    ).join('');
+  container.querySelectorAll('.auto-tag-chip[data-tag]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const field = document.getElementById('form-tags');
+      const cur = field.value.trim();
+      field.value = cur ? cur + ', ' + btn.dataset.tag : btn.dataset.tag;
+      btn.remove();
+      if (!container.querySelectorAll('.auto-tag-chip[data-tag]').length)
+        container.classList.add('hidden');
+    });
+  });
+}
+
+/* ------------------------------------------------------------
+   PHASE 7 � RESERVATION REMINDERS
+   ------------------------------------------------------------ */
+
+function initReminders () {
+  // Check stored reminders on load
+  const reminders = JSON.parse(localStorage.getItem('ftb_reminders') || '[]');
+  const now = Date.now();
+  const due = reminders.filter(r => r.ts <= now + 30000 && !r.shown);
+  due.forEach(r => {
+    fireReminder(r);
+    r.shown = true;
+  });
+  localStorage.setItem('ftb_reminders', JSON.stringify(reminders));
+  // Poll every 30s for upcoming reminders
+  setInterval(() => {
+    const all = JSON.parse(localStorage.getItem('ftb_reminders') || '[]');
+    const n = Date.now();
+    let changed = false;
+    all.forEach(r => {
+      if (r.ts <= n + 5000 && !r.shown) { fireReminder(r); r.shown = true; changed = true; }
+    });
+    if (changed) localStorage.setItem('ftb_reminders', JSON.stringify(all));
+  }, 30000);
+}
+function fireReminder (r) {
+  if (Notification.permission === 'granted') {
+    new Notification('??? Feed The Bear Reminder', {
+      body: 'Time for your visit to ' + r.name + '!',
+      icon: './icon-192.png',
+    });
+  }
+  showToast('?? Reminder!', 'Time for your visit to "' + r.name + '"!', 'success');
+}
+function setReminder (restaurantId) {
+  const r = state.restaurants.find(x => x.id === restaurantId);
+  if (!r) return;
+  const dateVal = document.getElementById('detail-reminder-date').value;
+  const timeVal = document.getElementById('detail-reminder-time').value || '12:00';
+  if (!dateVal) { showToast('Date Required', 'Pick a date for your reminder.', 'error'); return; }
+  const ts = new Date(dateVal + 'T' + timeVal).getTime();
+  if (ts < Date.now()) { showToast('Past Date', 'Choose a future date.', 'error'); return; }
+  // Request notification permission
+  const save = () => {
+    const all = JSON.parse(localStorage.getItem('ftb_reminders') || '[]')
+      .filter(x => x.id !== restaurantId);
+    all.push({ id: restaurantId, name: r.name, ts, shown: false });
+    localStorage.setItem('ftb_reminders', JSON.stringify(all));
+    const diff = ts - Date.now();
+    // In-tab setTimeout for same session
+    setTimeout(() => fireReminder({ name: r.name }), Math.max(diff, 0));
+    const status = document.getElementById('detail-reminder-status');
+    if (status) status.innerHTML = '<span style="color:var(--green)">? Reminder set for '
+      + new Date(ts).toLocaleString() + '</span>';
+    showToast('? Reminder Set!', '"' + r.name + '" on ' + new Date(ts).toLocaleDateString(), 'success');
+  };
+  if (Notification.permission === 'default') {
+    Notification.requestPermission().then(save);
+  } else {
+    save();
+  }
+}
+/* ------------------------------------------------------------
+   PHASE 7 � PHOTO GALLERY + LIGHTBOX
+   ------------------------------------------------------------ */
+
+let _galleryPhotos = []; // [{src, name, id}]
+let _lightboxIdx   = 0;
+
+function openGallery () {
+  const withPhotos = state.restaurants.filter(r => r.photo);
+  _galleryPhotos = withPhotos.map(r => ({ src: r.photo, name: r.name, id: r.id }));
+  const grid = document.getElementById('gallery-grid');
+  if (!_galleryPhotos.length) {
+    grid.innerHTML = '<div class="gallery-empty">No photos yet! Add photos when saving restaurants.</div>';
+  } else {
+    grid.innerHTML = _galleryPhotos.map((p,i) =>
+      '<div class="gallery-item" data-idx="' + i + '">'
+      + '<img src="' + escHtml(p.src) + '" alt="' + escHtml(p.name) + '" loading="lazy" />'
+      + '<div class="gallery-item-name">' + escHtml(p.name) + '</div>'
+      + '</div>'
+    ).join('');
+    grid.querySelectorAll('.gallery-item[data-idx]').forEach(el => {
+      el.addEventListener('click', () => openLightbox(parseInt(el.dataset.idx)));
+    });
+  }
+  document.getElementById('gallery-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeGallery () {
+  document.getElementById('gallery-overlay').classList.add('hidden');
+  closeLightbox();
+  maybeHideOverlay();
+}
+function openLightbox (idx) {
+  _lightboxIdx = idx;
+  renderLightbox();
+  document.getElementById('lightbox').classList.remove('hidden');
+}
+function closeLightbox () {
+  document.getElementById('lightbox').classList.add('hidden');
+}
+function renderLightbox () {
+  const p = _galleryPhotos[_lightboxIdx];
+  if (!p) return;
+  document.getElementById('lightbox-img').src = p.src;
+  document.getElementById('lightbox-img').alt = p.name;
+  document.getElementById('lightbox-caption').textContent = p.name;
+  document.getElementById('lightbox-prev').disabled = _lightboxIdx === 0;
+  document.getElementById('lightbox-next').disabled = _lightboxIdx === _galleryPhotos.length - 1;
+}
+
+/* ------------------------------------------------------------
+   PHASE 7 � COMPARE MODE
+   ------------------------------------------------------------ */
+
+let _compareMode = false;
+const _compareIds = new Set();
+
+function toggleCompareMode () {
+  _compareMode = !_compareMode;
+  _compareIds.clear();
+  document.getElementById('compare-bar').classList.toggle('hidden', !_compareMode);
+  document.getElementById('compare-btn').classList.toggle('active', _compareMode);
+  updateCompareBar();
+  renderCards();
+}
+function cancelCompare () {
+  _compareMode = false;
+  _compareIds.clear();
+  document.getElementById('compare-bar').classList.add('hidden');
+  document.getElementById('compare-btn').classList.remove('active');
+  renderCards();
+}
+function toggleCompareCard (id) {
+  if (_compareIds.has(id)) { _compareIds.delete(id); }
+  else { if (_compareIds.size >= 3) { showToast('Max 3', 'Compare up to 3 restaurants at a time.', 'error'); return; } _compareIds.add(id); }
+  updateCompareBar();
+  renderCards();
+}
+function updateCompareBar () {
+  const n = _compareIds.size;
+  document.getElementById('compare-count').textContent =
+    n === 0 ? 'Tap restaurants to compare (2�3)'
+    : n === 1 ? '1 selected � pick 1 or 2 more'
+    : n + ' selected';
+  document.getElementById('compare-now-btn').disabled = n < 2;
+}
+function showCompare () {
+  const ids = [..._compareIds];
+  const restaurants = ids.map(id => state.restaurants.find(r => r.id === id)).filter(Boolean);
+  if (restaurants.length < 2) return;
+  const cols = restaurants.length + 1;
+  const FIELDS = [
+    { label: 'Cuisine',   fn: r => escHtml(r.cuisine||'�') },
+    { label: 'Price',     fn: r => ['�','$','$$','$$$','$$$$'][r.priceRange||0] },
+    { label: 'My Rating', fn: r => r.myRating ? '?'.repeat(r.myRating) : '�', num: r => r.myRating||0 },
+    { label: 'Google ?',  fn: r => r.googleRating ? r.googleRating + ' / 5' : '�', num: r => r.googleRating||0 },
+    { label: 'Visits',    fn: r => String((r.visits||[]).length || (r.dateVisited?1:0)), num: r => (r.visits||[]).length||(r.dateVisited?1:0) },
+    { label: 'Status',    fn: r => r.status === 'visited' ? '? Visited' : '?? Want to Try' },
+    { label: 'Address',   fn: r => escHtml((r.address||'�').slice(0,40)) },
+  ];
+  let html = '<div class="compare-grid" style="grid-template-columns: 100px ' + restaurants.map(()=>'1fr').join(' ') + '">';
+  // Header row
+  html += '<div class="compare-row" style="grid-column: 1 / -1; display:grid; grid-template-columns: 100px ' + restaurants.map(()=>'1fr').join(' ') + '">';
+  html += '<div class="compare-cell label"></div>';
+  restaurants.forEach(r => { html += '<div class="compare-cell header">' + cuisineEmoji(r.cuisine) + ' ' + escHtml(r.name) + '</div>'; });
+  html += '</div>';
+  // Data rows
+  FIELDS.forEach(f => {
+    html += '<div class="compare-row" style="display:grid; grid-template-columns: 100px ' + restaurants.map(()=>'1fr').join(' ') + '">';
+    html += '<div class="compare-cell label">' + f.label + '</div>';
+    // find winner
+    let winnerIdx = -1;
+    if (f.num) {
+      const vals = restaurants.map(r => f.num(r));
+      const max = Math.max(...vals);
+      if (max > 0 && vals.filter(v=>v===max).length === 1) winnerIdx = vals.indexOf(max);
+    }
+    restaurants.forEach((r,i) => {
+      const cls = 'compare-cell' + (i === winnerIdx ? ' winner' : '');
+      html += '<div class="' + cls + '">' + f.fn(r) + '</div>';
+    });
+    html += '</div>';
+  });
+  html += '</div>';
+  document.getElementById('compare-table').innerHTML = html;
+  document.getElementById('compare-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeCompare () {
+  document.getElementById('compare-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+
+/* ------------------------------------------------------------
+   PHASE 7 � BUDGET TRACKER
+   ------------------------------------------------------------ */
+
+function openBudget () {
+  const { monthlyBudget = 0, avgSpend = 35 } = state.settings;
+  document.getElementById('budget-monthly-input').value = monthlyBudget || '';
+  document.getElementById('budget-avg-input').value = avgSpend || '';
+  document.getElementById('budget-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeBudget () {
+  document.getElementById('budget-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function saveBudget () {
+  state.settings.monthlyBudget = parseFloat(document.getElementById('budget-monthly-input').value) || 0;
+  state.settings.avgSpend      = parseFloat(document.getElementById('budget-avg-input').value) || 35;
+  saveData();
+  closeBudget();
+  showToast('?? Budget Saved!', 'Monthly budget set to $' + state.settings.monthlyBudget, 'success');
+  if (state.currentView === 'stats') renderBudgetChart();
+}
+function renderBudgetChart () {
+  const el = document.getElementById('chart-budget');
+  if (!el) return;
+  const { monthlyBudget = 0, avgSpend = 35 } = state.settings;
+  if (!monthlyBudget) {
+    el.innerHTML = '<div class="budget-setup">No budget set. <a onclick="openBudget()">Set your monthly budget ?</a></div>';
+    return;
+  }
+  const now = new Date();
+  const monthKey = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  const all = state.restaurants;
+  // Count visits this month
+  let visitsThisMonth = 0;
+  all.forEach(r => {
+    visitsThisMonth += (r.visits||[]).filter(v=>(v.date||'').slice(0,7)===monthKey).length;
+    if (r.dateVisited?.slice(0,7)===monthKey && !(r.visits||[]).length) visitsThisMonth++;
+  });
+  const estimated = visitsThisMonth * avgSpend;
+  const pct = Math.min((estimated / monthlyBudget) * 100, 110);
+  const over = estimated > monthlyBudget;
+  const remaining = monthlyBudget - estimated;
+  el.innerHTML = '<div class="budget-gauge-wrap">'
+    + '<div class="budget-gauge-label">'
+    + '<span>$0</span><span>$' + estimated.toFixed(0) + ' estimated</span><span>$' + monthlyBudget.toFixed(0) + '</span>'
+    + '</div>'
+    + '<div class="budget-gauge-track"><div class="budget-gauge-fill' + (over?' over':'') + '" style="width:' + Math.min(pct,100) + '%"></div></div>'
+    + '</div>'
+    + '<div class="budget-insight">'
+    + visitsThisMonth + ' visit' + (visitsThisMonth!==1?'s':'') + ' � $' + avgSpend + '/avg = ~$' + estimated.toFixed(0)
+    + (over ? ' � <span style="color:#e74c3c">$' + (estimated-monthlyBudget).toFixed(0) + ' over budget ??</span>'
+             : ' � <span style="color:var(--green)">$' + remaining.toFixed(0) + ' remaining ?</span>')
+    + '</div>';
+}
+
+/* ------------------------------------------------------------
+   PHASE 7 � VISIT CALENDAR
+   ------------------------------------------------------------ */
+
+let _calOffset = 0; // months from now
+
+function renderVisitCalendar () {
+  const el = document.getElementById('chart-calendar');
+  if (!el) return;
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() + _calOffset, 1);
+  const year = d.getFullYear(), month = d.getMonth();
+  const monthKey = year + '-' + String(month+1).padStart(2,'0');
+  const monthName = d.toLocaleString('default',{month:'long',year:'numeric'});
+
+  // Build set of visit dates this month
+  const visitDates = new Set();
+  state.restaurants.forEach(r => {
+    (r.visits||[]).forEach(v => { if ((v.date||'').slice(0,7)===monthKey) visitDates.add(v.date.slice(0,10)); });
+    if (r.dateVisited?.slice(0,7)===monthKey) visitDates.add(r.dateVisited.slice(0,10));
+  });
+
+  // Calendar grid
+  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const todayStr = iso();
+  const DAY_LABELS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+  let html = '<div class="cal-header">'
+    + '<button class="cal-nav" id="cal-prev">?</button>'
+    + '<span class="cal-month-label">' + monthName + '</span>'
+    + '<button class="cal-nav" id="cal-next">?</button>'
+    + '</div>'
+    + '<div class="cal-grid">'
+    + DAY_LABELS.map(l=>'<div class="cal-day-header">'+l+'</div>').join('');
+
+  // empty cells before first day
+  for (let i = 0; i < firstDay; i++) html += '<div class="cal-day other-month"></div>';
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = year + '-' + String(month+1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+    const hasVisit = visitDates.has(dateStr);
+    const isToday  = dateStr === todayStr;
+    html += '<div class="cal-day' + (hasVisit?' has-visit':'') + (isToday?' today':'') + '" data-date="' + dateStr + '">'
+      + day
+      + '</div>';
+  }
+  html += '</div>';
+  el.innerHTML = html;
+  el.querySelector('#cal-prev').addEventListener('click', () => { _calOffset--; renderVisitCalendar(); });
+  el.querySelector('#cal-next').addEventListener('click', () => { _calOffset++; renderVisitCalendar(); });
+  el.querySelectorAll('.cal-day.has-visit').forEach(cell => {
+    cell.addEventListener('click', () => {
+      const date = cell.dataset.date;
+      const visited = state.restaurants.filter(r =>
+        (r.visits||[]).some(v=>v.date?.slice(0,10)===date) ||
+        (r.dateVisited?.slice(0,10)===date && !(r.visits||[]).length)
+      );
+      if (visited.length === 1) openDetailModal(visited[0].id);
+      else showToast('?? ' + date, visited.map(r=>r.name).join(', '), 'success');
+    });
+  });
+}
+/* ------------------------------------------------------------
+   PHASE 7 � PUBLIC FOODIE PROFILE + QR CODE
+   ------------------------------------------------------------ */
+
+function buildProfileData () {
+  const top = [...state.restaurants]
+    .filter(r => r.myRating > 0)
+    .sort((a,b) => b.myRating - a.myRating)
+    .slice(0, 10)
+    .map(r => ({
+      n: r.name, c: r.cuisine||'', r: r.myRating,
+      a: (r.address||'').slice(0,60), p: (r.photo||'').slice(0,300),
+    }));
+  return { picks: top, ts: Date.now() };
+}
+function openFoodieProfile () {
+  const data = buildProfileData();
+  if (!data.picks.length) {
+    showToast('No ratings yet', 'Rate some restaurants first to generate your profile.', 'error');
+    return;
+  }
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  const url = window.location.href.split('?')[0].split('#')[0] + '#profile=' + encoded;
+  document.getElementById('profile-link').value = url;
+
+  // Generate QR code
+  const canvas = document.getElementById('profile-qr');
+  canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+  if (window.QRCode) {
+    try {
+      // qrcodejs uses a div; we'll render to a temp div then extract img
+      const tmp = document.createElement('div');
+      new QRCode(tmp, { text: url, width:180, height:180, colorDark:'#FF6B35', colorLight:'#1A1A2E' });
+      setTimeout(() => {
+        const img = tmp.querySelector('img');
+        if (img) {
+          const ctx = canvas.getContext('2d');
+          const i = new Image(); i.onload = () => ctx.drawImage(i,0,0,180,180); i.src = img.src;
+        }
+      }, 200);
+    } catch(_) {}
+  }
+
+  // Profile preview
+  const medals = ['??','??','??'];
+  document.getElementById('profile-preview').innerHTML = data.picks.map((p,i) =>
+    '<div class="profile-preview-item">'
+    + '<span class="pp-rank">' + (medals[i]||'') + '</span>'
+    + '<span class="pp-name">' + escHtml(p.n) + '</span>'
+    + (p.c ? '<span style="font-size:.72rem;color:var(--text-dim)">' + escHtml(p.c) + '</span>' : '')
+    + '<span class="pp-stars">' + '?'.repeat(p.r) + '</span>'
+    + '</div>'
+  ).join('');
+
+  document.getElementById('profile-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeFoodieProfile () {
+  document.getElementById('profile-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function copyProfileLink () {
+  const val = document.getElementById('profile-link').value;
+  navigator.clipboard?.writeText(val);
+  showToast('Copied!', 'Profile link copied to clipboard.', 'success');
+}
+function shareProfile () {
+  const url = document.getElementById('profile-link').value;
+  if (navigator.share) { navigator.share({ title: 'My Foodie Profile', url }).catch(()=>{}); }
+  else copyProfileLink();
+}
+
+// Check for incoming profile hash on load
+function checkGuestProfile () {
+  const hash = window.location.hash;
+  if (!hash.startsWith('#profile=')) return;
+  try {
+    const encoded = hash.slice('#profile='.length);
+    const data = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+    if (!data.picks?.length) return;
+    renderGuestProfile(data);
+  } catch(_) { /* invalid hash � ignore */ }
+}
+function renderGuestProfile (data) {
+  const overlay = document.getElementById('guest-profile-overlay');
+  const list    = document.getElementById('guest-profile-list');
+  const medals  = ['??','??','??'];
+  const priceMap = ['','$','$$','$$$','$$$$'];
+  list.innerHTML = data.picks.map((p,i) =>
+    '<div class="guest-item">'
+    + '<div class="guest-item-photo">' + (p.p ? `<img src="${escHtml(p.p)}" alt="${escHtml(p.n)}" style="width:100%;height:100%;object-fit:cover;border-radius:10px" />` : (CUISINE_EMOJI[(p.c||'').toLowerCase()] || '???')) + '</div>'
+    + '<div class="guest-item-body">'
+    + '<div class="guest-item-name">' + (medals[i]||'') + ' ' + escHtml(p.n) + '</div>'
+    + '<div class="guest-item-meta">' + escHtml(p.c||'Restaurant') + (p.a ? ' � ' + escHtml(p.a.slice(0,40)) : '') + '</div>'
+    + '<div class="guest-item-stars">' + '?'.repeat(p.r) + '</div>'
+    + '</div>'
+    + '</div>'
+  ).join('');
+  overlay.classList.remove('hidden');
+  document.getElementById('guest-profile-close').addEventListener('click', () => {
+    overlay.classList.add('hidden');
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  });
+}
+
+/* ------------------------------------------------------------
+   PHASE 7 � WEB SHARE TARGET HANDLER
+   ------------------------------------------------------------ */
+
+function handleWebShareTarget () {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has('share-target')) return;
+  const title = params.get('title') || '';
+  const url   = params.get('url')   || '';
+  const text  = params.get('text')  || '';
+  if (!title && !url) return;
+  // Clean up the URL
+  history.replaceState(null,'', window.location.pathname);
+  // Try to parse as restaurant
+  const name = title.replace(/\s*[-�|].*$/, '').trim() || text.trim() || 'Shared Place';
+  openAddModal();
+  document.getElementById('form-name').value = name;
+  if (url) {
+    document.getElementById('form-website').value = url;
+    // Auto-parse if it looks like a Maps URL
+    if (url.includes('maps.google') || url.includes('goo.gl/maps') || url.includes('maps.app.goo.gl')) {
+      document.getElementById('form-maps-url').value = url;
+      parseMapsUrl(url);
+    }
+  }
+  showToast('?? Shared!', '"' + name + '" opened for review � fill in details and save!', 'success');
+}
+
+/* ------------------------------------------------------------
+   PHASE 7 � renderCards hook for compare mode
+   ------------------------------------------------------------ */
+
+// Patch card rendering to show compare checkbox when _compareMode is on
+const _origRenderCards = window.renderCards;
+
+function addCompareCheckboxes () {
+  if (!_compareMode) return;
+  document.querySelectorAll('.restaurant-card[data-id]').forEach(card => {
+    if (card.querySelector('.compare-check')) return;
+    const id = card.dataset.id;
+    const cb = document.createElement('button');
+    cb.className = 'compare-check icon-btn';
+    cb.title = 'Add to compare';
+    cb.style.cssText = 'position:absolute;top:8px;left:8px;width:28px;height:28px;border-radius:50%;background:rgba(37,99,235,.8);color:#fff;font-size:.8rem;z-index:10';
+    cb.textContent = _compareIds.has(id) ? '?' : '+';
+    cb.addEventListener('click', e => { e.stopPropagation(); toggleCompareCard(id); });
+    card.style.position = 'relative';
+    card.prepend(cb);
+  });
 }

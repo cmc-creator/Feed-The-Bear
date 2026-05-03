@@ -31,5 +31,15 @@
       "url": "/Feed-The-Bear/?action=add",
       "icons": [{"src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text y='80' font-size='80'>➕</text></svg>", "sizes": "96x96"}]
     }
-  ]
+  ],
+  "share_target": {
+    "action": "/Feed-The-Bear/",
+    "method": "GET",
+    "enctype": "application/x-www-form-urlencoded",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
 }

@@ -96,6 +96,11 @@
       <button id="challenge-btn" class="icon-btn" title="Friend Challenge">
         🏆
       </button>
+      <button id="voice-btn" class="icon-btn" title="Voice Add (say 'add [name]')">🎙️</button>
+      <button id="gallery-btn" class="icon-btn" title="Photo Gallery">🖼️</button>
+      <button id="compare-btn" class="icon-btn" title="Compare Restaurants">⚖️</button>
+      <button id="budget-btn" class="icon-btn" title="Dining Budget">💰</button>
+      <button id="profile-btn" class="icon-btn" title="My Foodie Profile">🌐</button>
       <button id="wrap-btn" class="icon-btn" title="Monthly Wrap">
         🎁
       </button>
@@ -176,6 +181,13 @@
     </div>
   </section>
 
+  <!-- ── Compare Selection Bar ──────────────────────────── -->
+  <div id="compare-bar" class="compare-bar hidden">
+    <span id="compare-count">Select 2–3 restaurants to compare</span>
+    <button id="compare-now-btn" class="btn-sm btn-orange" disabled>⚖️ Compare Now</button>
+    <button id="compare-cancel-btn" class="btn-ghost btn-sm">✕ Cancel</button>
+  </div>
+
   <!-- ── Bulk Action Bar ──────────────────────────────────── -->
   <div id="bulk-bar" class="bulk-bar hidden">
     <span id="bulk-count">Select restaurants</span>
@@ -239,6 +251,19 @@
           <h3>🌍 Cuisine Passport</h3>
           <p class="chart-sub">Cuisines you've explored</p>
           <div id="chart-passport" class="passport-grid"></div>
+        </div>
+      </div>
+      <!-- Budget + Calendar row -->
+      <div class="stats-charts-row">
+        <div class="stats-chart-card">
+          <h3>💰 Monthly Budget</h3>
+          <p class="chart-sub">Estimated dining spend this month</p>
+          <div id="chart-budget" class="budget-chart"></div>
+        </div>
+        <div class="stats-chart-card">
+          <h3>📅 Visit Calendar</h3>
+          <p class="chart-sub">Days you logged a meal</p>
+          <div id="chart-calendar" class="visit-calendar"></div>
         </div>
       </div>
     </div>
@@ -455,6 +480,7 @@
             <label for="form-tags">Tags <span class="label-hint">(comma-separated)</span></label>
             <input type="text" id="form-tags" placeholder="date night, solo lunch, family, must try, spicy…" autocomplete="off" list="tag-suggestions" />
             <datalist id="tag-suggestions"></datalist>
+            <div id="form-auto-tags" class="auto-tag-row hidden"></div>
           </div>
 
           <!-- Collection -->
@@ -674,6 +700,100 @@
   <!-- ── PDF Print Report (hidden, print-only) ──────────── -->
   <div id="print-report"></div>
 
+  <!-- ── Voice Add Overlay ─────────────────────────────────── -->
+  <div id="voice-overlay" class="voice-overlay hidden" role="status" aria-live="polite">
+    <div class="voice-card">
+      <div id="voice-pulse" class="voice-pulse">🎙️</div>
+      <div id="voice-status" class="voice-status">Listening…</div>
+      <div id="voice-transcript" class="voice-transcript"></div>
+      <button id="voice-cancel-btn" class="btn-ghost btn-sm">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ── Photo Gallery Modal ──────────────────────────────── -->
+  <div id="gallery-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="gallery-title">
+    <div class="modal-card gallery-card">
+      <div class="modal-header">
+        <h2 id="gallery-title">🖼️ Photo Gallery</h2>
+        <button id="gallery-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div id="gallery-grid" class="gallery-grid"></div>
+    </div>
+    <!-- Lightbox -->
+    <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true">
+      <button id="lightbox-close" class="lightbox-close" aria-label="Close">✕</button>
+      <button id="lightbox-prev" class="lightbox-nav lightbox-prev" aria-label="Previous">‹</button>
+      <img id="lightbox-img" class="lightbox-img" src="" alt="Restaurant photo" />
+      <div id="lightbox-caption" class="lightbox-caption"></div>
+      <button id="lightbox-next" class="lightbox-nav lightbox-next" aria-label="Next">›</button>
+    </div>
+  </div>
+
+  <!-- ── Compare Modal ────────────────────────────────────── -->
+  <div id="compare-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="compare-title">
+    <div class="modal-card compare-card">
+      <div class="modal-header">
+        <h2 id="compare-title">⚖️ Compare Restaurants</h2>
+        <button id="compare-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div id="compare-table" class="compare-table"></div>
+    </div>
+  </div>
+
+  <!-- ── Budget Modal ─────────────────────────────────────── -->
+  <div id="budget-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="budget-title">
+    <div class="modal-card budget-card">
+      <div class="modal-header">
+        <h2 id="budget-title">💰 Dining Budget</h2>
+        <button id="budget-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="import-subtitle">Set your monthly dining budget to track estimated spending.</p>
+      <div class="form-group">
+        <label for="budget-monthly-input">Monthly Budget ($)</label>
+        <input type="number" id="budget-monthly-input" class="import-textarea" placeholder="300" min="0" step="10" style="height:auto;padding:10px 12px" />
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label for="budget-avg-input">Average Spend Per Visit ($)</label>
+        <input type="number" id="budget-avg-input" class="import-textarea" placeholder="35" min="0" step="5" style="height:auto;padding:10px 12px" />
+      </div>
+      <button id="budget-save-btn" class="btn-primary" style="width:100%;margin-top:16px">Save Budget</button>
+    </div>
+  </div>
+
+  <!-- ── Public Foodie Profile Modal ──────────────────────── -->
+  <div id="profile-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="profile-title">
+    <div class="modal-card profile-card">
+      <div class="modal-header">
+        <h2 id="profile-title">🌐 My Foodie Profile</h2>
+        <button id="profile-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="import-subtitle">Share your top picks as a shareable card — no account needed, data encoded right in the link.</p>
+      <div id="profile-qr-wrap" class="profile-qr-wrap">
+        <canvas id="profile-qr" width="180" height="180"></canvas>
+      </div>
+      <div class="profile-link-row">
+        <input id="profile-link" class="challenge-link-input" readonly placeholder="Generating…" />
+        <button id="profile-copy-btn" class="btn-sm btn-orange">Copy</button>
+      </div>
+      <button id="profile-share-btn" class="btn-primary" style="width:100%;margin-top:10px">📤 Share Profile</button>
+      <div id="profile-preview" class="profile-preview"></div>
+    </div>
+  </div>
+
+  <!-- ── Foodie Profile Guest View ────────────────────────── -->
+  <div id="guest-profile-overlay" class="guest-profile-overlay hidden" role="dialog" aria-modal="true">
+    <div class="guest-profile-card">
+      <div class="guest-header">
+        <span class="guest-bear">🐻</span>
+        <h1 id="guest-profile-name">Foodie Profile</h1>
+        <p id="guest-profile-sub" class="guest-sub">Top picks shared via Feed The Bear</p>
+      </div>
+      <div id="guest-profile-list" class="guest-profile-list"></div>
+      <a href="./" class="btn-primary" style="display:block;text-align:center;margin-top:20px;text-decoration:none">🐻 Build My Own List</a>
+      <button id="guest-profile-close" class="btn-ghost" style="width:100%;margin-top:8px">Close Preview</button>
+    </div>
+  </div>
+
   <!-- ── Monthly Wrap Modal ───────────────────────────────── -->
   <div id="wrap-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="wrap-title">
     <div class="modal-card wrap-card">
@@ -707,6 +827,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLEg=" crossorigin=""></script>
   <script src="app.js"></script>
   <script>
