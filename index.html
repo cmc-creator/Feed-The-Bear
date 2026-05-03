@@ -21,6 +21,12 @@
 </head>
 <body>
 
+  <!-- ── Offline Banner ─────────────────────────────────────── -->
+  <div id="offline-banner" class="offline-banner hidden" role="status">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.56 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+    <span>You're offline — viewing cached data</span>
+  </div>
+
   <!-- ── PWA Install Banner ────────────────────────────────── -->
   <div id="pwa-banner" class="pwa-banner hidden" role="banner">
     <span class="pwa-banner-text">🐻 Install Feed The Bear for faster launch, offline access, and a true app feel.</span>
@@ -78,8 +84,23 @@
       <button id="collections-btn" class="icon-btn" title="My Lists">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
       </button>
+      <button id="tonight-btn" class="icon-btn" title="Tonight's Pick">
+        🎯
+      </button>
+      <button id="pdf-export-btn" class="icon-btn" title="Export Foodie Report PDF">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      </button>
+      <button id="challenge-btn" class="icon-btn" title="Friend Challenge">
+        🏆
+      </button>
       <button id="add-btn" class="btn-primary">
         <span>＋</span> Add Restaurant
+      </button>
+      <button id="tonight-btn" class="icon-btn" title="Tonight's Pick">
+        🎯
+      </button>
+      <button id="pdf-export-btn" class="icon-btn" title="Export Foodie Report PDF">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
       </button>
       <button id="chat-toggle-btn" class="chat-toggle-btn" title="Foodie Bear Chat">
         🐻 <span>Ask Foodie Bear</span>
@@ -190,6 +211,17 @@
           <div id="chart-top" class="top-list"></div>
         </div>
       </div>
+      <!-- Streak + Heatmap row -->
+      <div class="stats-charts-row">
+        <div class="stats-chart-card stats-chart-card--narrow">
+          <h3>🔥 Streaks</h3>
+          <div id="chart-streaks" class="streak-section"></div>
+        </div>
+        <div class="stats-chart-card stats-chart-card--wide">
+          <h3>📅 Visit Heatmap</h3>
+          <div id="chart-heatmap" class="heatmap-grid"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -227,6 +259,49 @@
     </div>
 
   </main>
+
+  <!-- ── Tonight's Pick Modal ──────────────────────────────── -->
+  <div id="tonight-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="tonight-title">
+    <div class="modal-card tonight-card">
+      <div class="modal-header">
+        <h2 id="tonight-title">🎯 Tonight's Pick</h2>
+        <button id="tonight-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="tonight-subtitle">Tell me about tonight and I'll find the perfect spot.</p>
+      <div class="tonight-moods" id="tonight-moods">
+        <button class="mood-chip" data-mood="quick">⚡ Quick bite</button>
+        <button class="mood-chip" data-mood="date">💫 Date night</button>
+        <button class="mood-chip" data-mood="budget">💰 Budget-friendly</button>
+        <button class="mood-chip" data-mood="fancy">🥂 Treat myself</button>
+        <button class="mood-chip" data-mood="new">🆕 Try something new</button>
+        <button class="mood-chip" data-mood="comfort">🛋️ Comfort food</button>
+        <button class="mood-chip" data-mood="healthy">🥗 Something light</button>
+        <button class="mood-chip" data-mood="surprise">🎲 Surprise me</button>
+      </div>
+      <div id="tonight-result" class="tonight-result hidden"></div>
+      <div class="tonight-actions">
+        <button id="tonight-pick-btn" class="btn-primary" style="width:100%">Find My Pick 🎯</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Friend Challenge Modal ───────────────────────────── -->
+  <div id="challenge-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="challenge-title">
+    <div class="modal-card challenge-card">
+      <div class="modal-header">
+        <h2 id="challenge-title">🏆 Friend Challenge</h2>
+        <button id="challenge-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="challenge-subtitle">Share your top picks and challenge a friend to beat your taste!</p>
+      <div id="challenge-preview" class="challenge-preview"></div>
+      <div class="challenge-share-row">
+        <input id="challenge-link" class="challenge-link-input" readonly placeholder="Generating link…" />
+        <button id="challenge-copy-btn" class="btn-sm btn-orange">Copy</button>
+      </div>
+      <button id="challenge-share-btn" class="btn-primary" style="width:100%;margin-top:12px">📤 Share Challenge</button>
+      <div class="challenge-footer">Challenge links encode your top 5 rated restaurants — no account needed.</div>
+    </div>
+  </div>
 
   <!-- ── Add / Edit Modal ──────────────────────────────────── -->
   <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
@@ -301,12 +376,12 @@
 
           <!-- Photo -->
           <div class="form-group form-full">
-            <label for="form-photo">Photo <span class="label-hint">(URL or upload)</span></label>
+            <label for="form-photo">Photo <span class="label-hint">(URL or upload)</span> <button type="button" id="ai-photo-btn" class="btn-sm btn-ai">🤖 AI Fill</button></label>
             <input type="url" id="form-photo" placeholder="https://example.com/photo.jpg" />
             <label class="photo-upload-label">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               Upload from device
-              <input type="file" id="form-photo-file" accept="image/*" style="display:none" />
+              <input type="file" id="form-photo-file" accept="image/*" capture="environment" style="display:none" />
             </label>
           </div>
 
@@ -570,6 +645,9 @@
 
   <!-- ── Share Card Canvas (hidden) ─────────────────────── -->
   <canvas id="share-canvas" style="display:none" width="800" height="450"></canvas>
+
+  <!-- ── PDF Print Report (hidden, print-only) ──────────── -->
+  <div id="print-report"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLEg=" crossorigin=""></script>
   <script src="app.js"></script>

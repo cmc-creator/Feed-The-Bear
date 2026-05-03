@@ -1129,6 +1129,8 @@ function showStatsView () {
   document.getElementById('main-content').classList.add('hidden');
   document.getElementById('map-container').classList.add('hidden');
   renderStatsView();
+  renderStreaks();
+  renderHeatmap();
 }
 
 function hideStatsView () {
@@ -2260,11 +2262,40 @@ function setupEvents () {
       closeModal();
       closeDetailModal();
       closeChat();
+      closeTonightsPick();
+      closeChallengeModal();
       document.getElementById('nearby-overlay').classList.add('hidden');
       document.getElementById('collections-panel').classList.remove('open');
       maybeHideOverlay();
     }
   });
+
+  // Tonight's Pick
+  document.getElementById('tonight-btn').addEventListener('click', showTonightsPick);
+  document.getElementById('tonight-close-btn').addEventListener('click', closeTonightsPick);
+  document.getElementById('tonight-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('tonight-overlay')) closeTonightsPick();
+  });
+  document.getElementById('tonight-pick-btn').addEventListener('click', runTonightsPick);
+  document.getElementById('tonight-moods').addEventListener('click', e => {
+    const chip = e.target.closest('.mood-chip');
+    if (chip) chip.classList.toggle('selected');
+  });
+
+  // PDF export
+  document.getElementById('pdf-export-btn').addEventListener('click', exportFoodieReport);
+
+  // Friend Challenge
+  document.getElementById('challenge-btn').addEventListener('click', openChallengeModal);
+  document.getElementById('challenge-close-btn').addEventListener('click', closeChallengeModal);
+  document.getElementById('challenge-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('challenge-overlay')) closeChallengeModal();
+  });
+  document.getElementById('challenge-copy-btn').addEventListener('click', copyChallengeLink);
+  document.getElementById('challenge-share-btn').addEventListener('click', shareChallengeLink);
+
+  // AI Photo Fill
+  document.getElementById('ai-photo-btn').addEventListener('click', aiPhotoFill);
 }
 
 function updateClearBtn () {
@@ -2300,7 +2331,326 @@ document.addEventListener('DOMContentLoaded', () => {
   initPwa();
   initTheme();
   initCollections();
+  initOfflineIndicator();
   updateTagSuggestions();
   renderAll();
   showOnboarding();
+  checkIncomingChallenge();
 });
+/* ------------------------------------------------------------
+   PHASE 5 � STREAK TRACKER
+   ------------------------------------------------------------ */
+
+function calcStreaks () {
+  const all       = state.restaurants;
+  const allVisits = all.flatMap(r => (r.visits || []).map(v => v.date)).filter(Boolean);
+  all.forEach(r => { if (r.dateVisited && !(r.visits||[]).length) allVisits.push(r.dateVisited); });
+  if (!allVisits.length) return { currentStreak: 0, longestStreak: 0 };
+  const isoWeek = d => {
+    const date = new Date(d);
+    const jan1 = new Date(date.getFullYear(), 0, 1);
+    const week = Math.ceil(((date - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+    return date.getFullYear() + '-W' + String(week).padStart(2,'0');
+  };
+  const weekSet = new Set(allVisits.map(isoWeek));
+  const sorted  = [...weekSet].sort();
+  let longest = 1, current = 1;
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1], next = sorted[i];
+    const [py, pw] = prev.split('-W').map(Number);
+    const [ny, nw] = next.split('-W').map(Number);
+    const consec = (ny === py && nw === pw + 1) || (ny === py + 1 && pw >= 52 && nw === 1);
+    if (consec) { current++; if (current > longest) longest = current; } else { current = 1; }
+  }
+  const nowWeek  = isoWeek(new Date().toISOString().slice(0,10));
+  const lastWeek = (() => { const d = new Date(); d.setDate(d.getDate()-7); return isoWeek(d.toISOString().slice(0,10)); })();
+  const lastVisitWeek = sorted[sorted.length-1];
+  const active = lastVisitWeek === nowWeek || lastVisitWeek === lastWeek;
+  return { currentStreak: active ? current : 0, longestStreak: longest };
+}
+
+function renderStreaks () {
+  const el = document.getElementById('chart-streaks');
+  if (!el) return;
+  const { currentStreak, longestStreak } = calcStreaks();
+  const totalVisited = state.restaurants.filter(r => r.status === 'visited').length;
+  const allVisits    = state.restaurants.flatMap(r => r.visits || []);
+  let msg = currentStreak >= 5 ? 'You are on a hot streak! Keep it up!'
+          : currentStreak >= 3 ? 'Nice streak - do not break it!'
+          : currentStreak >  0 ? 'Just getting started!'
+          : 'No recent visits - time to eat out!';
+  el.innerHTML = '<div class="streak-big' + (currentStreak >= 3 ? ' fire' : '') + '">' + currentStreak + '</div>'
+    + '<div class="streak-label">week' + (currentStreak !== 1 ? 's' : '') + ' current streak</div>'
+    + '<div class="streak-row">'
+    + '<div class="streak-mini"><div class="sm-val">' + longestStreak + '</div><div class="sm-lbl">Best streak</div></div>'
+    + '<div class="streak-mini"><div class="sm-val">' + totalVisited + '</div><div class="sm-lbl">Visited</div></div>'
+    + '<div class="streak-mini"><div class="sm-val">' + allVisits.length + '</div><div class="sm-lbl">Check-ins</div></div>'
+    + '</div>'
+    + '<div class="streak-msg">' + (currentStreak >= 5 ? '?? ' : currentStreak >= 3 ? '?? ' : currentStreak > 0 ? '?? ' : '?? ') + escHtml(msg) + '</div>';
+}
+
+/* ------------------------------------------------------------
+   PHASE 5 � VISIT HEATMAP
+   ------------------------------------------------------------ */
+
+function renderHeatmap () {
+  const el = document.getElementById('chart-heatmap');
+  if (!el) return;
+  const dateCounts = {};
+  state.restaurants.forEach(r => {
+    (r.visits || []).forEach(v => { if (v.date) dateCounts[v.date] = (dateCounts[v.date]||0)+1; });
+    if (r.dateVisited && !(r.visits||[]).length) dateCounts[r.dateVisited] = (dateCounts[r.dateVisited]||0)+1;
+  });
+  const today = new Date();
+  const dow   = today.getDay();
+  const startDate = new Date(today);
+  startDate.setDate(today.getDate() - dow - 7 * 51);
+  const cur = new Date(startDate);
+  const weeks = [];
+  for (let w = 0; w < 53; w++) {
+    const days = [];
+    for (let d = 0; d < 7; d++) {
+      const iso   = cur.toISOString().slice(0,10);
+      const count = dateCounts[iso] || 0;
+      const level = count === 0 ? 0 : count === 1 ? 1 : count === 2 ? 2 : count <= 4 ? 3 : 4;
+      const future = cur > today;
+      days.push({ iso, level, count, future });
+      cur.setDate(cur.getDate()+1);
+    }
+    weeks.push(days);
+  }
+  const weeksHtml = weeks.map(days =>
+    '<div class="heatmap-week">' + days.map(d =>
+      '<div class="heatmap-cell" data-level="' + (d.future ? 0 : d.level) + '" title="' + d.iso + (d.count > 0 ? ': ' + d.count + ' visit' + (d.count > 1 ? 's' : '') : '') + '"></div>'
+    ).join('') + '</div>'
+  ).join('');
+  el.innerHTML = '<div class="heatmap-inner">' + weeksHtml + '</div>'
+    + '<div class="heatmap-legend">Less'
+    + '<div class="heatmap-legend-cell" data-level="0"></div>'
+    + '<div class="heatmap-legend-cell" data-level="1"></div>'
+    + '<div class="heatmap-legend-cell" data-level="2"></div>'
+    + '<div class="heatmap-legend-cell" data-level="3"></div>'
+    + '<div class="heatmap-legend-cell" data-level="4"></div>'
+    + 'More</div>';
+}
+
+/* ------------------------------------------------------------
+   PHASE 5 � TONIGHT'S PICK
+   ------------------------------------------------------------ */
+
+function showTonightsPick () {
+  document.getElementById('tonight-result').classList.add('hidden');
+  document.getElementById('tonight-result').innerHTML = '';
+  document.querySelectorAll('.mood-chip').forEach(c => c.classList.remove('selected'));
+  document.getElementById('tonight-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeTonightsPick () {
+  document.getElementById('tonight-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function runTonightsPick () {
+  const moods = [...document.querySelectorAll('.mood-chip.selected')].map(c => c.dataset.mood);
+  const all   = state.restaurants;
+  if (!all.length) {
+    document.getElementById('tonight-result').innerHTML = '<p style="text-align:center;color:var(--text-dim)">No restaurants saved yet!</p>';
+    document.getElementById('tonight-result').classList.remove('hidden');
+    return;
+  }
+  const scored = all.map(r => {
+    let s = Math.random() * 0.3;
+    if (r.myRating >= 4) s += 2; else if (r.myRating === 3) s += 1;
+    if (moods.includes('new')     && r.status === 'want-to-try') s += 3;
+    if (moods.includes('budget')  && r.priceRange <= 2) s += 2;
+    if (moods.includes('fancy')   && r.priceRange >= 3) s += 2;
+    if (moods.includes('date')    && r.priceRange >= 2) s += 1;
+    if (moods.includes('comfort') && ['Italian','American','Mexican','Japanese','Chinese','Indian'].includes(r.cuisine)) s += 2;
+    if (moods.includes('healthy') && ['Mediterranean','Japanese','Vietnamese','Thai','Greek'].includes(r.cuisine)) s += 2;
+    if (moods.includes('quick')   && r.priceRange <= 2) s += 1;
+    if (moods.includes('surprise')) s += Math.random() * 2;
+    return { r, s };
+  });
+  scored.sort((a,b) => b.s - a.s);
+  const p = scored[0].r;
+  const stars = p.myRating > 0 ? '?'.repeat(p.myRating) : '';
+  const price = p.priceRange ? '$'.repeat(p.priceRange) : '';
+  const status = p.status === 'visited' ? '? Visited' : '?? Want to Try';
+  const vc = (p.visits||[]).length;
+  const res = document.getElementById('tonight-result');
+  res.innerHTML = '<div class="pick-name">' + escHtml(p.name) + '</div>'
+    + '<div class="pick-meta">' + escHtml(p.cuisine||'Restaurant') + (price ? ' � '+price : '') + (stars ? ' � '+stars : '') + ' � ' + status + (vc > 0 ? ' � '+vc+' visit'+(vc>1?'s':'') : '') + '</div>'
+    + (p.address ? '<div class="pick-address">?? ' + escHtml(p.address) + '</div>' : '')
+    + '<div class="pick-actions">'
+    + '<button class="btn-sm btn-orange" onclick="openDetailModal(\'' + p.id + '\');closeTonightsPick()">View Details</button>'
+    + (p.address ? '<a class="btn-sm btn-secondary" style="text-decoration:none;display:inline-flex;align-items:center" href="https://maps.google.com/?q=' + encodeURIComponent(p.address) + '" target="_blank" rel="noopener">??? Directions</a>' : '')
+    + '</div>';
+  res.classList.remove('hidden');
+}
+
+/* ------------------------------------------------------------
+   PHASE 5 � OFFLINE INDICATOR
+   ------------------------------------------------------------ */
+
+function initOfflineIndicator () {
+  const banner = document.getElementById('offline-banner');
+  if (!banner) return;
+  const update = () => navigator.onLine ? banner.classList.add('hidden') : banner.classList.remove('hidden');
+  window.addEventListener('online',  update);
+  window.addEventListener('offline', update);
+  update();
+}
+
+/* ------------------------------------------------------------
+   PHASE 5 � EXPORT PDF (FOODIE REPORT)
+   ------------------------------------------------------------ */
+
+function exportFoodieReport () {
+  const all       = state.restaurants;
+  const visited   = all.filter(r => r.status === 'visited');
+  const want      = all.filter(r => r.status === 'want-to-try');
+  const allVisits = all.flatMap(r => r.visits || []);
+  const rated     = visited.filter(r => r.myRating > 0);
+  const avgRating = rated.length ? (rated.reduce((s,r)=>s+r.myRating,0)/rated.length).toFixed(1) : '�';
+  const topPicks  = [...visited].filter(r=>r.myRating>0).sort((a,b)=>b.myRating-a.myRating).slice(0,10);
+  const wantTop   = want.slice(0,8);
+  const { currentStreak, longestStreak } = calcStreaks();
+  const today = new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  const reportEl = document.getElementById('print-report');
+  reportEl.innerHTML = '<div class="pr-cover"><h1>Feed The Bear</h1>'
+    + '<p style="font-size:1.6rem;font-weight:700;margin:4px 0">My Foodie Report</p>'
+    + '<p>Generated ' + today + '</p></div>'
+    + '<div class="pr-section"><h2>Overview</h2>'
+    + '<div class="pr-stat-row">'
+    + '<div class="pr-stat"><div class="val">'+all.length+'</div><div class="lbl">Total Saved</div></div>'
+    + '<div class="pr-stat"><div class="val">'+visited.length+'</div><div class="lbl">Visited</div></div>'
+    + '<div class="pr-stat"><div class="val">'+want.length+'</div><div class="lbl">Want to Try</div></div>'
+    + '<div class="pr-stat"><div class="val">'+allVisits.length+'</div><div class="lbl">Check-ins</div></div>'
+    + '<div class="pr-stat"><div class="val">'+avgRating+(avgRating!=='�'?' ?':'')+'</div><div class="lbl">Avg Rating</div></div>'
+    + '<div class="pr-stat"><div class="val">'+currentStreak+' wk</div><div class="lbl">Current Streak</div></div>'
+    + '<div class="pr-stat"><div class="val">'+longestStreak+' wk</div><div class="lbl">Best Streak</div></div>'
+    + '</div></div>'
+    + (topPicks.length ? '<div class="pr-section"><h2>Top Rated Visits</h2>'
+      + topPicks.map((r,i) => '<div class="pr-pick"><div class="rank">#'+(i+1)+'</div><div><div class="name">'+escHtml(r.name)+'</div>'+(r.address?'<div class="addr">'+escHtml(r.address)+'</div>':'')+'</div><div class="stars">'+'?'.repeat(r.myRating)+'</div></div>').join('')
+      + '</div>' : '')
+    + (wantTop.length ? '<div class="pr-section"><h2>Restaurants to Try</h2>'
+      + wantTop.map((r,i) => '<div class="pr-pick"><div class="rank">'+(i+1)+'.</div><div><div class="name">'+escHtml(r.name)+'</div>'+(r.address?'<div class="addr">'+escHtml(r.address)+'</div>':'')+'</div><div class="stars">'+(r.priceRange?'$'.repeat(r.priceRange):'')+'</div></div>').join('')
+      + '</div>' : '');
+  window.print();
+}
+
+/* ------------------------------------------------------------
+   PHASE 5 � FRIEND CHALLENGE
+   ------------------------------------------------------------ */
+
+function openChallengeModal () {
+  const top5 = [...state.restaurants].filter(r=>r.myRating>0).sort((a,b)=>b.myRating-a.myRating).slice(0,5);
+  const preview = document.getElementById('challenge-preview');
+  if (!top5.length) {
+    preview.innerHTML = '<p style="text-align:center;color:var(--text-dim);padding:16px">Rate some restaurants first!</p>';
+  } else {
+    preview.innerHTML = top5.map((r,i) =>
+      '<div class="challenge-pick-item"><span class="cp-rank">#'+(i+1)+'</span><span class="cp-emoji">'+cuisineEmoji(r.cuisine)+'</span><span class="cp-name">'+escHtml(r.name)+'</span><span class="cp-stars">'+'?'.repeat(r.myRating)+'</span></div>'
+    ).join('');
+  }
+  const baseUrl = window.location.origin + window.location.pathname.replace(/\/$/, '');
+  const payload = top5.map(r => ({ n: r.name.slice(0,40), c: r.cuisine||'', s: r.myRating, a: (r.address||'').slice(0,60) }));
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  document.getElementById('challenge-link').value = baseUrl + '?challenge=' + encoded;
+  document.getElementById('challenge-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeChallengeModal () {
+  document.getElementById('challenge-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function copyChallengeLink () {
+  const input = document.getElementById('challenge-link');
+  input.select();
+  try { navigator.clipboard.writeText(input.value).catch(()=>document.execCommand('copy')); } catch(_) { document.execCommand('copy'); }
+  const btn = document.getElementById('challenge-copy-btn');
+  btn.textContent = '? Copied!';
+  setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+}
+function shareChallengeLink () {
+  const link = document.getElementById('challenge-link').value;
+  if (navigator.share) { navigator.share({ title: 'Feed The Bear Challenge', text: 'Can you beat my restaurant picks?', url: link }).catch(()=>{}); }
+  else { copyChallengeLink(); }
+}
+function checkIncomingChallenge () {
+  const params = new URLSearchParams(window.location.search);
+  const encoded = params.get('challenge');
+  if (!encoded) return;
+  try {
+    const picks = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+    if (!Array.isArray(picks) || !picks.length) return;
+    const preview = document.getElementById('challenge-preview');
+    preview.innerHTML = '<div class="challenge-incoming"><h3>A friend challenged you!</h3><p>Here are their top ' + picks.length + ' restaurants:</p></div>'
+      + picks.map((p,i) => '<div class="challenge-pick-item"><span class="cp-rank">#'+(i+1)+'</span><span class="cp-name">'+escHtml(p.n)+'</span><span class="cp-stars">'+'?'.repeat(p.s)+'</span></div>').join('')
+      + '<div class="challenge-reaction-row" id="cr-row"></div>';
+    const row = document.getElementById('cr-row');
+    [['Been there','??','var(--green)'],['Want to try','??','var(--blue)'],['Never heard of it','??','var(--text-dim)']].forEach(([lbl,em,col]) => {
+      const btn = document.createElement('button');
+      btn.className = 'reaction-btn';
+      btn.textContent = em + ' ' + lbl;
+      btn.onclick = () => { row.innerHTML = '<p style="text-align:center;color:'+col+';padding:8px">'+em+' Nice!</p>'; };
+      row.appendChild(btn);
+    });
+    document.getElementById('challenge-link').closest('.challenge-share-row').style.display = 'none';
+    const shareBtn = document.getElementById('challenge-share-btn');
+    shareBtn.textContent = 'Add Your Own List';
+    shareBtn.onclick = () => { closeChallengeModal(); openAddModal(); };
+    document.getElementById('challenge-title').textContent = 'Friend Challenge';
+    document.getElementById('challenge-overlay').classList.remove('hidden');
+    document.body.classList.add('overlay-open');
+  } catch(_) { /* malformed � ignore */ }
+}
+
+/* ------------------------------------------------------------
+   PHASE 5 � AI PHOTO RECOGNITION STUB
+   ------------------------------------------------------------ */
+
+async function aiPhotoFill () {
+  const apiKey = state.settings.aiApiKey || '';
+  if (!apiKey) {
+    const confirmed = confirm('AI Photo Fill uses GPT-4o to read restaurant signs and menus and auto-fill the form.\n\nAdd your OpenAI API key to enable it.\n\nClick OK to paste your key now.');
+    if (confirmed) {
+      const key = prompt('Paste your OpenAI API key (starts with sk-):');
+      if (key && key.startsWith('sk-')) { state.settings.aiApiKey = key; saveData(); alert('API key saved! Try AI Fill again.'); }
+      else if (key) { alert('That does not look like a valid OpenAI key.'); }
+    }
+    return;
+  }
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    const photoGroup = document.getElementById('form-photo').parentElement;
+    let ind = photoGroup.querySelector('.ai-analyzing');
+    if (!ind) { ind = document.createElement('div'); ind.className = 'ai-analyzing'; ind.innerHTML = 'Analyzing<div class="ai-dot"></div><div class="ai-dot"></div><div class="ai-dot"></div>'; photoGroup.appendChild(ind); }
+    try {
+      const b64 = await new Promise((res,rej) => { const r = new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(file); });
+      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+        body: JSON.stringify({ model: 'gpt-4o', max_tokens: 256, messages: [{ role:'user', content: [
+          { type:'text', text: 'If this image shows a restaurant, extract name, cuisine, address. Reply ONLY with JSON like {"name":"...","cuisine":"...","address":"..."}. If nothing identifiable, reply {}.' },
+          { type:'image_url', image_url: { url: 'data:'+file.type+';base64,'+b64, detail:'low' } }
+        ]}]})
+      });
+      if (!resp.ok) throw new Error('API ' + resp.status);
+      const data = await resp.json();
+      const txt  = data.choices?.[0]?.message?.content || '{}';
+      const result = JSON.parse(txt.replace(/```json\n?|\n?```/g,'').trim());
+      if (result.name)    document.getElementById('form-name').value    = result.name;
+      if (result.cuisine) document.getElementById('form-cuisine').value = result.cuisine;
+      if (result.address) document.getElementById('form-address').value = result.address;
+      ind.innerHTML = 'AI filled! Review above.'; ind.style.color = 'var(--green)';
+      setTimeout(() => ind.remove(), 4000);
+    } catch (err) {
+      ind.innerHTML = 'AI error: ' + escHtml(err.message); ind.style.color = 'var(--primary)';
+      setTimeout(() => ind.remove(), 5000);
+    }
+  };
+  input.click();
+}
