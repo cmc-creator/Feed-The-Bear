@@ -2409,3 +2409,245 @@ body.light-mode #profile-btn {
 .guest-item-name { font-weight:700; font-size:.92rem; }
 .guest-item-meta { font-size:.74rem; color:var(--text-dim); margin-top:2px; }
 .guest-item-stars { color:var(--gold); font-size:.78rem; }
+/* ------------------------------------------------------------
+   MOBILE FIX — Header overflow menu + general polish
+   ------------------------------------------------------------ */
+
+/* Slim down header-actions to only essential items */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* ? More menu */
+.more-menu-wrap {
+  position: relative;
+}
+.more-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 220px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 48px rgba(0,0,0,.5);
+  z-index: 300;
+  padding: 6px 0;
+  display: none;
+  animation: slideDown .15s ease;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.more-menu.open { display: block; }
+@keyframes slideDown { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+.more-menu-section {
+  padding: 8px 14px 4px;
+  font-size: .65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-dim);
+}
+.more-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 16px;
+  font-size: .85rem;
+  font-weight: 500;
+  color: var(--text);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background var(--transition);
+  font-family: inherit;
+}
+.more-menu-item:hover { background: var(--surface3); color: var(--primary); }
+
+/* Better touch targets on mobile */
+@media (max-width: 768px) {
+  .icon-btn { min-width: 44px; min-height: 44px; padding: 10px; }
+  .btn-primary { padding: 10px 16px; font-size: .9rem; }
+  .modal-card { border-radius: 20px 20px 0 0 !important; margin: auto 0 0; max-height: 92vh; overflow-y: auto; }
+  .modal-overlay { align-items: flex-end; }
+  .more-menu { right: -8px; width: 240px; }
+  .chat-toggle-btn span { display: none; }
+  /* Larger tap targets for cards */
+  .card-action-btn { padding: 10px 14px; font-size: .82rem; }
+}
+@media (max-width: 480px) {
+  .header-actions { gap: 4px; }
+  .btn-primary span { display: none; }
+  .app-header { padding: 0 10px; }
+}
+
+/* ------------------------------------------------------------
+   PHASE 8 — CRAVING ENGINE
+   ------------------------------------------------------------ */
+.craving-card { max-width: 520px; }
+.craving-subtitle { font-size: .85rem; color: var(--text-dim); margin: 0 0 16px; }
+.craving-chips-row {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.craving-chip {
+  padding: 7px 14px;
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.craving-chip:hover,
+.craving-chip.selected { background: var(--primary); color: #fff; border-color: var(--primary); }
+.craving-result {
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--surface2);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+}
+.craving-match-name { font-size: 1.2rem; font-weight: 800; color: var(--text); margin: 0 0 4px; }
+.craving-match-meta { font-size: .8rem; color: var(--text-dim); margin-bottom: 8px; }
+.craving-match-why { font-size: .82rem; color: var(--text-muted); font-style: italic; }
+.craving-match-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+/* ------------------------------------------------------------
+   PHASE 8 — DISH TRACKER
+   ------------------------------------------------------------ */
+.dish-card { max-width: 500px; }
+.dish-subtitle { font-size: .85rem; color: var(--primary); font-weight: 700; margin: 0 0 12px; }
+.dish-add-row { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+.star-picker-mini { display: flex; gap: 2px; }
+.spm {
+  font-size: 1.2rem; color: var(--border); cursor: pointer;
+  transition: color var(--transition);
+}
+.spm.on, .spm:hover { color: var(--gold); }
+.dish-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+.dish-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border-radius: 10px;
+  font-size: .85rem;
+}
+.dish-item-name { flex: 1; font-weight: 600; color: var(--text); }
+.dish-item-stars { color: var(--gold); font-size: .8rem; }
+.dish-item-delete { color: var(--text-dim); font-size: .8rem; cursor: pointer; }
+.dish-item-delete:hover { color: var(--red, #e74c3c); }
+.dish-empty { color: var(--text-dim); font-size: .82rem; text-align: center; padding: 20px; }
+
+/* ------------------------------------------------------------
+   PHASE 8 — YEAR IN REVIEW
+   ------------------------------------------------------------ */
+.review-card { max-width: 600px; }
+.review-year-picker {
+  display: flex; align-items: center; justify-content: center; gap: 16px;
+  margin-bottom: 16px;
+}
+.review-year-label { font-size: 1.5rem; font-weight: 800; color: var(--text); }
+.review-content { display: flex; flex-direction: column; gap: 16px; max-height: 60vh; overflow-y: auto; }
+.review-slide {
+  background: linear-gradient(135deg, var(--surface2), var(--surface3));
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  border: 1px solid var(--border);
+  text-align: center;
+}
+.review-slide-emoji { font-size: 3rem; margin-bottom: 8px; }
+.review-slide-title { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); margin-bottom: 4px; }
+.review-slide-value { font-size: 2rem; font-weight: 900; color: var(--primary); }
+.review-slide-sub { font-size: .82rem; color: var(--text-muted); margin-top: 6px; }
+.review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.review-top-list { list-style: none; padding: 0; margin: 8px 0 0; text-align: left; }
+.review-top-list li { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: .82rem; display: flex; justify-content: space-between; }
+
+/* ------------------------------------------------------------
+   PHASE 8 — FOODIE FRIENDS
+   ------------------------------------------------------------ */
+.friends-card { max-width: 520px; }
+.friends-subtitle { font-size: .82rem; color: var(--text-dim); margin: 0 0 12px; }
+.friends-result { margin-top: 16px; }
+.friends-overlap {
+  padding: 14px 16px; background: var(--surface2);
+  border-radius: 12px; margin-bottom: 12px;
+  border-left: 3px solid var(--primary);
+}
+.friends-overlap-title { font-size: .85rem; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.friends-overlap-item { font-size: .8rem; color: var(--text-muted); padding: 3px 0; }
+.friends-section-title { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); margin: 12px 0 6px; }
+.friends-pick-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.friends-pick-name { flex: 1; font-size: .85rem; font-weight: 600; color: var(--text); }
+.friends-pick-stars { color: var(--gold); font-size: .8rem; }
+
+/* ------------------------------------------------------------
+   PHASE 8 — SMART DISCOVERY
+   ------------------------------------------------------------ */
+.discover-card { max-width: 560px; }
+.discover-subtitle { font-size: .82rem; color: var(--text-dim); margin: 0 0 12px; }
+.discover-results { display: flex; flex-direction: column; gap: 10px; max-height: 50vh; overflow-y: auto; }
+.discover-empty { color: var(--text-dim); font-size: .82rem; text-align: center; padding: 24px; }
+.discover-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 14px; background: var(--surface2);
+  border-radius: 12px; border: 1px solid var(--border);
+}
+.discover-item-emoji { font-size: 1.6rem; flex-shrink: 0; }
+.discover-item-body { flex: 1; min-width: 0; }
+.discover-item-name { font-size: .9rem; font-weight: 700; color: var(--text); }
+.discover-item-meta { font-size: .75rem; color: var(--text-dim); margin: 2px 0 6px; }
+.discover-item-match { font-size: .72rem; color: var(--primary); font-weight: 600; }
+.discover-item-add { flex-shrink: 0; }
+.discover-loading { display: flex; align-items: center; gap: 10px; padding: 24px; color: var(--text-dim); font-size: .85rem; justify-content: center; }
+
+/* ------------------------------------------------------------
+   PHASE 8 — CHALLENGES
+   ------------------------------------------------------------ */
+.challenges-card { max-width: 540px; }
+.challenges-tabs { display: flex; gap: 4px; background: var(--surface2); border-radius: 10px; padding: 4px; margin-bottom: 14px; }
+.chal-tab {
+  flex: 1; padding: 8px 10px; border-radius: 8px;
+  font-size: .8rem; font-weight: 600; color: var(--text-dim);
+  background: none; border: none; cursor: pointer; transition: all var(--transition);
+  font-family: inherit;
+}
+.chal-tab.active { background: var(--primary); color: #fff; }
+.chal-tab-panel { display: flex; flex-direction: column; gap: 10px; }
+.chal-tab-panel.hidden { display: none; }
+.challenge-item {
+  padding: 14px 16px; background: var(--surface2);
+  border-radius: 12px; border: 1px solid var(--border);
+}
+.challenge-item-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.challenge-item-name { font-size: .9rem; font-weight: 700; color: var(--text); }
+.challenge-item-deadline { font-size: .72rem; color: var(--text-dim); }
+.challenge-progress-track { height: 8px; background: var(--surface3); border-radius: 4px; overflow: hidden; }
+.challenge-progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--gold)); border-radius: 4px; transition: width .6s cubic-bezier(.4,0,.2,1); }
+.challenge-progress-label { font-size: .75rem; color: var(--text-dim); margin-top: 5px; }
+.challenge-complete { border-color: var(--green); }
+.challenge-complete .challenge-item-name::before { content: '? '; }
+.challenges-empty { color: var(--text-dim); font-size: .82rem; text-align: center; padding: 24px; }
+.challenges-empty a { color: var(--primary); cursor: pointer; }
+
+/* ------------------------------------------------------------
+   PHASE 8 — VISIT DEBRIEF
+   ------------------------------------------------------------ */
+.debrief-card { max-width: 440px; }
+.debrief-subtitle { font-size: .9rem; color: var(--primary); font-weight: 700; margin: 0 0 16px; }
+.debrief-steps { display: flex; flex-direction: column; gap: 14px; }
+.debrief-q { font-size: .9rem; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+.debrief-emoji-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.debrief-emoji-btn {
+  padding: 8px 14px; border-radius: 20px;
+  background: var(--surface2); border: 1.5px solid var(--border);
+  font-size: .95rem; cursor: pointer; transition: all var(--transition);
+  font-family: inherit;
+}
+.debrief-emoji-btn.selected { background: var(--primary); border-color: var(--primary); color: #fff; }
+.debrief-textarea { width: 100%; resize: none; min-height: 70px; }

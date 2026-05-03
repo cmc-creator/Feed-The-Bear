@@ -2277,6 +2277,13 @@ function setupEvents () {
       closeCompare();
       closeBudget();
       closeFoodieProfile();
+      closeCravingEngine();
+      closeDishTracker();
+      closeYearReview();
+      closeFoodieFriends();
+      closeDiscover();
+      closeChallenges();
+      closeDebrief();
       document.getElementById('nearby-overlay').classList.add('hidden');
       document.getElementById('collections-panel').classList.remove('open');
       maybeHideOverlay();
@@ -2385,8 +2392,69 @@ function setupEvents () {
     if (el) el.addEventListener('input', computeAutoTags);
   });
 
-  // Phase 7 — Escape closes new modals
+  // Phase 7 — Escape closes new modals (comment only — actual close calls below in Escape handler)
   document.getElementById('form-name').addEventListener('input', computeAutoTags);
+
+  // Phase 8 — ⋯ More Menu
+  initMoreMenu();
+
+  // Phase 8 — Craving Engine
+  document.getElementById('craving-btn').addEventListener('click', openCravingEngine);
+  document.getElementById('craving-close-btn').addEventListener('click', closeCravingEngine);
+  document.getElementById('craving-go-btn').addEventListener('click', runCravingEngine);
+  document.getElementById('craving-overlay').addEventListener('click', e => { if (e.target === document.getElementById('craving-overlay')) closeCravingEngine(); });
+  document.getElementById('craving-mood-chips').addEventListener('click', e => {
+    const chip = e.target.closest('.craving-chip');
+    if (!chip) return;
+    chip.classList.toggle('selected');
+    const mood = chip.dataset.mood;
+    if (_cravingMoods.has(mood)) _cravingMoods.delete(mood); else _cravingMoods.add(mood);
+  });
+
+  // Phase 8 — Dish Tracker
+  document.getElementById('dish-close-btn').addEventListener('click', closeDishTracker);
+  document.getElementById('dish-overlay').addEventListener('click', e => { if (e.target === document.getElementById('dish-overlay')) closeDishTracker(); });
+  document.getElementById('dish-add-btn').addEventListener('click', addDish);
+  document.getElementById('dish-name-input').addEventListener('keydown', e => { if (e.key === 'Enter') addDish(); });
+  document.getElementById('dish-rating-picker').addEventListener('click', e => {
+    const star = e.target.closest('.spm');
+    if (!star) return;
+    _renderDishRatingPicker(parseInt(star.dataset.v));
+  });
+  document.getElementById('detail-dishes-btn').addEventListener('click', () => { if (state.detailId) openDishTracker(state.detailId); });
+
+  // Phase 8 — Visit Debrief
+  document.getElementById('detail-debrief-btn').addEventListener('click', () => { if (state.detailId) openVisitDebrief(state.detailId); });
+  document.getElementById('debrief-save-btn').addEventListener('click', saveDebrief);
+  document.getElementById('debrief-skip-btn').addEventListener('click', closeDebrief);
+  document.getElementById('debrief-overlay').addEventListener('click', e => { if (e.target === document.getElementById('debrief-overlay')) closeDebrief(); });
+
+  // Phase 8 — Year in Review
+  document.getElementById('review-close-btn').addEventListener('click', closeYearReview);
+  document.getElementById('review-close-btn2').addEventListener('click', closeYearReview);
+  document.getElementById('review-share-btn').addEventListener('click', shareYearReview);
+  document.getElementById('review-overlay').addEventListener('click', e => { if (e.target === document.getElementById('review-overlay')) closeYearReview(); });
+  document.getElementById('review-prev-year').addEventListener('click', () => { _reviewYear--; document.getElementById('review-year-label').textContent = _reviewYear; renderYearReview(); });
+  document.getElementById('review-next-year').addEventListener('click', () => { _reviewYear++; document.getElementById('review-year-label').textContent = _reviewYear; renderYearReview(); });
+
+  // Phase 8 — Foodie Friends
+  document.getElementById('friends-close-btn').addEventListener('click', closeFoodieFriends);
+  document.getElementById('friends-overlay').addEventListener('click', e => { if (e.target === document.getElementById('friends-overlay')) closeFoodieFriends(); });
+  document.getElementById('friends-load-btn').addEventListener('click', loadFriendProfile);
+  document.getElementById('friends-link-input').addEventListener('keydown', e => { if (e.key === 'Enter') loadFriendProfile(); });
+  document.getElementById('friends-copy-btn').addEventListener('click', () => { navigator.clipboard?.writeText(document.getElementById('friends-my-link-input').value); showToast('Copied!', 'Profile link copied.', 'success'); });
+
+  // Phase 8 — Smart Discovery
+  document.getElementById('discover-close-btn').addEventListener('click', closeDiscover);
+  document.getElementById('discover-overlay').addEventListener('click', e => { if (e.target === document.getElementById('discover-overlay')) closeDiscover(); });
+  document.getElementById('discover-search-btn').addEventListener('click', runDiscover);
+
+  // Phase 8 — Challenges
+  document.getElementById('challenges-close-btn').addEventListener('click', closeChallenges);
+  document.getElementById('challenges-overlay').addEventListener('click', e => { if (e.target === document.getElementById('challenges-overlay')) closeChallenges(); });
+  document.querySelectorAll('.chal-tab').forEach(tab => tab.addEventListener('click', () => switchChalTab(tab.dataset.tab)));
+  document.getElementById('chal-create-btn').addEventListener('click', createChallenge);
+  document.getElementById('chal-friend-load-btn').addEventListener('click', loadFriendChallenge);
 }
 
 function updateClearBtn () {
@@ -3916,4 +3984,750 @@ function addCompareCheckboxes () {
     card.style.position = 'relative';
     card.prepend(cb);
   });
+}
+
+/* ------------------------------------------------------------
+   PHASE 8 � ? MORE MENU CONTROLLER
+   ------------------------------------------------------------ */
+
+function initMoreMenu () {
+  const btn  = document.getElementById('more-menu-btn');
+  const menu = document.getElementById('more-menu');
+  if (!btn || !menu) return;
+
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const open = menu.classList.toggle('open');
+    btn.setAttribute('aria-expanded', open);
+  });
+
+  // Close on outside click
+  document.addEventListener('click', e => {
+    if (!menu.contains(e.target) && e.target !== btn) {
+      menu.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  // Dispatch to existing handlers via data-more attribute
+  menu.addEventListener('click', e => {
+    const item = e.target.closest('[data-more]');
+    if (!item) return;
+    menu.classList.remove('open');
+    btn.setAttribute('aria-expanded', 'false');
+    const action = item.dataset.more;
+    const map = {
+      'tonight':          () => document.getElementById('tonight-btn').click(),
+      'craving':          openCravingEngine,
+      'discover':         openDiscover,
+      'challenge':        openChallenges,
+      'gallery':          openGallery,
+      'compare':          toggleCompareMode,
+      'budget':           openBudget,
+      'dishes':           () => { if (state.detailId) openDishTracker(state.detailId); else showToast('Open a restaurant first', 'View a restaurant then tap Dishes.', 'error'); },
+      'review':           openYearReview,
+      'profile':          openFoodieProfile,
+      'friends':          openFoodieFriends,
+      'wrap':             () => document.getElementById('wrap-btn').click(),
+      'export':           () => document.getElementById('export-btn').click(),
+      'import-bookmarks': () => document.getElementById('import-bookmarks-btn').click(),
+      'pdf':              () => document.getElementById('pdf-export-btn').click(),
+      'bulk':             () => document.getElementById('bulk-select-btn').click(),
+      'collections':      () => document.getElementById('collections-btn').click(),
+      'location':         () => document.getElementById('location-toggle-btn').click(),
+    };
+    if (map[action]) map[action]();
+  });
+}
+
+/* ------------------------------------------------------------
+   PHASE 8 � ?? CRAVING ENGINE
+   ------------------------------------------------------------ */
+
+let _cravingMoods = new Set();
+
+function openCravingEngine () {
+  _cravingMoods.clear();
+  document.querySelectorAll('.craving-chip').forEach(c => c.classList.remove('selected'));
+  document.getElementById('craving-freetext').value = '';
+  document.getElementById('craving-result').classList.add('hidden');
+  document.getElementById('craving-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  // Populate my-link in friends while we're at it (pre-generate)
+  _buildFriendsMyLink();
+}
+function closeCravingEngine () {
+  document.getElementById('craving-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function runCravingEngine () {
+  const moods   = [..._cravingMoods];
+  const freetext = document.getElementById('craving-freetext').value.toLowerCase();
+  const candidates = state.restaurants.filter(r => r.status === 'want-to-try' || r.status === 'visited');
+  if (!candidates.length) {
+    document.getElementById('craving-result').innerHTML = '<p style="color:var(--text-dim);text-align:center">Add some restaurants first!</p>';
+    document.getElementById('craving-result').classList.remove('hidden');
+    return;
+  }
+
+  // Score each candidate
+  function score (r) {
+    let s = 0;
+    // Prefer unvisited if mood is 'new'
+    if (moods.includes('new') && r.status === 'want-to-try') s += 30;
+    if (!moods.includes('new') && r.myRating) s += r.myRating * 6;
+    // Price filters
+    const price = r.priceRange || 0;
+    if (moods.includes('cheap') && price <= 1) s += 25;
+    if (moods.includes('splurge') && price >= 3) s += 25;
+    if (moods.includes('quick') && price <= 2) s += 15;
+    if (moods.includes('date-night') && price >= 2) s += 20;
+    // Cuisine vibe
+    const cuisine = (r.cuisine || '').toLowerCase();
+    if (moods.includes('comfort') && /burger|pizza|bbq|american|italian|pasta/.test(cuisine)) s += 20;
+    if (moods.includes('healthy') && /salad|vegan|vegetarian|japanese|sushi|thai|mediterranean/.test(cuisine)) s += 20;
+    if (moods.includes('adventurous') && !/american|burger|pizza/.test(cuisine)) s += 15;
+    // Freetext matching
+    if (freetext) {
+      const haystack = [r.name, r.cuisine, r.notes, r.address].join(' ').toLowerCase();
+      const words = freetext.split(/\s+/).filter(w => w.length > 2);
+      words.forEach(w => { if (haystack.includes(w)) s += 12; });
+      // Budget hint
+      const budgetMatch = freetext.match(/under\s*\$?(\d+)/);
+      if (budgetMatch) {
+        const limit = parseInt(budgetMatch[1]);
+        const avgPerPrice = [0, 15, 30, 55, 90];
+        if (avgPerPrice[price] <= limit) s += 20;
+      }
+    }
+    // Recency penalty (don't always pick same place)
+    const visits = (r.visits||[]).length || (r.dateVisited ? 1 : 0);
+    s -= visits * 2;
+    // Random tiebreaker
+    s += Math.random() * 8;
+    return s;
+  }
+
+  const ranked = [...candidates].sort((a,b) => score(b) - score(a));
+  const winner = ranked[0];
+  const runner = ranked[1];
+
+  const priceMap = ['','$','$$','$$$','$$$$'];
+  const cuisine = winner.cuisine || 'Restaurant';
+  const price   = priceMap[winner.priceRange||0] || '';
+  const rating  = winner.myRating ? '?'.repeat(winner.myRating) : (winner.status === 'want-to-try' ? '?? Want to Try' : '');
+
+  // Build why string
+  const whyParts = [];
+  if (moods.includes('cheap') && (winner.priceRange||0) <= 1) whyParts.push('budget-friendly');
+  if (moods.includes('splurge') && (winner.priceRange||0) >= 3) whyParts.push('a great splurge');
+  if (moods.includes('date-night')) whyParts.push('perfect for a date night');
+  if (moods.includes('adventurous')) whyParts.push('something a bit different');
+  if (moods.includes('comfort')) whyParts.push('great comfort food vibes');
+  if (moods.includes('new') && winner.status === 'want-to-try') whyParts.push('on your want-to-try list');
+  if (!whyParts.length && winner.myRating >= 4) whyParts.push('one of your favourites');
+  if (!whyParts.length) whyParts.push('a solid pick from your list');
+  const why = 'Matches because it\'s ' + whyParts.join(', ') + '.';
+
+  const resultEl = document.getElementById('craving-result');
+  resultEl.innerHTML = `
+    <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--primary);margin-bottom:10px">?? Tonight's Match</div>
+    <div class="craving-match-name">${cuisineEmoji(winner.cuisine)} ${escHtml(winner.name)}</div>
+    <div class="craving-match-meta">${escHtml(cuisine)}${price ? ' � ' + price : ''}${rating ? ' � ' + rating : ''}</div>
+    <div class="craving-match-why">${escHtml(why)}</div>
+    <div class="craving-match-actions">
+      <button class="btn-primary btn-sm" onclick="openDetailModal('${winner.id}');closeCravingEngine()">View ?</button>
+      ${runner ? `<button class="btn-ghost btn-sm" onclick="runCravingEngine()">?? Try Again</button>` : ''}
+    </div>
+  `;
+  resultEl.classList.remove('hidden');
+}
+
+/* ------------------------------------------------------------
+   PHASE 8 � ??? DISH TRACKER
+   ------------------------------------------------------------ */
+
+let _dishRating = 0;
+const DISHES_KEY = 'ftb_dishes_v1';
+
+function getDishes () {
+  try { return JSON.parse(localStorage.getItem(DISHES_KEY)) || {}; } catch(_) { return {}; }
+}
+function saveDishes (data) { localStorage.setItem(DISHES_KEY, JSON.stringify(data)); }
+
+function openDishTracker (restaurantId) {
+  const r = state.restaurants.find(x => x.id === restaurantId);
+  if (!r) return;
+  state.detailId = restaurantId;
+  document.getElementById('dish-title').textContent = '??? Dish Tracker';
+  document.getElementById('dish-restaurant-name').textContent = r.name;
+  document.getElementById('dish-name-input').value = '';
+  _dishRating = 0;
+  _renderDishRatingPicker(0);
+  renderDishList(restaurantId);
+  document.getElementById('dish-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeDishTracker () {
+  document.getElementById('dish-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function _renderDishRatingPicker (val) {
+  document.querySelectorAll('.spm').forEach((s, i) => {
+    s.classList.toggle('on', i < val);
+  });
+  _dishRating = val;
+}
+function addDish () {
+  const name = document.getElementById('dish-name-input').value.trim();
+  if (!name) { showToast('Name required', 'Enter a dish name.', 'error'); return; }
+  const dishes = getDishes();
+  if (!dishes[state.detailId]) dishes[state.detailId] = [];
+  dishes[state.detailId].push({ id: uid(), name, rating: _dishRating, date: iso() });
+  saveDishes(dishes);
+  document.getElementById('dish-name-input').value = '';
+  _renderDishRatingPicker(0);
+  renderDishList(state.detailId);
+  showToast('??? Dish saved!', name + ' added to your dish log.', 'success');
+}
+function deleteDish (restaurantId, dishId) {
+  const dishes = getDishes();
+  if (dishes[restaurantId]) dishes[restaurantId] = dishes[restaurantId].filter(d => d.id !== dishId);
+  saveDishes(dishes);
+  renderDishList(restaurantId);
+}
+function renderDishList (restaurantId) {
+  const dishes = getDishes();
+  const list = (dishes[restaurantId] || []).sort((a,b) => b.rating - a.rating || b.date.localeCompare(a.date));
+  const el = document.getElementById('dish-list');
+  if (!list.length) {
+    el.innerHTML = '<div class="dish-empty">No dishes logged yet. Add your first one above!</div>';
+    return;
+  }
+  el.innerHTML = list.map(d => `
+    <div class="dish-item">
+      <div class="dish-item-name">${escHtml(d.name)}</div>
+      <div class="dish-item-stars">${d.rating ? '?'.repeat(d.rating) + '?'.repeat(5-d.rating) : '�'}</div>
+      <div class="dish-item-date" style="font-size:.72rem;color:var(--text-dim)">${d.date||''}</div>
+      <button class="dish-item-delete icon-btn" onclick="deleteDish('${restaurantId}','${d.id}')" title="Remove">?</button>
+    </div>
+  `).join('');
+}
+
+/* ------------------------------------------------------------
+   PHASE 8 � ?? YEAR IN REVIEW
+   ------------------------------------------------------------ */
+
+let _reviewYear = new Date().getFullYear();
+
+function openYearReview () {
+  _reviewYear = new Date().getFullYear();
+  document.getElementById('review-year-label').textContent = _reviewYear;
+  renderYearReview();
+  document.getElementById('review-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeYearReview () {
+  document.getElementById('review-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function renderYearReview () {
+  const yr = _reviewYear;
+  const all = state.restaurants;
+  const yearKey = String(yr);
+
+  // All visits this year
+  const yearVisits = [];
+  all.forEach(r => {
+    (r.visits||[]).forEach(v => { if ((v.date||'').startsWith(yearKey)) yearVisits.push({ r, v }); });
+    if (r.dateVisited?.startsWith(yearKey) && !(r.visits||[]).length) yearVisits.push({ r, v: { date: r.dateVisited, rating: r.myRating } });
+  });
+
+  const totalVisits = yearVisits.length;
+  const uniqueRestaurants = new Set(yearVisits.map(x => x.r.id)).size;
+  const cuisineMap = {};
+  yearVisits.forEach(x => { const c = x.r.cuisine || 'Other'; cuisineMap[c] = (cuisineMap[c]||0) + 1; });
+  const topCuisine = Object.entries(cuisineMap).sort((a,b)=>b[1]-a[1])[0];
+  const topRated = [...all].filter(r => r.myRating > 0).sort((a,b)=>b.myRating-a.myRating).slice(0,5);
+  const mostVisited = [...all].sort((a,b) => {
+    const av = (a.visits||[]).filter(v=>(v.date||'').startsWith(yearKey)).length + (a.dateVisited?.startsWith(yearKey)?1:0);
+    const bv = (b.visits||[]).filter(v=>(v.date||'').startsWith(yearKey)).length + (b.dateVisited?.startsWith(yearKey)?1:0);
+    return bv - av;
+  }).filter(r => {
+    const v = (r.visits||[]).filter(v=>(v.date||'').startsWith(yearKey)).length + (r.dateVisited?.startsWith(yearKey)?1:0);
+    return v > 0;
+  }).slice(0, 1)[0];
+  const avgRating = (() => {
+    const rated = yearVisits.filter(x=>x.v.rating);
+    return rated.length ? (rated.reduce((s,x)=>s+(x.v.rating||0),0)/rated.length).toFixed(1) : null;
+  })();
+  const totalCuisines = Object.keys(cuisineMap).length;
+  // Monthly distribution
+  const months = Array(12).fill(0);
+  yearVisits.forEach(x => {
+    const m = parseInt((x.v.date||'').slice(5,7)) - 1;
+    if (m >= 0 && m < 12) months[m]++;
+  });
+  const peakMonthIdx = months.indexOf(Math.max(...months));
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const estimatedSpend = totalVisits * (state.settings.avgSpend || 35);
+
+  const slides = [];
+
+  if (!totalVisits) {
+    slides.push(`<div class="review-slide"><div class="review-slide-emoji">??</div><div class="review-slide-title">No visits in ${yr}</div><div class="review-slide-value">0</div><div class="review-slide-sub">Start logging your visits!</div></div>`);
+  } else {
+    slides.push(`<div class="review-slide"><div class="review-slide-emoji">???</div><div class="review-slide-title">Meals Out in ${yr}</div><div class="review-slide-value">${totalVisits}</div><div class="review-slide-sub">across ${uniqueRestaurants} restaurant${uniqueRestaurants!==1?'s':''}</div></div>`);
+    if (topCuisine) slides.push(`<div class="review-slide"><div class="review-slide-emoji">${cuisineEmoji(topCuisine[0])}</div><div class="review-slide-title">Your #1 Cuisine</div><div class="review-slide-value">${escHtml(topCuisine[0])}</div><div class="review-slide-sub">${topCuisine[1]} visit${topCuisine[1]!==1?'s':''} � you really love it</div></div>`);
+    if (totalCuisines > 1) slides.push(`<div class="review-slide"><div class="review-slide-emoji">??</div><div class="review-slide-title">Cuisines Explored</div><div class="review-slide-value">${totalCuisines}</div><div class="review-slide-sub">You ate: ${Object.keys(cuisineMap).slice(0,5).join(', ')}</div></div>`);
+    if (mostVisited) slides.push(`<div class="review-slide"><div class="review-slide-emoji">??</div><div class="review-slide-title">Your Go-To Spot</div><div class="review-slide-value" style="font-size:1.3rem">${escHtml(mostVisited.name)}</div><div class="review-slide-sub">${cuisineEmoji(mostVisited.cuisine)} ${mostVisited.cuisine||''}</div></div>`);
+    if (avgRating) slides.push(`<div class="review-slide"><div class="review-slide-emoji">?</div><div class="review-slide-title">Your Average Rating</div><div class="review-slide-value">${avgRating} / 5</div><div class="review-slide-sub">${avgRating>=4.5?'You have high standards!':avgRating>=3.5?'You eat well ?':'Room to discover better spots'}</div></div>`);
+    if (months[peakMonthIdx] > 0) slides.push(`<div class="review-slide"><div class="review-slide-emoji">??</div><div class="review-slide-title">Most Active Month</div><div class="review-slide-value">${MONTH_NAMES[peakMonthIdx]}</div><div class="review-slide-sub">${months[peakMonthIdx]} meal${months[peakMonthIdx]!==1?'s':''} out that month</div></div>`);
+    slides.push(`<div class="review-slide"><div class="review-slide-emoji">??</div><div class="review-slide-title">Estimated Dining Spend</div><div class="review-slide-value">~$${estimatedSpend.toLocaleString()}</div><div class="review-slide-sub">Based on ${totalVisits} visits � $${state.settings.avgSpend||35}/avg</div></div>`);
+    if (topRated.length) {
+      const topRatedHtml = topRated.map(r=>`<li><span>${escHtml(r.name)}</span><span>${'?'.repeat(r.myRating)}</span></li>`).join('');
+      slides.push(`<div class="review-slide" style="text-align:left"><div class="review-slide-emoji" style="text-align:center">??</div><div class="review-slide-title" style="text-align:center">Your Top Rated</div><ul class="review-top-list">${topRatedHtml}</ul></div>`);
+    }
+  }
+
+  document.getElementById('review-content').innerHTML = slides.join('');
+}
+
+function shareYearReview () {
+  const yr = _reviewYear;
+  const all = state.restaurants;
+  const yearVisits = [];
+  all.forEach(r => {
+    (r.visits||[]).forEach(v => { if ((v.date||'').startsWith(yr)) yearVisits.push(r); });
+    if (r.dateVisited?.startsWith(yr) && !(r.visits||[]).length) yearVisits.push(r);
+  });
+  const text = `?? My ${yr} Foodie Year: ${yearVisits.length} meals out, ${new Set(yearVisits.map(r=>r.id)).size} restaurants. Track yours at Feed The Bear!`;
+  if (navigator.share) navigator.share({ title: 'My Foodie Year ' + yr, text }).catch(()=>{});
+  else { navigator.clipboard?.writeText(text); showToast('Copied!', 'Year in Review summary copied.', 'success'); }
+}
+
+/* ------------------------------------------------------------
+   PHASE 8 � ?? FOODIE FRIENDS
+   ------------------------------------------------------------ */
+
+function _buildFriendsMyLink () {
+  const data = buildProfileData();
+  if (!data.picks.length) return;
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  const url = window.location.href.split('?')[0].split('#')[0] + '#profile=' + encoded;
+  const el = document.getElementById('friends-my-link-input');
+  if (el) el.value = url;
+}
+
+function openFoodieFriends () {
+  _buildFriendsMyLink();
+  document.getElementById('friends-link-input').value = '';
+  document.getElementById('friends-result').classList.add('hidden');
+  document.getElementById('friends-result').innerHTML = '';
+  document.getElementById('friends-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeFoodieFriends () {
+  document.getElementById('friends-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function loadFriendProfile () {
+  const rawInput = document.getElementById('friends-link-input').value.trim();
+  if (!rawInput) { showToast('Paste a link', 'Paste your friend\'s profile link first.', 'error'); return; }
+  
+  // Extract the hash from a full URL or bare encoded string
+  let encoded = rawInput;
+  const hashMatch = rawInput.match(/#profile=(.+)$/);
+  if (hashMatch) encoded = hashMatch[1];
+
+  try {
+    const data = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+    if (!data.picks?.length) throw new Error('empty');
+    renderFriendComparison(data);
+  } catch(_) {
+    showToast('Invalid link', 'Could not read that profile link. Ask your friend to reshare.', 'error');
+  }
+}
+
+function renderFriendComparison (friendData) {
+  const myTop  = [...state.restaurants].filter(r => r.myRating > 0).sort((a,b) => b.myRating - a.myRating).slice(0,10);
+  const myNames = new Set(myTop.map(r => normalizeName(r.name)));
+  const friendNames = new Set(friendData.picks.map(p => normalizeName(p.n)));
+
+  // Find overlap by normalised name
+  const overlap = friendData.picks.filter(p => myNames.has(normalizeName(p.n)));
+  const onlyFriend = friendData.picks.filter(p => !myNames.has(normalizeName(p.n)));
+
+  // Shared cuisines
+  const myCuisines = new Set(myTop.map(r => (r.cuisine||'').toLowerCase()));
+  const friendCuisines = new Set(friendData.picks.map(p => (p.c||'').toLowerCase()));
+  const sharedCuisines = [...myCuisines].filter(c => c && friendCuisines.has(c));
+
+  let html = '<div class="friends-result">';
+
+  // Overlap section
+  if (overlap.length) {
+    html += `<div class="friends-overlap">
+      <div class="friends-overlap-title">?? You both love these (${overlap.length})</div>
+      ${overlap.map(p => `<div class="friends-overlap-item">${cuisineEmoji(p.c)} ${escHtml(p.n)} � you: ${'?'.repeat(p.r)}</div>`).join('')}
+    </div>`;
+  } else {
+    html += `<div class="friends-overlap"><div class="friends-overlap-title">?? No direct overlap yet � time to branch out!</div></div>`;
+  }
+
+  // Shared cuisines
+  if (sharedCuisines.length) {
+    html += `<div class="friends-section-title">Shared Cuisine Love</div>`;
+    html += sharedCuisines.map(c => `<div class="friends-overlap-item">${cuisineEmoji(c)} ${c.charAt(0).toUpperCase()+c.slice(1)}</div>`).join('');
+  }
+
+  // Friend's exclusive picks you haven't tried
+  if (onlyFriend.length) {
+    html += `<div class="friends-section-title">Their Picks You Haven't Tried (${onlyFriend.length})</div>`;
+    html += onlyFriend.slice(0,6).map(p => `
+      <div class="friends-pick-item">
+        <span style="font-size:1.2rem">${cuisineEmoji(p.c)}</span>
+        <div class="friends-pick-name">${escHtml(p.n)}<br><span style="font-size:.72rem;color:var(--text-dim)">${escHtml(p.c||'')}</span></div>
+        <div class="friends-pick-stars">${'?'.repeat(p.r)}</div>
+        <button class="btn-sm btn-orange" onclick="openAddModalPreFilled('${escHtml(p.n).replace(/'/g,"\\'")}','${escHtml(p.c||'')}')">Add +</button>
+      </div>`).join('');
+  }
+  html += '</div>';
+
+  const resultEl = document.getElementById('friends-result');
+  resultEl.innerHTML = html;
+  resultEl.classList.remove('hidden');
+}
+
+function openAddModalPreFilled (name, cuisine) {
+  closeFoodieFriends();
+  openAddModal();
+  setTimeout(() => {
+    document.getElementById('form-name').value = name;
+    if (cuisine) document.getElementById('form-cuisine').value = cuisine;
+  }, 100);
+}
+
+/* ------------------------------------------------------------
+   PHASE 8 � ??? SMART DISCOVERY
+   ------------------------------------------------------------ */
+
+function openDiscover () {
+  document.getElementById('discover-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeDiscover () {
+  document.getElementById('discover-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+
+async function runDiscover () {
+  if (!state.userLat || !state.userLng) {
+    showToast('Location needed', 'Enable location in the ? menu first.', 'error');
+    return;
+  }
+  const radius = parseInt(document.getElementById('discover-radius').value) || 1000;
+  const resultsEl = document.getElementById('discover-results');
+  resultsEl.innerHTML = '<div class="discover-loading">?? Searching nearby places�</div>';
+
+  // Overpass API query: restaurants + cafes within radius
+  const lat = state.userLat, lng = state.userLng;
+  const overpassQuery = `[out:json][timeout:15];(node["amenity"~"restaurant|cafe|fast_food|bar"](around:${radius},${lat},${lng}););out body 30;`;
+  const overpassUrl = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(overpassQuery);
+
+  try {
+    const resp = await fetch(overpassUrl, { signal: AbortSignal.timeout(12000) });
+    if (!resp.ok) throw new Error('Overpass error');
+    const json = await resp.json();
+    const elements = (json.elements || []).filter(el => el.tags?.name);
+
+    if (!elements.length) {
+      resultsEl.innerHTML = '<div class="discover-empty">No places found nearby. Try a larger radius.</div>';
+      return;
+    }
+
+    // Filter out already-saved places (by normalised name)
+    const savedNames = new Set(state.restaurants.map(r => normalizeName(r.name)));
+    const unsaved = elements.filter(el => !savedNames.has(normalizeName(el.tags.name)));
+
+    // Score by taste profile
+    const myCuisines = {};
+    state.restaurants.filter(r => r.myRating >= 4 && r.cuisine).forEach(r => {
+      const c = (r.cuisine||'').toLowerCase();
+      myCuisines[c] = (myCuisines[c]||0) + r.myRating;
+    });
+
+    function scorePlace (el) {
+      const tags = el.tags || {};
+      let s = Math.random() * 10;
+      // Match cuisine preference
+      const cuisine = (tags.cuisine||tags.amenity||'').toLowerCase();
+      Object.entries(myCuisines).forEach(([c,w]) => { if (cuisine.includes(c) || c.includes(cuisine)) s += w * 2; });
+      // Prefer restaurants over fast_food
+      if (tags.amenity === 'restaurant') s += 10;
+      if (tags.opening_hours) s += 5;
+      if (tags.website) s += 3;
+      return s;
+    }
+
+    const ranked = unsaved.sort((a,b) => scorePlace(b) - scorePlace(a)).slice(0, 12);
+
+    if (!ranked.length) {
+      resultsEl.innerHTML = '<div class="discover-empty">All nearby places are already in your list! Try a larger radius.</div>';
+      return;
+    }
+
+    // Cuisine emoji map helper
+    const amenityEmoji = t => ({ restaurant:'???', cafe:'?', fast_food:'??', bar:'??' }[t]||'???');
+
+    resultsEl.innerHTML = ranked.map(el => {
+      const tags = el.tags || {};
+      const name = escHtml(tags.name||'Unknown');
+      const cuisine = tags.cuisine ? escHtml(tags.cuisine.replace(/_/g,' ')) : '';
+      const type = tags.amenity || 'restaurant';
+      const emoji = amenityEmoji(type);
+      const address = [tags['addr:street'], tags['addr:housenumber']].filter(Boolean).join(' ');
+      const matchCuisines = Object.keys(myCuisines).filter(c => (tags.cuisine||'').toLowerCase().includes(c));
+      const matchTag = matchCuisines.length ? `Matches your love of ${matchCuisines[0]}` : '';
+
+      return `<div class="discover-item">
+        <div class="discover-item-emoji">${emoji}</div>
+        <div class="discover-item-body">
+          <div class="discover-item-name">${name}</div>
+          <div class="discover-item-meta">${cuisine ? cuisine + ' � ' : ''}${escHtml(type)}</div>
+          ${address ? `<div class="discover-item-meta">?? ${escHtml(address)}</div>` : ''}
+          ${matchTag ? `<div class="discover-item-match">? ${escHtml(matchTag)}</div>` : ''}
+        </div>
+        <div class="discover-item-add">
+          <button class="btn-sm btn-orange" onclick="openAddModalPreFilled('${name.replace(/'/g,'\\')}','${cuisine.replace(/'/g,'\\'')}')">Add +</button>
+        </div>
+      </div>`;
+    }).join('');
+
+  } catch (err) {
+    resultsEl.innerHTML = '<div class="discover-empty">Search failed. Check your connection and try again.</div>';
+  }
+}
+
+/* ------------------------------------------------------------
+   PHASE 8 � ?? CUSTOM CHALLENGES
+   ------------------------------------------------------------ */
+
+const CHALLENGES_KEY = 'ftb_challenges_v1';
+
+function getChallenges () {
+  try { return JSON.parse(localStorage.getItem(CHALLENGES_KEY)) || []; } catch(_) { return []; }
+}
+function saveChallenges (data) { localStorage.setItem(CHALLENGES_KEY, JSON.stringify(data)); }
+
+function openChallenges () {
+  renderChallengesList();
+  renderChallengeShareLink();
+  document.getElementById('challenges-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeChallenges () {
+  document.getElementById('challenges-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function switchChalTab (tab) {
+  document.querySelectorAll('.chal-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.chal-tab-panel').forEach(p => p.classList.toggle('hidden', p.id !== 'chal-tab-' + tab));
+}
+
+function calcChallengeProgress (ch) {
+  const now = state.restaurants;
+  switch (ch.type) {
+    case 'cuisine_count': {
+      const cuisines = new Set(now.filter(r => r.status==='visited').map(r => (r.cuisine||'').toLowerCase()).filter(Boolean));
+      return cuisines.size;
+    }
+    case 'visit_count':
+      return now.filter(r => r.status === 'visited').length;
+    case 'new_only': {
+      // Restaurants added AFTER challenge creation AND visited
+      const since = ch.createdAt || '2000-01-01';
+      return now.filter(r => r.status==='visited' && (r.dateAdded||'')>=since).length;
+    }
+    case 'price_budget':
+      return now.filter(r => r.status==='visited' && (r.priceRange||0) === 1).length;
+    case 'rating_avg': {
+      const rated = now.filter(r => r.myRating > 0);
+      const avg = rated.length ? rated.reduce((s,r)=>s+r.myRating,0)/rated.length : 0;
+      return parseFloat(avg.toFixed(2));
+    }
+    default: return 0;
+  }
+}
+
+function renderChallengesList () {
+  const challenges = getChallenges();
+  const el = document.getElementById('challenges-list');
+  if (!challenges.length) {
+    el.innerHTML = '<div class="challenges-empty">No challenges yet. <a onclick="switchChalTab(\'create\')">Create one ?</a></div>';
+    return;
+  }
+  el.innerHTML = challenges.map((ch, idx) => {
+    const progress = calcChallengeProgress(ch);
+    const goal = ch.goal;
+    const pct = Math.min((progress / goal) * 100, 100);
+    const done = progress >= goal;
+    return `<div class="challenge-item ${done?'challenge-complete':''}">
+      <div class="challenge-item-header">
+        <div class="challenge-item-name">${escHtml(ch.name)}</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          ${ch.deadline ? `<div class="challenge-item-deadline">? ${ch.deadline}</div>` : ''}
+          <button class="icon-btn" style="font-size:.7rem;padding:2px 6px" onclick="deleteChallenge(${idx})" title="Delete">?</button>
+        </div>
+      </div>
+      <div class="challenge-progress-track">
+        <div class="challenge-progress-fill" style="width:${pct}%"></div>
+      </div>
+      <div class="challenge-progress-label">${progress} / ${goal}${done?' � ?? Complete!':''}</div>
+    </div>`;
+  }).join('');
+}
+
+function createChallenge () {
+  const name     = document.getElementById('chal-name-input').value.trim();
+  const type     = document.getElementById('chal-type-input').value;
+  const goal     = parseInt(document.getElementById('chal-goal-input').value) || 0;
+  const deadline = document.getElementById('chal-deadline-input').value || '';
+  if (!name || !goal) { showToast('Fill in name + goal', 'Both fields required.', 'error'); return; }
+  const challenges = getChallenges();
+  challenges.push({ id: uid(), name, type, goal, deadline, createdAt: iso() });
+  saveChallenges(challenges);
+  document.getElementById('chal-name-input').value = '';
+  document.getElementById('chal-goal-input').value = '';
+  document.getElementById('chal-deadline-input').value = '';
+  showToast('?? Challenge created!', name, 'success');
+  switchChalTab('active');
+  renderChallengesList();
+}
+
+function deleteChallenge (idx) {
+  const challenges = getChallenges();
+  challenges.splice(idx, 1);
+  saveChallenges(challenges);
+  renderChallengesList();
+}
+
+function renderChallengeShareLink () {
+  const wrap = document.getElementById('chal-friend-share-wrap');
+  if (!wrap) return;
+  const challenges = getChallenges();
+  if (!challenges.length) { wrap.innerHTML = '<p style="color:var(--text-dim);font-size:.8rem">Create a challenge first.</p>'; return; }
+  const ch = challenges[0];
+  const encoded = btoa(JSON.stringify({ n: ch.name, t: ch.type, g: ch.goal, d: ch.deadline||'' }));
+  const url = window.location.href.split('?')[0].split('#')[0] + '#challenge=' + encoded;
+  wrap.innerHTML = `<div style="font-size:.78rem;color:var(--text-dim);margin-bottom:4px">Share your latest challenge:</div>
+    <div style="display:flex;gap:6px">
+      <input class="form-input" readonly value="${escHtml(url)}" style="flex:1;font-size:.72rem" />
+      <button class="btn-sm btn-orange" onclick="navigator.clipboard?.writeText('${escHtml(url)}');showToast('Copied!','','success')">Copy</button>
+    </div>`;
+}
+
+function loadFriendChallenge () {
+  const rawInput = document.getElementById('chal-friend-link').value.trim();
+  let encoded = rawInput;
+  const hashMatch = rawInput.match(/#challenge=(.+)$/);
+  if (hashMatch) encoded = hashMatch[1];
+  try {
+    const ch = JSON.parse(atob(encoded));
+    if (!ch.n || !ch.g) throw new Error('invalid');
+    const challenges = getChallenges();
+    challenges.push({ id: uid(), name: ch.n + ' (from friend)', type: ch.t||'visit_count', goal: ch.g, deadline: ch.d||'', createdAt: iso() });
+    saveChallenges(challenges);
+    showToast('?? Challenge joined!', ch.n, 'success');
+    switchChalTab('active');
+    renderChallengesList();
+  } catch(_) {
+    showToast('Invalid link', 'Could not load that challenge.', 'error');
+  }
+}
+
+/* ------------------------------------------------------------
+   PHASE 8 � ?? VISIT DEBRIEF
+   ------------------------------------------------------------ */
+
+let _debriefId = null;
+
+function openVisitDebrief (restaurantId) {
+  const r = state.restaurants.find(x => x.id === restaurantId);
+  if (!r) return;
+  _debriefId = restaurantId;
+  document.getElementById('debrief-restaurant-name').textContent = 'How was ' + r.name + '?';
+
+  const steps = `
+    <div>
+      <div class="debrief-q">Overall vibe?</div>
+      <div class="debrief-emoji-row" id="debrief-vibe">
+        <button class="debrief-emoji-btn" data-val="amazing">?? Amazing</button>
+        <button class="debrief-emoji-btn" data-val="good">?? Good</button>
+        <button class="debrief-emoji-btn" data-val="okay">?? Okay</button>
+        <button class="debrief-emoji-btn" data-val="disappointing">?? Disappointing</button>
+      </div>
+    </div>
+    <div>
+      <div class="debrief-q">Would you go back?</div>
+      <div class="debrief-emoji-row" id="debrief-return">
+        <button class="debrief-emoji-btn" data-val="definitely">?? Definitely</button>
+        <button class="debrief-emoji-btn" data-val="maybe">?? Maybe</button>
+        <button class="debrief-emoji-btn" data-val="nope">?? Nope</button>
+      </div>
+    </div>
+    <div>
+      <div class="debrief-q">Quick note (optional)</div>
+      <textarea id="debrief-note" class="form-input debrief-textarea" placeholder="Best dish? Service? Parking? Anything�" rows="2"></textarea>
+    </div>
+  `;
+  document.getElementById('debrief-steps').innerHTML = steps;
+
+  // Toggle selected state
+  document.getElementById('debrief-steps').querySelectorAll('.debrief-emoji-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const group = btn.closest('.debrief-emoji-row');
+      group.querySelectorAll('.debrief-emoji-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+  });
+
+  document.getElementById('debrief-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+
+function closeDebrief () {
+  document.getElementById('debrief-overlay').classList.add('hidden');
+  _debriefId = null;
+  maybeHideOverlay();
+}
+
+function saveDebrief () {
+  if (!_debriefId) { closeDebrief(); return; }
+  const r = state.restaurants.find(x => x.id === _debriefId);
+  if (!r) { closeDebrief(); return; }
+
+  const vibe   = document.querySelector('#debrief-vibe .selected')?.dataset.val || '';
+  const goBack = document.querySelector('#debrief-return .selected')?.dataset.val || '';
+  const note   = document.getElementById('debrief-note')?.value.trim() || '';
+
+  // Build note prefix
+  const vibeMap   = { amazing:'?? Amazing visit', good:'?? Good visit', okay:'?? Okay visit', disappointing:'?? Disappointing' };
+  const returnMap = { definitely:'Would definitely return', maybe:'Might return', nope:'Wouldn\'t return' };
+  const parts = [vibeMap[vibe], returnMap[goBack], note].filter(Boolean);
+
+  // Append to restaurant notes
+  if (parts.length) {
+    const stamp = '[' + iso() + '] ' + parts.join('. ');
+    r.notes = r.notes ? r.notes + '\n' + stamp : stamp;
+    // Update most recent visit note too
+    if (r.visits?.length) r.visits[r.visits.length-1].note = parts.join('. ');
+    saveData();
+    showToast('?? Debrief saved!', 'Notes updated for ' + r.name, 'success');
+  }
+  closeDebrief();
 }

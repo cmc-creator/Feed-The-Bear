@@ -64,52 +64,65 @@
     </nav>
 
     <div class="header-actions">
-      <button id="export-btn" class="icon-btn" title="Export list as JSON">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      </button>
-      <label class="icon-btn" title="Import list from JSON" style="cursor:pointer">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        <input type="file" id="import-file-input" accept=".json" style="display:none" />
-      </label>
-      <button id="import-bookmarks-btn" class="icon-btn" title="Import from Yelp / Google Maps">
-        📋
-      </button>
-      <button id="location-toggle-btn" class="icon-btn" title="Enable location tracking">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8" stroke-dasharray="3 2" opacity=".4"/></svg>
-      </button>
+      <!-- Always-visible: theme, voice, add, chat -->
       <button id="theme-toggle-btn" class="icon-btn" title="Toggle light/dark theme">
         <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       </button>
-      <button id="bulk-select-btn" class="icon-btn" title="Bulk select">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><rect x="3" y="5" width="4" height="4" rx="1"/><line x1="9" y1="7" x2="21" y2="7"/><rect x="3" y="12" width="4" height="4" rx="1"/><line x1="9" y1="14" x2="21" y2="14"/><rect x="3" y="19" width="4" height="4" rx="1"/><line x1="9" y1="21" x2="21" y2="21"/></svg>
-      </button>
-      <button id="collections-btn" class="icon-btn" title="My Lists">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-      </button>
-      <button id="tonight-btn" class="icon-btn" title="Tonight's Pick">
-        🎯
-      </button>
-      <button id="pdf-export-btn" class="icon-btn" title="Export Foodie Report PDF">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-      </button>
-      <button id="challenge-btn" class="icon-btn" title="Friend Challenge">
-        🏆
-      </button>
-      <button id="voice-btn" class="icon-btn" title="Voice Add (say 'add [name]')">🎙️</button>
-      <button id="gallery-btn" class="icon-btn" title="Photo Gallery">🖼️</button>
-      <button id="compare-btn" class="icon-btn" title="Compare Restaurants">⚖️</button>
-      <button id="budget-btn" class="icon-btn" title="Dining Budget">💰</button>
-      <button id="profile-btn" class="icon-btn" title="My Foodie Profile">🌐</button>
-      <button id="wrap-btn" class="icon-btn" title="Monthly Wrap">
-        🎁
-      </button>
+      <button id="voice-btn" class="icon-btn" title="Voice Add">🎙️</button>
+      <button id="craving-btn" class="icon-btn" title="Craving Engine — what should I eat?">🔥</button>
       <button id="add-btn" class="btn-primary">
         <span>＋</span> Add Restaurant
       </button>
       <button id="chat-toggle-btn" class="chat-toggle-btn" title="Foodie Bear Chat">
         🐻 <span>Ask Foodie Bear</span>
       </button>
+
+      <!-- Overflow ⋯ menu — all secondary tools -->
+      <div class="more-menu-wrap">
+        <button id="more-menu-btn" class="icon-btn" title="More tools" aria-haspopup="true" aria-expanded="false">⋯</button>
+        <div id="more-menu" class="more-menu" role="menu" aria-label="More tools">
+          <div class="more-menu-section">Discover</div>
+          <button class="more-menu-item" data-more="tonight">🎯 Tonight's Pick</button>
+          <button class="more-menu-item" data-more="craving">🔥 Craving Engine</button>
+          <button class="more-menu-item" data-more="discover">🗺️ Smart Discovery</button>
+          <button class="more-menu-item" data-more="challenge">🏆 Challenges</button>
+          <div class="more-menu-section">Track</div>
+          <button class="more-menu-item" data-more="gallery">🖼️ Photo Gallery</button>
+          <button class="more-menu-item" data-more="compare">⚖️ Compare</button>
+          <button class="more-menu-item" data-more="budget">💰 Budget</button>
+          <button class="more-menu-item" data-more="dishes">🍽️ Dish Tracker</button>
+          <button class="more-menu-item" data-more="review">📊 Year in Review</button>
+          <div class="more-menu-section">Social</div>
+          <button class="more-menu-item" data-more="profile">🌐 My Profile</button>
+          <button class="more-menu-item" data-more="friends">👥 Foodie Friends</button>
+          <button class="more-menu-item" data-more="wrap">🎁 Monthly Wrap</button>
+          <div class="more-menu-section">Data</div>
+          <button class="more-menu-item" data-more="export">📥 Export JSON</button>
+          <label class="more-menu-item" style="cursor:pointer">📤 Import JSON<input type="file" id="import-file-input" accept=".json" style="display:none" /></label>
+          <button class="more-menu-item" data-more="import-bookmarks">📋 Import Bookmarks</button>
+          <button class="more-menu-item" data-more="pdf">📄 Export PDF</button>
+          <div class="more-menu-section">View</div>
+          <button class="more-menu-item" data-more="bulk">☑️ Bulk Select</button>
+          <button class="more-menu-item" data-more="collections">📁 My Lists</button>
+          <button class="more-menu-item" data-more="location">📍 Location</button>
+        </div>
+      </div>
+
+      <!-- Hidden but still in DOM for JS compatibility -->
+      <button id="export-btn" style="display:none"></button>
+      <button id="import-bookmarks-btn" style="display:none"></button>
+      <button id="location-toggle-btn" style="display:none"></button>
+      <button id="bulk-select-btn" style="display:none"></button>
+      <button id="collections-btn" style="display:none"></button>
+      <button id="tonight-btn" style="display:none"></button>
+      <button id="pdf-export-btn" style="display:none"></button>
+      <button id="challenge-btn" style="display:none"></button>
+      <button id="gallery-btn" style="display:none"></button>
+      <button id="compare-btn" style="display:none"></button>
+      <button id="budget-btn" style="display:none"></button>
+      <button id="profile-btn" style="display:none"></button>
+      <button id="wrap-btn" style="display:none"></button>
     </div>
   </header>
 
@@ -582,6 +595,12 @@
           <button id="detail-calendar-btn" class="btn-secondary">
             📅 Add to Calendar
           </button>
+          <button id="detail-dishes-btn" class="btn-secondary">
+            🍽️ Dishes
+          </button>
+          <button id="detail-debrief-btn" class="btn-secondary">
+            📝 Debrief
+          </button>
           <button id="detail-edit-btn" class="btn-ghost">
             ✏️ Edit
           </button>
@@ -828,6 +847,177 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+  <!-- ══ PHASE 8 MODALS ═══════════════════════════════════════ -->
+
+  <!-- 🔥 Craving Engine -->
+  <div id="craving-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="craving-title">
+    <div class="modal-card craving-card">
+      <div class="modal-header">
+        <h2 id="craving-title">🔥 What Are You Craving?</h2>
+        <button id="craving-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="craving-subtitle">Describe your mood, budget, or vibe and I'll pick the perfect spot from your list.</p>
+      <div class="craving-chips-row" id="craving-mood-chips">
+        <button class="craving-chip" data-mood="comfort">🛋️ Comfort Food</button>
+        <button class="craving-chip" data-mood="adventurous">🌶️ Adventurous</button>
+        <button class="craving-chip" data-mood="date-night">💑 Date Night</button>
+        <button class="craving-chip" data-mood="quick">⚡ Quick &amp; Easy</button>
+        <button class="craving-chip" data-mood="healthy">🥗 Healthy</button>
+        <button class="craving-chip" data-mood="splurge">💎 Splurge</button>
+        <button class="craving-chip" data-mood="cheap">💸 Cheap Eats</button>
+        <button class="craving-chip" data-mood="new">✨ Try Something New</button>
+      </div>
+      <input id="craving-freetext" class="form-input" placeholder="Or type anything: 'spicy noodles under $20' …" style="margin-top:12px" />
+      <button id="craving-go-btn" class="btn-primary" style="width:100%;margin-top:12px">Find My Match 🎯</button>
+      <div id="craving-result" class="craving-result hidden"></div>
+    </div>
+  </div>
+
+  <!-- 🍽️ Dish Tracker modal (opens inside detail view as a sheet) -->
+  <div id="dish-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="dish-title">
+    <div class="modal-card dish-card">
+      <div class="modal-header">
+        <h2 id="dish-title">🍽️ Dish Tracker</h2>
+        <button id="dish-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p id="dish-restaurant-name" class="dish-subtitle"></p>
+      <div class="dish-add-row">
+        <input id="dish-name-input" class="form-input" placeholder="Dish name (e.g. Truffle Pasta)" style="flex:1" />
+        <div class="star-picker-mini" id="dish-rating-picker">
+          <span class="spm" data-v="1">★</span><span class="spm" data-v="2">★</span>
+          <span class="spm" data-v="3">★</span><span class="spm" data-v="4">★</span>
+          <span class="spm" data-v="5">★</span>
+        </div>
+        <button id="dish-add-btn" class="btn-sm btn-orange">Add</button>
+      </div>
+      <div id="dish-list" class="dish-list"></div>
+    </div>
+  </div>
+
+  <!-- 🎬 Year in Review -->
+  <div id="review-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="review-title">
+    <div class="modal-card review-card">
+      <div class="modal-header">
+        <h2 id="review-title">🎬 Your Foodie Year in Review</h2>
+        <button id="review-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="review-year-picker">
+        <button id="review-prev-year" class="icon-btn">◀</button>
+        <span id="review-year-label" class="review-year-label">2025</span>
+        <button id="review-next-year" class="icon-btn">▶</button>
+      </div>
+      <div id="review-content" class="review-content"></div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button id="review-share-btn" class="btn-primary" style="flex:1">📤 Share My Wrap</button>
+        <button id="review-close-btn2" class="btn-ghost">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 👥 Foodie Friends -->
+  <div id="friends-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="friends-title">
+    <div class="modal-card friends-card">
+      <div class="modal-header">
+        <h2 id="friends-title">👥 Foodie Friends</h2>
+        <button id="friends-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="friends-subtitle">Paste a friend's profile link to see your dining overlap and their top picks.</p>
+      <div style="display:flex;gap:8px">
+        <input id="friends-link-input" class="form-input" placeholder="Paste friend's profile link here …" style="flex:1" />
+        <button id="friends-load-btn" class="btn-sm btn-orange">Load</button>
+      </div>
+      <div id="friends-result" class="friends-result hidden"></div>
+      <div class="friends-my-link" style="margin-top:16px">
+        <span style="font-size:.78rem;color:var(--text-dim)">Your shareable link:</span>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <input id="friends-my-link-input" class="form-input" readonly style="flex:1;font-size:.75rem" />
+          <button id="friends-copy-btn" class="btn-sm btn-orange">Copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🗺️ Smart Discovery -->
+  <div id="discover-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="discover-title">
+    <div class="modal-card discover-card">
+      <div class="modal-header">
+        <h2 id="discover-title">🗺️ Smart Discovery</h2>
+        <button id="discover-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="discover-subtitle">Nearby restaurants you <strong>haven't saved yet</strong>, ranked by your taste profile.</p>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <select id="discover-radius" class="form-select" style="flex:1">
+          <option value="500">Within 500m</option>
+          <option value="1000" selected>Within 1km</option>
+          <option value="2000">Within 2km</option>
+          <option value="5000">Within 5km</option>
+        </select>
+        <button id="discover-search-btn" class="btn-sm btn-orange">🔍 Search</button>
+      </div>
+      <div id="discover-results" class="discover-results">
+        <div class="discover-empty">Enable location and tap Search to find places nearby.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🎯 Custom Challenges -->
+  <div id="challenges-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="challenges-title">
+    <div class="modal-card challenges-card">
+      <div class="modal-header">
+        <h2 id="challenges-title">🏆 Challenges</h2>
+        <button id="challenges-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="challenges-tabs">
+        <button class="chal-tab active" data-tab="active">Active</button>
+        <button class="chal-tab" data-tab="create">＋ Create</button>
+        <button class="chal-tab" data-tab="friend">📨 Friend</button>
+      </div>
+      <div id="chal-tab-active" class="chal-tab-panel">
+        <div id="challenges-list" class="challenges-list"></div>
+      </div>
+      <div id="chal-tab-create" class="chal-tab-panel hidden">
+        <div class="form-row"><label>Challenge Name</label><input id="chal-name-input" class="form-input" placeholder="e.g. 5 New Cuisines in May" /></div>
+        <div class="form-row"><label>Type</label>
+          <select id="chal-type-input" class="form-select">
+            <option value="cuisine_count">Visit N different cuisines</option>
+            <option value="visit_count">Visit N restaurants</option>
+            <option value="new_only">Visit N restaurants never tried before</option>
+            <option value="price_budget">Visit N budget restaurants ($)</option>
+            <option value="rating_avg">Get avg rating above X</option>
+          </select>
+        </div>
+        <div class="form-row"><label>Goal (number)</label><input id="chal-goal-input" class="form-input" type="number" min="1" placeholder="5" /></div>
+        <div class="form-row"><label>Deadline (optional)</label><input id="chal-deadline-input" class="form-input" type="date" /></div>
+        <button id="chal-create-btn" class="btn-primary" style="width:100%;margin-top:8px">🏆 Create Challenge</button>
+      </div>
+      <div id="chal-tab-friend" class="chal-tab-panel hidden">
+        <p style="font-size:.82rem;color:var(--text-dim);margin-bottom:12px">Share a challenge link or paste one from a friend.</p>
+        <div id="chal-friend-share-wrap"></div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <input id="chal-friend-link" class="form-input" placeholder="Paste friend's challenge link …" style="flex:1"/>
+          <button id="chal-friend-load-btn" class="btn-sm btn-orange">Join</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📝 Visit Debrief (small prompt sheet) -->
+  <div id="debrief-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="debrief-title">
+    <div class="modal-card debrief-card">
+      <div class="modal-header">
+        <h2 id="debrief-title">📝 Quick Debrief</h2>
+        <button id="debrief-skip-btn" class="icon-btn" aria-label="Skip">Skip</button>
+      </div>
+      <p id="debrief-restaurant-name" class="debrief-subtitle">How was it?</p>
+      <div id="debrief-steps" class="debrief-steps">
+        <!-- Dynamically rendered -->
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button id="debrief-save-btn" class="btn-primary" style="flex:1">Save Notes ✓</button>
+      </div>
+    </div>
+  </div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLEg=" crossorigin=""></script>
   <script src="app.js"></script>
   <script>
