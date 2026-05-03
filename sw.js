@@ -1,9 +1,9 @@
-/* ════════════════════════════════════════════════════════════
-   Feed The Bear — Service Worker
+﻿/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   Feed The Bear â€” Service Worker
    Offline-first cache strategy
-   ════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-const CACHE  = 'ftb-v11';
+const CACHE  = 'ftb-v12';
 const ASSETS = [
   './',
   './index.html',
@@ -46,7 +46,7 @@ self.addEventListener('fetch', e => {
   );
 });
 
-/* ── Push notification scheduling ── */
+/* â”€â”€ Push notification scheduling â”€â”€ */
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   e.waitUntil(clients.openWindow('/'));
@@ -58,8 +58,8 @@ self.addEventListener('message', e => {
     setTimeout(() => {
       self.registration.showNotification(title, {
         body,
-        icon: 'data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 64 64\'><text y=\'52\' font-size=\'52\'>🐻</text></svg>',
-        badge: 'data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 64 64\'><text y=\'52\' font-size=\'52\'>🐻</text></svg>',
+        icon: 'data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 64 64\'><text y=\'52\' font-size=\'52\'>ðŸ»</text></svg>',
+        badge: 'data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 64 64\'><text y=\'52\' font-size=\'52\'>ðŸ»</text></svg>',
         tag: 'ftb-reminder',
         requireInteraction: true,
       });
