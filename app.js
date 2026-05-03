@@ -108,14 +108,43 @@ let state = {
 function loadData () {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    state.restaurants = raw ? JSON.parse(raw) : seedData();
-    if (!raw) saveData();
-  } catch { state.restaurants = seedData(); saveData(); }
+    const parsed = raw ? JSON.parse(raw) : seedData();
+    state.restaurants = pruneLegacyDemoRestaurants(parsed);
+    if (!raw || state.restaurants.length !== parsed.length) saveData();
+  } catch {
+    state.restaurants = pruneLegacyDemoRestaurants(seedData());
+    saveData();
+  }
 
   try {
     const s = localStorage.getItem(SETTINGS_KEY);
     state.settings = s ? JSON.parse(s) : {};
   } catch { state.settings = {}; }
+}
+
+function pruneLegacyDemoRestaurants (list) {
+  if (!Array.isArray(list)) return [];
+  const demoNames = new Set([
+    'The Golden Spoon',
+    'Sakura Garden',
+    'El Rancho Taqueria',
+    'Smoke & Ember BBQ',
+    'Cafe Lumiere',
+    'Café Lumiere',
+    'Spice Route',
+  ]);
+  const cleaned = list.filter(r => {
+    const website = String(r?.website || '').toLowerCase();
+    const name = String(r?.name || '').trim();
+    const isDemoWebsite = website.includes('.example.com');
+    const isKnownDemo = demoNames.has(name);
+    return !(isDemoWebsite || isKnownDemo);
+  });
+  if (list.length !== cleaned.length) {
+    const removed = list.length - cleaned.length;
+    showToast('Cleaned Demo Data', `${removed} sample entr${removed === 1 ? 'y was' : 'ies were'} removed.`, 'info');
+  }
+  return cleaned;
 }
 
 function saveData () {
@@ -211,6 +240,32 @@ function enableLocation () {
     },
     { enableHighAccuracy: true, timeout: 12000 }
   );
+}
+
+async function ensureLocationForDiscovery () {
+  if (state.userLat != null && state.userLng != null) return true;
+  if (!navigator.geolocation) {
+    showToast('Location', 'Geolocation is not supported by your browser.', 'error');
+    return false;
+  }
+  try {
+    const pos = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 12000 });
+    });
+    state.userLat = pos.coords.latitude;
+    state.userLng = pos.coords.longitude;
+    if (!state.locationEnabled) {
+      state.locationEnabled = true;
+      updateLocationBtn();
+      hideBanner('location-banner');
+      startWatching();
+    }
+    renderCards();
+    return true;
+  } catch (err) {
+    showToast('Location Error', err?.message || 'Unable to get your current location.', 'error');
+    return false;
+  }
 }
 
 function startWatching () {
@@ -1723,9 +1778,7 @@ function parseMapsUrl (raw) {
    NEARBY DISCOVERY â€” Overpass API
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 async function discoverNearby () {
-  if (!state.locationEnabled || state.userLat == null) {
-    showToast('Location needed', 'Enable location tracking first.', 'error'); return;
-  }
+  if (!(await ensureLocationForDiscovery())) return;
   const overlay = document.getElementById('nearby-overlay');
   overlay.classList.remove('hidden');
   document.getElementById('ui-overlay').classList.remove('hidden');
@@ -4473,10 +4526,7 @@ function closeDiscover () {
 }
 
 async function runDiscover () {
-  if (!state.userLat || !state.userLng) {
-    showToast('Location needed', 'Enable location in the ? menu first.', 'error');
-    return;
-  }
+  if (!(await ensureLocationForDiscovery())) return;
   const radius = parseInt(document.getElementById('discover-radius').value) || 1000;
   const resultsEl = document.getElementById('discover-results');
   resultsEl.innerHTML = '<div class="discover-loading">ðŸ” Searching nearby places...</div>';
@@ -5910,6 +5960,7 @@ function closeOpenNow () {
 
 async function runOpenNowSearch () {
   const travelData = getTravelMode();
+  if (!travelData && !(await ensureLocationForDiscovery())) return;
   const lat = travelData ? travelData.lat : state.userLat;
   const lng = travelData ? travelData.lng : state.userLng;
   if (!lat || !lng) {
