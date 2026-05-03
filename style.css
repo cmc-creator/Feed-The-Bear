@@ -1,9 +1,9 @@
-﻿/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   Feed The Bear â€” Style Sheet
+/* ════════════════════════════════════════════════════════════
+   Feed The Bear — Style Sheet
    Dark, food-themed UI with warm accent colours
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ════════════════════════════════════════════════════════════ */
 
-/* â”€â”€ Custom Properties â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Custom Properties ──────────────────────────────────── */
 :root {
   --bg:          #0D0D1A;
   --surface:     #16162A;
@@ -45,7 +45,7 @@
   --filter-h:    60px;
 }
 
-/* â”€â”€ Reset â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Reset ───────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 body {
@@ -69,13 +69,13 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 a { color: var(--primary); text-decoration: none; }
 img { display: block; }
 
-/* â”€â”€ Scrollbar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Scrollbar ───────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--surface); }
 ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
 
-/* â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Header ──────────────────────────────────────────────── */
 .app-header {
   position: sticky;
   top: 0;
@@ -137,7 +137,7 @@ img { display: block; }
   margin-left: auto;
 }
 
-/* â”€â”€ Buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Buttons ─────────────────────────────────────────────── */
 .btn-primary {
   display: inline-flex;
   align-items: center;
@@ -238,7 +238,7 @@ img { display: block; }
   transform: translateY(-1px);
 }
 
-/* â”€â”€ Stats Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Stats Bar ───────────────────────────────────────────── */
 .stats-bar {
   height: var(--stats-h);
   background: var(--surface);
@@ -280,7 +280,7 @@ img { display: block; }
 .accent-green { color: var(--green); }
 .accent-gold  { color: var(--gold); }
 
-/* â”€â”€ Filter Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Filter Bar ──────────────────────────────────────────── */
 .filter-bar {
   position: sticky;
   top: var(--header-h);
@@ -324,7 +324,7 @@ img { display: block; }
 .filter-select option { background: var(--surface2); }
 .hidden { display: none !important; }
 
-/* â”€â”€ Main Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Main Content ────────────────────────────────────────── */
 .main-content {
   padding: 20px;
   max-width: 1400px;
@@ -347,14 +347,14 @@ img { display: block; }
 .location-banner svg { flex-shrink: 0; color: var(--blue); }
 .location-banner span { flex: 1; color: var(--text-muted); }
 
-/* â”€â”€ Restaurant Grid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Restaurant Grid ─────────────────────────────────────── */
 .restaurant-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
 }
 
-/* â”€â”€ Restaurant Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Restaurant Card ─────────────────────────────────────── */
 .restaurant-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -502,7 +502,7 @@ img { display: block; }
 }
 .g-star.half { position: relative; color: var(--text-dim); }
 .g-star.half::before {
-  content: 'â˜…';
+  content: '★';
   position: absolute;
   left: 0;
   width: 50%;
@@ -591,7 +591,7 @@ img { display: block; }
 }
 .card-action-btn.mark-visited:hover { background: var(--green); color: #fff; }
 
-/* â”€â”€ Empty States â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Empty States ────────────────────────────────────────── */
 .empty-state {
   text-align: center;
   padding: 80px 20px;
@@ -601,7 +601,7 @@ img { display: block; }
 .empty-state h2 { font-size: 1.4rem; color: var(--text); margin-bottom: 8px; }
 .empty-state p { font-size: .9rem; margin-bottom: 24px; }
 
-/* â”€â”€ Modal Overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Modal Overlay ───────────────────────────────────────── */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -643,7 +643,7 @@ img { display: block; }
 }
 .modal-header h2 { font-size: 1.2rem; font-weight: 700; }
 
-/* â”€â”€ Form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Form ────────────────────────────────────────────────── */
 #restaurant-form { padding: 20px 24px 24px; }
 .form-grid {
   display: grid;
@@ -708,7 +708,7 @@ img { display: block; }
   margin-top: 24px;
 }
 
-/* â”€â”€ Detail Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Detail Modal ────────────────────────────────────────── */
 .detail-card { max-width: 620px; padding: 0; overflow: hidden; }
 .detail-hero {
   height: 220px;
@@ -772,7 +772,7 @@ img { display: block; }
 .g-star-lg { font-size: 1rem; color: var(--gold); }
 .g-star-lg.empty { color: var(--text-dim); }
 .g-star-lg.half { position: relative; color: var(--text-dim); }
-.g-star-lg.half::before { content: 'â˜…'; position: absolute; left: 0; width: 50%; overflow: hidden; color: var(--gold); }
+.g-star-lg.half::before { content: '★'; position: absolute; left: 0; width: 50%; overflow: hidden; color: var(--gold); }
 
 .detail-notes { background: var(--surface2); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; }
 .detail-notes h4 { font-size: .82rem; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
@@ -782,7 +782,7 @@ img { display: block; }
 
 .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
-/* â”€â”€ Proximity Alert â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Proximity Alert ─────────────────────────────────────── */
 .proximity-alert {
   position: fixed;
   top: 80px;
@@ -818,7 +818,7 @@ img { display: block; }
 }
 #proximity-close:hover { color: var(--text); background: var(--surface3); }
 
-/* â”€â”€ Toast Notifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Toast Notifications ─────────────────────────────────── */
 #toast-container {
   position: fixed;
   bottom: 24px;
@@ -860,7 +860,7 @@ img { display: block; }
 }
 .toast.removing { animation: toast-out .3s ease forwards; }
 
-/* â”€â”€ Chat Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Chat Panel ──────────────────────────────────────────── */
 .chat-panel {
   position: fixed;
   right: 0;
@@ -1017,7 +1017,7 @@ img { display: block; }
 #chat-send-btn { width: 42px; height: 42px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 #chat-send-btn svg { width: 16px; height: 16px; }
 
-/* â”€â”€ Misc Overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Misc Overlay ────────────────────────────────────────── */
 .ui-overlay {
   position: fixed;
   inset: 0;
@@ -1025,7 +1025,7 @@ img { display: block; }
   background: rgba(0,0,0,.4);
 }
 
-/* â”€â”€ Responsive â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 768px) {
   .app-header { padding: 0 12px; gap: 10px; }
   .brand-name { font-size: 1rem; }
@@ -1082,7 +1082,7 @@ img { display: block; }
   .stat-label { font-size: .65rem; }
 }
 
-/* â”€â”€ Map View â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Map View ───────────────────────────────────────────── */
 .map-container {
   height: calc(100vh - var(--header-h) - var(--stats-h) - var(--filter-h));
   width: 100%;
@@ -1105,7 +1105,7 @@ img { display: block; }
 .leaflet-bar a { background: #1E1E35 !important; color: #EAEAEA !important; border-color: rgba(255,255,255,.1) !important; }
 .leaflet-bar a:hover { background: #252540 !important; }
 
-/* â”€â”€ Cuisine Group Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Cuisine Group Header ────────────────────────────────── */
 .cuisine-group-header {
   grid-column: 1 / -1;
   display: flex;
@@ -1128,7 +1128,7 @@ img { display: block; }
   font-weight: 600;
 }
 
-/* â”€â”€ Quick filter chips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Quick filter chips ──────────────────────────────────── */
 .quick-chips { display: flex; gap: 6px; }
 .quick-chip {
   padding: 5px 12px;
@@ -1145,7 +1145,7 @@ img { display: block; }
 .quick-chip:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
 #group-by-btn.active { background: var(--surface2); color: var(--primary); border-color: var(--primary); }
 
-/* â”€â”€ Photo upload label â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Photo upload label ─────────────────────────────────── */
 .photo-upload-label {
   display: inline-flex;
   align-items: center;
@@ -1163,10 +1163,10 @@ img { display: block; }
 }
 .photo-upload-label:hover { border-color: var(--primary); color: var(--primary); }
 
-/* â”€â”€ Mobile Bottom Nav â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Mobile Bottom Nav ───────────────────────────────────── */
 .mobile-bottom-nav { display: none; }
 
-/* â”€â”€ Utilities â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Utilities ───────────────────────────────────────────── */
 .sr-only {
   position: absolute;
   width: 1px; height: 1px;
@@ -1175,11 +1175,11 @@ img { display: block; }
   white-space: nowrap; border: 0;
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   âœ¦  NEW FEATURES  v3
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+/* ════════════════════════════════════════════════════════════
+   ✦  NEW FEATURES  v3
+   ════════════════════════════════════════════════════════════ */
 
-/* â”€â”€ Light Mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Light Mode ──────────────────────────────────────────── */
 body.light-mode {
   --bg:        #F2EDE8; --surface:   #FFFFFF; --surface2:  #F5F0EB;
   --surface3:  #EDE8E2; --border:    rgba(0,0,0,.1); --text:      #1A1117;
@@ -1202,7 +1202,7 @@ body.light-mode .modal-card { background: var(--surface); }
 body.light-mode #theme-toggle-btn .icon-sun  { display: block; }
 body.light-mode #theme-toggle-btn .icon-moon { display: none; }
 
-/* â”€â”€ PWA Install Banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── PWA Install Banner ──────────────────────────────────── */
 .pwa-banner {
   display: flex; align-items: center; gap: 12px;
   padding: 10px 20px;
@@ -1215,7 +1215,7 @@ body.light-mode #theme-toggle-btn .icon-moon { display: none; }
 .pwa-banner .icon-btn { color: rgba(255,255,255,.8); }
 .pwa-banner .icon-btn:hover { color: #fff; background: rgba(255,255,255,.15); }
 
-/* â”€â”€ Tags â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Tags ────────────────────────────────────────────────── */
 .card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 2px; }
 .card-tag {
   font-size: .63rem; padding: 2px 7px; border-radius: 20px;
@@ -1232,7 +1232,7 @@ body.light-mode #theme-toggle-btn .icon-moon { display: none; }
 }
 .detail-tag:hover { background: rgba(255,107,53,.3); }
 
-/* â”€â”€ Stats View â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Stats View ──────────────────────────────────────────── */
 .stats-view { padding: 24px 20px; overflow-y: auto; flex: 1; }
 .stats-view.hidden { display: none; }
 .stats-view-inner { max-width: 900px; margin: 0 auto; }
@@ -1277,7 +1277,7 @@ body.light-mode #theme-toggle-btn .icon-moon { display: none; }
   .kpi-card { min-width: 80px; padding: 12px; } .kpi-value { font-size: 1.5rem; }
 }
 
-/* â”€â”€ Visit Log â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Visit Log ───────────────────────────────────────────── */
 .detail-visit-log { margin: 16px 0; }
 .visit-log-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .visit-log-header h4 { margin: 0; font-size: .88rem; font-weight: 700; color: var(--text); }
@@ -1290,7 +1290,7 @@ body.light-mode #theme-toggle-btn .icon-moon { display: none; }
 .visit-note { flex: 1; color: var(--text); }
 .visit-log-empty { color: var(--text-dim); font-size: .8rem; padding: 8px 0; }
 
-/* â”€â”€ Reminder / Plan a Visit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Reminder / Plan a Visit ─────────────────────────────── */
 .detail-reminder-wrap {
   margin: 16px 0; padding: 14px 16px;
   background: var(--surface2); border-radius: 12px; border: 1px solid var(--border);
@@ -1304,7 +1304,7 @@ body.light-mode #theme-toggle-btn .icon-moon { display: none; }
 }
 .reminder-status { margin-top: 8px; font-size: .8rem; color: var(--primary); font-weight: 500; }
 
-/* â”€â”€ Bulk Action Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Bulk Action Bar ─────────────────────────────────────── */
 .bulk-bar {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 20px; background: var(--surface);
@@ -1324,10 +1324,10 @@ body.light-mode #theme-toggle-btn .icon-moon { display: none; }
 }
 body.bulk-mode .card-checkbox { display: flex; }
 .card-checkbox.checked { background: var(--primary); border-color: var(--primary); }
-.card-checkbox.checked::after { content: 'âœ“'; color: #fff; font-size: .72rem; font-weight: 700; }
+.card-checkbox.checked::after { content: '✓'; color: #fff; font-size: .72rem; font-weight: 700; }
 #bulk-select-btn.active { color: var(--primary); border-color: var(--primary); }
 
-/* â”€â”€ Nearby Discovery â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Nearby Discovery ────────────────────────────────────── */
 .nearby-card { max-width: 460px; width: 100%; }
 .nearby-results { padding: 4px 0 8px; max-height: 420px; overflow-y: auto; }
 .nearby-loading, .nearby-empty { padding: 32px; text-align: center; color: var(--text-dim); font-size: .9rem; }
@@ -1344,7 +1344,7 @@ body.bulk-mode .card-checkbox { display: flex; }
   padding: 4px 10px; background: rgba(46,204,113,.1); border-radius: 20px; white-space: nowrap;
 }
 
-/* â”€â”€ Onboarding Overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Onboarding Overlay ──────────────────────────────────── */
 .onboarding-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 9000;
   display: flex; align-items: center; justify-content: center; padding: 20px;
@@ -1371,7 +1371,7 @@ body.bulk-mode .card-checkbox { display: flex; }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* â”€â”€ Collections / Custom Lists â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Collections / Custom Lists ─────────────────────────── */
 .collection-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 .collection-badge {
   display: inline-flex; align-items: center; gap: 4px;
@@ -1406,14 +1406,14 @@ body.bulk-mode .card-checkbox { display: flex; }
 .collection-color-swatch { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: border-color .15s; }
 .collection-color-swatch.selected { border-color: rgba(255,255,255,.7); box-shadow: 0 0 0 2px var(--border); }
 
-/* â”€â”€ Maps URL Paste â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Maps URL Paste ──────────────────────────────────────── */
 .maps-paste-row { display: flex; gap: 8px; align-items: stretch; }
 .maps-paste-row input { flex: 1; }
 .label-hint { font-size: .73rem; color: var(--text-dim); font-weight: 400; }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════════════════
    TAGS
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ══════════════════════════════════════════════════════════ */
 .card-tags {
   display: flex;
   flex-wrap: wrap;
@@ -1464,9 +1464,9 @@ body.bulk-mode .card-checkbox { display: flex; }
   font-weight: 400;
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════════════════
    VISIT LOG
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ══════════════════════════════════════════════════════════ */
 .detail-visit-log {
   padding: 16px 24px;
   border-top: 1px solid var(--border);
@@ -1510,9 +1510,9 @@ body.bulk-mode .card-checkbox { display: flex; }
   padding: 8px 0;
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════════════════
    REMINDER / PLAN A VISIT
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ══════════════════════════════════════════════════════════ */
 .detail-reminder-wrap {
   padding: 16px 24px;
   border-top: 1px solid var(--border);
@@ -1540,9 +1540,9 @@ body.bulk-mode .card-checkbox { display: flex; }
   color: var(--gold);
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════════════════
    STATS / ANALYTICS VIEW
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ══════════════════════════════════════════════════════════ */
 .stats-view {
   padding: 24px 20px 40px;
   max-width: 960px;
@@ -1661,7 +1661,7 @@ body.bulk-mode .card-checkbox { display: flex; }
 
 
 /* ----------------------------------------------------------
-   Phase 5 ï¿½ New Features CSS
+   Phase 5 � New Features CSS
    ---------------------------------------------------------- */
 
 /* -- Offline Banner ----------------------------------------- */
@@ -2410,7 +2410,7 @@ body.light-mode #profile-btn {
 .guest-item-meta { font-size:.74rem; color:var(--text-dim); margin-top:2px; }
 .guest-item-stars { color:var(--gold); font-size:.78rem; }
 /* ------------------------------------------------------------
-   MOBILE FIX ï¿½ Header overflow menu + general polish
+   MOBILE FIX � Header overflow menu + general polish
    ------------------------------------------------------------ */
 
 /* Slim down header-actions to only essential items */
@@ -2485,7 +2485,7 @@ body.light-mode #profile-btn {
 }
 
 /* ------------------------------------------------------------
-   PHASE 8 ï¿½ CRAVING ENGINE
+   PHASE 8 � CRAVING ENGINE
    ------------------------------------------------------------ */
 .craving-card { max-width: 520px; }
 .craving-subtitle { font-size: .85rem; color: var(--text-dim); margin: 0 0 16px; }
@@ -2518,7 +2518,7 @@ body.light-mode #profile-btn {
 .craving-match-actions { display: flex; gap: 8px; margin-top: 12px; }
 
 /* ------------------------------------------------------------
-   PHASE 8 ï¿½ DISH TRACKER
+   PHASE 8 � DISH TRACKER
    ------------------------------------------------------------ */
 .dish-card { max-width: 500px; }
 .dish-subtitle { font-size: .85rem; color: var(--primary); font-weight: 700; margin: 0 0 12px; }
@@ -2544,7 +2544,7 @@ body.light-mode #profile-btn {
 .dish-empty { color: var(--text-dim); font-size: .82rem; text-align: center; padding: 20px; }
 
 /* ------------------------------------------------------------
-   PHASE 8 ï¿½ YEAR IN REVIEW
+   PHASE 8 � YEAR IN REVIEW
    ------------------------------------------------------------ */
 .review-card { max-width: 600px; }
 .review-year-picker {
@@ -2569,7 +2569,7 @@ body.light-mode #profile-btn {
 .review-top-list li { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: .82rem; display: flex; justify-content: space-between; }
 
 /* ------------------------------------------------------------
-   PHASE 8 ï¿½ FOODIE FRIENDS
+   PHASE 8 � FOODIE FRIENDS
    ------------------------------------------------------------ */
 .friends-card { max-width: 520px; }
 .friends-subtitle { font-size: .82rem; color: var(--text-dim); margin: 0 0 12px; }
@@ -2587,7 +2587,7 @@ body.light-mode #profile-btn {
 .friends-pick-stars { color: var(--gold); font-size: .8rem; }
 
 /* ------------------------------------------------------------
-   PHASE 8 ï¿½ SMART DISCOVERY
+   PHASE 8 � SMART DISCOVERY
    ------------------------------------------------------------ */
 .discover-card { max-width: 560px; }
 .discover-subtitle { font-size: .82rem; color: var(--text-dim); margin: 0 0 12px; }
@@ -2607,7 +2607,7 @@ body.light-mode #profile-btn {
 .discover-loading { display: flex; align-items: center; gap: 10px; padding: 24px; color: var(--text-dim); font-size: .85rem; justify-content: center; }
 
 /* ------------------------------------------------------------
-   PHASE 8 ï¿½ CHALLENGES
+   PHASE 8 � CHALLENGES
    ------------------------------------------------------------ */
 .challenges-card { max-width: 540px; }
 .challenges-tabs { display: flex; gap: 4px; background: var(--surface2); border-radius: 10px; padding: 4px; margin-bottom: 14px; }
@@ -2636,7 +2636,7 @@ body.light-mode #profile-btn {
 .challenges-empty a { color: var(--primary); cursor: pointer; }
 
 /* ------------------------------------------------------------
-   PHASE 8 ï¿½ VISIT DEBRIEF
+   PHASE 8 � VISIT DEBRIEF
    ------------------------------------------------------------ */
 .debrief-card { max-width: 440px; }
 .debrief-subtitle { font-size: .9rem; color: var(--primary); font-weight: 700; margin: 0 0 16px; }
@@ -3182,9 +3182,9 @@ body.light-mode #profile-btn {
   .ach-badges-grid { grid-template-columns: repeat(2, 1fr); }
   .digest-grid { grid-template-columns: repeat(2, 1fr); }
   .travel-city-grid { grid-template-columns: 1fr; }
-}/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   PHASE 11 â€¢ NEW FEATURES
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+}/* ═══════════════════════════════════════════════════════════
+   PHASE 11 • NEW FEATURES
+   ═══════════════════════════════════════════════════════════ */
 
 /* -- Weekly Goal Widget ------------------------------------ */
 .weekly-goal-widget {
@@ -3265,7 +3265,7 @@ body.light-mode #profile-btn {
 
 
 /* ═══════════════════════════════════════════════════════════
-   DESIGN REFRESH — photo-forward, premium feel
+   DESIGN REFRESH  photo-forward, premium feel
    ═══════════════════════════════════════════════════════════ */
 
 /* Photo loading shimmer while Unsplash loads */
@@ -3286,7 +3286,7 @@ body.light-mode #profile-btn {
  animation: none;
 }
 
-/* Restaurant grid — slightly wider min so photos look good */
+/* Restaurant grid  slightly wider min so photos look good */
 .restaurant-grid {
  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
 }
@@ -3294,18 +3294,18 @@ body.light-mode #profile-btn {
 /* Card body padding tweak */
 .card-body { padding: 12px 14px 14px; }
 
-/* Price badge — cleaner */
+/* Price badge  cleaner */
 .card-price-badge {
  font-size: .7rem;
  background: rgba(0,0,0,.55);
  border: 1px solid rgba(255,255,255,.1);
 }
 
-/* Nav buttons — slightly more refined */
+/* Nav buttons  slightly more refined */
 .nav-btn {
  font-size: .8rem;
  letter-spacing: .01em;
 }
 
-/* Empty state — remove giant emoji, use text-based icon */
+/* Empty state  remove giant emoji, use text-based icon */
 .empty-icon { font-size: 3rem; opacity: .4; }
