@@ -201,7 +201,7 @@ function seedData () {
 }
 
 function uid () {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+  return Date.now().toString(36) + Math.random().toString(36).slice(2-3);
 }
 function iso (offsetDays = 0) {
   const d = new Date();
@@ -2547,7 +2547,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (_compareMode) addCompareCheckboxes();
 });
 /* ------------------------------------------------------------
-   PHASE 5 � STREAK TRACKER
+   PHASE 5 • STREAK TRACKER
    ------------------------------------------------------------ */
 
 function calcStreaks () {
@@ -2599,7 +2599,7 @@ function renderStreaks () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 5 � VISIT HEATMAP
+   PHASE 5 • VISIT HEATMAP
    ------------------------------------------------------------ */
 
 function renderHeatmap () {
@@ -2644,7 +2644,7 @@ function renderHeatmap () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 5 � TONIGHT'S PICK
+   PHASE 5 • TONIGHT'S PICK
    ------------------------------------------------------------ */
 
 function showTonightsPick () {
@@ -2687,7 +2687,7 @@ function runTonightsPick () {
   const vc = (p.visits||[]).length;
   const res = document.getElementById('tonight-result');
   res.innerHTML = '<div class="pick-name">' + escHtml(p.name) + '</div>'
-    + '<div class="pick-meta">' + escHtml(p.cuisine||'Restaurant') + (price ? ' � '+price : '') + (stars ? ' � '+stars : '') + ' � ' + status + (vc > 0 ? ' � '+vc+' visit'+(vc>1?'s':'') : '') + '</div>'
+    + '<div class="pick-meta">' + escHtml(p.cuisine||'Restaurant') + (price ? ' · '+price : '') + (stars ? ' · '+stars : '') + ' · ' + status + (vc > 0 ? ' · '+vc+' visit'+(vc>1?'s':'') : '') + '</div>'
     + (p.address ? '<div class="pick-address">?? ' + escHtml(p.address) + '</div>' : '')
     + '<div class="pick-actions">'
     + '<button class="btn-sm btn-orange" onclick="openDetailModal(\'' + p.id + '\');closeTonightsPick()">View Details</button>'
@@ -2697,7 +2697,7 @@ function runTonightsPick () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 5 � OFFLINE INDICATOR
+   PHASE 5 • OFFLINE INDICATOR
    ------------------------------------------------------------ */
 
 function initOfflineIndicator () {
@@ -2710,7 +2710,7 @@ function initOfflineIndicator () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 5 � EXPORT PDF (FOODIE REPORT)
+   PHASE 5 • EXPORT PDF (FOODIE REPORT)
    ------------------------------------------------------------ */
 
 function exportFoodieReport () {
@@ -2719,7 +2719,7 @@ function exportFoodieReport () {
   const want      = all.filter(r => r.status === 'want-to-try');
   const allVisits = all.flatMap(r => r.visits || []);
   const rated     = visited.filter(r => r.myRating > 0);
-  const avgRating = rated.length ? (rated.reduce((s,r)=>s+r.myRating,0)/rated.length).toFixed(1) : '�';
+  const avgRating = rated.length ? (rated.reduce((s,r)=>s+r.myRating,0)/rated.length).toFixed(1) : '—';
   const topPicks  = [...visited].filter(r=>r.myRating>0).sort((a,b)=>b.myRating-a.myRating).slice(0,10);
   const wantTop   = want.slice(0,8);
   const { currentStreak, longestStreak } = calcStreaks();
@@ -2734,7 +2734,7 @@ function exportFoodieReport () {
     + '<div class="pr-stat"><div class="val">'+visited.length+'</div><div class="lbl">Visited</div></div>'
     + '<div class="pr-stat"><div class="val">'+want.length+'</div><div class="lbl">Want to Try</div></div>'
     + '<div class="pr-stat"><div class="val">'+allVisits.length+'</div><div class="lbl">Check-ins</div></div>'
-    + '<div class="pr-stat"><div class="val">'+avgRating+(avgRating!=='�'?' ?':'')+'</div><div class="lbl">Avg Rating</div></div>'
+    + '<div class="pr-stat"><div class="val">'+avgRating+(avgRating!=='—'?' ?':'')+'</div><div class="lbl">Avg Rating</div></div>'
     + '<div class="pr-stat"><div class="val">'+currentStreak+' wk</div><div class="lbl">Current Streak</div></div>'
     + '<div class="pr-stat"><div class="val">'+longestStreak+' wk</div><div class="lbl">Best Streak</div></div>'
     + '</div></div>'
@@ -2748,7 +2748,7 @@ function exportFoodieReport () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 5 � FRIEND CHALLENGE
+   PHASE 5 • FRIEND CHALLENGE
    ------------------------------------------------------------ */
 
 function openChallengeModal () {
@@ -2811,11 +2811,11 @@ function checkIncomingChallenge () {
     document.getElementById('challenge-title').textContent = 'Friend Challenge';
     document.getElementById('challenge-overlay').classList.remove('hidden');
     document.body.classList.add('overlay-open');
-  } catch(_) { /* malformed � ignore */ }
+  } catch(_) { /* malformed - ignore */ }
 }
 
 /* ------------------------------------------------------------
-   PHASE 5 � AI PHOTO RECOGNITION STUB
+   PHASE 5 • AI PHOTO RECOGNITION STUB
    ------------------------------------------------------------ */
 
 async function aiPhotoFill () {
@@ -2864,7 +2864,7 @@ async function aiPhotoFill () {
   input.click();
 }
 /* ------------------------------------------------------------
-   PHASE 6 � SMART DUPLICATE DETECTOR
+   PHASE 6 • SMART DUPLICATE DETECTOR
    ------------------------------------------------------------ */
 
 function normalizeName (s) {
@@ -2907,7 +2907,7 @@ function checkDuplicate () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 � ANIMATED CONFETTI
+   PHASE 6 • ANIMATED CONFETTI
    ------------------------------------------------------------ */
 
 const CONFETTI_COLORS = ['#FF6B35','#FFD700','#2ED573','#3498DB','#9B59B6','#FF69B4','#00CEC9'];
@@ -2978,13 +2978,13 @@ function checkConfettiMilestones (prev, next) {
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 � AUTO DARK / LIGHT MODE
+   PHASE 6 • AUTO DARK / LIGHT MODE
    ------------------------------------------------------------ */
 
 function initAutoTheme () {
   const mq = window.matchMedia('(prefers-color-scheme: light)');
   const apply = (isLight) => {
-    if (state.settings.themeManual) return; // user overrode � respect their choice
+    if (state.settings.themeManual) return; // user overrode - respect their choice
     document.body.classList.toggle('light-mode', isLight);
     const btn = document.getElementById('theme-toggle-btn');
     if (btn) {
@@ -2998,7 +2998,7 @@ function initAutoTheme () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 � SWIPE GESTURES (MOBILE)
+   PHASE 6 • SWIPE GESTURES (MOBILE)
    ------------------------------------------------------------ */
 
 function initSwipeGestures () {
@@ -3048,7 +3048,7 @@ function initSwipeGestures () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 � LEADERBOARD
+   PHASE 6 • LEADERBOARD
    ------------------------------------------------------------ */
 
 function renderLeaderboard () {
@@ -3068,7 +3068,7 @@ function renderLeaderboard () {
       + '<span class="lb-medal">' + (medals[i]||'') + '</span>'
       + '<span class="lb-name">' + escHtml(r.name) + '</span>'
       + '<div><div class="lb-stars">' + '?'.repeat(r.myRating) + '</div>'
-      + '<div class="lb-meta">' + escHtml(r.cuisine||'') + (visits ? ' � ' + visits + ' visit' + (visits>1?'s':'') : '') + '</div></div>'
+      + '<div class="lb-meta">' + escHtml(r.cuisine||'') + (visits ? ' · ' + visits + ' visit' + (visits>1?'s':'') : '') + '</div></div>'
       + '</div>';
   }).join('');
   el.querySelectorAll('.lb-item[data-id]').forEach(el2 =>
@@ -3076,7 +3076,7 @@ function renderLeaderboard () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 � PRICE TREND
+   PHASE 6 • PRICE TREND
    ------------------------------------------------------------ */
 
 function renderPriceTrend () {
@@ -3120,11 +3120,11 @@ function renderPriceTrend () {
   el.innerHTML = (insight ? '<div style="font-size:.75rem;color:var(--text-dim);margin-bottom:8px">' + insight + '</div>' : '')
     + trendData.map(d => {
     const pct = d.avg > 0 ? (d.avg/maxAvg*100).toFixed(0) : 0;
-    const label = d.avg > 0 ? ['','$','$$','$$$','$$$$'][Math.round(d.avg)]||'' : '�';
+    const label = d.avg > 0 ? ['','$','$$','$$$','$$$$'][Math.round(d.avg)]||'' : '—';
     return '<div class="bar-row">'
       + '<div class="bar-label">' + d.label + '</div>'
       + '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:var(--gold)"></div></div>'
-      + '<div class="bar-count">' + (d.count > 0 ? label : '�') + '</div>'
+      + '<div class="bar-count">' + (d.count > 0 ? label : '—') + '</div>'
       + '</div>';
   }).join('');
 
@@ -3136,7 +3136,7 @@ function renderPriceTrend () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 � CUISINE PASSPORT
+   PHASE 6 • CUISINE PASSPORT
    ------------------------------------------------------------ */
 
 const ALL_CUISINES = [
@@ -3182,7 +3182,7 @@ function renderPassport () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 � MONTHLY WRAP
+   PHASE 6 • MONTHLY WRAP
    ------------------------------------------------------------ */
 
 let _wrapOffset = 0; // 0 = current month, -1 = last month, etc.
@@ -3238,7 +3238,7 @@ function renderWrapContent () {
     + '<div class="wrap-stat-grid">'
     + '<div class="wrap-stat"><div class="ws-val">' + totalVisits + '</div><div class="ws-lbl">Meals Out</div></div>'
     + '<div class="wrap-stat"><div class="ws-val">' + addedThatMonth.length + '</div><div class="ws-lbl">Places Added</div></div>'
-    + '<div class="wrap-stat"><div class="ws-val">' + (ratedThatMonth.length > 0 ? (ratedThatMonth.reduce((s,v)=>s+(v.stars||0),0)/ratedThatMonth.length).toFixed(1)+' ?' : '�') + '</div><div class="ws-lbl">Avg Rating</div></div>'
+    + '<div class="wrap-stat"><div class="ws-val">' + (ratedThatMonth.length > 0 ? (ratedThatMonth.reduce((s,v)=>s+(v.stars||0),0)/ratedThatMonth.length).toFixed(1)+' ★' : '—') + '</div><div class="ws-lbl">Avg Rating</div></div>'
     + '</div>'
     + (topCuisine ? '<div class="wrap-top"><h4>Top Cuisine</h4><div class="wrap-top-item">' + cuisineEmoji(topCuisine[0]) + ' ' + escHtml(topCuisine[0]) + '<span class="wrap-badge">' + topCuisine[1] + 'x</span></div></div>' : '')
     + (bestVisit ? '<div class="wrap-top"><h4>Best Visit</h4><div class="wrap-top-item">' + cuisineEmoji(bestVisit.r.cuisine) + ' ' + escHtml(bestVisit.r.name) + ' <span class="wrap-badge">?'.repeat(bestVisit.stars||0) + '</span></div></div>' : '')
@@ -3261,7 +3261,7 @@ function shareWrap () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 � GOOGLE CALENDAR SYNC
+   PHASE 6 • GOOGLE CALENDAR SYNC
    ------------------------------------------------------------ */
 
 function addToGoogleCalendar (restaurantId) {
@@ -3274,7 +3274,7 @@ function addToGoogleCalendar (restaurantId) {
   const fmt = d => d.toISOString().replace(/[-:]/g,'').slice(0,15) + 'Z';
   const title  = encodeURIComponent('Dinner at ' + r.name);
   const loc    = encodeURIComponent(r.address || r.name);
-  const detail = encodeURIComponent((r.cuisine ? r.cuisine + ' � ' : '') + (r.website || '') + '\n\nAdded via Feed The Bear ??');
+  const detail = encodeURIComponent((r.cuisine ? r.cuisine + ' · ' : '') + (r.website || '') + '\n\nAdded via Feed The Bear ??');
   const url = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
     + '&text=' + title
     + '&dates=' + fmt(start) + '/' + fmt(end)
@@ -3284,7 +3284,7 @@ function addToGoogleCalendar (restaurantId) {
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 � IMPORT FROM YELP / GOOGLE MAPS
+   PHASE 6 • IMPORT FROM YELP / GOOGLE MAPS
    ------------------------------------------------------------ */
 
 let _importParsed = [];
@@ -3364,7 +3364,7 @@ function confirmImport () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 � AI WEEKLY SUGGESTION
+   PHASE 6 • AI WEEKLY SUGGESTION
    ------------------------------------------------------------ */
 
 function checkWeeklySuggestion () {
@@ -3402,7 +3402,7 @@ function checkWeeklySuggestion () {
     + '<div class="wsb-title">Foodie Bear\'s Pick of the Week</div>'
     + '<div class="wsb-text">How about <strong>' + escHtml(suggestion.name) + '</strong>'
     + (suggestion.cuisine ? ' (' + escHtml(suggestion.cuisine) + ')' : '')
-    + (favCuisine ? ' � you love ' + escHtml(favCuisine) + '!' : '?') + '</div>'
+    + (favCuisine ? ' · you love ' + escHtml(favCuisine) + '!' : '') + '</div>'
     + '</div>'
     + '<button class="btn-sm btn-orange" onclick="openDetailModal(\'' + suggestion.id + '\');this.closest(\'.weekly-suggest-banner\').remove()">View</button>'
     + '<button class="wsb-dismiss" onclick="this.closest(\'.weekly-suggest-banner\').remove()" aria-label="Dismiss">?</button>';
@@ -3410,7 +3410,7 @@ function checkWeeklySuggestion () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 6 � REFERRAL SHARE COUNT
+   PHASE 6 • REFERRAL SHARE COUNT
    ------------------------------------------------------------ */
 
 function trackReferralOpen () {
@@ -3435,7 +3435,7 @@ function updateChallengeBtnBadge () {
   btn.querySelector('.referral-badge').textContent = count;
 }
 /* ------------------------------------------------------------
-   PHASE 7 � VOICE ADD
+   PHASE 7 • VOICE ADD
    ------------------------------------------------------------ */
 
 let _voiceRecognition = null;
@@ -3451,7 +3451,7 @@ function startVoiceAdd () {
   const transcript = document.getElementById('voice-transcript');
   overlay.classList.remove('hidden');
   document.getElementById('voice-btn').classList.add('listening');
-  status.textContent = 'Listening�';
+  status.textContent = 'Listening...';
   transcript.textContent = 'Say: "Add [name] on [address]" or just "[name]"';
 
   _voiceRecognition = new SpeechRecognition();
@@ -3495,11 +3495,11 @@ function parseVoiceInput (text) {
   openAddModal();
   document.getElementById('form-name').value = name;
   if (address) document.getElementById('form-address').value = address;
-  showToast('??? Voice Captured!', '"' + name + '"' + (address ? ' at ' + address : '') + ' � review and save.', 'success');
+  showToast('??? Voice Captured!', '"' + name + '"' + (address ? ' at ' + address : '') + ' · review and save.', 'success');
 }
 
 /* ------------------------------------------------------------
-   PHASE 7 � SMART AUTO-TAGS
+   PHASE 7 • SMART AUTO-TAGS
    ------------------------------------------------------------ */
 
 const TAG_RULES = [
@@ -3557,7 +3557,7 @@ function computeAutoTags () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 7 � RESERVATION REMINDERS
+   PHASE 7 • RESERVATION REMINDERS
    ------------------------------------------------------------ */
 
 function initReminders () {
@@ -3619,7 +3619,7 @@ function setReminder (restaurantId) {
   }
 }
 /* ------------------------------------------------------------
-   PHASE 7 � PHOTO GALLERY + LIGHTBOX
+   PHASE 7 • PHOTO GALLERY + LIGHTBOX
    ------------------------------------------------------------ */
 
 let _galleryPhotos = []; // [{src, name, id}]
@@ -3669,7 +3669,7 @@ function renderLightbox () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 7 � COMPARE MODE
+   PHASE 7 • COMPARE MODE
    ------------------------------------------------------------ */
 
 let _compareMode = false;
@@ -3699,8 +3699,8 @@ function toggleCompareCard (id) {
 function updateCompareBar () {
   const n = _compareIds.size;
   document.getElementById('compare-count').textContent =
-    n === 0 ? 'Tap restaurants to compare (2�3)'
-    : n === 1 ? '1 selected � pick 1 or 2 more'
+    n === 0 ? 'Tap restaurants to compare (2-3)'
+    : n === 1 ? '1 selected · pick 1 or 2 more'
     : n + ' selected';
   document.getElementById('compare-now-btn').disabled = n < 2;
 }
@@ -3710,13 +3710,13 @@ function showCompare () {
   if (restaurants.length < 2) return;
   const cols = restaurants.length + 1;
   const FIELDS = [
-    { label: 'Cuisine',   fn: r => escHtml(r.cuisine||'�') },
-    { label: 'Price',     fn: r => ['�','$','$$','$$$','$$$$'][r.priceRange||0] },
-    { label: 'My Rating', fn: r => r.myRating ? '?'.repeat(r.myRating) : '�', num: r => r.myRating||0 },
-    { label: 'Google ?',  fn: r => r.googleRating ? r.googleRating + ' / 5' : '�', num: r => r.googleRating||0 },
+    { label: 'Cuisine',   fn: r => escHtml(r.cuisine||'—') },
+    { label: 'Price',     fn: r => ['Free','$','$$','$$$','$$$$'][r.priceRange||0] },
+    { label: 'My Rating', fn: r => r.myRating ? '?'.repeat(r.myRating) : '—', num: r => r.myRating||0 },
+    { label: 'Google ?',  fn: r => r.googleRating ? r.googleRating + ' / 5' : '—', num: r => r.googleRating||0 },
     { label: 'Visits',    fn: r => String((r.visits||[]).length || (r.dateVisited?1:0)), num: r => (r.visits||[]).length||(r.dateVisited?1:0) },
     { label: 'Status',    fn: r => r.status === 'visited' ? '? Visited' : '?? Want to Try' },
-    { label: 'Address',   fn: r => escHtml((r.address||'�').slice(0,40)) },
+    { label: 'Address',   fn: r => escHtml((r.address||'—').slice(0,40)) },
   ];
   let html = '<div class="compare-grid" style="grid-template-columns: 100px ' + restaurants.map(()=>'1fr').join(' ') + '">';
   // Header row
@@ -3752,7 +3752,7 @@ function closeCompare () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 7 � BUDGET TRACKER
+   PHASE 7 • BUDGET TRACKER
    ------------------------------------------------------------ */
 
 function openBudget () {
@@ -3802,14 +3802,14 @@ function renderBudgetChart () {
     + '<div class="budget-gauge-track"><div class="budget-gauge-fill' + (over?' over':'') + '" style="width:' + Math.min(pct,100) + '%"></div></div>'
     + '</div>'
     + '<div class="budget-insight">'
-    + visitsThisMonth + ' visit' + (visitsThisMonth!==1?'s':'') + ' � $' + avgSpend + '/avg = ~$' + estimated.toFixed(0)
-    + (over ? ' � <span style="color:#e74c3c">$' + (estimated-monthlyBudget).toFixed(0) + ' over budget ??</span>'
-             : ' � <span style="color:var(--green)">$' + remaining.toFixed(0) + ' remaining ?</span>')
+    + visitsThisMonth + ' visit' + (visitsThisMonth!==1?'s':'') + ' · $' + avgSpend + '/avg = ~$' + estimated.toFixed(0)
+    + (over ? ' · <span style="color:#e74c3c">$' + (estimated-monthlyBudget).toFixed(0) + ' over budget ??</span>'
+             : ' · <span style="color:var(--green)">$' + remaining.toFixed(0) + ' remaining ?</span>')
     + '</div>';
 }
 
 /* ------------------------------------------------------------
-   PHASE 7 � VISIT CALENDAR
+   PHASE 7 • VISIT CALENDAR
    ------------------------------------------------------------ */
 
 let _calOffset = 0; // months from now
@@ -3871,7 +3871,7 @@ function renderVisitCalendar () {
   });
 }
 /* ------------------------------------------------------------
-   PHASE 7 � PUBLIC FOODIE PROFILE + QR CODE
+   PHASE 7 • PUBLIC FOODIE PROFILE + QR CODE
    ------------------------------------------------------------ */
 
 function buildProfileData () {
@@ -3951,7 +3951,7 @@ function checkGuestProfile () {
     const data = JSON.parse(decodeURIComponent(escape(atob(encoded))));
     if (!data.picks?.length) return;
     renderGuestProfile(data);
-  } catch(_) { /* invalid hash � ignore */ }
+  } catch(_) { /* invalid hash - ignore */ }
 }
 function renderGuestProfile (data) {
   const overlay = document.getElementById('guest-profile-overlay');
@@ -3963,7 +3963,7 @@ function renderGuestProfile (data) {
     + '<div class="guest-item-photo">' + (p.p ? `<img src="${escHtml(p.p)}" alt="${escHtml(p.n)}" style="width:100%;height:100%;object-fit:cover;border-radius:10px" />` : (CUISINE_EMOJI[(p.c||'').toLowerCase()] || '???')) + '</div>'
     + '<div class="guest-item-body">'
     + '<div class="guest-item-name">' + (medals[i]||'') + ' ' + escHtml(p.n) + '</div>'
-    + '<div class="guest-item-meta">' + escHtml(p.c||'Restaurant') + (p.a ? ' � ' + escHtml(p.a.slice(0,40)) : '') + '</div>'
+    + '<div class="guest-item-meta">' + escHtml(p.c||'Restaurant') + (p.a ? ' · ' + escHtml(p.a.slice(0,40)) : '') + '</div>'
     + '<div class="guest-item-stars">' + '?'.repeat(p.r) + '</div>'
     + '</div>'
     + '</div>'
@@ -3976,7 +3976,7 @@ function renderGuestProfile (data) {
 }
 
 /* ------------------------------------------------------------
-   PHASE 7 � WEB SHARE TARGET HANDLER
+   PHASE 7 • WEB SHARE TARGET HANDLER
    ------------------------------------------------------------ */
 
 function handleWebShareTarget () {
@@ -3989,7 +3989,7 @@ function handleWebShareTarget () {
   // Clean up the URL
   history.replaceState(null,'', window.location.pathname);
   // Try to parse as restaurant
-  const name = title.replace(/\s*[-�|].*$/, '').trim() || text.trim() || 'Shared Place';
+  const name = title.replace(/\s*[-|].*$/, '').trim() || text.trim() || 'Shared Place';
   openAddModal();
   document.getElementById('form-name').value = name;
   if (url) {
@@ -4000,11 +4000,11 @@ function handleWebShareTarget () {
       parseMapsUrl(url);
     }
   }
-  showToast('?? Shared!', '"' + name + '" opened for review � fill in details and save!', 'success');
+  showToast('?? Shared!', '"' + name + '" opened for review · fill in details and save!', 'success');
 }
 
 /* ------------------------------------------------------------
-   PHASE 7 � renderCards hook for compare mode
+   PHASE 7 • renderCards hook for compare mode
    ------------------------------------------------------------ */
 
 // Patch card rendering to show compare checkbox when _compareMode is on
@@ -4027,7 +4027,7 @@ function addCompareCheckboxes () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 8 � ? MORE MENU CONTROLLER
+   PHASE 8 • ? MORE MENU CONTROLLER
    ------------------------------------------------------------ */
 
 function initMoreMenu () {
@@ -4092,7 +4092,7 @@ function initMoreMenu () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 8 � ?? CRAVING ENGINE
+   PHASE 8 • ?? CRAVING ENGINE
    ------------------------------------------------------------ */
 
 let _cravingMoods = new Set();
@@ -4185,7 +4185,7 @@ function runCravingEngine () {
   resultEl.innerHTML = `
     <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--primary);margin-bottom:10px">?? Tonight's Match</div>
     <div class="craving-match-name">${cuisineEmoji(winner.cuisine)} ${escHtml(winner.name)}</div>
-    <div class="craving-match-meta">${escHtml(cuisine)}${price ? ' � ' + price : ''}${rating ? ' � ' + rating : ''}</div>
+    <div class="craving-match-meta">${escHtml(cuisine)}${price ? ' · ' + price : ''}${rating ? ' · ' + rating : ''}</div>
     <div class="craving-match-why">${escHtml(why)}</div>
     <div class="craving-match-actions">
       <button class="btn-primary btn-sm" onclick="openDetailModal('${winner.id}');closeCravingEngine()">View ?</button>
@@ -4196,7 +4196,7 @@ function runCravingEngine () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 8 � ??? DISH TRACKER
+   PHASE 8 • ??? DISH TRACKER
    ------------------------------------------------------------ */
 
 let _dishRating = 0;
@@ -4259,7 +4259,7 @@ function renderDishList (restaurantId) {
   el.innerHTML = list.map(d => `
     <div class="dish-item">
       <div class="dish-item-name">${escHtml(d.name)}</div>
-      <div class="dish-item-stars">${d.rating ? '?'.repeat(d.rating) + '?'.repeat(5-d.rating) : '�'}</div>
+      <div class="dish-item-stars">${d.rating ? '?'.repeat(d.rating) + '?'.repeat(5-d.rating) : '☆'}</div>
       <div class="dish-item-date" style="font-size:.72rem;color:var(--text-dim)">${d.date||''}</div>
       <button class="dish-item-delete icon-btn" onclick="deleteDish('${restaurantId}','${d.id}')" title="Remove">?</button>
     </div>
@@ -4267,7 +4267,7 @@ function renderDishList (restaurantId) {
 }
 
 /* ------------------------------------------------------------
-   PHASE 8 � ?? YEAR IN REVIEW
+   PHASE 8 • ?? YEAR IN REVIEW
    ------------------------------------------------------------ */
 
 let _reviewYear = new Date().getFullYear();
@@ -4331,12 +4331,12 @@ function renderYearReview () {
     slides.push(`<div class="review-slide"><div class="review-slide-emoji">??</div><div class="review-slide-title">No visits in ${yr}</div><div class="review-slide-value">0</div><div class="review-slide-sub">Start logging your visits!</div></div>`);
   } else {
     slides.push(`<div class="review-slide"><div class="review-slide-emoji">???</div><div class="review-slide-title">Meals Out in ${yr}</div><div class="review-slide-value">${totalVisits}</div><div class="review-slide-sub">across ${uniqueRestaurants} restaurant${uniqueRestaurants!==1?'s':''}</div></div>`);
-    if (topCuisine) slides.push(`<div class="review-slide"><div class="review-slide-emoji">${cuisineEmoji(topCuisine[0])}</div><div class="review-slide-title">Your #1 Cuisine</div><div class="review-slide-value">${escHtml(topCuisine[0])}</div><div class="review-slide-sub">${topCuisine[1]} visit${topCuisine[1]!==1?'s':''} � you really love it</div></div>`);
+    if (topCuisine) slides.push(`<div class="review-slide"><div class="review-slide-emoji">${cuisineEmoji(topCuisine[0])}</div><div class="review-slide-title">Your #1 Cuisine</div><div class="review-slide-value">${escHtml(topCuisine[0])}</div><div class="review-slide-sub">${topCuisine[1]} visit${topCuisine[1]!==1?'s':''} · you really love it</div></div>`);
     if (totalCuisines > 1) slides.push(`<div class="review-slide"><div class="review-slide-emoji">??</div><div class="review-slide-title">Cuisines Explored</div><div class="review-slide-value">${totalCuisines}</div><div class="review-slide-sub">You ate: ${Object.keys(cuisineMap).slice(0,5).join(', ')}</div></div>`);
     if (mostVisited) slides.push(`<div class="review-slide"><div class="review-slide-emoji">??</div><div class="review-slide-title">Your Go-To Spot</div><div class="review-slide-value" style="font-size:1.3rem">${escHtml(mostVisited.name)}</div><div class="review-slide-sub">${cuisineEmoji(mostVisited.cuisine)} ${mostVisited.cuisine||''}</div></div>`);
     if (avgRating) slides.push(`<div class="review-slide"><div class="review-slide-emoji">?</div><div class="review-slide-title">Your Average Rating</div><div class="review-slide-value">${avgRating} / 5</div><div class="review-slide-sub">${avgRating>=4.5?'You have high standards!':avgRating>=3.5?'You eat well ?':'Room to discover better spots'}</div></div>`);
     if (months[peakMonthIdx] > 0) slides.push(`<div class="review-slide"><div class="review-slide-emoji">??</div><div class="review-slide-title">Most Active Month</div><div class="review-slide-value">${MONTH_NAMES[peakMonthIdx]}</div><div class="review-slide-sub">${months[peakMonthIdx]} meal${months[peakMonthIdx]!==1?'s':''} out that month</div></div>`);
-    slides.push(`<div class="review-slide"><div class="review-slide-emoji">??</div><div class="review-slide-title">Estimated Dining Spend</div><div class="review-slide-value">~$${estimatedSpend.toLocaleString()}</div><div class="review-slide-sub">Based on ${totalVisits} visits � $${state.settings.avgSpend||35}/avg</div></div>`);
+    slides.push(`<div class="review-slide"><div class="review-slide-emoji">??</div><div class="review-slide-title">Estimated Dining Spend</div><div class="review-slide-value">~$${estimatedSpend.toLocaleString()}</div><div class="review-slide-sub">Based on ${totalVisits} visits · $${state.settings.avgSpend||35}/avg</div></div>`);
     if (topRated.length) {
       const topRatedHtml = topRated.map(r=>`<li><span>${escHtml(r.name)}</span><span>${'?'.repeat(r.myRating)}</span></li>`).join('');
       slides.push(`<div class="review-slide" style="text-align:left"><div class="review-slide-emoji" style="text-align:center">??</div><div class="review-slide-title" style="text-align:center">Your Top Rated</div><ul class="review-top-list">${topRatedHtml}</ul></div>`);
@@ -4360,7 +4360,7 @@ function shareYearReview () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 8 � ?? FOODIE FRIENDS
+   PHASE 8 • ?? FOODIE FRIENDS
    ------------------------------------------------------------ */
 
 function _buildFriendsMyLink () {
@@ -4423,10 +4423,10 @@ function renderFriendComparison (friendData) {
   if (overlap.length) {
     html += `<div class="friends-overlap">
       <div class="friends-overlap-title">?? You both love these (${overlap.length})</div>
-      ${overlap.map(p => `<div class="friends-overlap-item">${cuisineEmoji(p.c)} ${escHtml(p.n)} � you: ${'?'.repeat(p.r)}</div>`).join('')}
+      ${overlap.map(p => `<div class="friends-overlap-item">${cuisineEmoji(p.c)} ${escHtml(p.n)} · you: ${'?'.repeat(p.r)}</div>`).join('')}
     </div>`;
   } else {
-    html += `<div class="friends-overlap"><div class="friends-overlap-title">?? No direct overlap yet � time to branch out!</div></div>`;
+    html += `<div class="friends-overlap"><div class="friends-overlap-title">?? No direct overlap yet · time to branch out!</div></div>`;
   }
 
   // Shared cuisines
@@ -4463,7 +4463,7 @@ function openAddModalPreFilled (name, cuisine) {
 }
 
 /* ------------------------------------------------------------
-   PHASE 8 � ??? SMART DISCOVERY
+   PHASE 8 • ??? SMART DISCOVERY
    ------------------------------------------------------------ */
 
 function openDiscover () {
@@ -4482,7 +4482,7 @@ async function runDiscover () {
   }
   const radius = parseInt(document.getElementById('discover-radius').value) || 1000;
   const resultsEl = document.getElementById('discover-results');
-  resultsEl.innerHTML = '<div class="discover-loading">?? Searching nearby places�</div>';
+  resultsEl.innerHTML = '<div class="discover-loading">?? Searching nearby places...</div>';
 
   // Overpass API query: restaurants + cafes within radius
   const lat = state.userLat, lng = state.userLng;
@@ -4550,7 +4550,7 @@ async function runDiscover () {
         <div class="discover-item-emoji">${emoji}</div>
         <div class="discover-item-body">
           <div class="discover-item-name">${name}</div>
-          <div class="discover-item-meta">${cuisine ? cuisine + ' � ' : ''}${escHtml(type)}</div>
+          <div class="discover-item-meta">${cuisine ? cuisine + ' · ' : ''}${escHtml(type)}</div>
           ${address ? `<div class="discover-item-meta">?? ${escHtml(address)}</div>` : ''}
           ${matchTag ? `<div class="discover-item-match">? ${escHtml(matchTag)}</div>` : ''}
         </div>
@@ -4566,7 +4566,7 @@ async function runDiscover () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 8 � ?? CUSTOM CHALLENGES
+   PHASE 8 • ?? CUSTOM CHALLENGES
    ------------------------------------------------------------ */
 
 const CHALLENGES_KEY = 'ftb_challenges_v1';
@@ -4611,7 +4611,7 @@ function calcChallengeProgress (ch) {
     case 'rating_avg': {
       const rated = now.filter(r => r.myRating > 0);
       const avg = rated.length ? rated.reduce((s,r)=>s+r.myRating,0)/rated.length : 0;
-      return parseFloat(avg.toFixed(2));
+      return parseFloat(avg.toFixed(2-3));
     }
     default: return 0;
   }
@@ -4640,7 +4640,7 @@ function renderChallengesList () {
       <div class="challenge-progress-track">
         <div class="challenge-progress-fill" style="width:${pct}%"></div>
       </div>
-      <div class="challenge-progress-label">${progress} / ${goal}${done?' � ?? Complete!':''}</div>
+      <div class="challenge-progress-label">${progress} / ${goal}${done?' ✅ Complete!':''}</div>
     </div>`;
   }).join('');
 }
@@ -4704,7 +4704,7 @@ function loadFriendChallenge () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 8 � ?? VISIT DEBRIEF
+   PHASE 8 • ?? VISIT DEBRIEF
    ------------------------------------------------------------ */
 
 let _debriefId = null;
@@ -4735,7 +4735,7 @@ function openVisitDebrief (restaurantId) {
     </div>
     <div>
       <div class="debrief-q">Quick note (optional)</div>
-      <textarea id="debrief-note" class="form-input debrief-textarea" placeholder="Best dish? Service? Parking? Anything�" rows="2"></textarea>
+      <textarea id="debrief-note" class="form-input debrief-textarea" placeholder="Best dish? Service? Parking? Anything..." rows="2"></textarea>
     </div>
   `;
   document.getElementById('debrief-steps').innerHTML = steps;
@@ -4786,7 +4786,7 @@ function saveDebrief () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 9 � ?? DEEP STATS
+   PHASE 9 • ?? DEEP STATS
    ------------------------------------------------------------ */
 
 function openStats2 () {
@@ -4846,7 +4846,7 @@ function renderStats2 () {
   // -- Scatter: Price (x) vs Rating (y) --
   renderScatterPlot(visited);
 
-  // -- Hidden Gems (high rating = 4, cheap price � / ��) --
+  // -- Hidden Gems (high rating = 4, cheap price $ / $$) --
   const gems = visited
     .filter(r => r.myRating >= 4 && (r.priceRange || 0) <= 2 && r.priceRange > 0)
     .sort((a, b) => b.myRating - a.myRating)
@@ -4859,12 +4859,12 @@ function renderStats2 () {
         <div class="gem-item-emoji">${cuisineEmoji(r.cuisine)}</div>
         <div>
           <div class="gem-item-name">${escHtml(r.name)}</div>
-          <div class="gem-item-meta">${escHtml(r.cuisine||'')} � ${'�'.repeat(r.priceRange||1)}</div>
+          <div class="gem-item-meta">${escHtml(r.cuisine||'')} · ${'$'.repeat(r.priceRange||1)}</div>
         </div>
         <div class="gem-badge">?${r.myRating} Hidden Gem</div>
       </div>`).join('');
   } else {
-    gemsList.innerHTML = '<div style="font-size:.8rem;color:var(--text-dim)">No hidden gems yet � rate more cheap spots!</div>';
+    gemsList.innerHTML = '<div style="font-size:.8rem;color:var(--text-dim)">No hidden gems yet · rate more cheap spots!</div>';
   }
 
   // -- Visit heatmap (last 52 weeks) --
@@ -4970,7 +4970,7 @@ function renderVisitHeatmap (visited) {
 }
 
 /* ------------------------------------------------------------
-   PHASE 9 � ?? AI ASSISTANT
+   PHASE 9 • ?? AI ASSISTANT
    ------------------------------------------------------------ */
 
 const _aiHistory = [];
@@ -5068,11 +5068,11 @@ async function getAiDetailSummary (restaurantId) {
   const el = document.getElementById('detail-ai-summary');
   if (!el) return;
   el.classList.remove('hidden');
-  el.textContent = '?? Generating summary�';
+  el.textContent = '?? Generating summary…';
 
   const key = state.settings.aiApiKey;
   if (!key) {
-    el.textContent = `?? ${r.name} � ${r.cuisine || 'restaurant'} � ?${r.myRating || '?'} � ${r.notes ? r.notes.slice(0,120) : 'No notes yet.'}`;
+    el.textContent = `?? ${r.name} · ${r.cuisine || 'restaurant'} · ?${r.myRating || '?'} · ${r.notes ? r.notes.slice(0,120) : 'No notes yet.'}`;
     return;
   }
 
@@ -5097,7 +5097,7 @@ async function getAiDetailSummary (restaurantId) {
 }
 
 /* ------------------------------------------------------------
-   PHASE 9 � ??? MAP UPGRADES (cluster + route)
+   PHASE 9 • ??? MAP UPGRADES (cluster + route)
    ------------------------------------------------------------ */
 
 // Route planner selected IDs
@@ -5118,7 +5118,7 @@ function openRoutePlanner () {
         <div class="route-pick-check" id="route-check-${r.id}"></div>
         <div>
           <div class="route-pick-name">${cuisineEmoji(r.cuisine)} ${escHtml(r.name)}</div>
-          <div class="route-pick-meta">${escHtml(r.cuisine||'')}${r.address ? ' � ' + escHtml(r.address) : ''}</div>
+          <div class="route-pick-meta">${escHtml(r.cuisine||'')}${r.address ? ' · ' + escHtml(r.address) : ''}</div>
         </div>
       </div>`).join('');
   }
@@ -5179,7 +5179,7 @@ function loadDetailPhoto (restaurant) {
 }
 
 /* ------------------------------------------------------------
-   PHASE 9 � ?? EXPORT v2
+   PHASE 9 • ?? EXPORT v2
    ------------------------------------------------------------ */
 
 function openExport2 () {
@@ -5191,12 +5191,12 @@ function closeExport2 () {
   maybeHideOverlay();
 }
 
-/* Restaurant Passport � print-ready HTML page */
+/* Restaurant Passport - print-ready HTML page */
 function exportPassport () {
   const visited = state.restaurants.filter(r => r.status === 'visited');
   if (!visited.length) { showToast('No visits yet', 'Mark some restaurants as visited first.', 'error'); return; }
 
-  const priceStr = n => n ? '�'.repeat(n) : '';
+  const priceStr = n => n ? '$'.repeat(n) : '';
   const ratingStr = n => n ? '?'.repeat(n) + '?'.repeat(5-n) : 'Unrated';
 
   const cards = visited.map(r => `
@@ -5219,7 +5219,7 @@ function exportPassport () {
   h1{font-size:1.8rem;border-bottom:2px solid #e63946;padding-bottom:8px;margin-bottom:24px}
   @media print{body{margin:0;padding:10px}}</style></head><body>
   <h1>??? My Restaurant Passport</h1>
-  <p style="color:#888;font-size:.85rem">Generated ${new Date().toLocaleDateString()} � ${visited.length} restaurants visited</p>
+  <p style="color:#888;font-size:.85rem">Generated ${new Date().toLocaleDateString()} · ${visited.length} restaurants visited</p>
   ${cards}
   </body></html>`;
 
@@ -5243,7 +5243,7 @@ function exportShareablePage () {
       <span style="font-size:1.6rem">${cuisineEmoji(r.cuisine)}</span>
       <div style="flex:1">
         <div style="font-weight:700;font-size:.95rem">${escHtml(r.name)}</div>
-        <div style="font-size:.78rem;color:#aaa">${escHtml(r.cuisine||'')}${r.priceRange ? ' � ' + '�'.repeat(r.priceRange) : ''}</div>
+        <div style="font-size:.78rem;color:#aaa">${escHtml(r.cuisine||'')}${r.priceRange ? ' · ' + '$'.repeat(r.priceRange) : ''}</div>
         ${r.myRating ? `<div style="color:#ff6b35;font-size:.82rem">${'?'.repeat(r.myRating)}</div>` : ''}
         ${r.notes ? `<div style="font-size:.75rem;color:#888;margin-top:4px">${escHtml(r.notes.slice(0,100))}</div>` : ''}
       </div>
@@ -5251,12 +5251,12 @@ function exportShareablePage () {
     </div>`).join('');
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>My Food List � Feed The Bear</title>
+  <title>My Food List - Feed The Bear</title>
   <style>*{box-sizing:border-box}body{background:#0d0d1a;color:#e8e8f0;font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:20px}
   h1{font-size:1.5rem;margin-bottom:4px}p{color:#888;font-size:.82rem;margin-top:0 0 20px}
   .list{display:flex;flex-direction:column;gap:8px}</style></head><body>
   <h1>?? My Food List</h1>
-  <p>Shared from Feed The Bear � ${restaurants.length} places � ${new Date().toLocaleDateString()}</p>
+  <p>Shared from Feed The Bear · ${restaurants.length} places · ${new Date().toLocaleDateString()}</p>
   <div class="list">${items}</div>
   </body></html>`;
 
@@ -5267,7 +5267,7 @@ function exportShareablePage () {
   a.click();
   URL.revokeObjectURL(a.href);
   closeExport2();
-  showToast('?? Page downloaded!', 'Share the HTML file � it works in any browser.', 'success');
+  showToast('?? Page downloaded!', 'Share the HTML file · it works in any browser.', 'success');
 }
 
 /* CSV export */
@@ -5275,7 +5275,7 @@ function exportCSV () {
   const rows = [['Name','Cuisine','Status','Rating','Price','Address','Date Added','Notes']];
   state.restaurants.forEach(r => {
     rows.push([
-      r.name, r.cuisine||'', r.status||'', r.myRating||'', r.priceRange ? '�'.repeat(r.priceRange) : '',
+      r.name, r.cuisine||'', r.status||'', r.myRating||'', r.priceRange ? '$'.repeat(r.priceRange) : '',
       r.address||'', r.dateAdded||'', (r.notes||'').replace(/\n/g,' ')
     ].map(v => '"' + String(v).replace(/"/g,'""') + '"'));
   });
@@ -5291,7 +5291,7 @@ function exportCSV () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 9 � ?? PWA INSTALL PROMPT + APP BADGING
+   PHASE 9 • ?? PWA INSTALL PROMPT + APP BADGING
    ------------------------------------------------------------ */
 
 let _deferredInstallPrompt = null;
@@ -5317,7 +5317,7 @@ function initInstallPrompt () {
     _deferredInstallPrompt.prompt();
     const { outcome } = await _deferredInstallPrompt.userChoice;
     _deferredInstallPrompt = null;
-    if (outcome === 'accepted') showToast('?? Installing�', '', 'success');
+    if (outcome === 'accepted') showToast('?? Installing…', '', 'success');
   });
 
   document.getElementById('install-dismiss-btn').addEventListener('click', () => {
@@ -5333,7 +5333,7 @@ function hideInstallBanner () {
   document.getElementById('install-banner').classList.add('hidden');
 }
 
-/* App Badging � show count of wishlist items as badge */
+/* App Badging - show count of wishlist items as badge */
 function updateAppBadge () {
   const wishlistCount = state.restaurants.filter(r => r.status === 'wishlist').length;
   if ('setAppBadge' in navigator) {
@@ -5343,7 +5343,7 @@ function updateAppBadge () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 9 � ?? PUSH NOTIFICATION NUDGES
+   PHASE 9 • ?? PUSH NOTIFICATION NUDGES
    ------------------------------------------------------------ */
 
 async function requestPushPermission () {
@@ -5394,7 +5394,7 @@ function checkAndNudge () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 10 � ?? ACHIEVEMENTS & XP
+   PHASE 10 • ?? ACHIEVEMENTS & XP
    ------------------------------------------------------------ */
 
 const XP_KEY  = 'ftb_xp_v1';
@@ -5420,7 +5420,7 @@ const BADGE_DEFS = [
   { id: 'first_5star',      icon: '??',  name: 'Perfection',        desc: 'Give a restaurant 5 stars',          xp: 30,  check: r => r.some(x=>x.myRating >= 5) },
   { id: 'photo_added',      icon: '??',  name: 'Shutterbug',        desc: 'Add a photo to a restaurant',        xp: 15,  check: r => r.some(x=>x.photo) },
   { id: 'has_notes',        icon: '??',  name: 'Critic',            desc: 'Write notes on 5 restaurants',       xp: 20,  check: r => r.filter(x=>x.notes&&x.notes.length>10).length >= 5 },
-  { id: 'cheap_gem',        icon: '??',  name: 'Bargain Hunter',    desc: 'Rate a � restaurant 4+ stars',       xp: 25,  check: r => r.some(x=>x.priceRange===1&&x.myRating>=4) },
+  { id: 'cheap_gem',        icon: '??',  name: 'Bargain Hunter',    desc: 'Rate a $ restaurant 4+ stars',       xp: 25,  check: r => r.some(x=>x.priceRange===1&&x.myRating>=4) },
 ];
 
 function getXpData () {
@@ -5453,7 +5453,7 @@ function awardXp (amount, reason) {
   // XP toast
   const toast = document.createElement('div');
   toast.className = 'ach-xp-toast';
-  toast.textContent = '+' + amount + ' XP � ' + reason;
+  toast.textContent = '+' + amount + ' XP · ' + reason;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 2400);
 
@@ -5493,7 +5493,7 @@ function openAchievements () {
   const next  = getNextLevel(data.xp);
 
   document.getElementById('ach-level-label').textContent = level.icon || '' + level.name;
-  document.getElementById('ach-xp-label').textContent    = data.xp + ' XP' + (next ? ' / ' + next.minXp : ' � MAX');
+  document.getElementById('ach-xp-label').textContent    = data.xp + ' XP' + (next ? ' / ' + next.minXp : ' · MAX');
 
   const pct = next
     ? Math.min(((data.xp - level.minXp) / (next.minXp - level.minXp)) * 100, 100)
@@ -5520,7 +5520,7 @@ function closeAchievements () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 10 � ?? SWIPE TO DECIDE
+   PHASE 10 • ?? SWIPE TO DECIDE
    ------------------------------------------------------------ */
 
 let _swipeDeck = [];
@@ -5568,7 +5568,7 @@ function _renderSwipeDeck () {
       <div class="swipe-label no">SKIP ?</div>
       <div class="swipe-card-emoji">${cuisineEmoji(r.cuisine)}</div>
       <div class="swipe-card-name">${escHtml(r.name)}</div>
-      <div class="swipe-card-meta">${escHtml(r.cuisine||'')}${r.priceRange ? ' � ' + '�'.repeat(r.priceRange) : ''}</div>
+      <div class="swipe-card-meta">${escHtml(r.cuisine||'')}${r.priceRange ? ' · ' + '$'.repeat(r.priceRange) : ''}</div>
       ${r.myRating ? `<div class="swipe-card-rating">${'?'.repeat(r.myRating)}</div>` : ''}
       ${r.address ? `<div class="swipe-card-meta" style="margin-top:4px">?? ${escHtml(r.address)}</div>` : ''}
     `;
@@ -5627,7 +5627,7 @@ function _completeSwipe (card, restaurant, picked) {
     _swipeIdx++;
     if (picked) {
       // Add to tonight's pick toast
-      showToast('?? ' + restaurant.name + ' picked!', 'Opening in Maps�', 'success');
+      showToast('?? ' + restaurant.name + ' picked!', 'Opening in Maps…', 'success');
       setTimeout(() => openDirections(restaurant), 800);
       awardXp(5, 'Made a dinner decision');
     }
@@ -5639,7 +5639,7 @@ function swipePick ()  { if (_swipeCurrentCard) { const r = _swipeDeck[_swipeIdx
 function swipeSkip ()  { if (_swipeCurrentCard) { const r = _swipeDeck[_swipeIdx]; _completeSwipe(_swipeCurrentCard, r, false); } }
 
 /* ------------------------------------------------------------
-   PHASE 10 � ?? SPIN THE WHEEL
+   PHASE 10 • ?? SPIN THE WHEEL
    ------------------------------------------------------------ */
 
 let _spinItems    = [];
@@ -5702,7 +5702,7 @@ function _drawWheel (highlightIdx = -1) {
     ctx.font         = `bold ${Math.max(10, Math.min(14, 160/n))}px Poppins, sans-serif`;
     ctx.shadowColor  = 'rgba(255,255,255,.5)';
     ctx.shadowBlur   = 3;
-    const label = item.name.length > 12 ? item.name.slice(0, 11) + '�' : item.name;
+    const label = item.name.length > 12 ? item.name.slice(0, 11) + '...' : item.name;
     ctx.fillText(label, r - 10, 5);
     ctx.restore();
   });
@@ -5760,7 +5760,7 @@ function spinWheel () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 10 � ?? TRAVEL MODE
+   PHASE 10 • ?? TRAVEL MODE
    ------------------------------------------------------------ */
 
 const TRAVEL_KEY = 'ftb_travel_v1';
@@ -5835,7 +5835,7 @@ async function activateTravelCity (city, lat, lng) {
 }
 
 /* ------------------------------------------------------------
-   PHASE 10 � ?? MONTHLY DIGEST
+   PHASE 10 • ?? MONTHLY DIGEST
    ------------------------------------------------------------ */
 
 let _digestMonth = 0;
@@ -5862,7 +5862,7 @@ function _renderDigest () {
   const added    = state.restaurants.filter(r => (r.dateAdded || '').startsWith(monthStr));
   const cuisines = new Set(visited.map(r => (r.cuisine || '').toLowerCase()).filter(Boolean));
   const rated    = visited.filter(r => r.myRating > 0);
-  const avgRating = rated.length ? (rated.reduce((s,r) => s + r.myRating, 0) / rated.length).toFixed(1) : '�';
+  const avgRating = rated.length ? (rated.reduce((s,r) => s + r.myRating, 0) / rated.length).toFixed(1) : '—';
   const topRated  = rated.sort((a,b) => b.myRating - a.myRating)[0];
   const estSpend  = visited.filter(r => r.priceRange).reduce((s,r) => s + [0,12,25,45,75][r.priceRange || 0], 0);
 
@@ -5875,7 +5875,7 @@ function _renderDigest () {
       <div class="digest-stat"><div class="digest-stat-val">${avgRating}</div><div class="digest-stat-label">Avg ?</div></div>
     </div>
     ${topRated ? `<div><div class="digest-top-label">Top spot this month</div><div class="digest-top-name">${cuisineEmoji(topRated.cuisine)} ${escHtml(topRated.name)} ${'?'.repeat(topRated.myRating)}</div></div>` : ''}
-    ${estSpend > 0 ? `<div class="digest-sub">Estimated spend: ~�${estSpend}</div>` : ''}
+    ${estSpend > 0 ? `<div class="digest-sub">Estimated spend: ~$${estSpend}</div>` : ''}
     ${visited.length === 0 ? '<div style="color:rgba(255,255,255,.35);font-size:.82rem;margin-top:8px">No visits recorded for this month.</div>' : ''}
   `;
 }
@@ -5885,7 +5885,7 @@ function shareDigest () {
     const d = r.dateVisited || r.dateAdded || '';
     return r.status === 'visited' && d.startsWith(_digestYear + '-' + String(_digestMonth + 1).padStart(2,'0'));
   }).length;
-  const text = `?? Feed The Bear � ${_MONTH_NAMES[_digestMonth]} ${_digestYear} Digest\n` +
+  const text = `?? Feed The Bear · ${_MONTH_NAMES[_digestMonth]} ${_digestYear} Digest\n` +
                `Visited: ${visitedCount} restaurant${visitedCount !== 1 ? 's' : ''}\n` +
                `Track yours at https://cmc-creator.github.io/Feed-The-Bear/`;
   if (navigator.share) {
@@ -5897,7 +5897,7 @@ function shareDigest () {
 }
 
 /* ------------------------------------------------------------
-   PHASE 10 � ?? OPEN NOW
+   PHASE 10 • ?? OPEN NOW
    ------------------------------------------------------------ */
 
 function openOpenNow () {
@@ -5922,7 +5922,7 @@ async function runOpenNowSearch () {
 
   const radius     = parseInt(document.getElementById('open-now-radius').value) || 1000;
   const resultsEl  = document.getElementById('open-now-results');
-  resultsEl.innerHTML = '<div class="open-now-loading">?? Searching nearby�</div>';
+  resultsEl.innerHTML = '<div class="open-now-loading">?? Searching nearby...</div>';
 
   const now        = new Date();
   const DAY_MAP    = { 0:'Su', 1:'Mo', 2:'Tu', 3:'We', 4:'Th', 5:'Fr', 6:'Sa' };
@@ -6001,7 +6001,7 @@ async function runOpenNowSearch () {
         <div class="open-now-item-emoji">${emoji}</div>
         <div style="flex:1;min-width:0">
           <div class="open-now-name">${escHtml(tags.name)}</div>
-          <div class="open-now-meta">${tags.cuisine ? escHtml(tags.cuisine.replace(/_/g,' ')) + ' � ' : ''}${tags.opening_hours ? escHtml(tags.opening_hours.slice(0,50)) : 'Hours vary'}</div>
+          <div class="open-now-meta">${tags.cuisine ? escHtml(tags.cuisine.replace(/_/g,' ')) + ' · ' : ''}${tags.opening_hours ? escHtml(tags.opening_hours.slice(0,50)) : 'Hours vary'}</div>
         </div>
         <div class="open-now-badge">${badge}</div>
         ${!alreadyIn ? `<button class="btn-sm btn-orange" onclick="openAddModalPreFilled('${safeName}','${safeCuisine}')">+</button>` : ''}
