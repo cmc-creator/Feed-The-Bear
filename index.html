@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🐻 Feed The Bear — Foodie Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ── Toast Notifications ──────────────────────────────── -->
+  <div id="toast-container" aria-live="polite"></div>
+
+  <!-- ── Proximity Alert Banner ───────────────────────────── -->
+  <div id="proximity-alert" class="proximity-alert hidden" role="alert">
+    <span id="proximity-icon">📍</span>
+    <div id="proximity-content">
+      <strong id="proximity-name"></strong>
+      <span id="proximity-msg"></span>
+    </div>
+    <button id="proximity-directions" class="btn-sm btn-orange">Directions</button>
+    <button id="proximity-close" aria-label="Dismiss">✕</button>
+  </div>
+
+  <!-- ── Header ────────────────────────────────────────────── -->
+  <header class="app-header">
+    <div class="header-brand">
+      <span class="brand-icon">🐻</span>
+      <span class="brand-name">Feed The Bear</span>
+    </div>
+
+    <nav class="header-nav" id="main-nav">
+      <button class="nav-btn active" data-view="all">All</button>
+      <button class="nav-btn" data-view="want-to-try">Want to Try</button>
+      <button class="nav-btn" data-view="visited">Visited</button>
+    </nav>
+
+    <div class="header-actions">
+      <button id="location-toggle-btn" class="icon-btn" title="Enable location tracking">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8" stroke-dasharray="3 2" opacity=".4"/></svg>
+      </button>
+      <button id="add-btn" class="btn-primary">
+        <span>＋</span> Add Restaurant
+      </button>
+      <button id="chat-toggle-btn" class="chat-toggle-btn" title="Foodie Bear Chat">
+        🐻 <span>Ask Foodie Bear</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ── Stats Bar ─────────────────────────────────────────── -->
+  <section class="stats-bar" id="stats-bar">
+    <div class="stat-item">
+      <span class="stat-value" id="stat-total">0</span>
+      <span class="stat-label">Saved</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <span class="stat-value accent-blue" id="stat-want">0</span>
+      <span class="stat-label">Want to Try</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <span class="stat-value accent-green" id="stat-visited">0</span>
+      <span class="stat-label">Visited</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <span class="stat-value accent-gold">
+        <span id="stat-avg-stars"></span>
+        <span id="stat-avg">—</span>
+      </span>
+      <span class="stat-label">Avg Rating</span>
+    </div>
+  </section>
+
+  <!-- ── Filter / Search Bar ───────────────────────────────── -->
+  <section class="filter-bar">
+    <div class="search-wrap">
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/>
+      </svg>
+      <input type="text" id="search-input" placeholder="Search restaurants, cuisine, notes…" autocomplete="off" />
+    </div>
+
+    <select id="filter-cuisine" class="filter-select" aria-label="Filter by cuisine">
+      <option value="">All Cuisines</option>
+    </select>
+
+    <select id="filter-price" class="filter-select" aria-label="Filter by price">
+      <option value="">Any Price</option>
+      <option value="1">$ Budget</option>
+      <option value="2">$$ Casual</option>
+      <option value="3">$$$ Upscale</option>
+      <option value="4">$$$$ Fine Dining</option>
+    </select>
+
+    <select id="sort-select" class="filter-select" aria-label="Sort by">
+      <option value="date-desc">Newest First</option>
+      <option value="date-asc">Oldest First</option>
+      <option value="name-asc">Name A–Z</option>
+      <option value="name-desc">Name Z–A</option>
+      <option value="rating-desc">Highest Rated</option>
+      <option value="distance-asc">Nearest</option>
+    </select>
+
+    <button id="clear-filters-btn" class="btn-ghost btn-sm hidden">✕ Clear</button>
+  </section>
+
+  <!-- ── Main Content ──────────────────────────────────────── -->
+  <main class="main-content">
+
+    <!-- No location banner -->
+    <div id="location-banner" class="location-banner hidden">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      <span>Enable location to get alerts when you're near restaurants on your list!</span>
+      <button id="enable-location-btn" class="btn-sm btn-orange">Enable</button>
+      <button id="dismiss-location-banner" class="btn-ghost btn-sm">Dismiss</button>
+    </div>
+
+    <!-- Restaurant grid -->
+    <div id="restaurant-grid" class="restaurant-grid"></div>
+
+    <!-- Empty state -->
+    <div id="empty-state" class="empty-state hidden">
+      <div class="empty-icon">🍽️</div>
+      <h2>No restaurants yet!</h2>
+      <p>Start building your foodie list. Add restaurants you want to visit or have already tried.</p>
+      <button class="btn-primary" id="empty-add-btn">＋ Add Your First Restaurant</button>
+    </div>
+
+    <!-- No results state -->
+    <div id="no-results" class="empty-state hidden">
+      <div class="empty-icon">🔍</div>
+      <h2>No results found</h2>
+      <p>Try adjusting your search or filters.</p>
+      <button class="btn-ghost" id="no-results-clear-btn">Clear Filters</button>
+    </div>
+
+  </main>
+
+  <!-- ── Add / Edit Modal ──────────────────────────────────── -->
+  <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="modal-title">Add Restaurant</h2>
+        <button id="modal-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+
+      <form id="restaurant-form" novalidate>
+        <input type="hidden" id="form-id" />
+
+        <div class="form-grid">
+          <!-- Name -->
+          <div class="form-group form-full">
+            <label for="form-name">Restaurant Name *</label>
+            <input type="text" id="form-name" placeholder="e.g. The Golden Spoon" required />
+          </div>
+
+          <!-- Cuisine -->
+          <div class="form-group">
+            <label for="form-cuisine">Cuisine Type</label>
+            <input type="text" id="form-cuisine" placeholder="e.g. Italian, Sushi, BBQ" list="cuisine-suggestions" />
+            <datalist id="cuisine-suggestions">
+              <option value="American"/><option value="BBQ"/>
+              <option value="Breakfast"/><option value="Brunch"/>
+              <option value="Burgers"/><option value="Cafe"/>
+              <option value="Chinese"/><option value="Desserts"/>
+              <option value="French"/><option value="Greek"/>
+              <option value="Indian"/><option value="Italian"/>
+              <option value="Japanese"/><option value="Korean"/>
+              <option value="Mediterranean"/><option value="Mexican"/>
+              <option value="Pizza"/><option value="Seafood"/>
+              <option value="Steakhouse"/><option value="Sushi"/>
+              <option value="Thai"/><option value="Vegan"/>
+              <option value="Vietnamese"/>
+            </datalist>
+          </div>
+
+          <!-- Price Range -->
+          <div class="form-group">
+            <label for="form-price">Price Range</label>
+            <select id="form-price">
+              <option value="0">Not Sure</option>
+              <option value="1">$ — Budget</option>
+              <option value="2">$$ — Casual</option>
+              <option value="3">$$$ — Upscale</option>
+              <option value="4">$$$$ — Fine Dining</option>
+            </select>
+          </div>
+
+          <!-- Address -->
+          <div class="form-group form-full">
+            <label for="form-address">Address</label>
+            <input type="text" id="form-address" placeholder="123 Main St, City, State" />
+          </div>
+
+          <!-- Website -->
+          <div class="form-group form-full">
+            <label for="form-website">Website URL</label>
+            <input type="url" id="form-website" placeholder="https://restaurant.com" />
+          </div>
+
+          <!-- Photo URL -->
+          <div class="form-group form-full">
+            <label for="form-photo">Photo URL <span class="label-hint">(optional)</span></label>
+            <input type="url" id="form-photo" placeholder="https://example.com/photo.jpg" />
+          </div>
+
+          <!-- Status -->
+          <div class="form-group form-full">
+            <label>Status</label>
+            <div class="radio-group">
+              <label class="radio-label">
+                <input type="radio" name="form-status" value="want-to-try" checked />
+                <span class="radio-pill want">🔖 Want to Try</span>
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="form-status" value="visited" />
+                <span class="radio-pill visited">✅ Visited</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- My Rating -->
+          <div class="form-group form-full">
+            <label>My Rating</label>
+            <div class="star-picker" id="form-star-picker" role="radiogroup" aria-label="My rating">
+              <button type="button" class="star-pick" data-val="1" aria-label="1 star">★</button>
+              <button type="button" class="star-pick" data-val="2" aria-label="2 stars">★</button>
+              <button type="button" class="star-pick" data-val="3" aria-label="3 stars">★</button>
+              <button type="button" class="star-pick" data-val="4" aria-label="4 stars">★</button>
+              <button type="button" class="star-pick" data-val="5" aria-label="5 stars">★</button>
+            </div>
+            <input type="hidden" id="form-rating" value="0" />
+          </div>
+
+          <!-- Google Rating -->
+          <div class="form-group">
+            <label for="form-google-rating">Google Rating <span class="label-hint">(from Google Maps)</span></label>
+            <input type="number" id="form-google-rating" min="1" max="5" step="0.1" placeholder="4.5" />
+          </div>
+
+          <!-- Google Reviews -->
+          <div class="form-group">
+            <label for="form-google-reviews">Review Count <span class="label-hint">(optional)</span></label>
+            <input type="number" id="form-google-reviews" min="0" placeholder="523" />
+          </div>
+
+          <!-- Notes -->
+          <div class="form-group form-full">
+            <label for="form-notes">Notes</label>
+            <textarea id="form-notes" rows="3" placeholder="Must try the truffle pasta! Call ahead for reservations. Great for date night…"></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-ghost" id="modal-cancel-btn">Cancel</button>
+          <button type="submit" class="btn-primary" id="modal-save-btn">Save Restaurant</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Restaurant Detail Modal ───────────────────────────── -->
+  <div id="detail-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="detail-name">
+    <div class="modal-card detail-card">
+      <div class="detail-hero" id="detail-hero">
+        <button id="detail-close-btn" class="icon-btn detail-close" aria-label="Close">✕</button>
+        <div class="detail-hero-content">
+          <div class="detail-cuisine-badge" id="detail-cuisine-badge"></div>
+          <h2 id="detail-name"></h2>
+          <div class="detail-address" id="detail-address"></div>
+        </div>
+      </div>
+
+      <div class="detail-body">
+        <div class="detail-ratings-row">
+          <div class="detail-rating-block">
+            <div class="g-rating-display" id="detail-google-rating"></div>
+          </div>
+          <div class="detail-rating-block">
+            <div class="my-rating-display" id="detail-my-rating"></div>
+          </div>
+          <div class="detail-rating-block">
+            <div class="price-display" id="detail-price"></div>
+          </div>
+        </div>
+
+        <div class="detail-notes" id="detail-notes-wrap">
+          <h4>📝 My Notes</h4>
+          <p id="detail-notes"></p>
+        </div>
+
+        <div class="detail-meta" id="detail-meta"></div>
+
+        <div class="detail-actions">
+          <button id="detail-directions-btn" class="btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+            Directions
+          </button>
+          <button id="detail-website-btn" class="btn-secondary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            Website
+          </button>
+          <button id="detail-maps-search-btn" class="btn-secondary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            View on Map
+          </button>
+          <button id="detail-edit-btn" class="btn-ghost">
+            ✏️ Edit
+          </button>
+          <button id="detail-delete-btn" class="btn-danger">
+            🗑️ Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Chat Panel ─────────────────────────────────────────── -->
+  <aside id="chat-panel" class="chat-panel hidden" aria-label="Foodie Bear Chat">
+    <div class="chat-header">
+      <div class="chat-avatar">🐻</div>
+      <div>
+        <div class="chat-title">Foodie Bear</div>
+        <div class="chat-subtitle">Your personal food guide</div>
+      </div>
+      <button id="chat-close-btn" class="icon-btn" aria-label="Close chat">✕</button>
+    </div>
+
+    <div class="chat-messages" id="chat-messages" aria-live="polite">
+      <!-- populated by JS -->
+    </div>
+
+    <div class="chat-suggestions" id="chat-suggestions">
+      <!-- quick-reply chips populated by JS -->
+    </div>
+
+    <div class="chat-input-row">
+      <input type="text" id="chat-input" placeholder="Ask me anything foodie…" autocomplete="off" />
+      <button id="chat-send-btn" class="btn-primary" aria-label="Send">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── Overlay (for panels/modals on mobile) ─────────────── -->
+  <div id="ui-overlay" class="ui-overlay hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
