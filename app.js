@@ -231,6 +231,8 @@ function enableLocation () {
         Notification.requestPermission();
       }
       startWatching();
+      // Auto-open nearby discovery so the user sees restaurants right away
+      setTimeout(() => discoverNearby(), 250);
     },
     err => {
       showToast('Location Error', err.message || 'Unable to get location.', 'error');
