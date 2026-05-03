@@ -53,11 +53,16 @@ let state = {
   watchId: null,
   notifiedAt: {},          // id → timestamp
   currentView: 'all',
-  filter: { search:'', cuisine:'', price:'', sort:'date-desc' },
+  filter: { search:'', cuisine:'', price:'', sort:'date-desc', tag:'', collection:'' },
   settings: {},
   editingId: null,
   formRating: 0,
   detailId: null,
+  mapLeaflet: null,
+  mapMarkers: [],
+  groupBy: false,
+  bulkMode: false,
+  selectedIds: new Set(),
 };
 
 /* ════════════════════════════════════════════════════════════
@@ -78,6 +83,49 @@ function loadData () {
 
 function saveData () {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.restaurants));
+  updateTagSuggestions();
+}
+
+/* ════════════════════════════════════════════════════════════
+   EXPORT / IMPORT
+   ════════════════════════════════════════════════════════════ */
+function exportData () {
+  const json = JSON.stringify(state.restaurants, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `feed-the-bear-${iso()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Exported! 📥', `${state.restaurants.length} restaurants saved to file.`, 'success');
+}
+
+function importData (file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) throw new Error('Invalid format');
+      let added = 0;
+      data.forEach(r => {
+        const exists = state.restaurants.some(x =>
+          x.id === r.id || (x.name === r.name && x.address === r.address)
+        );
+        if (!exists) {
+          state.restaurants.push({ ...r, id: r.id || uid() });
+          added++;
+        }
+      });
+      saveData();
+      renderAll();
+      showToast('Imported! 📤', `${added} new restaurant${added !== 1 ? 's' : ''} added.`, 'success');
+    } catch {
+      showToast('Import Error', 'Invalid file. Please use a Feed The Bear export file.', 'error');
+    }
+  };
+  reader.readAsText(file);
 }
 
 /* ── Seed restaurants so the app looks populated on first run */
@@ -91,8 +139,8 @@ function seedData () {
       status: "want-to-try", myRating: 0,
       googleRating: 4.6, googleReviews: 1842,
       notes: "Heard the truffle pasta is unreal 🤤 Need to book ahead — super popular on weekends!",
-      photo: "", priceRange: 3,
-      dateAdded: iso(-10), dateVisited: null
+      photo: "", priceRange: 3, tags: ['date night', 'italian'],
+      dateAdded: iso(-10), dateVisited: null, visits: []
     },
     {
       id: uid(), name: "Sakura Garden", cuisine: "Japanese",
@@ -102,8 +150,8 @@ function seedData () {
       status: "visited", myRating: 5,
       googleRating: 4.8, googleReviews: 3102,
       notes: "Omakase was 🔥 The chef's special toro melt in your mouth. Pricey but worth every penny!",
-      photo: "", priceRange: 4,
-      dateAdded: iso(-30), dateVisited: iso(-5)
+      photo: "", priceRange: 4, tags: ['special occasion', 'sushi'],
+      dateAdded: iso(-30), dateVisited: iso(-5), visits: [{date: iso(-5), note:'Omakase dinner', rating:5}]
     },
     {
       id: uid(), name: "El Rancho Taqueria", cuisine: "Mexican",
@@ -112,8 +160,8 @@ function seedData () {
       website: "", status: "visited", myRating: 4,
       googleRating: 4.3, googleReviews: 567,
       notes: "Street tacos are legit. Get the birria — dipping broth is incredible.",
-      photo: "", priceRange: 1,
-      dateAdded: iso(-45), dateVisited: iso(-14)
+      photo: "", priceRange: 1, tags: ['budget', 'casual'],
+      dateAdded: iso(-45), dateVisited: iso(-14), visits: [{date: iso(-14), note:'Birria tacos', rating:4}]
     },
     {
       id: uid(), name: "Smoke & Ember BBQ", cuisine: "BBQ",
@@ -123,8 +171,8 @@ function seedData () {
       status: "want-to-try", myRating: 0,
       googleRating: 4.7, googleReviews: 2314,
       notes: "Pitmaster won last year's regional comp. Brisket allegedly the best in the South.",
-      photo: "", priceRange: 2,
-      dateAdded: iso(-7), dateVisited: null
+      photo: "", priceRange: 2, tags: ['bbq', 'worth the drive'],
+      dateAdded: iso(-7), dateVisited: null, visits: []
     },
     {
       id: uid(), name: "Café Lumière", cuisine: "French",
@@ -134,8 +182,8 @@ function seedData () {
       status: "visited", myRating: 4,
       googleRating: 4.5, googleReviews: 798,
       notes: "Croissants are flaky perfection. Grab a table by the window for Sunday brunch.",
-      photo: "", priceRange: 3,
-      dateAdded: iso(-60), dateVisited: iso(-20)
+      photo: "", priceRange: 3, tags: ['brunch', 'date night'],
+      dateAdded: iso(-60), dateVisited: iso(-20), visits: [{date: iso(-20), note:'Sunday brunch', rating:4}]
     },
     {
       id: uid(), name: "Spice Route", cuisine: "Indian",
@@ -145,8 +193,8 @@ function seedData () {
       status: "want-to-try", myRating: 0,
       googleRating: 4.4, googleReviews: 441,
       notes: "Biryani is the star. Friday specials are half price!",
-      photo: "", priceRange: 2,
-      dateAdded: iso(-3), dateVisited: null
+      photo: "", priceRange: 2, tags: ['budget', 'spicy'],
+      dateAdded: iso(-3), dateVisited: null, visits: []
     },
   ];
 }
@@ -318,6 +366,15 @@ function getFiltered () {
   if (state.filter.price) {
     list = list.filter(r => String(r.priceRange) === String(state.filter.price));
   }
+  // Tag filter
+  if (state.filter.tag) {
+    const t = state.filter.tag.toLowerCase();
+    list = list.filter(r => (r.tags||[]).some(tag => tag.toLowerCase().includes(t)));
+  }
+  // Collection filter
+  if (state.filter.collection) {
+    list = list.filter(r => r.collectionId === state.filter.collection);
+  }
   // Sort
   switch (state.filter.sort) {
     case 'name-asc':
@@ -378,6 +435,7 @@ function renderCuisineFilter () {
 }
 
 function renderCards () {
+  if (state.currentView === 'map') return;
   const grid   = document.getElementById('restaurant-grid');
   const empty  = document.getElementById('empty-state');
   const noRes  = document.getElementById('no-results');
@@ -396,7 +454,19 @@ function renderCards () {
     return;
   }
 
-  list.forEach(r => grid.appendChild(buildCard(r)));
+  if (state.groupBy) {
+    const groups = {};
+    list.forEach(r => { const k = r.cuisine || 'Other'; (groups[k] = groups[k] || []).push(r); });
+    Object.entries(groups).sort(([a],[b]) => a.localeCompare(b)).forEach(([cuisine, items]) => {
+      const hdr = document.createElement('div');
+      hdr.className = 'cuisine-group-header';
+      hdr.innerHTML = `<span>${cuisineEmoji(cuisine)} ${escHtml(cuisine)}</span><span class="group-count">${items.length}</span>`;
+      grid.appendChild(hdr);
+      items.forEach(r => grid.appendChild(buildCard(r)));
+    });
+  } else {
+    list.forEach(r => grid.appendChild(buildCard(r)));
+  }
 }
 
 function buildCard (r) {
@@ -406,6 +476,7 @@ function buildCard (r) {
   card.tabIndex = 0;
   card.setAttribute('role', 'button');
   card.setAttribute('aria-label', `View details for ${r.name}`);
+  if (state.selectedIds.has(r.id)) card.classList.add('bulk-selected');
 
   const dist = distOf(r);
   const distStr = dist < Infinity ? fmtDist(dist) : '';
@@ -414,6 +485,86 @@ function buildCard (r) {
     ? `<img src="${escHtml(r.photo)}" alt="${escHtml(r.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />`
     : '';
   const bgStyle = `background: linear-gradient(135deg, ${c1}, ${c2});`;
+
+  // Collection badge
+  const col = (state.settings.collections||[]).find(c => c.id === r.collectionId);
+  const collBadge = col
+    ? `<span class="collection-badge" style="background:${col.color}22;color:${col.color};border-color:${col.color}44"><span class="collection-dot" style="background:${col.color}"></span>${escHtml(col.name)}</span>`
+    : '';
+
+  card.innerHTML = `
+    <div class="card-checkbox${state.selectedIds.has(r.id) ? ' checked' : ''}" title="Select"></div>
+    <div class="card-photo">
+      ${photoHtml}
+      <div class="card-photo-bg" style="${bgStyle}${r.photo ? 'display:none;' : ''}">${cuisineEmoji(r.cuisine)}</div>
+      <div class="card-img-overlay"></div>
+      <span class="card-status-badge ${r.status === 'want-to-try' ? 'want' : 'visited'}">
+        ${r.status === 'want-to-try' ? '🔖 Want to Try' : '✅ Visited'}
+      </span>
+      ${r.priceRange ? `<span class="card-price-badge">${priceDollars(r.priceRange)}</span>` : ''}
+      ${distStr ? `<span class="card-distance-badge">📍 ${distStr}</span>` : ''}
+    </div>
+    <div class="card-body">
+      ${r.cuisine ? `<div class="card-cuisine">${cuisineEmoji(r.cuisine)} ${escHtml(r.cuisine)}</div>` : ''}
+      <div class="card-name">${escHtml(r.name)}</div>
+      <div class="card-rating-row">
+        ${r.googleRating ? googleStarsHtml(r.googleRating, r.googleReviews) : ''}
+        ${r.myRating ? `<span class="my-rating-row"><span class="my-stars">${'★'.repeat(r.myRating)}${'☆'.repeat(5-r.myRating)}</span> My Rating</span>` : ''}
+      </div>
+      ${r.address ? `
+        <div class="card-address">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          ${escHtml(r.address)}
+        </div>` : ''}
+      ${r.tags && r.tags.length ? `<div class="card-tags">${r.tags.map(t=>`<span class="card-tag">${escHtml(t)}</span>`).join('')}</div>` : ''}
+      ${collBadge}
+      ${r.notes ? `<div class="card-notes">"${escHtml(r.notes)}"</div>` : ''}
+      <div class="card-actions">
+        ${r.address ? `<button class="card-action-btn directions" data-action="directions" aria-label="Get directions to ${escHtml(r.name)}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+            Directions
+          </button>` : ''}
+        ${r.website ? `<button class="card-action-btn website" data-action="website" aria-label="Open website for ${escHtml(r.name)}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            Website
+          </button>` : ''}
+        <button class="card-action-btn edit-card" data-action="edit" aria-label="Edit ${escHtml(r.name)}">
+          ✏️ Edit
+        </button>
+      </div>
+    </div>`;
+
+  // Bulk-mode checkbox click
+  card.querySelector('.card-checkbox').addEventListener('click', e => {
+    if (!state.bulkMode) return;
+    e.stopPropagation();
+    if (state.selectedIds.has(r.id)) {
+      state.selectedIds.delete(r.id);
+      card.classList.remove('bulk-selected');
+      e.currentTarget.classList.remove('checked');
+    } else {
+      state.selectedIds.add(r.id);
+      card.classList.add('bulk-selected');
+      e.currentTarget.classList.add('checked');
+    }
+    updateBulkCount();
+  });
+
+  // Event delegation on the card
+  card.addEventListener('click', e => {
+    if (state.bulkMode) return; // checkboxes handle it
+    const action = e.target.closest('[data-action]')?.dataset.action;
+    if (action === 'directions')   { e.stopPropagation(); openDirections(r);      return; }
+    if (action === 'website')       { e.stopPropagation(); openWebsite(r);         return; }
+    if (action === 'edit')          { e.stopPropagation(); openEditModal(r.id);    return; }
+    if (action === 'mark-visited')  { e.stopPropagation(); markVisited(r.id);      return; }
+    openDetailModal(r.id);
+  });
+  card.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetailModal(r.id); }
+  });
+  return card;
+}
 
   card.innerHTML = `
     <div class="card-photo">
@@ -438,6 +589,7 @@ function buildCard (r) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
           ${escHtml(r.address)}
         </div>` : ''}
+      ${r.tags && r.tags.length ? `<div class="card-tags">${r.tags.map(t=>`<span class="card-tag">${escHtml(t)}</span>`).join('')}</div>` : ''}
       ${r.notes ? `<div class="card-notes">"${escHtml(r.notes)}"</div>` : ''}
       <div class="card-actions">
         ${r.address ? `<button class="card-action-btn directions" data-action="directions" aria-label="Get directions to ${escHtml(r.name)}">
@@ -457,9 +609,10 @@ function buildCard (r) {
   // Event delegation on the card
   card.addEventListener('click', e => {
     const action = e.target.closest('[data-action]')?.dataset.action;
-    if (action === 'directions') { e.stopPropagation(); openDirections(r); return; }
-    if (action === 'website')    { e.stopPropagation(); openWebsite(r);    return; }
-    if (action === 'edit')       { e.stopPropagation(); openEditModal(r.id); return; }
+    if (action === 'directions')   { e.stopPropagation(); openDirections(r);      return; }
+    if (action === 'website')       { e.stopPropagation(); openWebsite(r);         return; }
+    if (action === 'edit')          { e.stopPropagation(); openEditModal(r.id);    return; }
+    if (action === 'mark-visited')  { e.stopPropagation(); markVisited(r.id);      return; }
     openDetailModal(r.id);
   });
   card.addEventListener('keydown', e => {
@@ -576,7 +729,72 @@ function openDetailModal (id) {
     ${r.status==='visited'?'✅ Visited':'🔖 Want to Try'}</span>`);
   document.getElementById('detail-meta').innerHTML = meta.join('<span style="color:var(--border)">|</span>');
 
+  // Tags display
+  const tagsWrap = document.getElementById('detail-tags-wrap');
+  if (r.tags && r.tags.length) {
+    tagsWrap.innerHTML = r.tags.map(t =>
+      `<span class="detail-tag" data-tag="${escHtml(t)}">${escHtml(t)}</span>`
+    ).join('');
+    tagsWrap.querySelectorAll('.detail-tag').forEach(el => {
+      el.addEventListener('click', () => {
+        state.filter.tag = el.dataset.tag;
+        closeDetailModal();
+        state.currentView = 'all';
+        document.querySelectorAll('.nav-btn, .mobile-nav-btn[data-view]').forEach(b => b.classList.remove('active'));
+        document.querySelector('.nav-btn[data-view="all"]')?.classList.add('active');
+        document.querySelector('.mobile-nav-btn[data-view="all"]')?.classList.add('active');
+        renderCards();
+        showToast('Filtered 🏷️', `Showing: ${el.dataset.tag}`, 'info');
+      });
+    });
+    tagsWrap.classList.remove('hidden');
+  } else {
+    tagsWrap.innerHTML = '';
+    tagsWrap.classList.add('hidden');
+  }
+
+  // Visit log
+  const visits = r.visits || [];
+  const logList = document.getElementById('detail-visit-log-list');
+  logList.innerHTML = visits.length
+    ? visits.slice().reverse().map(v => `
+        <div class="visit-log-item">
+          <span class="visit-date">${fmtDate(v.date)}</span>
+          ${v.rating ? `<span class="visit-stars">${'\u2605'.repeat(v.rating)}</span>` : ''}
+          ${v.note ? `<span class="visit-note">${escHtml(v.note)}</span>` : ''}
+        </div>`).join('')
+    : '<div class="visit-log-empty">No visits logged yet.</div>';
+
+  document.getElementById('detail-checkin-btn').onclick = () => {
+    const note = prompt('Quick note for this visit (optional):') || '';
+    const ratingStr = prompt('Your rating 1-5 (optional):') || '0';
+    const rating = Math.min(5, Math.max(0, parseInt(ratingStr) || 0));
+    const visitEntry = { date: iso(), note, rating };
+    const idx = state.restaurants.findIndex(x => x.id === id);
+    if (idx !== -1) {
+      if (!state.restaurants[idx].visits) state.restaurants[idx].visits = [];
+      state.restaurants[idx].visits.push(visitEntry);
+      state.restaurants[idx].status = 'visited';
+      state.restaurants[idx].dateVisited = state.restaurants[idx].dateVisited || iso();
+      if (rating) state.restaurants[idx].myRating = rating;
+      saveData();
+      renderAll();
+      openDetailModal(id);
+      showToast('✅ Checked In!', `Visit logged for ${state.restaurants[idx].name}`, 'success');
+    }
+  };
+
+  // Reminder
+  const reminderStatus = document.getElementById('detail-reminder-status');
+  const storedReminder = state.settings[`reminder_${id}`];
+  reminderStatus.textContent = storedReminder
+    ? `🔔 Reminder set for ${new Date(storedReminder).toLocaleString()}`
+    : '';
+  document.getElementById('detail-set-reminder-btn').onclick = () => scheduleReminder(r);
+
+  document.getElementById('detail-share-btn').onclick = () => shareCard(r);
   document.getElementById('detail-directions-btn').onclick = () => openDirections(r);
+  document.getElementById('detail-sms-btn').onclick = () => shareViaSMS(r);
   document.getElementById('detail-website-btn').style.display = r.website ? '' : 'none';
   document.getElementById('detail-website-btn').onclick = () => openWebsite(r);
   document.getElementById('detail-maps-search-btn').onclick = () => openMapsSearch(r);
@@ -609,6 +827,13 @@ function openAddModal () {
   document.getElementById('restaurant-form').reset();
   document.getElementById('form-id').value = '';
   setFormStars(0);
+  document.getElementById('form-date-visited-group').classList.add('hidden');
+  document.getElementById('form-date-visited').value = '';
+  document.getElementById('form-photo-file').value = '';
+  document.getElementById('form-tags').value = '';
+  document.getElementById('form-maps-url').value = '';
+  populateFormCollections();
+  document.getElementById('form-collection').value = '';
   document.getElementById('modal-overlay').classList.remove('hidden');
   document.getElementById('ui-overlay').classList.remove('hidden');
   document.getElementById('form-name').focus();
@@ -632,11 +857,25 @@ function openEditModal (id) {
   document.getElementById('form-google-rating').value = r.googleRating || '';
   document.getElementById('form-google-reviews').value = r.googleReviews || '';
   document.getElementById('form-notes').value = r.notes || '';
+  document.getElementById('form-tags').value = (r.tags||[]).join(', ');
+  populateFormCollections();
+  document.getElementById('form-collection').value = r.collectionId || '';
   // status radio
   document.querySelectorAll('input[name="form-status"]').forEach(radio => {
     radio.checked = radio.value === r.status;
   });
   setFormStars(r.myRating || 0);
+
+  const dvGroup = document.getElementById('form-date-visited-group');
+  const dvField = document.getElementById('form-date-visited');
+  if (r.status === 'visited') {
+    dvGroup.classList.remove('hidden');
+    dvField.value = r.dateVisited || '';
+  } else {
+    dvGroup.classList.add('hidden');
+    dvField.value = '';
+  }
+  document.getElementById('form-photo-file').value = '';
 
   document.getElementById('modal-overlay').classList.remove('hidden');
   document.getElementById('ui-overlay').classList.remove('hidden');
@@ -646,6 +885,16 @@ function openEditModal (id) {
 function closeModal () {
   document.getElementById('modal-overlay').classList.add('hidden');
   maybeHideOverlay();
+}
+
+function markVisited (id) {
+  const idx = state.restaurants.findIndex(r => r.id === id);
+  if (idx === -1) return;
+  state.restaurants[idx].status = 'visited';
+  state.restaurants[idx].dateVisited = state.restaurants[idx].dateVisited || iso();
+  saveData();
+  renderAll();
+  showToast('✅ Visited!', `"${state.restaurants[idx].name}" marked as visited.`, 'success');
 }
 
 function setFormStars (n) {
@@ -682,10 +931,13 @@ function handleFormSubmit (e) {
     googleReviews: parseInt(document.getElementById('form-google-reviews').value) || 0,
     myRating:      state.formRating,
     notes:         document.getElementById('form-notes').value.trim(),
+    tags:          document.getElementById('form-tags').value.split(',').map(t=>t.trim()).filter(Boolean),
+    collectionId:  document.getElementById('form-collection').value || null,
     status,
     dateAdded:     isNew ? now : (state.restaurants.find(r => r.id === state.editingId)?.dateAdded || now),
     dateVisited:   status === 'visited'
-      ? (state.restaurants.find(r => r.id === state.editingId)?.dateVisited || now)
+      ? (document.getElementById('form-date-visited').value ||
+         state.restaurants.find(r => r.id === state.editingId)?.dateVisited || now)
       : null,
   };
 
@@ -694,9 +946,11 @@ function handleFormSubmit (e) {
     const orig = state.restaurants.find(r => r.id === state.editingId);
     entry.lat = orig?.lat || null;
     entry.lng = orig?.lng || null;
+    entry.visits = orig?.visits || [];
     state.restaurants = state.restaurants.map(r => r.id === state.editingId ? entry : r);
     showToast('Updated! ✏️', `"${name}" has been updated.`, 'success');
   } else {
+    entry.visits = [];
     state.restaurants.unshift(entry);
     showToast('Added! 🍽️', `"${name}" added to your list.`, 'success');
   }
@@ -747,11 +1001,253 @@ function openMapsSearch (r) {
   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`, '_blank', 'noopener');
 }
 
+/* ── Reminder scheduling ──────────────────────────────────── */
+async function scheduleReminder (r) {
+  const dateVal = document.getElementById('detail-reminder-date').value;
+  const timeVal = document.getElementById('detail-reminder-time').value || '12:00';
+  if (!dateVal) { showToast('Pick a date', 'Choose a date for the reminder.', 'error'); return; }
+  const when = new Date(`${dateVal}T${timeVal}`);
+  if (when <= new Date()) { showToast('Past date', 'Please pick a future date and time.', 'error'); return; }
+  const delay = when.getTime() - Date.now();
+
+  if ('Notification' in window && Notification.permission !== 'granted') {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { showToast('Notifications blocked', 'Enable notifications in browser settings.', 'error'); return; }
+  }
+
+  const swReg = await navigator.serviceWorker?.ready.catch(() => null);
+  if (swReg) {
+    swReg.active.postMessage({
+      type: 'SCHEDULE_REMINDER',
+      title: `🐻 Time to visit ${r.name}!`,
+      body: `${r.cuisine ? cuisineEmoji(r.cuisine)+' '+r.cuisine+' · ' : ''}${r.address || ''}`,
+      delay,
+    });
+  } else {
+    setTimeout(() => {
+      if (Notification.permission === 'granted') {
+        new Notification(`🐻 Time to visit ${r.name}!`, { body: r.address || r.cuisine || '' });
+      }
+    }, delay);
+  }
+
+  state.settings[`reminder_${r.id}`] = when.toISOString();
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+  document.getElementById('detail-reminder-status').textContent = `🔔 Reminder set for ${when.toLocaleString()}`;
+  showToast('🔔 Reminder Set!', `We'll remind you on ${when.toLocaleDateString()} at ${when.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`, 'success');
+}
+
+/* ── Share via SMS ─────────────────────────────────────── */
+function shareViaSMS (r) {
+  const lines = [`🐻 ${r.name}`];
+  if (r.cuisine) lines.push(`${cuisineEmoji(r.cuisine)} ${r.cuisine}`);
+  if (r.address) lines.push(`📍 ${r.address}`);
+  if (r.googleRating) lines.push(`⭐ ${r.googleRating}/5`);
+  if (r.website) lines.push(`🌐 ${r.website}`);
+  lines.push('\n— via Feed The Bear');
+  window.open(`sms:?body=${encodeURIComponent(lines.join('\n'))}`);
+}
+
+/* ════════════════════════════════════════════════════════════
+   MAP VIEW (Leaflet + OpenStreetMap)
+   ════════════════════════════════════════════════════════════ */
+function initMap () {
+  if (state.mapLeaflet) return;
+  const container = document.getElementById('map-container');
+  state.mapLeaflet = L.map(container, { center: [39.8283, -98.5795], zoom: 4 });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '\u00a9 <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19,
+  }).addTo(state.mapLeaflet);
+  window.__ftbOpenDetail = id => openDetailModal(id);
+  window.__ftbDirections = id => { const r = state.restaurants.find(x => x.id === id); if (r) openDirections(r); };
+}
+
+function renderMap () {
+  if (!state.mapLeaflet) return;
+  state.mapMarkers.forEach(m => m.remove());
+  state.mapMarkers = [];
+  const list = getFiltered().filter(r => r.lat && r.lng);
+  if (!list.length) {
+    showToast('No Map Data', 'Add addresses to restaurants so they appear on the map.', 'info');
+    return;
+  }
+  const bounds = [];
+  list.forEach(r => {
+    const emoji = cuisineEmoji(r.cuisine);
+    const isVisited = r.status === 'visited';
+    const bg  = isVisited ? 'rgba(46,204,113,.9)' : 'rgba(74,144,217,.9)';
+    const bdr = isVisited ? '#2ECC71' : '#4A90D9';
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:38px;height:38px;background:${bg};border:3px solid ${bdr};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;box-shadow:0 3px 12px rgba(0,0,0,.6);cursor:pointer">${emoji}</div>`,
+      iconSize: [38, 38],
+      iconAnchor: [19, 19],
+      popupAnchor: [0, -24],
+    });
+    const popup = `<div style="min-width:180px;font-family:system-ui,sans-serif">
+      <div style="font-weight:700;font-size:.92rem;margin-bottom:3px">${escHtml(r.name)}</div>
+      <div style="font-size:.77rem;color:#aaa;margin-bottom:6px">${r.cuisine ? escHtml(r.cuisine)+'&nbsp;&middot;&nbsp;' : ''}${priceDollars(r.priceRange)||''}</div>
+      ${r.googleRating ? `<div style="font-size:.8rem;margin-bottom:6px">⭐ ${r.googleRating}/5</div>` : ''}
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button onclick="window.__ftbOpenDetail('${r.id}')" style="flex:1;padding:5px 8px;background:#FF6B35;color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:600;cursor:pointer">Details</button>
+        ${r.address ? `<button onclick="window.__ftbDirections('${r.id}')" style="flex:1;padding:5px 8px;background:#4A90D9;color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:600;cursor:pointer">Directions</button>` : ''}
+      </div>
+    </div>`;
+    const marker = L.marker([r.lat, r.lng], { icon })
+      .bindPopup(popup, { maxWidth: 250, closeButton: true })
+      .addTo(state.mapLeaflet);
+    state.mapMarkers.push(marker);
+    bounds.push([r.lat, r.lng]);
+  });
+  if (bounds.length === 1) {
+    state.mapLeaflet.setView(bounds[0], 14);
+  } else {
+    state.mapLeaflet.fitBounds(bounds, { padding: [50, 50] });
+  }
+  setTimeout(() => state.mapLeaflet.invalidateSize(), 150);
+}
+
+function showMapView () {
+  document.getElementById('map-container').classList.remove('hidden');
+  document.getElementById('main-content').classList.add('hidden');
+  document.getElementById('stats-view').classList.add('hidden');
+  initMap();
+  renderMap();
+}
+
+function hideMapView () {
+  document.getElementById('map-container').classList.add('hidden');
+  document.getElementById('main-content').classList.remove('hidden');
+}
+
+/* ════════════════════════════════════════════════════════════
+   STATS / ANALYTICS VIEW
+   ════════════════════════════════════════════════════════════ */
+function showStatsView () {
+  document.getElementById('stats-view').classList.remove('hidden');
+  document.getElementById('main-content').classList.add('hidden');
+  document.getElementById('map-container').classList.add('hidden');
+  renderStatsView();
+}
+
+function hideStatsView () {
+  const sv = document.getElementById('stats-view');
+  if (sv) sv.classList.add('hidden');
+  document.getElementById('main-content').classList.remove('hidden');
+}
+
+function renderStatsView () {
+  const all       = state.restaurants;
+  const visited   = all.filter(r => r.status === 'visited');
+  const want      = all.filter(r => r.status === 'want-to-try');
+  const allVisits = all.flatMap(r => r.visits || []);
+  const rated     = visited.filter(r => r.myRating > 0);
+  const avgMy     = rated.length
+    ? (rated.reduce((s,r) => s + r.myRating, 0) / rated.length).toFixed(1)
+    : null;
+
+  // KPI row
+  document.getElementById('stats-kpi-row').innerHTML = [
+    { label: 'Restaurants Saved', value: all.length,       color: 'var(--primary)' },
+    { label: 'Places Visited',    value: visited.length,   color: 'var(--green)' },
+    { label: 'Want to Try',       value: want.length,      color: 'var(--blue)' },
+    { label: 'Total Check-ins',   value: allVisits.length, color: 'var(--purple, #9B59B6)' },
+    { label: 'Avg My Rating',     value: avgMy ? `${avgMy} ★` : '—', color: 'var(--gold)' },
+  ].map(k => `
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:${k.color}">${k.value}</div>
+      <div class="kpi-label">${k.label}</div>
+    </div>`).join('');
+
+  // Cuisine bar chart
+  const cuisineMap = {};
+  all.forEach(r => { const k = r.cuisine || 'Other'; cuisineMap[k] = (cuisineMap[k]||0)+1; });
+  const maxC = Math.max(...Object.values(cuisineMap), 1);
+  document.getElementById('chart-cuisine').innerHTML = Object.entries(cuisineMap)
+    .sort(([,a],[,b]) => b-a).slice(0,8)
+    .map(([c,n]) => `
+      <div class="bar-row">
+        <div class="bar-label">${cuisineEmoji(c)} ${escHtml(c)}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(n/maxC*100).toFixed(0)}%;background:${cuisineGrad(c)[0]}"></div></div>
+        <div class="bar-count">${n}</div>
+      </div>`).join('') || '<div class="chart-empty">No data yet</div>';
+
+  // Visits over time (last 6 months)
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(); d.setMonth(d.getMonth() - i);
+    months.push({
+      key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,
+      label: d.toLocaleString('default', { month: 'short' }),
+    });
+  }
+  const visitsByMonth = {};
+  allVisits.forEach(v => {
+    const m = (v.date||'').slice(0,7);
+    if (m) visitsByMonth[m] = (visitsByMonth[m]||0)+1;
+  });
+  visited.forEach(r => {
+    if (r.dateVisited && !(r.visits||[]).length) {
+      const m = r.dateVisited.slice(0,7);
+      visitsByMonth[m] = (visitsByMonth[m]||0)+1;
+    }
+  });
+  const maxV = Math.max(...months.map(m => visitsByMonth[m.key]||0), 1);
+  document.getElementById('chart-visits').innerHTML = months.map(m => {
+    const n = visitsByMonth[m.key] || 0;
+    return `<div class="bar-row">
+      <div class="bar-label">${m.label}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(n/maxV*100).toFixed(0)}%;background:var(--green)"></div></div>
+      <div class="bar-count">${n}</div>
+    </div>`;
+  }).join('');
+
+  // Price distribution
+  const priceLabels = {1:'$ Budget', 2:'$$ Casual', 3:'$$$ Upscale', 4:'$$$$ Fine Dining'};
+  const priceMap = {};
+  all.forEach(r => { if (r.priceRange) priceMap[r.priceRange] = (priceMap[r.priceRange]||0)+1; });
+  const maxP = Math.max(...Object.values(priceMap), 1);
+  document.getElementById('chart-price').innerHTML = [1,2,3,4].map(p => {
+    const n = priceMap[p] || 0;
+    return `<div class="bar-row">
+      <div class="bar-label">${priceLabels[p]}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(n/maxP*100).toFixed(0)}%;background:var(--gold)"></div></div>
+      <div class="bar-count">${n}</div>
+    </div>`;
+  }).join('');
+
+  // Top rated visited
+  const topRated = [...visited].filter(r => r.myRating > 0)
+    .sort((a,b) => b.myRating - a.myRating).slice(0,5);
+  document.getElementById('chart-top').innerHTML = topRated.length
+    ? topRated.map((r,i) => `
+        <div class="top-list-item" data-id="${r.id}">
+          <span class="top-rank">#${i+1}</span>
+          <span class="top-emoji">${cuisineEmoji(r.cuisine)}</span>
+          <span class="top-name">${escHtml(r.name)}</span>
+          <span class="top-stars">${'\u2605'.repeat(r.myRating)}</span>
+        </div>`).join('')
+    : '<div class="chart-empty">Rate your visits to see top picks</div>';
+
+  document.querySelectorAll('.top-list-item[data-id]').forEach(el => {
+    el.addEventListener('click', () => openDetailModal(el.dataset.id));
+  });
+}
+
 /* ── Full render ──────────────────────────────────────────── */
 function renderAll () {
   renderStats();
   renderCuisineFilter();
-  renderCards();
+  if (state.currentView === 'map') {
+    showMapView();
+  } else if (state.currentView === 'stats') {
+    showStatsView();
+  } else {
+    hideMapView();
+    hideStatsView();
+    renderCards();
+  }
   updateLocationBanner();
 }
 
@@ -792,9 +1288,9 @@ function showToast (title, msg, type = 'default') {
    CHAT BUDDY — FOODIE BEAR
    ════════════════════════════════════════════════════════════ */
 const GREETINGS = [
-  'Hey foodie! 🐻 I\'m Foodie Bear — your personal restaurant guide. Ask me anything!',
-  'Hey there, hungry adventurer! 🐻 What are we hunting for today?',
-  'Roar! 🐻 Ready to help you find the perfect bite. What\'s on your mind?',
+  'Hey foodie! 🐻 I\'m Foodie Bear, your personal restaurant strategist. What should we plan first?',
+  'Welcome back, hungry adventurer. 🐻 Want a recommendation, a surprise pick, or your next list idea?',
+  'Roar and ready. 🐻 I can help you discover, organize, and decide where to eat next.',
 ];
 
 const FOOD_TIPS = [
@@ -813,8 +1309,9 @@ const GENERAL_RESPONSES = [
     'Hello, fellow food lover! 🍽️ What can I help you find?',
     'Hi there! Ready to discover something delicious? 😋',
   ]),
-  (q) => q.match(/\b(help|how|what can)\b/i) && `Here's what I can do:\n\n• **Find** restaurants from your list by cuisine, rating, or status\n• **Recommend** top-rated spots you haven't visited yet\n• **Nearby** — show what's close to you\n• **Tips** — share foodie advice\n\nJust ask! 🐻`,
+  (q) => q.match(/\b(help|how|what can)\b/i) && `Here's how I can help:\n\n• **Find** restaurants by cuisine, rating, tags, or status\n• **Recommend** high-rated spots you still need to try\n• **Nearby** discovery based on your live location\n• **Surprise me** for instant decision relief\n• **Top cuisine** insights from your visit history\n• **Collections** to organize date nights, lunch spots, and more\n• **Share cards** so your picks look great on social\n\nSay what you're craving and I'll do the rest. 🐻`,
   (q) => q.match(/\b(nearby|close|near me|around me|area)\b/i) && nearbyResponse(),
+  (q) => q.match(/\b(surprise|random|anything|don.?t care|pick for me|choose for me)\b/i) && surpriseMeResponse(),
   (q) => q.match(/\b(recommend|suggest|best|top|favorite|favourite)\b/i) && recommendResponse(),
   (q) => q.match(/\b(want.?to.?try|bucket|list|haven.?t visited|unvisited)\b/i) && wantToTryResponse(),
   (q) => q.match(/\b(visited|been|went|tried|already)\b/i) && visitedResponse(),
@@ -822,10 +1319,13 @@ const GENERAL_RESPONSES = [
   (q) => q.match(/\b(note|notes|reminder|remember)\b/i) && notesResponse(),
   (q) => q.match(/\b(direction|navigate|how to get|get there)\b/i) && `To get directions, just click the **Directions** button on any restaurant card — it'll open Google Maps and route you right to the door! 🗺️`,
   (q) => q.match(/\b(rate|rating|star|review)\b/i) && `You can rate any restaurant from 1–5 stars when you add or edit it. I also show the **Google rating** and review count so you know what others think! ⭐`,
-  (q) => q.match(/\b(add|new restaurant|save)\b/i) && `Click **＋ Add Restaurant** in the header to add a new spot. Fill in the name, cuisine, address, and any notes — I'll even geocode the address so you get proximity alerts! 📍`,
+  (q) => q.match(/\b(add|new restaurant|save)\b/i) && `Click **＋ Add Restaurant** in the header to add a new spot. You can even paste a Google Maps link and I'll auto-fill the details instantly! 📍`,
   (q) => q.match(/\b(notification|alert|remind|ping)\b/i) && `Enable location tracking (the 📍 button in the header) and I'll alert you whenever you're within walking distance of a restaurant on your list! 🔔`,
   (q) => q.match(/\b(cheap|budget|affordable|\$[^$])/i) && budgetResponse(),
   (q) => q.match(/\b(expensive|fancy|upscale|fine dining|\$\$\$\$)/i) && fancyResponse(),
+  (q) => q.match(/\b(collection|list|group|category)\b/i) && collectionsResponse(),
+  (q) => q.match(/\b(tag|tagged|#)\b/i) && tagQueryResponse(q),
+  (q) => q.match(/\b(most|history|pattern|cuisine breakdown|eating most|ate most)\b/i) && topCuisineResponse(),
   (q) => cuisineFromQuery(q) && cuisineResponse(cuisineFromQuery(q)),
 ];
 
@@ -843,9 +1343,9 @@ function chatResponse (userText) {
 
   // Generic fallback
   return randomFrom([
-    `Hmm, let me think… 🐻 Try asking "recommend something", "what's nearby", or name a cuisine like "Italian" or "Sushi"!`,
-    `Not sure about that one! But I know your restaurant list pretty well. Try asking "best rated" or "want to try" 🍽️`,
-    `Great question! I'm still learning… but try asking me about cuisines, ratings, or nearby restaurants! 🐻`,
+    `Try asking "surprise me", "what's nearby", or "top cuisine breakdown" and I'll pull your best options. 🐻`,
+    `Ask me for "date night ideas", "best rated", or "my collections" and I'll curate from your list. 🍽️`,
+    `Tell me a cuisine like "Thai" or "Sushi", and I'll instantly surface your top choices. 🐻`,
   ]);
 }
 
@@ -949,16 +1449,62 @@ function restaurantDetailResponse (r) {
     (r.myRating ? `⭐ Your rating: ${r.myRating}/5\n` : '') +
     (r.address ? `📍 ${r.address}${distStr}\n` : '') +
     (r.priceRange ? `💰 ${priceDollars(r.priceRange)}\n` : '') +
+    (r.tags?.length ? `🏷️ Tags: ${r.tags.join(', ')}\n` : '') +
     (r.notes ? `\n📝 "${r.notes}"` : '') +
     `\n\n<span class="chip-link" data-id="${r.id}">View full details</span>`;
 }
 
+function surpriseMeResponse () {
+  const unvisited = state.restaurants.filter(r => r.status === 'want-to-try');
+  const pool = unvisited.length ? unvisited : state.restaurants;
+  if (!pool.length) return `Your list is empty! Add some restaurants first 🐻`;
+  const r = randomFrom(pool);
+  return `🎲 How about… **${r.name}**? ${r.cuisine ? `${cuisineEmoji(r.cuisine)} ${r.cuisine} vibes.` : ''} ${r.googleRating ? `Rated ⭐${r.googleRating}.` : ''} ${r.address ? `📍 ${r.address}` : ''}\n\n<span class="chip-link" data-id="${r.id}">View details</span>`;
+}
+
+function topCuisineResponse () {
+  const visited = state.restaurants.filter(r => r.status === 'visited');
+  if (!visited.length) return `No visited restaurants yet! Mark some as visited to see your cuisine breakdown 📊`;
+  const counts = {};
+  visited.forEach(r => { const c = r.cuisine || 'Other'; counts[c] = (counts[c]||0)+1; });
+  const sorted = Object.entries(counts).sort(([,a],[,b]) => b-a).slice(0,5);
+  const total = visited.length;
+  const lines = sorted.map(([c,n]) => `${cuisineEmoji(c)} **${c}** — ${n} visit${n>1?'s':''} (${Math.round(n/total*100)}%)`).join('\n');
+  return `Your foodie habits revealed! 🔍\n\n${lines}\n\n*Total: ${total} restaurants visited* 🐻`;
+}
+
+function collectionsResponse () {
+  const cols = state.settings.collections || [];
+  if (!cols.length) return `You haven't created any custom lists yet. Tap the 📁 button to create lists like "Date Night", "Lunch Spots", or "Hidden Gems"! 🗂️`;
+  const lines = cols.map(c => {
+    const count = state.restaurants.filter(r => r.collectionId === c.id).length;
+    return `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c.color};margin-right:4px"></span> **${c.name}** — ${count} restaurant${count!==1?'s':''}`;
+  }).join('\n');
+  return `Your custom lists 📁\n\n${lines}`;
+}
+
+function tagQueryResponse (q) {
+  const allTags = [...new Set(state.restaurants.flatMap(r => r.tags||[]))];
+  const matched = allTags.find(t => q.toLowerCase().includes(t.toLowerCase()));
+  if (matched) {
+    const matches = state.restaurants.filter(r => (r.tags||[]).some(t => t.toLowerCase() === matched.toLowerCase()));
+    if (!matches.length) return `Nothing tagged "${matched}" yet!`;
+    const items = matches.slice(0,5).map(r => `<span class="chip-link" data-id="${r.id}">${cuisineEmoji(r.cuisine)} ${r.name}</span>`).join('');
+    return `Restaurants tagged **#${matched}** (${matches.length}):\n${items}`;
+  }
+  if (!allTags.length) return `No tags yet! Add tags to your restaurants when you save or edit them to quickly filter by vibe, occasion, or food type. 🏷️`;
+  return `Your tags: ${allTags.map(t=>`**#${t}**`).join(', ')}\n\nAsk me about a specific tag!`;
+}
+
 const QUICK_REPLIES = [
   'Recommend something 🌟',
+  'Surprise me! 🎲',
   'What\'s nearby? 📍',
+  'Date night ideas 💫',
+  'Top cuisine breakdown 📊',
   'Want to try list 🔖',
+  'My collections 📁',
   'Food tip! 💡',
-  'Best rated ⭐',
 ];
 
 function randomFrom (arr) { return arr[Math.floor(Math.random() * arr.length)]; }
@@ -1089,6 +1635,7 @@ function escHtml (s) {
 /* Only allow http/https photo URLs; strip characters that could break CSS url() */
 function safeUrl (url) {
   if (!url) return '';
+  if (/^data:image\/(png|jpe?g|gif|webp|svg\+xml);base64,/.test(url)) return url;
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return '';
@@ -1120,7 +1667,359 @@ function maybeHideOverlay () {
 }
 
 function hasActiveFilters () {
-  return !!(state.filter.search || state.filter.cuisine || state.filter.price);
+  return !!(state.filter.search || state.filter.cuisine || state.filter.price || state.filter.tag || state.filter.collection);
+}
+
+/* ════════════════════════════════════════════════════════════
+   PWA INSTALL PROMPT
+   ════════════════════════════════════════════════════════════ */
+let _pwaPromptEvent = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _pwaPromptEvent = e;
+  if (!state.settings.pwaDismissed) {
+    document.getElementById('pwa-banner').classList.remove('hidden');
+  }
+});
+function initPwa () {
+  document.getElementById('pwa-install-btn').addEventListener('click', async () => {
+    if (!_pwaPromptEvent) return;
+    _pwaPromptEvent.prompt();
+    const { outcome } = await _pwaPromptEvent.userChoice;
+    if (outcome === 'accepted') document.getElementById('pwa-banner').classList.add('hidden');
+    _pwaPromptEvent = null;
+  });
+  document.getElementById('pwa-dismiss-btn').addEventListener('click', () => {
+    document.getElementById('pwa-banner').classList.add('hidden');
+    state.settings.pwaDismissed = true;
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+  });
+}
+
+/* ════════════════════════════════════════════════════════════
+   LIGHT / DARK THEME TOGGLE
+   ════════════════════════════════════════════════════════════ */
+function initTheme () {
+  if (state.settings.theme === 'light') document.body.classList.add('light-mode');
+  document.getElementById('theme-toggle-btn').addEventListener('click', () => {
+    const light = document.body.classList.toggle('light-mode');
+    state.settings.theme = light ? 'light' : 'dark';
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+  });
+}
+
+/* ════════════════════════════════════════════════════════════
+   ONBOARDING TOUR
+   ════════════════════════════════════════════════════════════ */
+const ONBOARDING_STEPS = [
+  { icon: '🐻', title: 'Welcome to Feed The Bear', desc: 'Build your personal restaurant HQ: save spots, track visits, and keep every great find in one place.' },
+  { icon: '➕', title: 'Capture Places Instantly', desc: 'Add restaurants in seconds, or paste a Google Maps URL to auto-fill details and move faster.' },
+  { icon: '🗺️', title: 'Discover Around You', desc: 'Use Map view and Nearby Discovery to find what\'s close now, then save your favorites with one tap.' },
+  { icon: '📊', title: 'See Your Food Story', desc: 'Stats turns your history into insights: top cuisines, ratings, trends, and your best-performing picks.' },
+  { icon: '🐻', title: 'Let Foodie Bear Curate', desc: 'Ask for smart recommendations, random picks, tag-based suggestions, and ready-to-share cards.' },
+];
+let _onboardingStep = 0;
+function showOnboarding () {
+  if (state.settings.onboardingDone) return;
+  _onboardingStep = 0;
+  renderOnboardingStep();
+  document.getElementById('onboarding-overlay').classList.remove('hidden');
+}
+function renderOnboardingStep () {
+  const step = ONBOARDING_STEPS[_onboardingStep];
+  document.getElementById('onboarding-icon').textContent = step.icon;
+  document.getElementById('onboarding-title').textContent = step.title;
+  document.getElementById('onboarding-desc').textContent = step.desc;
+  const isLast = _onboardingStep === ONBOARDING_STEPS.length - 1;
+  document.getElementById('onboarding-next-btn').textContent = isLast ? 'Get Started! 🐻' : 'Next →';
+  document.getElementById('onboarding-dots').innerHTML = ONBOARDING_STEPS.map((_,i) =>
+    `<div class="onboarding-dot ${i === _onboardingStep ? 'active' : ''}"></div>`
+  ).join('');
+}
+function dismissOnboarding () {
+  document.getElementById('onboarding-overlay').classList.add('hidden');
+  state.settings.onboardingDone = true;
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+}
+
+/* ════════════════════════════════════════════════════════════
+   QUICK-ADD FROM GOOGLE MAPS URL
+   ════════════════════════════════════════════════════════════ */
+function parseMapsUrl (raw) {
+  if (!raw?.trim()) { showToast('No URL', 'Paste a Google Maps link first.', 'error'); return; }
+  try {
+    const u = new URL(raw.trim());
+    let name = '', addr = '';
+    const placeMatch = u.pathname.match(/\/place\/([^/@?]+)/);
+    if (placeMatch) name = decodeURIComponent(placeMatch[1]).replace(/\+/g, ' ');
+    const q = u.searchParams.get('q');
+    if (q) addr = decodeURIComponent(q).replace(/\+/g, ' ');
+    if (name) {
+      document.getElementById('form-name').value = name;
+      if (!addr) document.getElementById('form-address').value = name;
+    }
+    if (addr && addr !== name) document.getElementById('form-address').value = addr;
+    if (!name && !addr) throw new Error('no data');
+    document.getElementById('form-maps-url').value = '';
+    showToast('✓ Pre-filled!', 'Review the details, add notes, and save.', 'success');
+    document.getElementById('form-name').focus();
+  } catch {
+    showToast('Could not parse', 'Copy the full Google Maps URL from your browser address bar.', 'error');
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   NEARBY DISCOVERY — Overpass API
+   ════════════════════════════════════════════════════════════ */
+async function discoverNearby () {
+  if (!state.locationEnabled || state.userLat == null) {
+    showToast('Location needed', 'Enable location tracking first.', 'error'); return;
+  }
+  const overlay = document.getElementById('nearby-overlay');
+  overlay.classList.remove('hidden');
+  document.getElementById('ui-overlay').classList.remove('hidden');
+  document.getElementById('nearby-results').innerHTML = '<div class="nearby-loading">🐻 Sniffing out restaurants near you…</div>';
+  try {
+    const { userLat: lat, userLng: lng } = state;
+    const query = `[out:json][timeout:15];(node["amenity"="restaurant"](around:1000,${lat},${lng});way["amenity"="restaurant"](around:1000,${lat},${lng}););out center 20;`;
+    const res  = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:query });
+    const data = await res.json();
+    const els  = (data.elements || []).slice(0, 20);
+    if (!els.length) { document.getElementById('nearby-results').innerHTML = '<div class="nearby-empty">No restaurants found within 1 km. Try a different area!</div>'; return; }
+    const html = els.map(el => {
+      const tags = el.tags || {};
+      const elLat = el.lat ?? el.center?.lat, elLon = el.lon ?? el.center?.lon;
+      const name = tags.name || 'Unknown Restaurant';
+      const cuisine = (tags.cuisine || '').split(';')[0];
+      const dist = (elLat && elLon) ? haversine(lat, lng, elLat, elLon) : null;
+      const saved = state.restaurants.some(r => r.name.toLowerCase() === name.toLowerCase());
+      return `<div class="nearby-item">
+        <div class="nearby-item-info">
+          <div class="nearby-item-name">${escHtml(name)}</div>
+          <div class="nearby-item-meta">${cuisine ? `${cuisineEmoji(cuisine)} ${escHtml(cuisine)} · ` : ''}${dist ? fmtDist(dist)+' away' : ''}</div>
+        </div>
+        ${saved ? '<span class="nearby-saved-badge">✓ Saved</span>' :
+          `<button class="btn-sm btn-orange nearby-add-btn" data-name="${escHtml(name)}" data-cuisine="${escHtml(cuisine)}" data-lat="${elLat||''}" data-lng="${elLon||''}">+ Add</button>`}
+      </div>`;
+    }).join('');
+    document.getElementById('nearby-results').innerHTML = html;
+    document.querySelectorAll('.nearby-add-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        overlay.classList.add('hidden'); maybeHideOverlay();
+        openAddModal();
+        document.getElementById('form-name').value    = btn.dataset.name;
+        document.getElementById('form-cuisine').value = btn.dataset.cuisine;
+        showToast('Pre-filled!', 'Review the details and save.', 'info');
+      });
+    });
+  } catch {
+    document.getElementById('nearby-results').innerHTML = '<div class="nearby-empty">Could not fetch — check your connection.</div>';
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   SHAREABLE RESTAURANT CARD — Canvas API
+   ════════════════════════════════════════════════════════════ */
+function ftbRoundRect (ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r); ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r); ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
+}
+function shareCard (r) {
+  const canvas = document.getElementById('share-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = 800, H = 450;
+  canvas.width = W; canvas.height = H;
+  const [c1, c2] = cuisineGrad(r.cuisine);
+  const bg = ctx.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,'#0D0D1A'); bg.addColorStop(1,'#1A1A2E');
+  ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
+  const acc = ctx.createLinearGradient(0,0,0,H);
+  acc.addColorStop(0,c1); acc.addColorStop(1,c2);
+  ctx.fillStyle = acc; ctx.fillRect(0,0,8,H);
+  ctx.globalAlpha = .07; ctx.font = '220px serif'; ctx.fillStyle = '#FFF';
+  ctx.fillText(cuisineEmoji(r.cuisine), W-260, H-10); ctx.globalAlpha = 1;
+  ctx.fillStyle = '#FFF'; ctx.font = 'bold 40px system-ui,sans-serif';
+  ctx.fillText(r.name.length>30 ? r.name.slice(0,30)+'…' : r.name, 50, 130);
+  if (r.cuisine) {
+    ctx.font = '15px system-ui,sans-serif';
+    const badge = `${cuisineEmoji(r.cuisine)} ${r.cuisine}`;
+    const bw = ctx.measureText(badge).width + 24;
+    ctx.fillStyle = c1+'44'; ftbRoundRect(ctx,50,148,bw,28,8); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillText(badge, 62, 168);
+  }
+  if (r.googleRating) {
+    ctx.fillStyle = '#F4C430'; ctx.font = 'bold 26px system-ui,sans-serif';
+    ctx.fillText(`★ ${r.googleRating}`, 50, 225);
+    if (r.googleReviews) { ctx.fillStyle = '#888'; ctx.font = '14px system-ui,sans-serif'; ctx.fillText(`(${r.googleReviews.toLocaleString()} reviews)`, 50, 248); }
+  }
+  if (r.myRating) { ctx.fillStyle = '#F4C430'; ctx.font = '18px system-ui,sans-serif'; ctx.fillText('★'.repeat(r.myRating)+'☆'.repeat(5-r.myRating)+' My Rating', 50, r.googleRating ? 278 : 225); }
+  if (r.address) { ctx.fillStyle = '#AAA'; ctx.font = '17px system-ui,sans-serif'; ctx.fillText(`📍 ${r.address.length>55?r.address.slice(0,55)+'…':r.address}`, 50, 318); }
+  if (r.notes) { ctx.fillStyle = '#777'; ctx.font = 'italic 15px system-ui,sans-serif'; ctx.fillText(`"${r.notes.length>72?r.notes.slice(0,72)+'…':r.notes}"`, 50, 356); }
+  if (r.priceRange) { ctx.fillStyle = '#F4C430'; ctx.font = 'bold 20px monospace'; ctx.fillText(priceDollars(r.priceRange), 50, 408); }
+  const bc = r.status==='visited' ? '#2ECC71' : '#4A90D9';
+  ctx.fillStyle = bc+'33'; ftbRoundRect(ctx, r.priceRange?110:50, 390, 130, 28, 8); ctx.fill();
+  ctx.fillStyle = bc; ctx.font = 'bold 13px system-ui,sans-serif';
+  ctx.fillText(r.status==='visited'?'✅ Visited':'🔖 Want to Try', r.priceRange?122:62, 409);
+  ctx.fillStyle = '#FF6B35'; ctx.font = 'bold 15px system-ui,sans-serif';
+  ctx.fillText('🐻 Feed The Bear', W-195, H-18);
+  canvas.toBlob(blob => {
+    const file = new File([blob], `${r.name.replace(/[^a-z0-9]/gi,'_')}-ftb.png`, {type:'image/png'});
+    if (navigator.share && navigator.canShare?.({files:[file]})) {
+      navigator.share({title:r.name, text:`Check out ${r.name} on Feed The Bear 🐻`, files:[file]}).catch(()=>{});
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download=file.name; a.click(); URL.revokeObjectURL(url);
+    }
+    showToast('📤 Card Ready!', `"${r.name}" card saved!`, 'success');
+  }, 'image/png');
+}
+
+/* ════════════════════════════════════════════════════════════
+   BULK SELECT & ACTIONS
+   ════════════════════════════════════════════════════════════ */
+function toggleBulkMode () {
+  state.bulkMode = !state.bulkMode;
+  state.selectedIds.clear();
+  document.body.classList.toggle('bulk-mode', state.bulkMode);
+  document.getElementById('bulk-bar').classList.toggle('hidden', !state.bulkMode);
+  document.getElementById('bulk-select-btn').classList.toggle('active', state.bulkMode);
+  updateBulkCount();
+  renderCards();
+}
+function updateBulkCount () {
+  const n = state.selectedIds.size;
+  document.getElementById('bulk-count').textContent = n === 0 ? 'Select restaurants' : `${n} selected`;
+  ['bulk-tag-btn','bulk-collection-btn','bulk-export-btn','bulk-delete-btn'].forEach(id => {
+    document.getElementById(id).disabled = n === 0;
+  });
+}
+function bulkDelete () {
+  const n = state.selectedIds.size;
+  if (!n || !confirm(`Delete ${n} restaurant${n>1?'s':''}? This cannot be undone.`)) return;
+  state.restaurants = state.restaurants.filter(r => !state.selectedIds.has(r.id));
+  saveData(); toggleBulkMode(); renderAll();
+  showToast('🗑️ Deleted', `${n} restaurant${n>1?'s':''} removed.`, 'info');
+}
+function bulkTag () {
+  if (!state.selectedIds.size) return;
+  const tag = prompt('Tag to add to all selected:');
+  if (!tag?.trim()) return;
+  const t = tag.trim().toLowerCase();
+  state.selectedIds.forEach(id => {
+    const idx = state.restaurants.findIndex(r => r.id === id);
+    if (idx !== -1) { if (!state.restaurants[idx].tags) state.restaurants[idx].tags = []; if (!state.restaurants[idx].tags.includes(t)) state.restaurants[idx].tags.push(t); }
+  });
+  saveData(); toggleBulkMode(); renderAll();
+  showToast('🏷️ Tagged!', `"${t}" added to ${state.selectedIds.size} restaurants.`, 'success');
+}
+function bulkExport () {
+  const sel = state.restaurants.filter(r => state.selectedIds.has(r.id));
+  if (!sel.length) return;
+  const blob = new Blob([JSON.stringify(sel, null, 2)], {type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a'); a.href=url; a.download=`ftb-export-${iso()}.json`; a.click(); URL.revokeObjectURL(url);
+  showToast('📥 Exported!', `${sel.length} restaurants saved.`, 'success');
+}
+function bulkMoveToCollection () {
+  if (!state.selectedIds.size) return;
+  const cols = state.settings.collections || [];
+  if (!cols.length) { showToast('No Lists', 'Create a list first via the 📁 button.', 'info'); return; }
+  const names = cols.map((c,i) => `${i+1}. ${c.name}`).join('\n');
+  const choice = prompt(`Move to which list?\n\n${names}\n\n(Enter number, or 0 to remove from all):`);
+  const num = parseInt(choice);
+  if (isNaN(num)) return;
+  const col = num===0 ? null : cols[num-1];
+  state.selectedIds.forEach(id => { const idx = state.restaurants.findIndex(r=>r.id===id); if (idx!==-1) state.restaurants[idx].collectionId = col?.id||null; });
+  saveData(); toggleBulkMode(); renderAll();
+  showToast('📁 Moved!', col ? `Added to "${col.name}".` : 'Removed from all lists.', 'success');
+}
+
+/* ════════════════════════════════════════════════════════════
+   CUSTOM LISTS / COLLECTIONS
+   ════════════════════════════════════════════════════════════ */
+const COLLECTION_COLORS = ['#FF6B35','#E74C3C','#9B59B6','#3498DB','#2ECC71','#F39C12','#1ABC9C','#E91E63'];
+let _newCollectionColor = COLLECTION_COLORS[0];
+function initCollections () {
+  const panel = document.getElementById('collections-panel');
+  const swatchRow = document.getElementById('collection-color-swatches');
+  swatchRow.innerHTML = COLLECTION_COLORS.map(c =>
+    `<div class="collection-color-swatch${c===_newCollectionColor?' selected':''}" data-color="${c}" style="background:${c}" title="${c}"></div>`
+  ).join('');
+  swatchRow.querySelectorAll('.collection-color-swatch').forEach(sw => {
+    sw.addEventListener('click', () => {
+      _newCollectionColor = sw.dataset.color;
+      swatchRow.querySelectorAll('.collection-color-swatch').forEach(s => s.classList.remove('selected'));
+      sw.classList.add('selected');
+    });
+  });
+  document.getElementById('collections-btn').addEventListener('click', () => {
+    panel.classList.add('open');
+    document.getElementById('ui-overlay').classList.remove('hidden');
+    renderCollectionsList();
+  });
+  document.getElementById('collections-panel-close').addEventListener('click', () => {
+    panel.classList.remove('open'); maybeHideOverlay();
+  });
+  document.getElementById('add-collection-btn').addEventListener('click', () => {
+    const name = document.getElementById('new-collection-name').value.trim();
+    if (!name) return;
+    if (!state.settings.collections) state.settings.collections = [];
+    state.settings.collections.push({id: uid(), name, color: _newCollectionColor});
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+    document.getElementById('new-collection-name').value = '';
+    renderCollectionsList(); renderCollectionFilter();
+    showToast('📁 List Created!', `"${name}" ready.`, 'success');
+  });
+  renderCollectionFilter();
+}
+function renderCollectionsList () {
+  const list = document.getElementById('collections-list');
+  const cols = state.settings.collections || [];
+  if (!cols.length) { list.innerHTML = '<div style="color:var(--text-dim);font-size:.82rem;padding:8px 0">No custom lists yet. Create one below!</div>'; return; }
+  list.innerHTML = cols.map(c => {
+    const count = state.restaurants.filter(r => r.collectionId === c.id).length;
+    return `<div class="collection-item" data-cid="${c.id}">
+      <div class="collection-dot" style="background:${c.color}"></div>
+      <div class="collection-item-name">${escHtml(c.name)}</div>
+      <div class="collection-item-count">${count}</div>
+      <button class="collection-item-del" data-del="${c.id}" title="Delete">✕</button>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.collection-item-del').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); deleteCollection(btn.dataset.del); });
+  });
+}
+function deleteCollection (id) {
+  if (!confirm('Delete this list? Restaurants won\'t be deleted.')) return;
+  state.settings.collections = (state.settings.collections||[]).filter(c => c.id!==id);
+  state.restaurants.forEach(r => { if (r.collectionId===id) r.collectionId=null; });
+  saveData(); localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+  renderCollectionsList(); renderCollectionFilter(); renderAll();
+}
+function renderCollectionFilter () {
+  const sel = document.getElementById('filter-collection'); if (!sel) return;
+  const cur = sel.value;
+  while (sel.options.length > 1) sel.remove(1);
+  (state.settings.collections||[]).forEach(c => { const o=document.createElement('option'); o.value=c.id; o.textContent=`📁 ${c.name}`; sel.appendChild(o); });
+  sel.value = cur;
+}
+function populateFormCollections () {
+  const sel = document.getElementById('form-collection'); if (!sel) return;
+  while (sel.options.length > 1) sel.remove(1);
+  (state.settings.collections||[]).forEach(c => { const o=document.createElement('option'); o.value=c.id; o.textContent=c.name; sel.appendChild(o); });
+}
+
+/* ════════════════════════════════════════════════════════════
+   TAG AUTOCOMPLETE
+   ════════════════════════════════════════════════════════════ */
+function updateTagSuggestions () {
+  const dl = document.getElementById('tag-suggestions'); if (!dl) return;
+  const allTags = [...new Set(state.restaurants.flatMap(r => r.tags||[]))].sort();
+  dl.innerHTML = allTags.map(t => `<option value="${escHtml(t)}">`).join('');
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -1131,10 +2030,13 @@ function setupEvents () {
   document.getElementById('main-nav').addEventListener('click', e => {
     const btn = e.target.closest('.nav-btn');
     if (!btn) return;
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.nav-btn, .mobile-nav-btn[data-view]').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
+    document.querySelector(`.mobile-nav-btn[data-view="${btn.dataset.view}"]`)?.classList.add('active');
     state.currentView = btn.dataset.view;
-    renderCards();
+    if (state.currentView === 'map') { showMapView(); }
+    else if (state.currentView === 'stats') { showStatsView(); }
+    else { hideMapView(); hideStatsView(); renderCards(); }
   });
 
   // Add button
@@ -1238,12 +2140,129 @@ function setupEvents () {
     closeChat();
   });
 
+  // Status radio → show/hide date-visited field
+  document.querySelectorAll('input[name="form-status"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const isVisited = document.querySelector('input[name="form-status"]:checked')?.value === 'visited';
+      document.getElementById('form-date-visited-group').classList.toggle('hidden', !isVisited);
+      if (!isVisited) document.getElementById('form-date-visited').value = '';
+    });
+  });
+
+  // Photo file upload → read as data URL into URL field
+  document.getElementById('form-photo-file').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Invalid File', 'Please select an image file.', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.getElementById('form-photo').value = ev.target.result;
+      showToast('Photo Added 📷', 'Image loaded successfully.', 'success');
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Export / Import
+  document.getElementById('export-btn').addEventListener('click', exportData);
+  document.getElementById('import-file-input').addEventListener('change', e => {
+    importData(e.target.files[0]);
+    e.target.value = '';
+  });
+
+  // Mobile bottom nav
+  document.getElementById('mobile-bottom-nav').addEventListener('click', e => {
+    const btn = e.target.closest('.mobile-nav-btn');
+    if (!btn) return;
+    if (btn.id === 'mobile-add-btn') { openAddModal(); return; }
+    document.querySelectorAll('.nav-btn, .mobile-nav-btn[data-view]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelector(`.nav-btn[data-view="${btn.dataset.view}"]`)?.classList.add('active');
+    state.currentView = btn.dataset.view;
+    if (state.currentView === 'map') { showMapView(); }
+    else if (state.currentView === 'stats') { showStatsView(); }
+    else { hideMapView(); hideStatsView(); renderCards(); }
+  });
+
+  // Group-by toggle
+  document.getElementById('group-by-btn').addEventListener('click', () => {
+    state.groupBy = !state.groupBy;
+    document.getElementById('group-by-btn').classList.toggle('active', state.groupBy);
+    if (state.currentView !== 'map') renderCards();
+  });
+
+  // Quick filter chips
+  document.querySelectorAll('.quick-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const action = chip.dataset.action;
+      if (action === 'top-rated') {
+        state.filter.sort = 'rating-desc';
+        document.getElementById('sort-select').value = 'rating-desc';
+      } else if (action === 'nearest') {
+        if (!state.locationEnabled) { showToast('Location needed', 'Enable location tracking first.', 'error'); return; }
+        state.filter.sort = 'distance-asc';
+        document.getElementById('sort-select').value = 'distance-asc';
+      } else if (action === 'discover') {
+        discoverNearby(); return;
+      }
+      if (state.currentView !== 'map') renderCards();
+    });
+  });
+
+  // Collection filter
+  const fcSel = document.getElementById('filter-collection');
+  if (fcSel) {
+    fcSel.addEventListener('change', e => {
+      state.filter.collection = e.target.value;
+      updateClearBtn(); renderCards();
+    });
+  }
+
+  // Maps URL parse
+  document.getElementById('form-maps-parse-btn').addEventListener('click', () => {
+    parseMapsUrl(document.getElementById('form-maps-url').value);
+  });
+  document.getElementById('form-maps-url').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); parseMapsUrl(e.target.value); }
+  });
+
+  // Bulk mode
+  document.getElementById('bulk-select-btn').addEventListener('click', toggleBulkMode);
+  document.getElementById('bulk-cancel-btn').addEventListener('click', toggleBulkMode);
+  document.getElementById('bulk-tag-btn').addEventListener('click', bulkTag);
+  document.getElementById('bulk-collection-btn').addEventListener('click', bulkMoveToCollection);
+  document.getElementById('bulk-export-btn').addEventListener('click', bulkExport);
+  document.getElementById('bulk-delete-btn').addEventListener('click', bulkDelete);
+
+  // Nearby overlay close
+  document.getElementById('nearby-close-btn').addEventListener('click', () => {
+    document.getElementById('nearby-overlay').classList.add('hidden'); maybeHideOverlay();
+  });
+  document.getElementById('nearby-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('nearby-overlay')) {
+      document.getElementById('nearby-overlay').classList.add('hidden'); maybeHideOverlay();
+    }
+  });
+
+  // Onboarding
+  document.getElementById('onboarding-next-btn').addEventListener('click', () => {
+    if (_onboardingStep < ONBOARDING_STEPS.length - 1) {
+      _onboardingStep++; renderOnboardingStep();
+    } else { dismissOnboarding(); }
+  });
+  document.getElementById('onboarding-skip-btn').addEventListener('click', dismissOnboarding);
+
   // Keyboard: Escape
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       closeModal();
       closeDetailModal();
       closeChat();
+      document.getElementById('nearby-overlay').classList.add('hidden');
+      document.getElementById('collections-panel').classList.remove('open');
+      maybeHideOverlay();
     }
   });
 }
@@ -1261,9 +2280,13 @@ function clearFilters () {
   state.filter.search = '';
   state.filter.cuisine = '';
   state.filter.price = '';
+  state.filter.tag = '';
+  state.filter.collection = '';
   document.getElementById('search-input').value = '';
   document.getElementById('filter-cuisine').value = '';
   document.getElementById('filter-price').value = '';
+  const fc = document.getElementById('filter-collection');
+  if (fc) fc.value = '';
   updateClearBtn();
   renderCards();
 }
@@ -1274,5 +2297,10 @@ function clearFilters () {
 document.addEventListener('DOMContentLoaded', () => {
   loadData();
   setupEvents();
+  initPwa();
+  initTheme();
+  initCollections();
+  updateTagSuggestions();
   renderAll();
+  showOnboarding();
 });
