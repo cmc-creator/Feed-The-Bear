@@ -1242,10 +1242,10 @@ function showToast (title, msg, type = 'default') {
 }
 
 /* ════════════════════════════════════════════════════════════
-   CHAT BUDDY — FOODIE BEAR
+   CHAT BUDDY — BYTE CUB
    ════════════════════════════════════════════════════════════ */
 const GREETINGS = [
-  'Hey foodie! 🐻 I\'m Foodie Bear, your personal restaurant strategist. What should we plan first?',
+  'Hey foodie! 🐻 I\'m Byte Cub, your personal restaurant strategist. What should we plan first?',
   'Welcome back, hungry adventurer. 🐻 Want a recommendation, a surprise pick, or your next list idea?',
   'Roar and ready. 🐻 I can help you discover, organize, and decide where to eat next.',
 ];
@@ -1674,7 +1674,7 @@ const ONBOARDING_STEPS = [
   { icon: '➕', title: 'Capture Places Instantly', desc: 'Add restaurants in seconds, or paste a Google Maps URL to auto-fill details and move faster.' },
   { icon: '🗺️', title: 'Discover Around You', desc: 'Use Map view and Nearby Discovery to find what\'s close now, then save your favorites with one tap.' },
   { icon: '📊', title: 'See Your Food Story', desc: 'Stats turns your history into insights: top cuisines, ratings, trends, and your best-performing picks.' },
-  { icon: '🐻', title: 'Let Foodie Bear Curate', desc: 'Ask for smart recommendations, random picks, tag-based suggestions, and ready-to-share cards.' },
+  { icon: '🐻', title: 'Let Byte Cub Curate', desc: 'Ask for smart recommendations, random picks, tag-based suggestions, and ready-to-share cards.' },
 ];
 let _onboardingStep = 0;
 function showOnboarding () {
@@ -3399,7 +3399,7 @@ function checkWeeklySuggestion () {
   banner.className = 'weekly-suggest-banner';
   banner.innerHTML = '<div class="wsb-icon">??</div>'
     + '<div class="wsb-body">'
-    + '<div class="wsb-title">Foodie Bear\'s Pick of the Week</div>'
+    + '<div class="wsb-title">Byte Cub\'s Pick of the Week</div>'
     + '<div class="wsb-text">How about <strong>' + escHtml(suggestion.name) + '</strong>'
     + (suggestion.cuisine ? ' (' + escHtml(suggestion.cuisine) + ')' : '')
     + (favCuisine ? ' · you love ' + escHtml(favCuisine) + '!' : '') + '</div>'
@@ -4980,7 +4980,7 @@ function openAiPanel () {
   document.getElementById('ai-key-notice').classList.toggle('hidden', !!key);
   document.getElementById('ai-panel-overlay').classList.remove('hidden');
   document.body.classList.add('overlay-open');
-  if (!_aiHistory.length) _appendAiMsg('assistant', "Hi! I'm your food AI. Ask me anything about your restaurant list, or tap a quick button above. ???");
+  if (!_aiHistory.length) _appendAiMsg('assistant', "Hi! I'm Byte Cub, your food AI. Ask me anything about your restaurant list, or tap a quick button above. ???");
 }
 function closeAiPanel () {
   document.getElementById('ai-panel-overlay').classList.add('hidden');
