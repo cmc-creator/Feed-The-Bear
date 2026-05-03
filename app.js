@@ -812,6 +812,10 @@ function openDetailModal (id) {
 
   document.getElementById('detail-overlay').classList.remove('hidden');
   document.getElementById('ui-overlay').classList.remove('hidden');
+  // Phase 9 — load cuisine photo + hide stale AI summary
+  loadDetailPhoto(r);
+  const aiSumEl = document.getElementById('detail-ai-summary');
+  if (aiSumEl) aiSumEl.classList.add('hidden');
 }
 
 function closeDetailModal () {
@@ -2284,6 +2288,10 @@ function setupEvents () {
       closeDiscover();
       closeChallenges();
       closeDebrief();
+      closeStats2();
+      closeAiPanel();
+      closeRoutePlanner();
+      closeExport2();
       document.getElementById('nearby-overlay').classList.add('hidden');
       document.getElementById('collections-panel').classList.remove('open');
       maybeHideOverlay();
@@ -2455,6 +2463,35 @@ function setupEvents () {
   document.querySelectorAll('.chal-tab').forEach(tab => tab.addEventListener('click', () => switchChalTab(tab.dataset.tab)));
   document.getElementById('chal-create-btn').addEventListener('click', createChallenge);
   document.getElementById('chal-friend-load-btn').addEventListener('click', loadFriendChallenge);
+
+  // Phase 9 — Deep Stats
+  document.getElementById('stats2-close-btn').addEventListener('click', closeStats2);
+  document.getElementById('stats2-overlay').addEventListener('click', e => { if (e.target === document.getElementById('stats2-overlay')) closeStats2(); });
+
+  // Phase 9 — AI Assistant
+  document.getElementById('ai-panel-close-btn').addEventListener('click', closeAiPanel);
+  document.getElementById('ai-panel-overlay').addEventListener('click', e => { if (e.target === document.getElementById('ai-panel-overlay')) closeAiPanel(); });
+  document.getElementById('ai-chat-send-btn').addEventListener('click', () => sendAiMessage(document.getElementById('ai-chat-input').value));
+  document.getElementById('ai-chat-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendAiMessage(document.getElementById('ai-chat-input').value); });
+  document.getElementById('ai-chat-history').addEventListener('click', e => {
+    const btn = e.target.closest('.ai-quick-btn');
+    if (btn) handleAiQuickBtn(btn.dataset.prompt);
+  });
+  document.querySelectorAll('.ai-quick-btn').forEach(btn => btn.addEventListener('click', () => handleAiQuickBtn(btn.dataset.prompt)));
+  document.getElementById('detail-ai-btn').addEventListener('click', () => { if (state.detailId) getAiDetailSummary(state.detailId); });
+
+  // Phase 9 — Route Planner
+  document.getElementById('route-close-btn').addEventListener('click', closeRoutePlanner);
+  document.getElementById('route-overlay').addEventListener('click', e => { if (e.target === document.getElementById('route-overlay')) closeRoutePlanner(); });
+  document.getElementById('route-go-btn').addEventListener('click', launchRoute);
+  document.getElementById('detail-route-btn').addEventListener('click', openRoutePlanner);
+
+  // Phase 9 — Export v2
+  document.getElementById('export2-close-btn').addEventListener('click', closeExport2);
+  document.getElementById('export2-overlay').addEventListener('click', e => { if (e.target === document.getElementById('export2-overlay')) closeExport2(); });
+  document.getElementById('export2-passport-btn').addEventListener('click', exportPassport);
+  document.getElementById('export2-page-btn').addEventListener('click', exportShareablePage);
+  document.getElementById('export2-csv-btn').addEventListener('click', exportCSV);
 }
 
 function updateClearBtn () {
@@ -2494,7 +2531,10 @@ document.addEventListener('DOMContentLoaded', () => {
   initOfflineIndicator();
   initSwipeGestures();
   initReminders();
+  initInstallPrompt();
+  checkAndNudge();
   updateTagSuggestions();
+  updateAppBadge();
   renderAll();
   showOnboarding();
   checkIncomingChallenge();
@@ -4028,6 +4068,11 @@ function initMoreMenu () {
       'review':           openYearReview,
       'profile':          openFoodieProfile,
       'friends':          openFoodieFriends,
+      'stats2':           openStats2,
+      'ai-panel':         openAiPanel,
+      'route':            openRoutePlanner,
+      'export2':          openExport2,
+      'push':             requestPushPermission,
       'wrap':             () => document.getElementById('wrap-btn').click(),
       'export':           () => document.getElementById('export-btn').click(),
       'import-bookmarks': () => document.getElementById('import-bookmarks-btn').click(),
@@ -4730,4 +4775,612 @@ function saveDebrief () {
     showToast('?? Debrief saved!', 'Notes updated for ' + r.name, 'success');
   }
   closeDebrief();
+}
+
+/* ------------------------------------------------------------
+   PHASE 9 � ?? DEEP STATS
+   ------------------------------------------------------------ */
+
+function openStats2 () {
+  document.getElementById('stats2-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  renderStats2();
+}
+function closeStats2 () {
+  document.getElementById('stats2-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function renderStats2 () {
+  const visited = state.restaurants.filter(r => r.status === 'visited');
+
+  // -- Cuisine Diversity (Shannon entropy normalised 0-100) --
+  const cuisineCount = {};
+  visited.forEach(r => {
+    const c = (r.cuisine || 'Unknown').toLowerCase();
+    cuisineCount[c] = (cuisineCount[c] || 0) + 1;
+  });
+  const total = visited.length || 1;
+  const uniq  = Object.keys(cuisineCount).length;
+  let entropy = 0;
+  Object.values(cuisineCount).forEach(n => {
+    const p = n / total;
+    entropy -= p * Math.log2(p);
+  });
+  const maxEntropy = Math.log2(Math.max(uniq, 2));
+  const diversityPct = maxEntropy > 0 ? Math.round((entropy / maxEntropy) * 100) : 0;
+  document.getElementById('s2-diversity-val').textContent = diversityPct + '%';
+  document.getElementById('s2-diversity-bar').style.width = diversityPct + '%';
+  document.getElementById('s2-diversity-sub').textContent = uniq + ' cuisines explored';
+
+  // -- Visit Streak (consecutive weeks with =1 new place) --
+  const visitDates = visited
+    .map(r => r.dateVisited || r.dateAdded)
+    .filter(Boolean)
+    .map(d => new Date(d))
+    .sort((a, b) => b - a);
+
+  let streak = 0;
+  if (visitDates.length) {
+    const msPerWeek = 7 * 24 * 3600 * 1000;
+    let ref = new Date();
+    ref.setHours(0,0,0,0);
+    for (let w = 0; w < 52; w++) {
+      const weekStart = new Date(ref - w * msPerWeek);
+      const weekEnd   = new Date(ref - (w-1) * msPerWeek);
+      if (visitDates.some(d => d >= weekStart && d < weekEnd)) streak++;
+      else if (w > 0) break;
+    }
+  }
+  document.getElementById('s2-streak-val').textContent = streak + ' wk' + (streak !== 1 ? 's' : '');
+  document.getElementById('s2-streak-sub').textContent = streak >= 4 ? '?? On fire!' : streak >= 2 ? '?? Nice rhythm' : 'Try something new this week!';
+
+  // -- Scatter: Price (x) vs Rating (y) --
+  renderScatterPlot(visited);
+
+  // -- Hidden Gems (high rating = 4, cheap price � / ��) --
+  const gems = visited
+    .filter(r => r.myRating >= 4 && (r.priceRange || 0) <= 2 && r.priceRange > 0)
+    .sort((a, b) => b.myRating - a.myRating)
+    .slice(0, 5);
+
+  const gemsList = document.getElementById('s2-gems-list');
+  if (gems.length) {
+    gemsList.innerHTML = gems.map(r => `
+      <div class="gem-item">
+        <div class="gem-item-emoji">${cuisineEmoji(r.cuisine)}</div>
+        <div>
+          <div class="gem-item-name">${escHtml(r.name)}</div>
+          <div class="gem-item-meta">${escHtml(r.cuisine||'')} � ${'�'.repeat(r.priceRange||1)}</div>
+        </div>
+        <div class="gem-badge">?${r.myRating} Hidden Gem</div>
+      </div>`).join('');
+  } else {
+    gemsList.innerHTML = '<div style="font-size:.8rem;color:var(--text-dim)">No hidden gems yet � rate more cheap spots!</div>';
+  }
+
+  // -- Visit heatmap (last 52 weeks) --
+  renderVisitHeatmap(visited);
+}
+
+function renderScatterPlot (visited) {
+  const canvas = document.getElementById('scatter-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = { l: 36, r: 16, t: 14, b: 30 };
+  const iw = W - pad.l - pad.r;
+  const ih = H - pad.t - pad.b;
+
+  // Background
+  ctx.fillStyle = '#1a1a2e';
+  ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(0,0,W,H,10) : ctx.rect(0,0,W,H);
+  ctx.fill();
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,.07)';
+  ctx.lineWidth = 1;
+  for (let i = 1; i <= 5; i++) {
+    const y = pad.t + ih - (i/5)*ih;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l+iw, y); ctx.stroke();
+  }
+  for (let i = 1; i <= 4; i++) {
+    const x = pad.l + (i/4)*iw;
+    ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t+ih); ctx.stroke();
+  }
+
+  // Axis labels
+  ctx.fillStyle = 'rgba(255,255,255,.4)';
+  ctx.font = '10px Poppins, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Cheap', pad.l, H-6);
+  ctx.fillText('Expensive', pad.l+iw, H-6);
+  ctx.save();
+  ctx.translate(11, pad.t + ih/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.fillText('Rating', 0, 0);
+  ctx.restore();
+
+  // Axis title
+  ctx.fillStyle = 'rgba(255,255,255,.25)';
+  ctx.font = '9px Poppins, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Price vs Enjoyment', W/2, 11);
+
+  // Data points
+  const withBoth = visited.filter(r => r.myRating > 0 && r.priceRange > 0);
+  withBoth.forEach(r => {
+    const x = pad.l + ((r.priceRange - 1) / 3) * iw;
+    const y = pad.t + ih - ((r.myRating - 1) / 4) * ih;
+    const isGem = r.myRating >= 4 && r.priceRange <= 2;
+    ctx.beginPath();
+    ctx.arc(x + (Math.random()-.5)*14, y + (Math.random()-.5)*10, 5, 0, Math.PI*2);
+    ctx.fillStyle = isGem ? '#ffd166' : 'rgba(255,107,53,.75)';
+    ctx.fill();
+  });
+
+  // Legend
+  ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(pad.l+6, pad.t+8, 4, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.font = '9px Poppins, sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('Hidden gem', pad.l+14, pad.t+12);
+  ctx.fillStyle = 'rgba(255,107,53,.75)'; ctx.beginPath(); ctx.arc(pad.l+76, pad.t+8, 4, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.fillText('Other', pad.l+84, pad.t+12);
+
+  if (!withBoth.length) {
+    ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.font = '12px Poppins, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('Rate & set prices to see scatter', W/2, H/2);
+  }
+}
+
+function renderVisitHeatmap (visited) {
+  const el = document.getElementById('s2-heatmap');
+  if (!el) return;
+  const msPerDay = 86400000;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const WEEKS = 26;
+  const DAYS = WEEKS * 7;
+
+  // Count visits per day
+  const dayCounts = {};
+  visited.forEach(r => {
+    const d = r.dateVisited || r.dateAdded;
+    if (d) dayCounts[d.slice(0,10)] = (dayCounts[d.slice(0,10)] || 0) + 1;
+  });
+
+  let html = '';
+  for (let i = DAYS - 1; i >= 0; i--) {
+    const date = new Date(today - i * msPerDay);
+    const key  = date.toISOString().slice(0,10);
+    const n    = dayCounts[key] || 0;
+    const cls  = n === 0 ? '' : n === 1 ? 'h1' : n === 2 ? 'h2' : n === 3 ? 'h3' : 'h4';
+    html += `<div class="heatmap-cell ${cls}" title="${key}: ${n} visit${n!==1?'s':''}"></div>`;
+  }
+  el.innerHTML = html;
+}
+
+/* ------------------------------------------------------------
+   PHASE 9 � ?? AI ASSISTANT
+   ------------------------------------------------------------ */
+
+const _aiHistory = [];
+
+function openAiPanel () {
+  const key = state.settings.aiApiKey;
+  document.getElementById('ai-key-notice').classList.toggle('hidden', !!key);
+  document.getElementById('ai-panel-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  if (!_aiHistory.length) _appendAiMsg('assistant', "Hi! I'm your food AI. Ask me anything about your restaurant list, or tap a quick button above. ???");
+}
+function closeAiPanel () {
+  document.getElementById('ai-panel-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function _appendAiMsg (role, text) {
+  _aiHistory.push({ role, text });
+  const hist = document.getElementById('ai-chat-history');
+  const div = document.createElement('div');
+  div.className = 'ai-msg ' + role;
+  div.innerHTML = `<div class="ai-msg-avatar">${role === 'assistant' ? '??' : '??'}</div><div class="ai-msg-bubble">${escHtml(text)}</div>`;
+  hist.appendChild(div);
+  hist.scrollTop = hist.scrollHeight;
+}
+
+function _showAiThinking () {
+  const hist = document.getElementById('ai-chat-history');
+  const div = document.createElement('div');
+  div.className = 'ai-msg assistant';
+  div.id = 'ai-thinking-bubble';
+  div.innerHTML = `<div class="ai-msg-avatar">??</div><div class="ai-msg-bubble ai-thinking"><span></span><span></span><span></span></div>`;
+  hist.appendChild(div);
+  hist.scrollTop = hist.scrollHeight;
+  return div;
+}
+
+function _buildListContext () {
+  const visited = state.restaurants.filter(r => r.status === 'visited');
+  const wishlist = state.restaurants.filter(r => r.status === 'wishlist');
+  const topRated = visited.sort((a,b) => b.myRating - a.myRating).slice(0,5).map(r => `${r.name} (${r.cuisine}, ?${r.myRating})`).join(', ');
+  const cuisines = [...new Set(visited.map(r => r.cuisine).filter(Boolean))].join(', ');
+  return `User's food tracker summary: ${visited.length} visited, ${wishlist.length} on wishlist. Top rated: ${topRated}. Cuisines explored: ${cuisines}.`;
+}
+
+async function sendAiMessage (userText) {
+  if (!userText.trim()) return;
+  const key = state.settings.aiApiKey;
+  _appendAiMsg('user', userText);
+  document.getElementById('ai-chat-input').value = '';
+
+  if (!key) {
+    _appendAiMsg('assistant', "I need an OpenAI API key to give smart answers. Go to Settings ? AI API Key to add yours. In the meantime, here's what I can see: " + _buildListContext());
+    return;
+  }
+
+  const thinking = _showAiThinking();
+
+  try {
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: 'You are a friendly food assistant. Answer questions about the user\'s restaurant list concisely. ' + _buildListContext() },
+          ..._aiHistory.filter(m => m.role !== 'assistant' || _aiHistory.indexOf(m) > _aiHistory.length - 8).map(m => ({ role: m.role, content: m.text }))
+        ],
+        max_tokens: 300
+      })
+    });
+    const data = await resp.json();
+    thinking.remove();
+    const reply = data.choices?.[0]?.message?.content || 'No response. Check your API key.';
+    _appendAiMsg('assistant', reply);
+  } catch (_) {
+    thinking.remove();
+    _appendAiMsg('assistant', 'Connection error. Check your internet and API key.');
+  }
+}
+
+function handleAiQuickBtn (prompt) {
+  const prompts = {
+    summarize: 'Give me a fun summary of my food journey so far.',
+    recommend: 'Based on my taste, what should I eat tonight?',
+    rut:       'Am I stuck in a food rut? What do you suggest I try next?',
+    'next-cuisine': 'What new cuisine would suit my tastes that I haven\'t tried yet?'
+  };
+  sendAiMessage(prompts[prompt] || prompt);
+}
+
+async function getAiDetailSummary (restaurantId) {
+  const r = state.restaurants.find(x => x.id === restaurantId);
+  if (!r) return;
+  const el = document.getElementById('detail-ai-summary');
+  if (!el) return;
+  el.classList.remove('hidden');
+  el.textContent = '?? Generating summary�';
+
+  const key = state.settings.aiApiKey;
+  if (!key) {
+    el.textContent = `?? ${r.name} � ${r.cuisine || 'restaurant'} � ?${r.myRating || '?'} � ${r.notes ? r.notes.slice(0,120) : 'No notes yet.'}`;
+    return;
+  }
+
+  try {
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: 'Write a 2-sentence review vibe for a restaurant. Be warm and personal. No fluff.' },
+          { role: 'user', content: `Restaurant: ${r.name}. Cuisine: ${r.cuisine}. Rating: ${r.myRating}/5. Notes: ${r.notes || 'none'}.` }
+        ],
+        max_tokens: 100
+      })
+    });
+    const data = await resp.json();
+    el.textContent = '?? ' + (data.choices?.[0]?.message?.content || 'Could not generate summary.');
+  } catch (_) {
+    el.textContent = '?? Could not connect to AI.';
+  }
+}
+
+/* ------------------------------------------------------------
+   PHASE 9 � ??? MAP UPGRADES (cluster + route)
+   ------------------------------------------------------------ */
+
+// Route planner selected IDs
+const _routeSelected = new Set();
+
+function openRoutePlanner () {
+  _routeSelected.clear();
+  const visited = state.restaurants.filter(r => r.status === 'visited' && r.lat && r.lng);
+  const wishlist = state.restaurants.filter(r => r.status === 'wishlist' && r.lat && r.lng);
+  const all = [...visited, ...wishlist];
+
+  const list = document.getElementById('route-pick-list');
+  if (!all.length) {
+    list.innerHTML = '<div style="font-size:.8rem;color:var(--text-dim)">No restaurants with location data found. Add addresses to your entries first.</div>';
+  } else {
+    list.innerHTML = all.map(r => `
+      <div class="route-pick-item" data-id="${r.id}" onclick="toggleRouteItem('${r.id}', this)">
+        <div class="route-pick-check" id="route-check-${r.id}"></div>
+        <div>
+          <div class="route-pick-name">${cuisineEmoji(r.cuisine)} ${escHtml(r.name)}</div>
+          <div class="route-pick-meta">${escHtml(r.cuisine||'')}${r.address ? ' � ' + escHtml(r.address) : ''}</div>
+        </div>
+      </div>`).join('');
+  }
+  _updateRouteBar();
+  document.getElementById('route-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeRoutePlanner () {
+  document.getElementById('route-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function toggleRouteItem (id, el) {
+  if (_routeSelected.has(id)) {
+    _routeSelected.delete(id);
+    el.classList.remove('selected');
+    document.getElementById('route-check-' + id).textContent = '';
+  } else {
+    if (_routeSelected.size >= 5) { showToast('Max 5 stops', 'Remove one first.', 'error'); return; }
+    _routeSelected.add(id);
+    el.classList.add('selected');
+    document.getElementById('route-check-' + id).textContent = '?';
+  }
+  _updateRouteBar();
+}
+
+function _updateRouteBar () {
+  const bar = document.getElementById('route-selected-bar');
+  const cnt = document.getElementById('route-selected-count');
+  const n = _routeSelected.size;
+  cnt.textContent = n + ' stop' + (n !== 1 ? 's' : '') + ' selected';
+  bar.classList.toggle('hidden', n < 2);
+}
+
+function launchRoute () {
+  const stops = [..._routeSelected].map(id => state.restaurants.find(r => r.id === id)).filter(Boolean);
+  if (stops.length < 2) return;
+  const waypoints = stops.map(r => encodeURIComponent(r.address || (r.lat + ',' + r.lng)));
+  const origin = waypoints.shift();
+  const dest   = waypoints.pop();
+  const via    = waypoints.length ? '&waypoints=' + waypoints.join('|') : '';
+  const url    = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}${via}&travelmode=driving`;
+  window.open(url, '_blank', 'noopener');
+  closeRoutePlanner();
+}
+
+/* Detail photo from Unsplash Source (no API key) */
+function loadDetailPhoto (restaurant) {
+  const el = document.getElementById('detail-photo-strip');
+  if (!el) return;
+  const query = encodeURIComponent((restaurant.cuisine || 'food') + ' restaurant');
+  // Use picsum as reliable no-key fallback; encode cuisine as seed for consistency
+  const seed = restaurant.id ? restaurant.id.slice(-6) : '1';
+  el.src = `https://picsum.photos/seed/${seed}/640/160`;
+  el.alt = restaurant.cuisine + ' restaurant photo';
+  el.style.display = 'block';
+  el.onerror = () => { el.style.display = 'none'; };
+}
+
+/* ------------------------------------------------------------
+   PHASE 9 � ?? EXPORT v2
+   ------------------------------------------------------------ */
+
+function openExport2 () {
+  document.getElementById('export2-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeExport2 () {
+  document.getElementById('export2-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+
+/* Restaurant Passport � print-ready HTML page */
+function exportPassport () {
+  const visited = state.restaurants.filter(r => r.status === 'visited');
+  if (!visited.length) { showToast('No visits yet', 'Mark some restaurants as visited first.', 'error'); return; }
+
+  const priceStr = n => n ? '�'.repeat(n) : '';
+  const ratingStr = n => n ? '?'.repeat(n) + '?'.repeat(5-n) : 'Unrated';
+
+  const cards = visited.map(r => `
+    <div style="border:1px solid #ddd;border-radius:12px;padding:16px 18px;break-inside:avoid;margin-bottom:12px;font-family:Georgia,serif">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <span style="font-size:2rem">${cuisineEmoji(r.cuisine)}</span>
+        <div>
+          <div style="font-size:1.1rem;font-weight:700">${escHtml(r.name)}</div>
+          <div style="font-size:.8rem;color:#666">${escHtml(r.cuisine||'')} ${priceStr(r.priceRange)}</div>
+        </div>
+        <div style="margin-left:auto;font-size:.9rem;color:#e63946">${ratingStr(r.myRating)}</div>
+      </div>
+      ${r.address ? `<div style="font-size:.78rem;color:#888;margin-bottom:4px">?? ${escHtml(r.address)}</div>` : ''}
+      ${r.dateVisited ? `<div style="font-size:.78rem;color:#888;margin-bottom:4px">?? Visited: ${r.dateVisited}</div>` : ''}
+      ${r.notes ? `<div style="font-size:.8rem;color:#444;border-top:1px solid #eee;padding-top:6px;margin-top:6px">${escHtml(r.notes.slice(0,200))}</div>` : ''}
+    </div>`).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>My Restaurant Passport</title>
+  <style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;padding:0 20px;color:#222}
+  h1{font-size:1.8rem;border-bottom:2px solid #e63946;padding-bottom:8px;margin-bottom:24px}
+  @media print{body{margin:0;padding:10px}}</style></head><body>
+  <h1>??? My Restaurant Passport</h1>
+  <p style="color:#888;font-size:.85rem">Generated ${new Date().toLocaleDateString()} � ${visited.length} restaurants visited</p>
+  ${cards}
+  </body></html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'restaurant-passport.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  closeExport2();
+  showToast('?? Passport downloaded!', 'Open the HTML file in any browser to print.', 'success');
+}
+
+/* Shareable standalone page */
+function exportShareablePage () {
+  const restaurants = state.restaurants;
+  if (!restaurants.length) { showToast('Nothing to export', 'Add some restaurants first.', 'error'); return; }
+
+  const items = restaurants.map(r => `
+    <div style="display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid #2a2a3e;border-radius:10px;background:#16162a">
+      <span style="font-size:1.6rem">${cuisineEmoji(r.cuisine)}</span>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:.95rem">${escHtml(r.name)}</div>
+        <div style="font-size:.78rem;color:#aaa">${escHtml(r.cuisine||'')}${r.priceRange ? ' � ' + '�'.repeat(r.priceRange) : ''}</div>
+        ${r.myRating ? `<div style="color:#ff6b35;font-size:.82rem">${'?'.repeat(r.myRating)}</div>` : ''}
+        ${r.notes ? `<div style="font-size:.75rem;color:#888;margin-top:4px">${escHtml(r.notes.slice(0,100))}</div>` : ''}
+      </div>
+      <span style="font-size:.7rem;padding:3px 8px;border-radius:10px;background:${r.status==='visited'?'#1a3a2a':r.status==='wishlist'?'#1a1a3a':'#2a2a2a'};color:${r.status==='visited'?'#4caf50':r.status==='wishlist'?'#7c83fd':'#888'}">${r.status}</span>
+    </div>`).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>My Food List � Feed The Bear</title>
+  <style>*{box-sizing:border-box}body{background:#0d0d1a;color:#e8e8f0;font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:20px}
+  h1{font-size:1.5rem;margin-bottom:4px}p{color:#888;font-size:.82rem;margin-top:0 0 20px}
+  .list{display:flex;flex-direction:column;gap:8px}</style></head><body>
+  <h1>?? My Food List</h1>
+  <p>Shared from Feed The Bear � ${restaurants.length} places � ${new Date().toLocaleDateString()}</p>
+  <div class="list">${items}</div>
+  </body></html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'my-food-list.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  closeExport2();
+  showToast('?? Page downloaded!', 'Share the HTML file � it works in any browser.', 'success');
+}
+
+/* CSV export */
+function exportCSV () {
+  const rows = [['Name','Cuisine','Status','Rating','Price','Address','Date Added','Notes']];
+  state.restaurants.forEach(r => {
+    rows.push([
+      r.name, r.cuisine||'', r.status||'', r.myRating||'', r.priceRange ? '�'.repeat(r.priceRange) : '',
+      r.address||'', r.dateAdded||'', (r.notes||'').replace(/\n/g,' ')
+    ].map(v => '"' + String(v).replace(/"/g,'""') + '"'));
+  });
+  const csv = rows.map(r => r.join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'feed-the-bear.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  closeExport2();
+  showToast('?? CSV downloaded!', '', 'success');
+}
+
+/* ------------------------------------------------------------
+   PHASE 9 � ?? PWA INSTALL PROMPT + APP BADGING
+   ------------------------------------------------------------ */
+
+let _deferredInstallPrompt = null;
+
+function initInstallPrompt () {
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    _deferredInstallPrompt = e;
+    // Show banner after 30 seconds if not dismissed
+    if (!localStorage.getItem('ftb_install_dismissed')) {
+      setTimeout(showInstallBanner, 30000);
+    }
+  });
+
+  window.addEventListener('appinstalled', () => {
+    hideInstallBanner();
+    showToast('?? Installed!', 'Feed The Bear is now on your home screen.', 'success');
+  });
+
+  document.getElementById('install-accept-btn').addEventListener('click', async () => {
+    hideInstallBanner();
+    if (!_deferredInstallPrompt) return;
+    _deferredInstallPrompt.prompt();
+    const { outcome } = await _deferredInstallPrompt.userChoice;
+    _deferredInstallPrompt = null;
+    if (outcome === 'accepted') showToast('?? Installing�', '', 'success');
+  });
+
+  document.getElementById('install-dismiss-btn').addEventListener('click', () => {
+    hideInstallBanner();
+    localStorage.setItem('ftb_install_dismissed', '1');
+  });
+}
+
+function showInstallBanner () {
+  document.getElementById('install-banner').classList.remove('hidden');
+}
+function hideInstallBanner () {
+  document.getElementById('install-banner').classList.add('hidden');
+}
+
+/* App Badging � show count of wishlist items as badge */
+function updateAppBadge () {
+  const wishlistCount = state.restaurants.filter(r => r.status === 'wishlist').length;
+  if ('setAppBadge' in navigator) {
+    if (wishlistCount > 0) navigator.setAppBadge(wishlistCount).catch(() => {});
+    else navigator.clearAppBadge().catch(() => {});
+  }
+}
+
+/* ------------------------------------------------------------
+   PHASE 9 � ?? PUSH NOTIFICATION NUDGES
+   ------------------------------------------------------------ */
+
+async function requestPushPermission () {
+  if (!('Notification' in window)) {
+    showToast('Not supported', 'Push notifications not available in this browser.', 'error');
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  if (perm === 'granted') {
+    showToast('?? Notifications on!', 'You\'ll get nudges when you haven\'t visited anywhere in a while.', 'success');
+    localStorage.setItem('ftb_push_enabled', '1');
+    schedulePushNudge();
+  } else {
+    showToast('Notifications blocked', 'Enable them in browser settings.', 'error');
+  }
+}
+
+function schedulePushNudge () {
+  if (Notification.permission !== 'granted') return;
+  const visited = state.restaurants.filter(r => r.status === 'visited');
+  if (!visited.length) return;
+
+  const lastVisitDates = visited
+    .map(r => r.dateVisited || r.dateAdded)
+    .filter(Boolean)
+    .sort()
+    .reverse();
+
+  const last = lastVisitDates[0];
+  if (!last) return;
+
+  const daysSince = Math.floor((Date.now() - new Date(last)) / 86400000);
+  if (daysSince >= 14) {
+    // Fire a nudge now (in a real app this would use Push API via server)
+    new Notification('?? Feed The Bear misses you!', {
+      body: `It's been ${daysSince} days since your last visit. Time to try somewhere new!`,
+      icon: './icon-192.png',
+      badge: './icon-192.png',
+      tag: 'ftb-nudge'
+    });
+  }
+}
+
+function checkAndNudge () {
+  if (localStorage.getItem('ftb_push_enabled') && Notification.permission === 'granted') {
+    schedulePushNudge();
+  }
 }

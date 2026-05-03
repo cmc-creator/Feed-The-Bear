@@ -97,7 +97,12 @@
           <button class="more-menu-item" data-more="profile">🌐 My Profile</button>
           <button class="more-menu-item" data-more="friends">👥 Foodie Friends</button>
           <button class="more-menu-item" data-more="wrap">🎁 Monthly Wrap</button>
+          <div class="more-menu-section">Analyse</div>
+          <button class="more-menu-item" data-more="stats2">📊 Deep Stats</button>
+          <button class="more-menu-item" data-more="ai-panel">🤖 AI Assistant</button>
+          <button class="more-menu-item" data-more="route">🗺️ Route Planner</button>
           <div class="more-menu-section">Data</div>
+          <button class="more-menu-item" data-more="export2">📦 Export Passport</button>
           <button class="more-menu-item" data-more="export">📥 Export JSON</button>
           <label class="more-menu-item" style="cursor:pointer">📤 Import JSON<input type="file" id="import-file-input" accept=".json" style="display:none" /></label>
           <button class="more-menu-item" data-more="import-bookmarks">📋 Import Bookmarks</button>
@@ -570,6 +575,7 @@
         </div>
 
         <div class="detail-meta" id="detail-meta"></div>
+        <div id="detail-ai-summary" class="detail-ai-summary hidden"></div>
 
         <div class="detail-actions">
           <button id="detail-directions-btn" class="btn-primary">
@@ -600,6 +606,12 @@
           </button>
           <button id="detail-debrief-btn" class="btn-secondary">
             📝 Debrief
+          </button>
+          <button id="detail-ai-btn" class="btn-secondary">
+            🤖 AI Summary
+          </button>
+          <button id="detail-route-btn" class="btn-secondary">
+            🗺️ Route
           </button>
           <button id="detail-edit-btn" class="btn-ghost">
             ✏️ Edit
@@ -1018,6 +1030,129 @@
       </div>
     </div>
   </div>
+  <!-- Phase 9 Modals -->
+
+  <!-- 📊 Deep Stats -->
+  <div id="stats2-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="stats2-title">
+    <div class="modal-card stats2-card">
+      <div class="modal-header">
+        <h2 id="stats2-title">📊 Deep Stats</h2>
+        <button id="stats2-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="stats2-body">
+        <div class="stats2-row">
+          <div class="stats2-tile" id="s2-diversity">
+            <div class="stats2-tile-label">Cuisine Diversity</div>
+            <div class="stats2-tile-val" id="s2-diversity-val">—</div>
+            <div class="diversity-bar-track"><div class="diversity-bar-fill" id="s2-diversity-bar"></div></div>
+            <div class="stats2-tile-sub" id="s2-diversity-sub"></div>
+          </div>
+          <div class="stats2-tile" id="s2-streak">
+            <div class="stats2-tile-label">New-Place Streak</div>
+            <div class="stats2-tile-val" id="s2-streak-val">—</div>
+            <div class="stats2-tile-sub" id="s2-streak-sub"></div>
+          </div>
+        </div>
+        <div class="stats2-section-title">Value vs. Enjoyment</div>
+        <canvas id="scatter-canvas" width="340" height="220"></canvas>
+        <div class="stats2-section-title">💎 Hidden Gems</div>
+        <div id="s2-gems-list" class="gems-list"></div>
+        <div class="stats2-section-title">📅 Visit Heatmap</div>
+        <div id="s2-heatmap" class="visit-heatmap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🤖 AI Assistant -->
+  <div id="ai-panel-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="ai-panel-title">
+    <div class="modal-card ai-panel-card">
+      <div class="modal-header">
+        <h2 id="ai-panel-title">🤖 AI Assistant</h2>
+        <button id="ai-panel-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="ai-panel-body">
+        <div id="ai-key-notice" class="ai-key-notice hidden">
+          ⚙️ Add your OpenAI key in <strong>Settings → AI API Key</strong> to unlock AI features.
+        </div>
+        <div class="ai-quick-btns">
+          <button class="ai-quick-btn" data-prompt="summarize">📝 Summarise my list</button>
+          <button class="ai-quick-btn" data-prompt="recommend">🎯 Recommend tonight</button>
+          <button class="ai-quick-btn" data-prompt="rut">🔄 Am I in a food rut?</button>
+          <button class="ai-quick-btn" data-prompt="next-cuisine">🌍 New cuisine to try</button>
+        </div>
+        <div class="ai-chat-history" id="ai-chat-history"></div>
+        <div class="ai-input-row">
+          <input id="ai-chat-input" class="form-input" placeholder="Ask anything about your food journey…" type="text" />
+          <button id="ai-chat-send-btn" class="btn-primary">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📦 Export v2 — Passport + Shareable Page -->
+  <div id="export2-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="export2-title">
+    <div class="modal-card export2-card">
+      <div class="modal-header">
+        <h2 id="export2-title">📦 Export &amp; Share</h2>
+        <button id="export2-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="export2-body">
+        <div class="export2-option" id="export2-passport-btn">
+          <div class="export2-icon">📄</div>
+          <div>
+            <div class="export2-label">Restaurant Passport</div>
+            <div class="export2-sub">Print-ready card for every visited spot</div>
+          </div>
+        </div>
+        <div class="export2-option" id="export2-page-btn">
+          <div class="export2-icon">🌐</div>
+          <div>
+            <div class="export2-label">Shareable Web Page</div>
+            <div class="export2-sub">Download a standalone HTML you can share</div>
+          </div>
+        </div>
+        <div class="export2-option" id="export2-csv-btn">
+          <div class="export2-icon">📊</div>
+          <div>
+            <div class="export2-label">CSV Spreadsheet</div>
+            <div class="export2-sub">Open in Excel or Google Sheets</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🗺️ Route Planner -->
+  <div id="route-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="route-title">
+    <div class="modal-card route-card">
+      <div class="modal-header">
+        <h2 id="route-title">🗺️ Route Planner</h2>
+        <button id="route-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="route-body">
+        <p class="route-hint">Pick up to 5 restaurants to visit in one trip. We'll open them in Google Maps as a route.</p>
+        <div id="route-pick-list" class="route-pick-list"></div>
+        <div id="route-selected-bar" class="route-selected-bar hidden">
+          <span id="route-selected-count">0 selected</span>
+          <button id="route-go-btn" class="btn-primary">Open in Maps 🗺️</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📲 PWA Install Banner -->
+  <div id="install-banner" class="install-banner hidden">
+    <div class="install-banner-text">
+      <span>📲</span>
+      <div>
+        <strong>Add to Home Screen</strong>
+        <div style="font-size:.75rem;color:var(--text-dim)">Works offline, feels native</div>
+      </div>
+    </div>
+    <button id="install-accept-btn" class="btn-primary" style="padding:6px 14px;font-size:.8rem">Install</button>
+    <button id="install-dismiss-btn" class="icon-btn" style="font-size:.9rem">✕</button>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLEg=" crossorigin=""></script>
   <script src="app.js"></script>
   <script>
