@@ -1131,6 +1131,9 @@ function showStatsView () {
   renderStatsView();
   renderStreaks();
   renderHeatmap();
+  renderLeaderboard();
+  renderPriceTrend();
+  renderPassport();
 }
 
 function hideStatsView () {
@@ -1706,6 +1709,7 @@ function initTheme () {
   document.getElementById('theme-toggle-btn').addEventListener('click', () => {
     const light = document.body.classList.toggle('light-mode');
     state.settings.theme = light ? 'light' : 'dark';
+    state.settings.themeManual = true; // user overrode auto-theme
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
   });
 }
@@ -2264,6 +2268,8 @@ function setupEvents () {
       closeChat();
       closeTonightsPick();
       closeChallengeModal();
+      closeWrap();
+      closeImportBookmarks();
       document.getElementById('nearby-overlay').classList.add('hidden');
       document.getElementById('collections-panel').classList.remove('open');
       maybeHideOverlay();
@@ -2296,6 +2302,33 @@ function setupEvents () {
 
   // AI Photo Fill
   document.getElementById('ai-photo-btn').addEventListener('click', aiPhotoFill);
+
+  // Phase 6 — Wrap
+  document.getElementById('wrap-btn').addEventListener('click', () => showWrap(0));
+  document.getElementById('wrap-close-btn').addEventListener('click', closeWrap);
+  document.getElementById('wrap-prev-btn').addEventListener('click', () => showWrap(_wrapOffset - 1));
+  document.getElementById('wrap-next-btn').addEventListener('click', () => showWrap(_wrapOffset + 1));
+  document.getElementById('wrap-share-btn').addEventListener('click', shareWrap);
+  document.getElementById('wrap-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('wrap-overlay')) closeWrap();
+  });
+
+  // Phase 6 — Import Bookmarks
+  document.getElementById('import-bookmarks-btn').addEventListener('click', showImportBookmarks);
+  document.getElementById('import-close-btn').addEventListener('click', closeImportBookmarks);
+  document.getElementById('import-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('import-overlay')) closeImportBookmarks();
+  });
+  document.getElementById('import-parse-btn').addEventListener('click', parseImportText);
+  document.getElementById('import-confirm-btn').addEventListener('click', confirmImport);
+
+  // Phase 6 — Add to Calendar
+  document.getElementById('detail-calendar-btn').addEventListener('click', () => {
+    if (state.detailId) addToGoogleCalendar(state.detailId);
+  });
+
+  // Phase 6 — Duplicate check on name input
+  document.getElementById('form-name').addEventListener('input', checkDuplicate);
 }
 
 function updateClearBtn () {
@@ -2330,12 +2363,17 @@ document.addEventListener('DOMContentLoaded', () => {
   setupEvents();
   initPwa();
   initTheme();
+  initAutoTheme();
   initCollections();
   initOfflineIndicator();
+  initSwipeGestures();
   updateTagSuggestions();
   renderAll();
   showOnboarding();
   checkIncomingChallenge();
+  trackReferralOpen();
+  updateChallengeBtnBadge();
+  checkWeeklySuggestion();
 });
 /* ------------------------------------------------------------
    PHASE 5 � STREAK TRACKER
@@ -2653,4 +2691,575 @@ async function aiPhotoFill () {
     }
   };
   input.click();
+}
+/* ------------------------------------------------------------
+   PHASE 6 � SMART DUPLICATE DETECTOR
+   ------------------------------------------------------------ */
+
+function normalizeName (s) {
+  return s.toLowerCase().replace(/[^a-z0-9]/g,'').trim();
+}
+function levenshtein (a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({length: m+1}, (_,i) => Array.from({length: n+1}, (_,j) => i||j ? (i ? (j ? 0 : i) : j) : 0));
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++)
+    dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+  return dp[m][n];
+}
+function findDuplicates (name) {
+  const norm = normalizeName(name);
+  if (!norm) return [];
+  return state.restaurants.filter(r => {
+    if (r.id === state.editingId) return false;
+    const rn = normalizeName(r.name);
+    if (!rn) return false;
+    if (rn === norm) return true;
+    const maxLen = Math.max(norm.length, rn.length);
+    if (maxLen === 0) return false;
+    return levenshtein(norm, rn) / maxLen < 0.25;
+  });
+}
+function checkDuplicate () {
+  const name = document.getElementById('form-name').value.trim();
+  const existing = document.getElementById('duplicate-warning');
+  if (existing) existing.remove();
+  if (!name || state.editingId) return;
+  const dupes = findDuplicates(name);
+  if (!dupes.length) return;
+  const warn = document.createElement('div');
+  warn.id = 'duplicate-warning';
+  warn.className = 'duplicate-warning';
+  warn.innerHTML = '?? Possible duplicate: '
+    + dupes.map(r => '<a onclick="openDetailModal(\'' + r.id + '\');closeModal()">' + escHtml(r.name) + '</a>').join(', ')
+    + ' already in your list.';
+  document.getElementById('form-name').after(warn);
+}
+
+/* ------------------------------------------------------------
+   PHASE 6 � ANIMATED CONFETTI
+   ------------------------------------------------------------ */
+
+const CONFETTI_COLORS = ['#FF6B35','#FFD700','#2ED573','#3498DB','#9B59B6','#FF69B4','#00CEC9'];
+let _confettiAnim = null;
+
+function launchConfetti (durationMs) {
+  durationMs = durationMs || 2500;
+  const canvas = document.getElementById('confetti-canvas');
+  if (!canvas) return;
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  canvas.classList.add('active');
+  const ctx = canvas.getContext('2d');
+  const pieces = Array.from({length: 80}, () => ({
+    x: Math.random() * canvas.width,
+    y: -10 - Math.random() * 60,
+    w: 6 + Math.random() * 8,
+    h: 10 + Math.random() * 8,
+    color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+    speed: 2 + Math.random() * 4,
+    spin: (Math.random() - .5) * 0.2,
+    angle: Math.random() * Math.PI * 2,
+    drift: (Math.random() - .5) * 1.5,
+  }));
+  const start = performance.now();
+  function draw (now) {
+    const elapsed = now - start;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    pieces.forEach(p => {
+      p.y += p.speed;
+      p.x += p.drift;
+      p.angle += p.spin;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+      ctx.restore();
+    });
+    if (elapsed < durationMs) {
+      _confettiAnim = requestAnimationFrame(draw);
+    } else {
+      canvas.classList.remove('active');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+  if (_confettiAnim) cancelAnimationFrame(_confettiAnim);
+  _confettiAnim = requestAnimationFrame(draw);
+}
+
+function checkConfettiMilestones (prev, next) {
+  const prevTotal = prev.flatMap(r => r.visits || []).length + prev.filter(r => r.status==='visited' && !(r.visits||[]).length).length;
+  const nextTotal = next.flatMap(r => r.visits || []).length + next.filter(r => r.status==='visited' && !(r.visits||[]).length).length;
+  const milestones = [1,5,10,25,50,100];
+  const hit = milestones.find(m => prevTotal < m && nextTotal >= m);
+  if (hit) {
+    launchConfetti(3000);
+    showToast('?? Milestone!', 'You have ' + hit + ' total check-in' + (hit>1?'s':'') + '! Keep exploring!', 'success');
+  }
+  // streak milestone
+  if (next.length > prev.length) {
+    const { currentStreak } = calcStreaks();
+    if ([3,5,10,20].includes(currentStreak)) {
+      launchConfetti(2500);
+      showToast('?? Streak ' + currentStreak + '!', currentStreak + '-week streak! You are a foodie legend.', 'success');
+    }
+  }
+}
+
+/* ------------------------------------------------------------
+   PHASE 6 � AUTO DARK / LIGHT MODE
+   ------------------------------------------------------------ */
+
+function initAutoTheme () {
+  const mq = window.matchMedia('(prefers-color-scheme: light)');
+  const apply = (isLight) => {
+    if (state.settings.themeManual) return; // user overrode � respect their choice
+    document.body.classList.toggle('light-mode', isLight);
+    const btn = document.getElementById('theme-toggle-btn');
+    if (btn) {
+      btn.querySelector('.icon-moon')?.style && (btn.querySelector('.icon-moon').style.display = isLight ? '' : 'none');
+      btn.querySelector('.icon-sun')?.style  && (btn.querySelector('.icon-sun').style.display  = isLight ? 'none' : '');
+    }
+  };
+  mq.addEventListener('change', e => apply(e.matches));
+  // Only apply auto if no manual preference saved yet
+  if (!state.settings.themeManual) apply(mq.matches);
+}
+
+/* ------------------------------------------------------------
+   PHASE 6 � SWIPE GESTURES (MOBILE)
+   ------------------------------------------------------------ */
+
+function initSwipeGestures () {
+  const grid = document.getElementById('restaurant-grid');
+  if (!grid) return;
+  let startX = 0, startY = 0, activeCard = null;
+  grid.addEventListener('touchstart', e => {
+    const card = e.target.closest('.restaurant-card');
+    if (!card || state.bulkMode) return;
+    activeCard = card;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  grid.addEventListener('touchmove', e => {
+    if (!activeCard) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (Math.abs(dy) > Math.abs(dx)) { activeCard = null; return; } // vertical scroll
+    if (Math.abs(dx) > 20) {
+      activeCard.classList.toggle('swipe-right', dx > 20);
+      activeCard.classList.toggle('swipe-left',  dx < -20);
+    }
+  }, { passive: true });
+  grid.addEventListener('touchend', e => {
+    if (!activeCard) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    const id = activeCard.dataset.id;
+    const THRESHOLD = 80;
+    if (dx > THRESHOLD && id) {
+      // Swipe right ? mark visited
+      const r = state.restaurants.find(x => x.id === id);
+      if (r && r.status !== 'visited') {
+        r.status = 'visited';
+        r.dateVisited = r.dateVisited || iso();
+        saveData();
+        renderAll();
+        showToast('? Visited!', '"' + r.name + '" marked as visited.', 'success');
+        launchConfetti(1500);
+      }
+    } else if (dx < -THRESHOLD && id) {
+      // Swipe left ? show detail
+      openDetailModal(id);
+    }
+    activeCard.classList.remove('swipe-right','swipe-left');
+    activeCard = null;
+  }, { passive: true });
+}
+
+/* ------------------------------------------------------------
+   PHASE 6 � LEADERBOARD
+   ------------------------------------------------------------ */
+
+function renderLeaderboard () {
+  const el = document.getElementById('chart-leaderboard');
+  if (!el) return;
+  const medals = ['??','??','??','4??','5??','6??','7??','8??'];
+  const top = [...state.restaurants]
+    .filter(r => r.myRating > 0)
+    .sort((a,b) => {
+      if (b.myRating !== a.myRating) return b.myRating - a.myRating;
+      return (b.visits||[]).length - (a.visits||[]).length;
+    }).slice(0, 8);
+  if (!top.length) { el.innerHTML = '<div class="chart-empty">Rate restaurants to build your leaderboard</div>'; return; }
+  el.innerHTML = top.map((r,i) => {
+    const visits = (r.visits||[]).length;
+    return '<div class="lb-item" data-id="' + r.id + '">'
+      + '<span class="lb-medal">' + (medals[i]||'') + '</span>'
+      + '<span class="lb-name">' + escHtml(r.name) + '</span>'
+      + '<div><div class="lb-stars">' + '?'.repeat(r.myRating) + '</div>'
+      + '<div class="lb-meta">' + escHtml(r.cuisine||'') + (visits ? ' � ' + visits + ' visit' + (visits>1?'s':'') : '') + '</div></div>'
+      + '</div>';
+  }).join('');
+  el.querySelectorAll('.lb-item[data-id]').forEach(el2 =>
+    el2.addEventListener('click', () => openDetailModal(el2.dataset.id)));
+}
+
+/* ------------------------------------------------------------
+   PHASE 6 � PRICE TREND
+   ------------------------------------------------------------ */
+
+function renderPriceTrend () {
+  const el = document.getElementById('chart-price-trend');
+  if (!el) return;
+  const all = state.restaurants;
+  if (!all.length) { el.innerHTML = '<div class="chart-empty">No data yet</div>'; return; }
+
+  // Average price range by month (last 6 months)
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(); d.setMonth(d.getMonth()-i);
+    months.push({
+      key: d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'),
+      label: d.toLocaleString('default',{month:'short'}),
+    });
+  }
+  const trendData = months.map(m => {
+    const inMonth = all.filter(r => {
+      const date = r.dateVisited || (r.visits||[])[0]?.date || '';
+      return date.slice(0,7) === m.key && r.priceRange > 0;
+    });
+    const avg = inMonth.length ? inMonth.reduce((s,r) => s+r.priceRange,0)/inMonth.length : 0;
+    return { label: m.label, avg, count: inMonth.length };
+  });
+
+  const maxAvg = Math.max(...trendData.map(d => d.avg), 1);
+  const overallAvg = (() => {
+    const withPrice = all.filter(r => r.priceRange > 0);
+    return withPrice.length ? withPrice.reduce((s,r) => s+r.priceRange,0)/withPrice.length : 0;
+  })();
+  const trend6 = trendData.filter(d => d.count > 0);
+  let insight = '';
+  if (trend6.length >= 2) {
+    const first = trend6[0].avg, last = trend6[trend6.length-1].avg;
+    if (last > first + 0.3) insight = '?? Trending upscale lately';
+    else if (last < first - 0.3) insight = '?? More budget-friendly recently';
+    else insight = '?? Spending has been consistent';
+  }
+
+  el.innerHTML = (insight ? '<div style="font-size:.75rem;color:var(--text-dim);margin-bottom:8px">' + insight + '</div>' : '')
+    + trendData.map(d => {
+    const pct = d.avg > 0 ? (d.avg/maxAvg*100).toFixed(0) : 0;
+    const label = d.avg > 0 ? ['','$','$$','$$$','$$$$'][Math.round(d.avg)]||'' : '�';
+    return '<div class="bar-row">'
+      + '<div class="bar-label">' + d.label + '</div>'
+      + '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:var(--gold)"></div></div>'
+      + '<div class="bar-count">' + (d.count > 0 ? label : '�') + '</div>'
+      + '</div>';
+  }).join('');
+
+  // Show overall average below
+  if (overallAvg > 0) {
+    const avgLabel = ['','$','$$','$$$','$$$$'][Math.round(overallAvg)] || '';
+    el.innerHTML += '<div style="margin-top:8px;font-size:.75rem;color:var(--text-dim)">Overall avg: <strong>' + avgLabel + '</strong> ('+overallAvg.toFixed(1)+')</div>';
+  }
+}
+
+/* ------------------------------------------------------------
+   PHASE 6 � CUISINE PASSPORT
+   ------------------------------------------------------------ */
+
+const ALL_CUISINES = [
+  ['Italian','??'],['Japanese','??'],['Mexican','??'],['Chinese','??'],['Indian','??'],
+  ['American','??'],['Thai','??'],['French','??'],['Mediterranean','??'],['Korean','??'],
+  ['Vietnamese','??'],['Greek','??'],['Spanish','??'],['Brazilian','??'],['Ethiopian','??'],
+  ['Turkish','??'],['Middle Eastern','??'],['Caribbean','??'],['Peruvian','??'],['Sushi','??'],
+  ['Pizza','??'],['Burgers','??'],['Seafood','??'],['Steakhouse','??'],['Vegan','??'],
+  ['BBQ','??'],['Dim Sum','??'],['Tapas','??'],['Ramen','??'],['Breakfast','??'],
+];
+function renderPassport () {
+  const el = document.getElementById('chart-passport');
+  if (!el) return;
+  const visited = state.restaurants.filter(r => r.status === 'visited');
+  const triedSet = new Set(visited.map(r => (r.cuisine||'').toLowerCase().trim()));
+  const prevUnlocked = new Set(state.settings.passportUnlocked || []);
+
+  let html = '';
+  let newUnlocks = 0;
+  ALL_CUISINES.forEach(([name, emoji]) => {
+    const key = name.toLowerCase();
+    const count = visited.filter(r => (r.cuisine||'').toLowerCase() === key).length;
+    const unlocked = triedSet.has(key);
+    const isNew = unlocked && !prevUnlocked.has(key);
+    if (isNew) newUnlocks++;
+    html += '<div class="passport-stamp ' + (unlocked ? 'unlocked' : 'locked') + (isNew ? ' new-unlock' : '') + '" title="' + (count > 0 ? count + ' visit' + (count>1?'s':'') : 'Not tried yet') + '">'
+      + '<span class="ps-emoji">' + (unlocked ? emoji : '??') + '</span>'
+      + '<span>' + escHtml(name) + '</span>'
+      + (count > 0 ? '<span class="ps-count">' + count + 'x</span>' : '')
+      + '</div>';
+  });
+
+  el.innerHTML = html + '<div style="width:100%;margin-top:8px;font-size:.75rem;color:var(--text-dim)">'
+    + triedSet.size + ' of ' + ALL_CUISINES.length + ' cuisines explored</div>';
+
+  // Save newly unlocked
+  if (newUnlocks > 0) {
+    state.settings.passportUnlocked = [...new Set([...(state.settings.passportUnlocked||[]), ...Array.from(triedSet)])];
+    saveData();
+    launchConfetti(2000);
+    showToast('?? Passport Stamped!', newUnlocks + ' new cuisine' + (newUnlocks>1?'s':'') + ' unlocked!', 'success');
+  }
+}
+
+/* ------------------------------------------------------------
+   PHASE 6 � MONTHLY WRAP
+   ------------------------------------------------------------ */
+
+let _wrapOffset = 0; // 0 = current month, -1 = last month, etc.
+
+function showWrap (offset) {
+  _wrapOffset = (typeof offset === 'number') ? offset : 0;
+  renderWrapContent();
+  document.getElementById('wrap-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeWrap () {
+  document.getElementById('wrap-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function renderWrapContent () {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() + _wrapOffset, 1);
+  const year  = d.getFullYear();
+  const month = d.getMonth();
+  const monthKey = year + '-' + String(month+1).padStart(2,'0');
+  const monthName = d.toLocaleString('default',{month:'long'});
+
+  const all = state.restaurants;
+  const allVisits = all.flatMap(r =>
+    (r.visits||[]).filter(v => (v.date||'').slice(0,7) === monthKey)
+      .map(v => ({...v, r}))
+  );
+  // also count restaurants marked visited that month
+  const visitedThatMonth = all.filter(r => r.status==='visited' && r.dateVisited?.slice(0,7)===monthKey && !(r.visits||[]).length);
+  const totalVisits = allVisits.length + visitedThatMonth.length;
+  const addedThatMonth = all.filter(r => (r.dateAdded||'').slice(0,7) === monthKey);
+  const ratedThatMonth = allVisits.filter(v => v.stars > 0);
+
+  // Top cuisine
+  const cuisineCounts = {};
+  allVisits.forEach(v => { const c = v.r.cuisine||'Other'; cuisineCounts[c]=(cuisineCounts[c]||0)+1; });
+  visitedThatMonth.forEach(r => { const c = r.cuisine||'Other'; cuisineCounts[c]=(cuisineCounts[c]||0)+1; });
+  const topCuisine = Object.entries(cuisineCounts).sort(([,a],[,b])=>b-a)[0];
+
+  // Best rated visit this month
+  const bestVisit = [...allVisits].sort((a,b) => (b.stars||0)-(a.stars||0))[0];
+
+  let headline = '';
+  if (totalVisits === 0) headline = 'A quiet ' + monthName + '.';
+  else if (totalVisits === 1) headline = 'One great meal in ' + monthName + '!';
+  else if (totalVisits < 4) headline = totalVisits + ' tasty adventures in ' + monthName + '!';
+  else if (totalVisits < 8) headline = monthName + ' was delicious!';
+  else headline = monthName + ' was your best foodie month yet!';
+
+  const el = document.getElementById('wrap-content');
+  el.innerHTML = '<div class="wrap-month-label">' + monthName + ' ' + year + '</div>'
+    + '<div class="wrap-headline">' + headline + '</div>'
+    + '<div class="wrap-stat-grid">'
+    + '<div class="wrap-stat"><div class="ws-val">' + totalVisits + '</div><div class="ws-lbl">Meals Out</div></div>'
+    + '<div class="wrap-stat"><div class="ws-val">' + addedThatMonth.length + '</div><div class="ws-lbl">Places Added</div></div>'
+    + '<div class="wrap-stat"><div class="ws-val">' + (ratedThatMonth.length > 0 ? (ratedThatMonth.reduce((s,v)=>s+(v.stars||0),0)/ratedThatMonth.length).toFixed(1)+' ?' : '�') + '</div><div class="ws-lbl">Avg Rating</div></div>'
+    + '</div>'
+    + (topCuisine ? '<div class="wrap-top"><h4>Top Cuisine</h4><div class="wrap-top-item">' + cuisineEmoji(topCuisine[0]) + ' ' + escHtml(topCuisine[0]) + '<span class="wrap-badge">' + topCuisine[1] + 'x</span></div></div>' : '')
+    + (bestVisit ? '<div class="wrap-top"><h4>Best Visit</h4><div class="wrap-top-item">' + cuisineEmoji(bestVisit.r.cuisine) + ' ' + escHtml(bestVisit.r.name) + ' <span class="wrap-badge">?'.repeat(bestVisit.stars||0) + '</span></div></div>' : '')
+    + (totalVisits === 0 ? '<div style="text-align:center;padding:20px;color:var(--text-dim)">No visits logged this month. Time to get out there! ???</div>' : '');
+
+  // Disable next if we're at current month
+  const nextBtn = document.getElementById('wrap-next-btn');
+  if (nextBtn) nextBtn.disabled = _wrapOffset >= 0;
+}
+function shareWrap () {
+  const d = new Date();
+  const month = new Date(d.getFullYear(), d.getMonth() + _wrapOffset, 1)
+    .toLocaleString('default',{month:'long',year:'numeric'});
+  const all = state.restaurants;
+  const monthKey = new Date(d.getFullYear(), d.getMonth()+_wrapOffset, 1).toISOString().slice(0,7);
+  const total = all.flatMap(r=>(r.visits||[]).filter(v=>(v.date||'').slice(0,7)===monthKey)).length;
+  const text = 'My ' + month + ' foodie wrap: ' + total + ' meals out! Track yours with Feed The Bear ??';
+  if (navigator.share) { navigator.share({ title: 'My Foodie Wrap', text }).catch(()=>{}); }
+  else { navigator.clipboard?.writeText(text); showToast('Copied!','Wrap text copied to clipboard','success'); }
+}
+
+/* ------------------------------------------------------------
+   PHASE 6 � GOOGLE CALENDAR SYNC
+   ------------------------------------------------------------ */
+
+function addToGoogleCalendar (restaurantId) {
+  const r = state.restaurants.find(x => x.id === restaurantId);
+  if (!r) return;
+  const now = new Date();
+  // Default to tomorrow 7pm for 1.5h
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 19, 0, 0);
+  const end   = new Date(start.getTime() + 90*60*1000);
+  const fmt = d => d.toISOString().replace(/[-:]/g,'').slice(0,15) + 'Z';
+  const title  = encodeURIComponent('Dinner at ' + r.name);
+  const loc    = encodeURIComponent(r.address || r.name);
+  const detail = encodeURIComponent((r.cuisine ? r.cuisine + ' � ' : '') + (r.website || '') + '\n\nAdded via Feed The Bear ??');
+  const url = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
+    + '&text=' + title
+    + '&dates=' + fmt(start) + '/' + fmt(end)
+    + '&location=' + loc
+    + '&details=' + detail;
+  window.open(url, '_blank', 'noopener');
+}
+
+/* ------------------------------------------------------------
+   PHASE 6 � IMPORT FROM YELP / GOOGLE MAPS
+   ------------------------------------------------------------ */
+
+let _importParsed = [];
+
+function showImportBookmarks () {
+  _importParsed = [];
+  document.getElementById('import-paste-area').value = '';
+  document.getElementById('import-preview').innerHTML = '';
+  document.getElementById('import-confirm-btn').disabled = true;
+  document.getElementById('import-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeImportBookmarks () {
+  document.getElementById('import-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function parseImportText () {
+  const raw = document.getElementById('import-paste-area').value.trim();
+  if (!raw) return;
+  const lines = raw.split(/\n/).map(l => l.trim()).filter(Boolean);
+  _importParsed = [];
+  lines.forEach(line => {
+    // Try CSV: Name, Address, (optional more fields)
+    // Skip header rows
+    if (/^(name|title|place|location)/i.test(line)) return;
+    // Remove Google Takeout JSON array brackets
+    if (line === '[' || line === ']' || line === '{' || line === '}') return;
+    // Try JSON object {"Title":"...","Note":"...","Location":{"Address":"..."}}
+    try {
+      const obj = JSON.parse(line.replace(/,$/, ''));
+      const name    = obj.Title || obj.name || obj.Name || '';
+      const address = obj.Location?.Address || obj.address || obj.Address || '';
+      if (name) { _importParsed.push({ name, address }); return; }
+    } catch(_) {}
+    // Try CSV-style
+    const parts = line.split(',').map(p => p.trim().replace(/^["']|["']$/g,''));
+    if (parts[0]) {
+      _importParsed.push({ name: parts[0], address: parts.slice(1).join(', ').trim() });
+    }
+  });
+  const preview = document.getElementById('import-preview');
+  if (!_importParsed.length) {
+    preview.innerHTML = '<div style="color:var(--text-dim);font-size:.82rem;padding:8px">Could not parse any entries. Try one name per line.</div>';
+    document.getElementById('import-confirm-btn').disabled = true;
+    return;
+  }
+  preview.innerHTML = '<div style="font-size:.75rem;color:var(--text-dim);margin-bottom:6px">Found ' + _importParsed.length + ' places:</div>'
+    + _importParsed.map(p =>
+      '<div class="import-row"><span class="import-row-name">' + escHtml(p.name) + '</span>'
+      + (p.address ? '<span class="import-row-addr">' + escHtml(p.address.slice(0,50)) + '</span>' : '')
+      + '</div>'
+    ).join('');
+  document.getElementById('import-confirm-btn').disabled = false;
+}
+function confirmImport () {
+  if (!_importParsed.length) return;
+  const now = iso();
+  let added = 0;
+  _importParsed.forEach(p => {
+    const dupes = findDuplicates(p.name);
+    if (dupes.length) return; // skip duplicates
+    const entry = {
+      id: uid(), name: p.name, cuisine: '', priceRange: 0,
+      address: p.address||'', lat: null, lng: null,
+      website: '', photo: '', googleRating: 0, googleReviews: 0,
+      myRating: 0, notes: '', tags: [], collectionId: null,
+      status: 'want-to-try', dateAdded: now, dateVisited: null, visits: [],
+    };
+    state.restaurants.unshift(entry);
+    if (p.address) geocodeAddress(entry.id, p.address);
+    added++;
+  });
+  saveData(); renderAll();
+  closeImportBookmarks();
+  showToast('? Imported!', added + ' restaurant' + (added!==1?'s':'') + ' added to Want to Try.', 'success');
+  if (added > 0) launchConfetti(2000);
+}
+
+/* ------------------------------------------------------------
+   PHASE 6 � AI WEEKLY SUGGESTION
+   ------------------------------------------------------------ */
+
+function checkWeeklySuggestion () {
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  const last = state.settings.lastWeeklySuggest || 0;
+  const now  = Date.now();
+  // Only show on Monday (day 1) and if >6 days since last shown
+  const isMonday = new Date().getDay() === 1;
+  if (!isMonday && (now - last) < WEEK_MS) return;
+
+  const wantToTry = state.restaurants.filter(r => r.status === 'want-to-try');
+  if (!wantToTry.length) return;
+
+  // Find favourite cuisine type from visited restaurants
+  const visited = state.restaurants.filter(r => r.status === 'visited');
+  const cuisineMap = {};
+  visited.forEach(r => { if (r.cuisine) cuisineMap[r.cuisine] = (cuisineMap[r.cuisine]||0)+1; });
+  const favCuisine = Object.entries(cuisineMap).sort(([,a],[,b])=>b-a)[0]?.[0];
+
+  // Pick a restaurant to suggest
+  let suggestion = favCuisine
+    ? wantToTry.find(r => r.cuisine === favCuisine) || wantToTry[Math.floor(Math.random()*wantToTry.length)]
+    : wantToTry[Math.floor(Math.random()*wantToTry.length)];
+
+  state.settings.lastWeeklySuggest = now;
+  saveData();
+
+  // Show banner in main content
+  const main = document.getElementById('main-content');
+  if (!main) return;
+  const banner = document.createElement('div');
+  banner.className = 'weekly-suggest-banner';
+  banner.innerHTML = '<div class="wsb-icon">??</div>'
+    + '<div class="wsb-body">'
+    + '<div class="wsb-title">Foodie Bear\'s Pick of the Week</div>'
+    + '<div class="wsb-text">How about <strong>' + escHtml(suggestion.name) + '</strong>'
+    + (suggestion.cuisine ? ' (' + escHtml(suggestion.cuisine) + ')' : '')
+    + (favCuisine ? ' � you love ' + escHtml(favCuisine) + '!' : '?') + '</div>'
+    + '</div>'
+    + '<button class="btn-sm btn-orange" onclick="openDetailModal(\'' + suggestion.id + '\');this.closest(\'.weekly-suggest-banner\').remove()">View</button>'
+    + '<button class="wsb-dismiss" onclick="this.closest(\'.weekly-suggest-banner\').remove()" aria-label="Dismiss">?</button>';
+  main.prepend(banner);
+}
+
+/* ------------------------------------------------------------
+   PHASE 6 � REFERRAL SHARE COUNT
+   ------------------------------------------------------------ */
+
+function trackReferralOpen () {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has('challenge')) return;
+  const count = (parseInt(localStorage.getItem('ftb_referral_opens')||'0') || 0) + 1;
+  localStorage.setItem('ftb_referral_opens', String(count));
+}
+function getReferralCount () {
+  return parseInt(localStorage.getItem('ftb_referral_opens')||'0') || 0;
+}
+function updateChallengeBtnBadge () {
+  const count = getReferralCount();
+  if (!count) return;
+  const btn = document.getElementById('challenge-btn');
+  if (!btn) return;
+  if (!btn.querySelector('.referral-badge')) {
+    const badge = document.createElement('span');
+    badge.className = 'referral-badge';
+    btn.appendChild(badge);
+  }
+  btn.querySelector('.referral-badge').textContent = count;
 }
