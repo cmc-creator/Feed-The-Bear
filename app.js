@@ -84,6 +84,7 @@ function loadData () {
 function saveData () {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.restaurants));
   updateTagSuggestions();
+  setTimeout(checkAchievements, 0);
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -2292,6 +2293,12 @@ function setupEvents () {
       closeAiPanel();
       closeRoutePlanner();
       closeExport2();
+      closeAchievements();
+      closeSwipeDeck();
+      closeSpinWheel();
+      closeTravelMode();
+      closeMonthlyDigest();
+      closeOpenNow();
       document.getElementById('nearby-overlay').classList.add('hidden');
       document.getElementById('collections-panel').classList.remove('open');
       maybeHideOverlay();
@@ -2492,6 +2499,52 @@ function setupEvents () {
   document.getElementById('export2-passport-btn').addEventListener('click', exportPassport);
   document.getElementById('export2-page-btn').addEventListener('click', exportShareablePage);
   document.getElementById('export2-csv-btn').addEventListener('click', exportCSV);
+
+  // Phase 10 — Achievements
+  document.getElementById('ach-close-btn').addEventListener('click', closeAchievements);
+  document.getElementById('achievements-overlay').addEventListener('click', e => { if (e.target === document.getElementById('achievements-overlay')) closeAchievements(); });
+
+  // Phase 10 — Swipe Deck
+  document.getElementById('swipe-close-btn').addEventListener('click', closeSwipeDeck);
+  document.getElementById('swipe-overlay').addEventListener('click', e => { if (e.target === document.getElementById('swipe-overlay')) closeSwipeDeck(); });
+  document.getElementById('swipe-pick-btn').addEventListener('click', swipePick);
+  document.getElementById('swipe-skip-btn').addEventListener('click', swipeSkip);
+
+  // Phase 10 — Spin Wheel
+  document.getElementById('spin-close-btn').addEventListener('click', closeSpinWheel);
+  document.getElementById('spin-overlay').addEventListener('click', e => { if (e.target === document.getElementById('spin-overlay')) closeSpinWheel(); });
+  document.getElementById('spin-btn').addEventListener('click', spinWheel);
+
+  // Phase 10 — Travel Mode
+  document.getElementById('travel-close-btn').addEventListener('click', closeTravelMode);
+  document.getElementById('travel-overlay').addEventListener('click', e => { if (e.target === document.getElementById('travel-overlay')) closeTravelMode(); });
+  document.getElementById('travel-deactivate-btn').addEventListener('click', clearTravelMode);
+  document.getElementById('travel-set-btn').addEventListener('click', () => {
+    const v = document.getElementById('travel-city-input').value.trim();
+    if (v) activateTravelCity(v);
+  });
+  document.getElementById('travel-city-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { const v = e.target.value.trim(); if (v) activateTravelCity(v); }
+  });
+  document.querySelectorAll('.travel-city-btn').forEach(btn => {
+    btn.addEventListener('click', () => activateTravelCity(btn.dataset.city, btn.dataset.lat, btn.dataset.lng));
+  });
+
+  // Phase 10 — Monthly Digest
+  document.getElementById('digest-close-btn').addEventListener('click', closeMonthlyDigest);
+  document.getElementById('digest-overlay').addEventListener('click', e => { if (e.target === document.getElementById('digest-overlay')) closeMonthlyDigest(); });
+  document.getElementById('digest-share-btn').addEventListener('click', shareDigest);
+  document.getElementById('digest-prev-btn').addEventListener('click', () => {
+    _digestMonth--; if (_digestMonth < 0) { _digestMonth = 11; _digestYear--; } _renderDigest();
+  });
+  document.getElementById('digest-next-btn').addEventListener('click', () => {
+    _digestMonth++; if (_digestMonth > 11) { _digestMonth = 0; _digestYear++; } _renderDigest();
+  });
+
+  // Phase 10 — Open Now
+  document.getElementById('open-now-close-btn').addEventListener('click', closeOpenNow);
+  document.getElementById('open-now-overlay').addEventListener('click', e => { if (e.target === document.getElementById('open-now-overlay')) closeOpenNow(); });
+  document.getElementById('open-now-search-btn').addEventListener('click', runOpenNowSearch);
 }
 
 function updateClearBtn () {
@@ -2533,6 +2586,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initReminders();
   initInstallPrompt();
   checkAndNudge();
+  checkAchievements();
+  // Restore travel mode state on load
+  (function () { const t = getTravelMode(); if (t) { state._travelLat = t.lat; state._travelLng = t.lng; } })();
   updateTagSuggestions();
   updateAppBadge();
   renderAll();
@@ -4073,6 +4129,12 @@ function initMoreMenu () {
       'route':            openRoutePlanner,
       'export2':          openExport2,
       'push':             requestPushPermission,
+      'open-now':         openOpenNow,
+      'travel':           openTravelMode,
+      'swipe':            openSwipeDeck,
+      'spin':             openSpinWheel,
+      'achievements':     openAchievements,
+      'digest':           openMonthlyDigest,
       'wrap':             () => document.getElementById('wrap-btn').click(),
       'export':           () => document.getElementById('export-btn').click(),
       'import-bookmarks': () => document.getElementById('import-bookmarks-btn').click(),
@@ -5382,5 +5444,625 @@ function schedulePushNudge () {
 function checkAndNudge () {
   if (localStorage.getItem('ftb_push_enabled') && Notification.permission === 'granted') {
     schedulePushNudge();
+  }
+}
+
+/* ------------------------------------------------------------
+   PHASE 10 � ?? ACHIEVEMENTS & XP
+   ------------------------------------------------------------ */
+
+const XP_KEY  = 'ftb_xp_v1';
+const ACH_KEY = 'ftb_ach_v1';
+
+const LEVELS = [
+  { name: 'Foodie Rookie',         minXp: 0    },
+  { name: 'Taste Explorer',        minXp: 100  },
+  { name: 'Cuisine Connoisseur',   minXp: 300  },
+  { name: 'Gastronome',            minXp: 700  },
+  { name: 'Food Legend',           minXp: 1500 },
+];
+
+const BADGE_DEFS = [
+  { id: 'first_visit',      icon: '???',  name: 'First Bite',       desc: 'Log your first visited restaurant',  xp: 20,  check: r => r.filter(x=>x.status==='visited').length >= 1 },
+  { id: 'visits_5',         icon: '?',  name: 'Regular',           desc: '5 restaurants visited',              xp: 30,  check: r => r.filter(x=>x.status==='visited').length >= 5 },
+  { id: 'visits_10',        icon: '??',  name: 'Foodie',            desc: '10 restaurants visited',             xp: 50,  check: r => r.filter(x=>x.status==='visited').length >= 10 },
+  { id: 'visits_25',        icon: '??',  name: 'Veteran',           desc: '25 restaurants visited',             xp: 100, check: r => r.filter(x=>x.status==='visited').length >= 25 },
+  { id: 'visits_50',        icon: '??',  name: 'Legend',            desc: '50 restaurants visited',             xp: 200, check: r => r.filter(x=>x.status==='visited').length >= 50 },
+  { id: 'cuisines_5',       icon: '??',  name: 'Globe Trotter',     desc: '5 different cuisines explored',      xp: 40,  check: r => new Set(r.filter(x=>x.status==='visited').map(x=>(x.cuisine||'').toLowerCase()).filter(Boolean)).size >= 5 },
+  { id: 'cuisines_10',      icon: '???', name: 'Culinary Tourist',  desc: '10 different cuisines explored',     xp: 80,  check: r => new Set(r.filter(x=>x.status==='visited').map(x=>(x.cuisine||'').toLowerCase()).filter(Boolean)).size >= 10 },
+  { id: 'wishlist_10',      icon: '??',  name: 'Dream List',        desc: '10 places on your wishlist',         xp: 25,  check: r => r.filter(x=>x.status==='wishlist').length >= 10 },
+  { id: 'first_5star',      icon: '??',  name: 'Perfection',        desc: 'Give a restaurant 5 stars',          xp: 30,  check: r => r.some(x=>x.myRating >= 5) },
+  { id: 'photo_added',      icon: '??',  name: 'Shutterbug',        desc: 'Add a photo to a restaurant',        xp: 15,  check: r => r.some(x=>x.photo) },
+  { id: 'has_notes',        icon: '??',  name: 'Critic',            desc: 'Write notes on 5 restaurants',       xp: 20,  check: r => r.filter(x=>x.notes&&x.notes.length>10).length >= 5 },
+  { id: 'cheap_gem',        icon: '??',  name: 'Bargain Hunter',    desc: 'Rate a � restaurant 4+ stars',       xp: 25,  check: r => r.some(x=>x.priceRange===1&&x.myRating>=4) },
+];
+
+function getXpData () {
+  try { return JSON.parse(localStorage.getItem(XP_KEY)) || { xp: 0, unlocked: [] }; } catch(_) { return { xp: 0, unlocked: [] }; }
+}
+function saveXpData (data) { localStorage.setItem(XP_KEY, JSON.stringify(data)); }
+
+function getLevelForXp (xp) {
+  let level = LEVELS[0];
+  for (const l of LEVELS) { if (xp >= l.minXp) level = l; }
+  return level;
+}
+
+function getNextLevel (xp) {
+  for (let i = LEVELS.length - 1; i >= 0; i--) {
+    if (xp >= LEVELS[i].minXp) {
+      return LEVELS[i + 1] || null;
+    }
+  }
+  return LEVELS[1];
+}
+
+function awardXp (amount, reason) {
+  const data = getXpData();
+  const before = getLevelForXp(data.xp);
+  data.xp += amount;
+  const after = getLevelForXp(data.xp);
+  saveXpData(data);
+
+  // XP toast
+  const toast = document.createElement('div');
+  toast.className = 'ach-xp-toast';
+  toast.textContent = '+' + amount + ' XP � ' + reason;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2400);
+
+  // Level up
+  if (before.name !== after.name) {
+    setTimeout(() => showToast('?? Level Up!', 'You are now: ' + after.name, 'success'), 400);
+  }
+}
+
+function checkAchievements () {
+  const data = getXpData();
+  const restaurants = state.restaurants;
+  let newUnlocks = [];
+
+  BADGE_DEFS.forEach(def => {
+    if (!data.unlocked.includes(def.id) && def.check(restaurants)) {
+      data.unlocked.push(def.id);
+      newUnlocks.push(def);
+    }
+  });
+
+  if (newUnlocks.length) {
+    saveXpData(data);
+    newUnlocks.forEach((def, i) => {
+      setTimeout(() => {
+        showToast('?? Badge Unlocked!', def.icon + ' ' + def.name, 'success');
+        awardXp(def.xp, def.name);
+      }, i * 600);
+    });
+  }
+}
+
+function openAchievements () {
+  checkAchievements();
+  const data = getXpData();
+  const level = getLevelForXp(data.xp);
+  const next  = getNextLevel(data.xp);
+
+  document.getElementById('ach-level-label').textContent = level.icon || '' + level.name;
+  document.getElementById('ach-xp-label').textContent    = data.xp + ' XP' + (next ? ' / ' + next.minXp : ' � MAX');
+
+  const pct = next
+    ? Math.min(((data.xp - level.minXp) / (next.minXp - level.minXp)) * 100, 100)
+    : 100;
+  document.getElementById('ach-xp-fill').style.width = pct + '%';
+
+  const grid = document.getElementById('ach-badges-grid');
+  grid.innerHTML = BADGE_DEFS.map(def => {
+    const unlocked = data.unlocked.includes(def.id);
+    return `<div class="ach-badge ${unlocked ? 'unlocked' : ''}">
+      <div class="ach-badge-icon">${def.icon}</div>
+      <div class="ach-badge-name">${def.name}</div>
+      <div class="ach-badge-desc">${def.desc}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('achievements-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+
+function closeAchievements () {
+  document.getElementById('achievements-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+
+/* ------------------------------------------------------------
+   PHASE 10 � ?? SWIPE TO DECIDE
+   ------------------------------------------------------------ */
+
+let _swipeDeck = [];
+let _swipeIdx  = 0;
+let _swipeDragging = false;
+let _swipeStartX = 0;
+let _swipeCurrentCard = null;
+
+function openSwipeDeck () {
+  _swipeDeck = [...state.restaurants]
+    .filter(r => r.status === 'wishlist')
+    .sort(() => Math.random() - .5);
+  _swipeIdx = 0;
+  _renderSwipeDeck();
+  document.getElementById('swipe-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+
+function closeSwipeDeck () {
+  document.getElementById('swipe-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function _renderSwipeDeck () {
+  const deck = document.getElementById('swipe-deck');
+  const empty = document.getElementById('swipe-empty');
+  deck.querySelectorAll('.swipe-card-item').forEach(el => el.remove());
+
+  const remaining = _swipeDeck.slice(_swipeIdx);
+  if (!remaining.length) {
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  // Render top 3 cards (z-stacked)
+  remaining.slice(0, 3).reverse().forEach((r, stackIdx) => {
+    const isTop = stackIdx === remaining.slice(0,3).length - 1;
+    const card = document.createElement('div');
+    card.className = 'swipe-card-item';
+    card.style.zIndex = stackIdx + 1;
+    card.style.transform = `scale(${1 - (remaining.slice(0,3).length - 1 - stackIdx) * 0.04}) translateY(${(remaining.slice(0,3).length - 1 - stackIdx) * -8}px)`;
+    card.innerHTML = `
+      <div class="swipe-label yes">PICK ?</div>
+      <div class="swipe-label no">SKIP ?</div>
+      <div class="swipe-card-emoji">${cuisineEmoji(r.cuisine)}</div>
+      <div class="swipe-card-name">${escHtml(r.name)}</div>
+      <div class="swipe-card-meta">${escHtml(r.cuisine||'')}${r.priceRange ? ' � ' + '�'.repeat(r.priceRange) : ''}</div>
+      ${r.myRating ? `<div class="swipe-card-rating">${'?'.repeat(r.myRating)}</div>` : ''}
+      ${r.address ? `<div class="swipe-card-meta" style="margin-top:4px">?? ${escHtml(r.address)}</div>` : ''}
+    `;
+    if (isTop) {
+      _attachSwipeListeners(card, r);
+      _swipeCurrentCard = card;
+    }
+    deck.appendChild(card);
+  });
+}
+
+function _attachSwipeListeners (card, restaurant) {
+  let startX = 0, currentX = 0, dragging = false;
+
+  const onStart = e => {
+    dragging = true;
+    startX = (e.touches ? e.touches[0].clientX : e.clientX);
+    card.style.transition = 'none';
+  };
+  const onMove = e => {
+    if (!dragging) return;
+    currentX = (e.touches ? e.touches[0].clientX : e.clientX) - startX;
+    const rot = currentX * 0.12;
+    card.style.transform = `translateX(${currentX}px) rotate(${rot}deg)`;
+    const yesLabel = card.querySelector('.swipe-label.yes');
+    const noLabel  = card.querySelector('.swipe-label.no');
+    yesLabel.style.opacity = Math.min(Math.max(currentX / 80, 0), 1);
+    noLabel.style.opacity  = Math.min(Math.max(-currentX / 80, 0), 1);
+  };
+  const onEnd = () => {
+    if (!dragging) return;
+    dragging = false;
+    if (Math.abs(currentX) > 80) {
+      _completeSwipe(card, restaurant, currentX > 0);
+    } else {
+      card.style.transition = 'transform .3s ease';
+      card.style.transform  = '';
+    }
+  };
+
+  card.addEventListener('mousedown', onStart);
+  card.addEventListener('touchstart', onStart, { passive: true });
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('touchmove', onMove, { passive: true });
+  window.addEventListener('mouseup', onEnd);
+  window.addEventListener('touchend', onEnd);
+}
+
+function _completeSwipe (card, restaurant, picked) {
+  const dir = picked ? 1 : -1;
+  card.style.transition = 'transform .35s ease, opacity .35s ease';
+  card.style.transform  = `translateX(${dir * 500}px) rotate(${dir * 20}deg)`;
+  card.style.opacity    = '0';
+  setTimeout(() => {
+    card.remove();
+    _swipeIdx++;
+    if (picked) {
+      // Add to tonight's pick toast
+      showToast('?? ' + restaurant.name + ' picked!', 'Opening in Maps�', 'success');
+      setTimeout(() => openDirections(restaurant), 800);
+      awardXp(5, 'Made a dinner decision');
+    }
+    _renderSwipeDeck();
+  }, 350);
+}
+
+function swipePick ()  { if (_swipeCurrentCard) { const r = _swipeDeck[_swipeIdx]; _completeSwipe(_swipeCurrentCard, r, true);  } }
+function swipeSkip ()  { if (_swipeCurrentCard) { const r = _swipeDeck[_swipeIdx]; _completeSwipe(_swipeCurrentCard, r, false); } }
+
+/* ------------------------------------------------------------
+   PHASE 10 � ?? SPIN THE WHEEL
+   ------------------------------------------------------------ */
+
+let _spinItems    = [];
+let _spinAngle    = 0;
+let _spinAnimId   = null;
+let _spinning     = false;
+
+const WHEEL_COLORS = ['#FF6B35','#FF8C42','#FFA62B','#FFD166','#06D6A0','#118AB2','#7C83FD','#EF476F','#F78C6B','#C77DFF'];
+
+function openSpinWheel () {
+  _spinItems = state.restaurants.filter(r => r.status === 'wishlist' || r.status === 'visited');
+  if (_spinItems.length < 2) {
+    showToast('Need more restaurants', 'Add at least 2 to your list first.', 'error');
+    return;
+  }
+  if (_spinItems.length > 12) _spinItems = _spinItems.sort(() => Math.random() - .5).slice(0, 12);
+  _drawWheel();
+  document.getElementById('spin-result').classList.add('hidden');
+  document.getElementById('spin-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+
+function closeSpinWheel () {
+  if (_spinAnimId) { cancelAnimationFrame(_spinAnimId); _spinAnimId = null; }
+  document.getElementById('spin-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function _drawWheel (highlightIdx = -1) {
+  const canvas = document.getElementById('spin-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W / 2, cy = H / 2, r = W / 2 - 6;
+  const n = _spinItems.length;
+  const arc = (Math.PI * 2) / n;
+
+  ctx.clearRect(0, 0, W, H);
+
+  _spinItems.forEach((item, i) => {
+    const startAngle = _spinAngle + arc * i - Math.PI / 2;
+    const endAngle   = startAngle + arc;
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, startAngle, endAngle);
+    ctx.closePath();
+    ctx.fillStyle   = i === highlightIdx ? '#fff' : WHEEL_COLORS[i % WHEEL_COLORS.length];
+    ctx.strokeStyle = 'rgba(0,0,0,.3)';
+    ctx.lineWidth   = 2;
+    ctx.fill();
+    ctx.stroke();
+
+    // Label
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(startAngle + arc / 2);
+    ctx.textAlign    = 'right';
+    ctx.fillStyle    = '#000';
+    ctx.font         = `bold ${Math.max(10, Math.min(14, 160/n))}px Poppins, sans-serif`;
+    ctx.shadowColor  = 'rgba(255,255,255,.5)';
+    ctx.shadowBlur   = 3;
+    const label = item.name.length > 12 ? item.name.slice(0, 11) + '�' : item.name;
+    ctx.fillText(label, r - 10, 5);
+    ctx.restore();
+  });
+
+  // Centre circle
+  ctx.beginPath();
+  ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+  ctx.fillStyle = '#0D0D1A';
+  ctx.fill();
+  ctx.strokeStyle = 'var(--border)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = '#FF6B35';
+  ctx.font = 'bold 14px Poppins';
+  ctx.textAlign = 'center';
+  ctx.fillText('??', cx, cy + 5);
+}
+
+function spinWheel () {
+  if (_spinning) return;
+  _spinning = true;
+  document.getElementById('spin-result').classList.add('hidden');
+
+  const targetRotations = 6 + Math.random() * 6;
+  const targetAngle     = _spinAngle + targetRotations * Math.PI * 2 + Math.random() * Math.PI * 2;
+  const duration        = 3500 + Math.random() * 1500;
+  const startAngle      = _spinAngle;
+  const startTime       = performance.now();
+
+  function easeOut (t) { return 1 - Math.pow(1 - t, 3); }
+
+  function step (now) {
+    const elapsed = now - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    _spinAngle = startAngle + (targetAngle - startAngle) * easeOut(progress);
+    _drawWheel();
+    if (progress < 1) {
+      _spinAnimId = requestAnimationFrame(step);
+    } else {
+      _spinning = false;
+      // Determine winner: pointer at top (angle = 0 in canvas space = -p/2)
+      const normalised = ((-_spinAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      const arc = (Math.PI * 2) / _spinItems.length;
+      const idx = Math.floor(normalised / arc) % _spinItems.length;
+      const winner = _spinItems[idx];
+      _drawWheel(idx);
+      const resultEl = document.getElementById('spin-result');
+      resultEl.innerHTML = `${cuisineEmoji(winner.cuisine)} <strong>${escHtml(winner.name)}</strong> wins the spin!`;
+      resultEl.classList.remove('hidden');
+      showToast('?? The wheel chose!', winner.name, 'success');
+      awardXp(5, 'Spun the wheel');
+    }
+  }
+  requestAnimationFrame(step);
+}
+
+/* ------------------------------------------------------------
+   PHASE 10 � ?? TRAVEL MODE
+   ------------------------------------------------------------ */
+
+const TRAVEL_KEY = 'ftb_travel_v1';
+
+function getTravelMode () {
+  try { return JSON.parse(localStorage.getItem(TRAVEL_KEY)); } catch(_) { return null; }
+}
+function _saveTravelMode (city, lat, lng) {
+  localStorage.setItem(TRAVEL_KEY, JSON.stringify({ city, lat, lng }));
+  state._travelLat = lat;
+  state._travelLng = lng;
+}
+function clearTravelMode () {
+  localStorage.removeItem(TRAVEL_KEY);
+  delete state._travelLat;
+  delete state._travelLng;
+  _refreshTravelUI();
+  showToast('?? Travel Mode Off', 'Back to real location', 'info');
+}
+
+function _refreshTravelUI () {
+  const t = getTravelMode();
+  const banner   = document.getElementById('travel-active-banner');
+  const cityLabel = document.getElementById('travel-active-city');
+  if (t) {
+    banner?.classList.remove('hidden');
+    if (cityLabel) cityLabel.textContent = t.city;
+  } else {
+    banner?.classList.add('hidden');
+  }
+  document.querySelectorAll('.travel-city-btn').forEach(btn => {
+    btn.classList.toggle('active', t && btn.dataset.city === t.city);
+  });
+}
+
+function openTravelMode () {
+  _refreshTravelUI();
+  document.getElementById('travel-city-input').value = '';
+  document.getElementById('travel-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeTravelMode () {
+  document.getElementById('travel-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+
+async function activateTravelCity (city, lat, lng) {
+  if (!city) return;
+
+  if (lat !== undefined && lng !== undefined) {
+    _saveTravelMode(city, parseFloat(lat), parseFloat(lng));
+    _refreshTravelUI();
+    showToast('?? Travel Mode!', 'Location set to ' + city, 'success');
+    awardXp(10, 'Activated Travel Mode');
+    checkAchievements();
+  } else {
+    // Geocode via Nominatim
+    try {
+      const resp = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(city), { headers: { 'Accept-Language': 'en' } });
+      const results = await resp.json();
+      if (!results.length) { showToast('Not found', 'Try a different city name.', 'error'); return; }
+      const displayCity = results[0].display_name.split(',')[0];
+      _saveTravelMode(displayCity, parseFloat(results[0].lat), parseFloat(results[0].lon));
+      _refreshTravelUI();
+      showToast('?? Travel Mode!', 'Location set to ' + displayCity, 'success');
+      awardXp(10, 'Activated Travel Mode');
+      checkAchievements();
+    } catch(e) {
+      showToast('Error', 'Could not find that city.', 'error');
+    }
+  }
+}
+
+/* ------------------------------------------------------------
+   PHASE 10 � ?? MONTHLY DIGEST
+   ------------------------------------------------------------ */
+
+let _digestMonth = 0;
+let _digestYear  = 0;
+
+const _MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function openMonthlyDigest () {
+  const now = new Date();
+  _digestMonth = now.getMonth();
+  _digestYear  = now.getFullYear();
+  _renderDigest();
+  document.getElementById('digest-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeMonthlyDigest () {
+  document.getElementById('digest-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function _renderDigest () {
+  const monthStr = _digestYear + '-' + String(_digestMonth + 1).padStart(2, '0');
+  const visited  = state.restaurants.filter(r => r.status === 'visited' && ((r.dateVisited || r.dateAdded) || '').startsWith(monthStr));
+  const added    = state.restaurants.filter(r => (r.dateAdded || '').startsWith(monthStr));
+  const cuisines = new Set(visited.map(r => (r.cuisine || '').toLowerCase()).filter(Boolean));
+  const rated    = visited.filter(r => r.myRating > 0);
+  const avgRating = rated.length ? (rated.reduce((s,r) => s + r.myRating, 0) / rated.length).toFixed(1) : '�';
+  const topRated  = rated.sort((a,b) => b.myRating - a.myRating)[0];
+  const estSpend  = visited.filter(r => r.priceRange).reduce((s,r) => s + [0,12,25,45,75][r.priceRange || 0], 0);
+
+  document.getElementById('digest-body').innerHTML = `
+    <div class="digest-month-label">${_MONTH_NAMES[_digestMonth]} ${_digestYear}</div>
+    <div class="digest-big">${visited.length}<br><span style="font-size:.95rem;font-weight:500;color:rgba(255,255,255,.6)">visits this month</span></div>
+    <div class="digest-grid">
+      <div class="digest-stat"><div class="digest-stat-val">${added.length}</div><div class="digest-stat-label">Added</div></div>
+      <div class="digest-stat"><div class="digest-stat-val">${cuisines.size}</div><div class="digest-stat-label">Cuisines</div></div>
+      <div class="digest-stat"><div class="digest-stat-val">${avgRating}</div><div class="digest-stat-label">Avg ?</div></div>
+    </div>
+    ${topRated ? `<div><div class="digest-top-label">Top spot this month</div><div class="digest-top-name">${cuisineEmoji(topRated.cuisine)} ${escHtml(topRated.name)} ${'?'.repeat(topRated.myRating)}</div></div>` : ''}
+    ${estSpend > 0 ? `<div class="digest-sub">Estimated spend: ~�${estSpend}</div>` : ''}
+    ${visited.length === 0 ? '<div style="color:rgba(255,255,255,.35);font-size:.82rem;margin-top:8px">No visits recorded for this month.</div>' : ''}
+  `;
+}
+
+function shareDigest () {
+  const visitedCount = state.restaurants.filter(r => {
+    const d = r.dateVisited || r.dateAdded || '';
+    return r.status === 'visited' && d.startsWith(_digestYear + '-' + String(_digestMonth + 1).padStart(2,'0'));
+  }).length;
+  const text = `?? Feed The Bear � ${_MONTH_NAMES[_digestMonth]} ${_digestYear} Digest\n` +
+               `Visited: ${visitedCount} restaurant${visitedCount !== 1 ? 's' : ''}\n` +
+               `Track yours at https://cmc-creator.github.io/Feed-The-Bear/`;
+  if (navigator.share) {
+    navigator.share({ title: 'My Food Digest', text }).catch(() => {});
+  } else {
+    navigator.clipboard?.writeText(text);
+    showToast('Copied!', 'Digest copied to clipboard', 'success');
+  }
+}
+
+/* ------------------------------------------------------------
+   PHASE 10 � ?? OPEN NOW
+   ------------------------------------------------------------ */
+
+function openOpenNow () {
+  document.getElementById('open-now-time').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('open-now-results').innerHTML = '';
+  document.getElementById('open-now-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeOpenNow () {
+  document.getElementById('open-now-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+
+async function runOpenNowSearch () {
+  const travelData = getTravelMode();
+  const lat = travelData ? travelData.lat : state.userLat;
+  const lng = travelData ? travelData.lng : state.userLng;
+  if (!lat || !lng) {
+    showToast('Location needed', 'Enable location or activate Travel Mode first.', 'error');
+    return;
+  }
+
+  const radius     = parseInt(document.getElementById('open-now-radius').value) || 1000;
+  const resultsEl  = document.getElementById('open-now-results');
+  resultsEl.innerHTML = '<div class="open-now-loading">?? Searching nearby�</div>';
+
+  const now        = new Date();
+  const DAY_MAP    = { 0:'Su', 1:'Mo', 2:'Tu', 3:'We', 4:'Th', 5:'Fr', 6:'Sa' };
+  const todayKey   = DAY_MAP[now.getDay()];
+  const curMins    = now.getHours() * 60 + now.getMinutes();
+  const DAY_ORDER  = ['Mo','Tu','We','Th','Fr','Sa','Su'];
+
+  const query = `[out:json][timeout:20];(node["amenity"~"restaurant|cafe|fast_food|bar"]["opening_hours"](around:${radius},${lat},${lng}););out body 40;`;
+
+  try {
+    const resp = await fetch('https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query), {
+      signal: AbortSignal.timeout(18000)
+    });
+    const json = await resp.json();
+    const elements = (json.elements || []).filter(el => el.tags?.name);
+
+    if (!elements.length) {
+      resultsEl.innerHTML = '<div class="open-now-loading">No places found nearby. Try increasing the radius.</div>';
+      return;
+    }
+
+    function parseOpenNow (ohStr) {
+      if (!ohStr) return null;
+      if (ohStr.trim() === '24/7') return true;
+      try {
+        const segments = ohStr.split(';');
+        for (const seg of segments) {
+          const match = seg.trim().match(/^([A-Za-z,\-]+)\s+(\d{1,2}:\d{2})-(\d{1,2}:\d{2})$/);
+          if (!match) continue;
+          const [, dayPart, startT, endT] = match;
+          const [sh, sm] = startT.split(':').map(Number);
+          const [eh, em] = endT.split(':').map(Number);
+          const startMin = sh * 60 + sm, endMin = eh * 60 + em;
+
+          // Parse day part: "Mo-Fr", "Mo,We,Fr", "Mo"
+          const dayRangeMatch = dayPart.match(/^([A-Z][a-z])(?:-([A-Z][a-z]))?$/);
+          if (dayRangeMatch) {
+            const dStart = DAY_ORDER.indexOf(dayRangeMatch[1]);
+            const dEnd   = dayRangeMatch[2] ? DAY_ORDER.indexOf(dayRangeMatch[2]) : dStart;
+            const today  = DAY_ORDER.indexOf(todayKey);
+            if (today < 0) continue;
+            const inRange = dEnd >= dStart
+              ? (today >= dStart && today <= dEnd)
+              : (today >= dStart || today <= dEnd);
+            if (inRange && curMins >= startMin && curMins <= endMin) return true;
+          }
+        }
+        return false;
+      } catch(_) { return null; }
+    }
+
+    const TYPE_EMOJI = { restaurant:'???', cafe:'?', fast_food:'??', bar:'??', pub:'??' };
+    const savedNames = new Set(state.restaurants.map(r => normalizeName(r.name)));
+
+    const items = elements.map(el => {
+      const tags       = el.tags || {};
+      const isOpen     = parseOpenNow(tags.opening_hours);
+      const alreadyIn  = savedNames.has(normalizeName(tags.name));
+      return { tags, isOpen, alreadyIn };
+    }).filter(item => item.isOpen !== false)
+      .sort((a,b) => (b.isOpen === true ? 1 : 0) - (a.isOpen === true ? 1 : 0))
+      .slice(0, 20);
+
+    if (!items.length) {
+      resultsEl.innerHTML = '<div class="open-now-loading">No open places found right now. Try a larger radius.</div>';
+      return;
+    }
+
+    resultsEl.innerHTML = items.map(({ tags, isOpen, alreadyIn }) => {
+      const type = tags.amenity || 'restaurant';
+      const emoji = TYPE_EMOJI[type] || '???';
+      const badge = isOpen === true ? '?? Open' : '?? Maybe';
+      const safeName = tags.name.replace(/'/g, '\\\'').replace(/"/g, '&quot;');
+      const safeCuisine = (tags.cuisine || '').replace(/'/g, '\\\'');
+      return `<div class="open-now-item">
+        <div class="open-now-item-emoji">${emoji}</div>
+        <div style="flex:1;min-width:0">
+          <div class="open-now-name">${escHtml(tags.name)}</div>
+          <div class="open-now-meta">${tags.cuisine ? escHtml(tags.cuisine.replace(/_/g,' ')) + ' � ' : ''}${tags.opening_hours ? escHtml(tags.opening_hours.slice(0,50)) : 'Hours vary'}</div>
+        </div>
+        <div class="open-now-badge">${badge}</div>
+        ${!alreadyIn ? `<button class="btn-sm btn-orange" onclick="openAddModalPreFilled('${safeName}','${safeCuisine}')">+</button>` : ''}
+      </div>`;
+    }).join('');
+
+  } catch(e) {
+    resultsEl.innerHTML = '<div class="open-now-loading">Search failed. Check your connection and try again.</div>';
   }
 }

@@ -2903,3 +2903,283 @@ body.light-mode #profile-btn {
   .stats2-tile-val { font-size: 1.6rem; }
   #scatter-canvas { height: 160px; }
 }
+/* ------------------------------------------------------------
+   PHASE 10 CSS
+   ------------------------------------------------------------ */
+
+/* -- Achievements & XP ------------------------------------- */
+.ach-card { max-width: 520px; max-height: 88vh; overflow-y: auto; }
+.ach-xp-bar-wrap {
+  background: var(--surface2);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+}
+.ach-level-label { font-weight: 800; font-size: 1.1rem; color: var(--primary); margin-bottom: 8px; }
+.ach-xp-track {
+  background: var(--surface3);
+  border-radius: 6px;
+  height: 10px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.ach-xp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--gold));
+  border-radius: 6px;
+  transition: width .8s cubic-bezier(.4,0,.2,1);
+}
+.ach-xp-label { font-size: .78rem; color: var(--text-dim); text-align: right; }
+.ach-badges-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.ach-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 12px 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-align: center;
+  transition: transform .15s;
+}
+.ach-badge.unlocked { border-color: var(--gold); background: rgba(255,209,102,.06); }
+.ach-badge.unlocked .ach-badge-icon { opacity: 1; }
+.ach-badge-icon { font-size: 2rem; opacity: .25; transition: opacity .3s; }
+.ach-badge-name { font-size: .7rem; font-weight: 600; color: var(--text); }
+.ach-badge-desc { font-size: .63rem; color: var(--text-dim); line-height: 1.3; }
+.ach-badge.unlocked .ach-badge-name { color: var(--gold); }
+.ach-xp-toast {
+  position: fixed;
+  top: 80px;
+  right: 16px;
+  background: linear-gradient(135deg, #ff6b35, #ffd166);
+  color: #000;
+  font-weight: 700;
+  font-size: .85rem;
+  padding: 8px 16px;
+  border-radius: 20px;
+  z-index: 9999;
+  box-shadow: 0 4px 20px rgba(255,107,53,.5);
+  animation: slideInRight .3s ease, fadeOutUp .3s ease 2s forwards;
+}
+@keyframes slideInRight { from{transform:translateX(80px);opacity:0} to{transform:translateX(0);opacity:1} }
+@keyframes fadeOutUp { to{transform:translateY(-30px);opacity:0} }
+
+/* -- Swipe Deck -------------------------------------------- */
+.swipe-card { max-width: 380px; }
+.swipe-hint { font-size: .78rem; color: var(--text-dim); margin: 0 0 16px; text-align: center; }
+.swipe-deck {
+  position: relative;
+  height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.swipe-card-item {
+  position: absolute;
+  width: 100%;
+  max-width: 320px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 24px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  transition: box-shadow .15s;
+  box-shadow: 0 4px 24px rgba(0,0,0,.3);
+  will-change: transform;
+}
+.swipe-card-item:active { cursor: grabbing; }
+.swipe-card-item .swipe-card-emoji { font-size: 3rem; text-align: center; margin-bottom: 10px; }
+.swipe-card-item .swipe-card-name { font-size: 1.1rem; font-weight: 700; text-align: center; margin-bottom: 4px; }
+.swipe-card-item .swipe-card-meta { font-size: .78rem; color: var(--text-dim); text-align: center; }
+.swipe-card-item .swipe-card-rating { font-size: .85rem; color: var(--gold); text-align: center; margin-top: 6px; }
+.swipe-label {
+  position: absolute;
+  top: 16px;
+  font-size: 1.2rem;
+  font-weight: 800;
+  border-radius: 8px;
+  padding: 4px 10px;
+  opacity: 0;
+  transition: opacity .1s;
+  pointer-events: none;
+}
+.swipe-label.yes { right: 16px; background: rgba(46,204,113,.2); color: #2ecc71; border: 2px solid #2ecc71; }
+.swipe-label.no  { left: 16px;  background: rgba(231,76,60,.2);  color: #e74c3c;  border: 2px solid #e74c3c; }
+.swipe-empty { text-align: center; color: var(--text-dim); padding: 40px 0; }
+.swipe-btns { display: flex; justify-content: center; gap: 24px; margin-top: 14px; }
+.swipe-btn {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  border: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .15s, box-shadow .15s;
+  box-shadow: 0 4px 16px rgba(0,0,0,.3);
+}
+.swipe-btn:hover { transform: scale(1.1); }
+.swipe-btn-skip { background: var(--surface2); border: 2px solid #e74c3c; }
+.swipe-btn-pick { background: linear-gradient(135deg, #2ecc71, #27ae60); color: #fff; }
+
+/* -- Spin the Wheel ---------------------------------------- */
+.spin-card { max-width: 360px; }
+.spin-wrap { position: relative; display: flex; justify-content: center; margin: 10px 0 0; }
+.spin-pointer {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.4rem;
+  color: var(--primary);
+  z-index: 2;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.5));
+}
+#spin-canvas { border-radius: 50%; box-shadow: 0 4px 32px rgba(0,0,0,.4); display: block; }
+.spin-result {
+  background: var(--surface2);
+  border: 2px solid var(--gold);
+  border-radius: 12px;
+  padding: 12px 16px;
+  text-align: center;
+  margin-top: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+}
+.spin-result.hidden { display: none; }
+
+/* -- Travel Mode ------------------------------------------- */
+.travel-card { max-width: 440px; }
+.travel-body { display: flex; flex-direction: column; gap: 12px; }
+.travel-hint { font-size: .8rem; color: var(--text-dim); margin: 0; }
+.travel-active-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,107,53,.12);
+  border: 1px solid var(--primary);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: .82rem;
+  color: var(--primary);
+  font-weight: 600;
+}
+.travel-active-banner.hidden { display: none; }
+.travel-section-label { font-size: .72rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: .06em; }
+.travel-city-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 6px; }
+.travel-city-btn {
+  padding: 10px 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: .82rem;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition), border-color var(--transition);
+}
+.travel-city-btn:hover { background: var(--surface3); border-color: var(--primary); }
+.travel-city-btn.active { border-color: var(--primary); background: rgba(255,107,53,.1); color: var(--primary); font-weight: 600; }
+
+/* -- Monthly Digest ---------------------------------------- */
+.digest-card { max-width: 420px; }
+.digest-body {
+  background: linear-gradient(135deg, #1a0533, #0d1a2e);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 280px;
+}
+.digest-month-label { font-size: .78rem; color: rgba(255,255,255,.5); text-transform: uppercase; letter-spacing: .08em; }
+.digest-big { font-size: 2.2rem; font-weight: 800; color: #fff; line-height: 1.1; }
+.digest-sub { font-size: .82rem; color: rgba(255,255,255,.6); }
+.digest-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.digest-stat {
+  background: rgba(255,255,255,.06);
+  border-radius: 10px;
+  padding: 10px 8px;
+  text-align: center;
+}
+.digest-stat-val { font-size: 1.3rem; font-weight: 800; color: var(--primary); }
+.digest-stat-label { font-size: .65rem; color: rgba(255,255,255,.45); text-transform: uppercase; margin-top: 2px; }
+.digest-top-name { font-weight: 700; font-size: .92rem; color: #fff; }
+.digest-top-label { font-size: .72rem; color: rgba(255,255,255,.5); }
+
+/* -- Open Now ---------------------------------------------- */
+.open-now-card { max-width: 500px; max-height: 88vh; overflow-y: auto; }
+.open-now-body { display: flex; flex-direction: column; gap: 12px; }
+.open-now-hint { font-size: .8rem; color: var(--text-dim); margin: 0; }
+.open-now-time-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.open-now-results { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; }
+.open-now-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.open-now-item-emoji { font-size: 1.3rem; flex-shrink: 0; }
+.open-now-name { font-weight: 600; font-size: .88rem; }
+.open-now-meta { font-size: .72rem; color: var(--text-dim); }
+.open-now-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: rgba(46,204,113,.15);
+  color: #2ecc71;
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: .68rem;
+  font-weight: 700;
+}
+.open-now-loading { text-align: center; color: var(--text-dim); font-size: .85rem; padding: 24px; }
+
+/* -- XP level badge on header ------------------------------ */
+.xp-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--gold);
+  color: #000;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  font-size: .55rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* Travel mode indicator */
+.travel-indicator {
+  background: rgba(255,107,53,.15);
+  border: 1px solid var(--primary);
+  border-radius: 20px;
+  padding: 2px 10px;
+  font-size: .7rem;
+  color: var(--primary);
+  font-weight: 600;
+  display: none;
+  align-items: center;
+  gap: 4px;
+}
+.travel-indicator.visible { display: flex; }
+
+@media (max-width: 500px) {
+  .ach-badges-grid { grid-template-columns: repeat(2, 1fr); }
+  .digest-grid { grid-template-columns: repeat(2, 1fr); }
+  .travel-city-grid { grid-template-columns: 1fr; }
+}

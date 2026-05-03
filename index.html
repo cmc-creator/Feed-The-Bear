@@ -87,6 +87,12 @@
           <button class="more-menu-item" data-more="craving">🔥 Craving Engine</button>
           <button class="more-menu-item" data-more="discover">🗺️ Smart Discovery</button>
           <button class="more-menu-item" data-more="challenge">🏆 Challenges</button>
+          <button class="more-menu-item" data-more="open-now">🟢 Open Now</button>
+          <button class="more-menu-item" data-more="travel">✈️ Travel Mode</button>
+          <div class="more-menu-section">Play</div>
+          <button class="more-menu-item" data-more="swipe">🃏 Swipe to Decide</button>
+          <button class="more-menu-item" data-more="spin">🎯 Spin the Wheel</button>
+          <button class="more-menu-item" data-more="achievements">🏅 Achievements</button>
           <div class="more-menu-section">Track</div>
           <button class="more-menu-item" data-more="gallery">🖼️ Photo Gallery</button>
           <button class="more-menu-item" data-more="compare">⚖️ Compare</button>
@@ -97,6 +103,7 @@
           <button class="more-menu-item" data-more="profile">🌐 My Profile</button>
           <button class="more-menu-item" data-more="friends">👥 Foodie Friends</button>
           <button class="more-menu-item" data-more="wrap">🎁 Monthly Wrap</button>
+          <button class="more-menu-item" data-more="digest">📅 Monthly Digest</button>
           <div class="more-menu-section">Analyse</div>
           <button class="more-menu-item" data-more="stats2">📊 Deep Stats</button>
           <button class="more-menu-item" data-more="ai-panel">🤖 AI Assistant</button>
@@ -1151,6 +1158,139 @@
     </div>
     <button id="install-accept-btn" class="btn-primary" style="padding:6px 14px;font-size:.8rem">Install</button>
     <button id="install-dismiss-btn" class="icon-btn" style="font-size:.9rem">✕</button>
+  </div>
+
+  <!-- Phase 10 Modals -->
+
+  <!-- 🏅 Achievements & XP -->
+  <div id="achievements-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="ach-title">
+    <div class="modal-card ach-card">
+      <div class="modal-header">
+        <h2 id="ach-title">🏅 Achievements</h2>
+        <button id="ach-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="ach-xp-bar-wrap">
+        <div class="ach-level-label" id="ach-level-label">Foodie Rookie</div>
+        <div class="ach-xp-track"><div class="ach-xp-fill" id="ach-xp-fill"></div></div>
+        <div class="ach-xp-label" id="ach-xp-label">0 XP</div>
+      </div>
+      <div id="ach-badges-grid" class="ach-badges-grid"></div>
+    </div>
+  </div>
+
+  <!-- 🃏 Swipe to Decide -->
+  <div id="swipe-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="swipe-title">
+    <div class="modal-card swipe-card">
+      <div class="modal-header">
+        <h2 id="swipe-title">🃏 Swipe to Decide</h2>
+        <button id="swipe-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="swipe-hint">➡️ Swipe right or tap ✔ to pick tonight &nbsp;·&nbsp; ⬅️ Swipe left to skip</p>
+      <div id="swipe-deck" class="swipe-deck">
+        <div class="swipe-empty hidden" id="swipe-empty">
+          <div style="font-size:3rem">🖤</div>
+          <div style="font-weight:600;margin-top:8px">All caught up!</div>
+          <div style="font-size:.8rem;color:var(--text-dim)">Add more to your wishlist to keep swiping.</div>
+        </div>
+      </div>
+      <div class="swipe-btns">
+        <button class="swipe-btn swipe-btn-skip" id="swipe-skip-btn" title="Skip">❌</button>
+        <button class="swipe-btn swipe-btn-pick" id="swipe-pick-btn" title="Pick tonight">❤️</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🎯 Spin the Wheel -->
+  <div id="spin-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="spin-title">
+    <div class="modal-card spin-card">
+      <div class="modal-header">
+        <h2 id="spin-title">🎯 Spin the Wheel</h2>
+        <button id="spin-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="spin-wrap">
+        <div class="spin-pointer">▼</div>
+        <canvas id="spin-canvas" width="300" height="300"></canvas>
+      </div>
+      <div id="spin-result" class="spin-result hidden"></div>
+      <button id="spin-btn" class="btn-primary" style="width:100%;margin-top:12px">🎯 Spin!</button>
+    </div>
+  </div>
+
+  <!-- ✈️ Travel Mode -->
+  <div id="travel-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="travel-title">
+    <div class="modal-card travel-card">
+      <div class="modal-header">
+        <h2 id="travel-title">✈️ Travel Mode</h2>
+        <button id="travel-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="travel-body">
+        <p class="travel-hint">Set a custom location for Discovery &amp; Map. Great for planning food stops on a trip!</p>
+        <div id="travel-active-banner" class="travel-active-banner hidden">
+          ✈️ Travel Mode active: <strong id="travel-active-city"></strong>
+          <button id="travel-deactivate-btn" class="btn-sm" style="margin-left:auto">Turn Off</button>
+        </div>
+        <div class="travel-quick-cities">
+          <div class="travel-section-label">Quick picks</div>
+          <div class="travel-city-grid" id="travel-city-grid">
+            <button class="travel-city-btn" data-city="London, UK" data-lat="51.5074" data-lng="-0.1278">🇬🇧 London</button>
+            <button class="travel-city-btn" data-city="Paris, France" data-lat="48.8566" data-lng="2.3522">🇫🇷 Paris</button>
+            <button class="travel-city-btn" data-city="New York, USA" data-lat="40.7128" data-lng="-74.006">🇺🇸 New York</button>
+            <button class="travel-city-btn" data-city="Tokyo, Japan" data-lat="35.6762" data-lng="139.6503">🇯🇵 Tokyo</button>
+            <button class="travel-city-btn" data-city="Barcelona, Spain" data-lat="41.3851" data-lng="2.1734">🇪🇸 Barcelona</button>
+            <button class="travel-city-btn" data-city="Sydney, Australia" data-lat="-33.8688" data-lng="151.2093">🇦🇺 Sydney</button>
+            <button class="travel-city-btn" data-city="Bangkok, Thailand" data-lat="13.7563" data-lng="100.5018">🇹🇭 Bangkok</button>
+            <button class="travel-city-btn" data-city="Rome, Italy" data-lat="41.9028" data-lng="12.4964">🇮🇹 Rome</button>
+          </div>
+        </div>
+        <div class="travel-section-label" style="margin-top:12px">Custom city</div>
+        <div style="display:flex;gap:8px">
+          <input id="travel-city-input" class="form-input" placeholder="e.g. Melbourne, Australia" style="flex:1" />
+          <button id="travel-set-btn" class="btn-primary">Set</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📅 Monthly Digest -->
+  <div id="digest-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="digest-title">
+    <div class="modal-card digest-card">
+      <div class="modal-header">
+        <h2 id="digest-title">📅 Monthly Digest</h2>
+        <button id="digest-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div id="digest-body" class="digest-body">
+        <!-- Dynamically rendered -->
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button id="digest-share-btn" class="btn-primary" style="flex:1">📲 Share Digest</button>
+        <button id="digest-prev-btn" class="btn-secondary">❮</button>
+        <button id="digest-next-btn" class="btn-secondary">❯</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🟢 Open Now -->
+  <div id="open-now-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="open-now-title">
+    <div class="modal-card open-now-card">
+      <div class="modal-header">
+        <h2 id="open-now-title">🟢 Open Now Nearby</h2>
+        <button id="open-now-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="open-now-body">
+        <p class="open-now-hint">Find restaurants near you that OpenStreetMap says are open right now.</p>
+        <div class="open-now-time-row">
+          <span id="open-now-time" style="font-size:.82rem;color:var(--text-dim)"></span>
+          <select id="open-now-radius" class="form-input" style="width:auto;padding:4px 8px">
+            <option value="500">500 m</option>
+            <option value="1000" selected>1 km</option>
+            <option value="2000">2 km</option>
+            <option value="5000">5 km</option>
+          </select>
+          <button id="open-now-search-btn" class="btn-primary">Search</button>
+        </div>
+        <div id="open-now-results" class="open-now-results"></div>
+      </div>
+    </div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLEg=" crossorigin=""></script>
