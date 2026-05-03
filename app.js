@@ -132,73 +132,7 @@ function importData (file) {
 
 /* ── Seed restaurants so the app looks populated on first run */
 function seedData () {
-  return [
-    {
-      id: uid(), name: "The Golden Spoon", cuisine: "Italian",
-      address: "123 W 51st St, New York, NY 10019",
-      lat: 40.7615, lng: -73.9833,
-      website: "https://thegoldenspoon.example.com",
-      status: "want-to-try", myRating: 0,
-      googleRating: 4.6, googleReviews: 1842,
-      notes: "Heard the truffle pasta is unreal 🤤 Need to book ahead — super popular on weekends!",
-      photo: "", priceRange: 3, tags: ['date night', 'italian'],
-      dateAdded: iso(-10), dateVisited: null, visits: []
-    },
-    {
-      id: uid(), name: "Sakura Garden", cuisine: "Japanese",
-      address: "45 E Village Blvd, New York, NY 10003",
-      lat: 40.7265, lng: -73.9867,
-      website: "https://sakuragarden.example.com",
-      status: "visited", myRating: 5,
-      googleRating: 4.8, googleReviews: 3102,
-      notes: "Omakase was 🔥 The chef's special toro melt in your mouth. Pricey but worth every penny!",
-      photo: "", priceRange: 4, tags: ['special occasion', 'sushi'],
-      dateAdded: iso(-30), dateVisited: iso(-5), visits: [{date: iso(-5), note:'Omakase dinner', rating:5}]
-    },
-    {
-      id: uid(), name: "El Rancho Taqueria", cuisine: "Mexican",
-      address: "880 Fulton Ave, Houston, TX 77009",
-      lat: 29.7800, lng: -95.3700,
-      website: "", status: "visited", myRating: 4,
-      googleRating: 4.3, googleReviews: 567,
-      notes: "Street tacos are legit. Get the birria — dipping broth is incredible.",
-      photo: "", priceRange: 1, tags: ['budget', 'casual'],
-      dateAdded: iso(-45), dateVisited: iso(-14), visits: [{date: iso(-14), note:'Birria tacos', rating:4}]
-    },
-    {
-      id: uid(), name: "Smoke & Ember BBQ", cuisine: "BBQ",
-      address: "2200 Peachtree Rd, Atlanta, GA 30309",
-      lat: 33.8023, lng: -84.3894,
-      website: "https://smokeember.example.com",
-      status: "want-to-try", myRating: 0,
-      googleRating: 4.7, googleReviews: 2314,
-      notes: "Pitmaster won last year's regional comp. Brisket allegedly the best in the South.",
-      photo: "", priceRange: 2, tags: ['bbq', 'worth the drive'],
-      dateAdded: iso(-7), dateVisited: null, visits: []
-    },
-    {
-      id: uid(), name: "Café Lumière", cuisine: "French",
-      address: "18 Rue Lafayette, Chicago, IL 60601",
-      lat: 41.8845, lng: -87.6241,
-      website: "https://cafelumiere.example.com",
-      status: "visited", myRating: 4,
-      googleRating: 4.5, googleReviews: 798,
-      notes: "Croissants are flaky perfection. Grab a table by the window for Sunday brunch.",
-      photo: "", priceRange: 3, tags: ['brunch', 'date night'],
-      dateAdded: iso(-60), dateVisited: iso(-20), visits: [{date: iso(-20), note:'Sunday brunch', rating:4}]
-    },
-    {
-      id: uid(), name: "Spice Route", cuisine: "Indian",
-      address: "512 Devon Ave, Chicago, IL 60659",
-      lat: 41.9989, lng: -87.7066,
-      website: "",
-      status: "want-to-try", myRating: 0,
-      googleRating: 4.4, googleReviews: 441,
-      notes: "Biryani is the star. Friday specials are half price!",
-      photo: "", priceRange: 2, tags: ['budget', 'spicy'],
-      dateAdded: iso(-3), dateVisited: null, visits: []
-    },
-  ];
+  return [];
 }
 
 function uid () {
