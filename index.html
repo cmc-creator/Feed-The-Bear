@@ -228,6 +228,16 @@
     <div class="stats-view-inner">
       <h2 class="stats-view-title">📊 Your Foodie Stats</h2>
       <div class="stats-kpi-row" id="stats-kpi-row"></div>
+
+      <!-- Taste DNA -->
+      <div class="stats-charts-row">
+        <div class="stats-chart-card" style="flex:1">
+          <h3>🧬 Your Taste DNA</h3>
+          <p class="chart-sub">Your unique flavor fingerprint</p>
+          <div id="chart-taste-dna" class="taste-dna-section"></div>
+        </div>
+      </div>
+
       <div class="stats-charts-row">
         <div class="stats-chart-card">
           <h3>Cuisine Breakdown</h3>
@@ -306,6 +316,21 @@
       <span>Enable location to get alerts when you're near restaurants on your list!</span>
       <button id="enable-location-btn" class="btn-sm btn-orange">Enable</button>
       <button id="dismiss-location-banner" class="btn-ghost btn-sm">Dismiss</button>
+    </div>
+
+    <!-- Weekly Dining Goal Widget -->
+    <div id="weekly-goal-widget" class="weekly-goal-widget hidden">
+      <div class="wg-left">
+        <span class="wg-icon">🎯</span>
+        <div class="wg-text-col">
+          <div class="wg-title">Weekly Dining Goal: <strong id="wg-count">0</strong>/<strong id="wg-goal">3</strong> meals</div>
+          <div class="wg-label" id="wg-label">Get out and eat this week!</div>
+        </div>
+      </div>
+      <div class="wg-right">
+        <div class="wg-bar-track"><div class="wg-bar-fill" id="wg-fill"></div></div>
+        <button class="btn-ghost btn-sm wg-set-btn" id="wg-set-btn">✏️ Goal</button>
+      </div>
     </div>
 
     <!-- Restaurant grid -->
@@ -498,6 +523,17 @@
           <div class="form-group">
             <label for="form-google-reviews">Review Count <span class="label-hint">(optional)</span></label>
             <input type="number" id="form-google-reviews" min="0" placeholder="523" />
+          </div>
+
+          <!-- Priority -->
+          <div class="form-group">
+            <label for="form-priority">Priority</label>
+            <select id="form-priority">
+              <option value="">Normal</option>
+              <option value="hot">🔥 Hot — Must Go!</option>
+              <option value="next">⭐ Up Next</option>
+              <option value="someday">📌 Someday</option>
+            </select>
           </div>
 
           <!-- Tags -->

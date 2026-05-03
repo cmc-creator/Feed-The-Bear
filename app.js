@@ -85,6 +85,7 @@ function saveData () {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.restaurants));
   updateTagSuggestions();
   setTimeout(checkAchievements, 0);
+  setTimeout(renderWeeklyGoal, 0);
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -396,6 +397,13 @@ function getFiltered () {
     default: // date-desc
       list.sort((a,b) => (b.dateAdded||'').localeCompare(a.dateAdded||'')); break;
   }
+
+  // Phase 11: For want-to-try view, put "hot" priority items first
+  if (state.currentView === 'want-to-try') {
+    const priorityOrder = { hot: 0, next: 1, '': 2, normal: 2, someday: 3 };
+    list.sort((a, b) => (priorityOrder[a.priority||''] ?? 2) - (priorityOrder[b.priority||''] ?? 2));
+  }
+
   return list;
 }
 
@@ -521,6 +529,7 @@ function buildCard (r) {
         </div>` : ''}
       ${r.tags && r.tags.length ? `<div class="card-tags">${r.tags.map(t=>`<span class="card-tag">${escHtml(t)}</span>`).join('')}</div>` : ''}
       ${collBadge}
+      ${priorityBadgeHtml(r)}
       ${r.notes ? `<div class="card-notes">"${escHtml(r.notes)}"</div>` : ''}
       <div class="card-actions">
         ${r.address ? `<button class="card-action-btn directions" data-action="directions" aria-label="Get directions to ${escHtml(r.name)}">
@@ -829,6 +838,9 @@ function openEditModal (id) {
   }
   document.getElementById('form-photo-file').value = '';
 
+  const priorityEl = document.getElementById('form-priority');
+  if (priorityEl) priorityEl.value = r.priority || '';
+
   document.getElementById('modal-overlay').classList.remove('hidden');
   document.getElementById('ui-overlay').classList.remove('hidden');
   document.getElementById('form-name').focus();
@@ -885,6 +897,7 @@ function handleFormSubmit (e) {
     notes:         document.getElementById('form-notes').value.trim(),
     tags:          document.getElementById('form-tags').value.split(',').map(t=>t.trim()).filter(Boolean),
     collectionId:  document.getElementById('form-collection').value || null,
+    priority:      document.getElementById('form-priority')?.value || '',
     status,
     dateAdded:     isNew ? now : (state.restaurants.find(r => r.id === state.editingId)?.dateAdded || now),
     dateVisited:   status === 'visited'
@@ -1192,6 +1205,8 @@ function renderStatsView () {
   document.querySelectorAll('.top-list-item[data-id]').forEach(el => {
     el.addEventListener('click', () => openDetailModal(el.dataset.id));
   });
+  // Taste DNA
+  renderTasteDna();
 }
 
 /* ── Full render ──────────────────────────────────────────── */
@@ -1208,6 +1223,7 @@ function renderAll () {
     renderCards();
   }
   updateLocationBanner();
+  renderWeeklyGoal();
 }
 
 function updateLocationBanner () {
@@ -1286,6 +1302,13 @@ const GENERAL_RESPONSES = [
   (q) => q.match(/\b(tag|tagged|#)\b/i) && tagQueryResponse(q),
   (q) => q.match(/\b(most|history|pattern|cuisine breakdown|eating most|ate most)\b/i) && topCuisineResponse(),
   (q) => cuisineFromQuery(q) && cuisineResponse(cuisineFromQuery(q)),
+  // Phase 11 — enhanced responses
+  (q) => q.match(/\b(taste|dna|profile|personality|my style|what am i|who am i|flavor|flavour)\b/i) && tasteDnaResponse(),
+  (q) => q.match(/\b(never tried|new cuisine|never been|haven.?t been|exotic|different cuisine)\b/i) && neverTriedCuisineResponse(),
+  (q) => q.match(/\b(breakfast|brunch|lunch|dinner|tonight|this evening|morning|noon|supper)\b/i) && timeBasedResponse(q),
+  (q) => q.match(/\b(how many|how much|total|count|my stats|how am i doing|how.?re? i doing)\b/i) && myStatsResponse(),
+  (q) => q.match(/\b(note|funny note|funniest|memorable moment|best memory)\b/i) && funnyNoteResponse(),
+  (q) => q.match(/\b(going tonight|plans tonight|where tonight|eat tonight)\b/i) && goingTonightResponse(),
 ];
 
 function chatResponse (userText) {
@@ -2491,6 +2514,10 @@ function setupEvents () {
   document.getElementById('open-now-close-btn').addEventListener('click', closeOpenNow);
   document.getElementById('open-now-overlay').addEventListener('click', e => { if (e.target === document.getElementById('open-now-overlay')) closeOpenNow(); });
   document.getElementById('open-now-search-btn').addEventListener('click', runOpenNowSearch);
+
+  // Phase 11 — Weekly Goal
+  const wgBtn = document.getElementById('wg-set-btn');
+  if (wgBtn) wgBtn.addEventListener('click', setWeeklyGoal);
 }
 
 function updateClearBtn () {
@@ -6013,4 +6040,353 @@ async function runOpenNowSearch () {
   } catch(e) {
     resultsEl.innerHTML = '<div class="open-now-loading">Search failed. Check your connection and try again.</div>';
   }
+}
+
+/* ════════════════════════════════════════════════════════════
+   PHASE 11 • TASTE DNA + WEEKLY GOAL + ENHANCEMENTS
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Taste DNA ─────────────────────────────────────────── */
+function renderTasteDna () {
+  const el = document.getElementById('chart-taste-dna');
+  if (!el) return;
+  const visited = state.restaurants.filter(r => r.status === 'visited');
+  if (!visited.length) {
+    el.innerHTML = '<div class="chart-empty">Visit restaurants to reveal your Taste DNA!</div>';
+    return;
+  }
+
+  const cuisineMap = {};
+  visited.forEach(r => {
+    const c = (r.cuisine || 'Other').trim();
+    cuisineMap[c] = (cuisineMap[c] || 0) + 1 + (r.myRating || 0) * 0.15;
+  });
+  const total = Object.values(cuisineMap).reduce((a, b) => a + b, 0);
+  const top5 = Object.entries(cuisineMap).sort(([, a], [, b]) => b - a).slice(0, 5);
+
+  const withPrice = visited.filter(r => r.priceRange > 0);
+  const avgPrice = withPrice.length ? withPrice.reduce((s, r) => s + r.priceRange, 0) / withPrice.length : 0;
+  const priceLabel = avgPrice < 1.5 ? 'Budget Hunter 💰'
+    : avgPrice < 2.5 ? 'Value Seeker 🍜'
+    : avgPrice < 3.5 ? 'Upscale Diner 🍷'
+    : 'Fine Dining Connoisseur 🥂';
+
+  const uniqueCuisines = Object.keys(cuisineMap).length;
+  const adventureScore = Math.min(Math.round((uniqueCuisines / Math.max(visited.length, 1)) * 100), 100);
+  const adventureLabel = adventureScore > 70 ? 'Adventurous Explorer 🌍'
+    : adventureScore > 40 ? 'Curious Foodie 🍽️'
+    : 'Comfort Loyalist 🏠';
+
+  const signature = top5[0];
+  const dnaColors = ['#FF6B35', '#3498DB', '#2ECC71', '#F39C12', '#9B59B6'];
+
+  el.innerHTML = `
+    <div class="dna-personality">${adventureLabel} · ${priceLabel}</div>
+    <div class="dna-cuisines">
+      ${top5.map(([c, score], i) => {
+        const pct = Math.round(score / total * 100);
+        return `<div class="dna-bar-row">
+          <div class="dna-bar-label">${cuisineEmoji(c)} ${escHtml(c)}</div>
+          <div class="dna-bar-track"><div class="dna-bar-fill" style="width:${pct}%;background:${dnaColors[i]}"></div></div>
+          <div class="dna-bar-pct">${pct}%</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="dna-stats-row">
+      <div class="dna-stat"><div class="dna-stat-val">${uniqueCuisines}</div><div class="dna-stat-lbl">Cuisines</div></div>
+      <div class="dna-stat"><div class="dna-stat-val">${adventureScore}%</div><div class="dna-stat-lbl">Variety</div></div>
+      <div class="dna-stat"><div class="dna-stat-val">${signature ? cuisineEmoji(signature[0]) : '🍽️'}</div><div class="dna-stat-lbl">Signature</div></div>
+    </div>
+    <button class="btn-sm btn-orange" style="width:100%;margin-top:10px" onclick="shareTasteDna()">📤 Share My Taste DNA</button>
+  `;
+}
+
+function shareTasteDna () {
+  const visited = state.restaurants.filter(r => r.status === 'visited');
+  if (!visited.length) { showToast('No data yet', 'Visit some restaurants first!', 'error'); return; }
+
+  const cuisineMap = {};
+  visited.forEach(r => { const c = r.cuisine || 'Other'; cuisineMap[c] = (cuisineMap[c] || 0) + 1; });
+  const top3 = Object.entries(cuisineMap).sort(([, a], [, b]) => b - a).slice(0, 3);
+  const total = visited.length;
+
+  const canvas = document.getElementById('share-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = 800, H = 450;
+  canvas.width = W; canvas.height = H;
+
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#0D0D1A'); bg.addColorStop(1, '#1A1A2E');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  const acc = ctx.createLinearGradient(0, 0, 0, H);
+  acc.addColorStop(0, '#FF6B35'); acc.addColorStop(1, '#C0392B');
+  ctx.fillStyle = acc; ctx.fillRect(0, 0, 8, H);
+
+  ctx.globalAlpha = .06; ctx.font = '200px serif'; ctx.fillStyle = '#FFF';
+  ctx.fillText('🧬', W - 240, H - 10); ctx.globalAlpha = 1;
+
+  ctx.fillStyle = '#FFF'; ctx.font = 'bold 38px system-ui,sans-serif';
+  ctx.fillText('🧬 My Taste DNA', 50, 75);
+  ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.font = '16px system-ui,sans-serif';
+  ctx.fillText('Based on ' + total + ' restaurant' + (total !== 1 ? 's' : '') + ' visited', 50, 104);
+
+  const dnaColors = ['#FF6B35', '#3498DB', '#2ECC71'];
+  const maxVal = Math.max(...top3.map(([, v]) => v), 1);
+  top3.forEach(([c, n], i) => {
+    const y = 155 + i * 82;
+    const barW = Math.max((n / maxVal) * 430, 8);
+    ctx.fillStyle = dnaColors[i] + '22';
+    ctx.beginPath(); try { ctx.roundRect(50, y - 28, 480, 40, 8); } catch(_) { ctx.rect(50, y-28, 480, 40); } ctx.fill();
+    ctx.fillStyle = dnaColors[i];
+    ctx.beginPath(); try { ctx.roundRect(50, y - 28, barW, 40, 8); } catch(_) { ctx.rect(50, y-28, barW, 40); } ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 17px system-ui,sans-serif';
+    ctx.fillText(cuisineEmoji(c) + ' ' + c + '  ' + Math.round(n / total * 100) + '%', 62, y);
+  });
+
+  ctx.fillStyle = '#FF6B35'; ctx.font = 'bold 15px system-ui,sans-serif';
+  ctx.fillText('🐻 Feed The Bear', W - 195, H - 18);
+
+  canvas.toBlob(blob => {
+    const file = new File([blob], 'taste-dna-ftb.png', { type: 'image/png' });
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      navigator.share({ title: 'My Taste DNA', text: 'My foodie personality on Feed The Bear 🐻🧬', files: [file] }).catch(() => {});
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = file.name; a.click(); URL.revokeObjectURL(url);
+    }
+    showToast('🧬 Taste DNA!', 'Your flavor profile card is ready!', 'success');
+  }, 'image/png');
+}
+
+/* ── Weekly Dining Goal ────────────────────────────────── */
+function renderWeeklyGoal () {
+  const widget = document.getElementById('weekly-goal-widget');
+  if (!widget) return;
+  const goal = state.settings.weeklyGoal || 0;
+  if (!goal) { widget.classList.add('hidden'); return; }
+
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay());
+  const weekStart = startOfWeek.toISOString().slice(0, 10);
+
+  let count = 0;
+  state.restaurants.forEach(r => {
+    (r.visits || []).forEach(v => { if ((v.date || '') >= weekStart) count++; });
+    if (r.dateVisited >= weekStart && !(r.visits || []).length) count++;
+  });
+
+  const pct = Math.min(count / goal * 100, 100);
+  const done = count >= goal;
+
+  widget.classList.remove('hidden');
+  document.getElementById('wg-count').textContent = count;
+  document.getElementById('wg-goal').textContent = goal;
+  const fill = document.getElementById('wg-fill');
+  fill.style.width = pct + '%';
+  fill.classList.toggle('complete', done);
+  const label = document.getElementById('wg-label');
+  if (label) {
+    label.textContent = done ? '🎉 Goal crushed! You\'re on fire!'
+      : count === 0 ? 'Get out and eat this week!'
+      : (goal - count) + ' more meal' + ((goal - count) !== 1 ? 's' : '') + ' to hit your goal!';
+  }
+  if (done) {
+    widget.style.borderColor = 'rgba(46,204,113,.5)';
+    widget.style.background = 'linear-gradient(135deg,rgba(46,204,113,.1),rgba(46,204,113,.05))';
+  } else {
+    widget.style.borderColor = '';
+    widget.style.background = '';
+  }
+}
+
+function setWeeklyGoal () {
+  const current = state.settings.weeklyGoal || 0;
+  const val = prompt('How many meals do you want to eat out each week?\n\nEnter 0 to disable the goal widget.', current || 3);
+  if (val === null) return;
+  const n = Math.max(0, parseInt(val) || 0);
+  state.settings.weeklyGoal = n;
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+  renderWeeklyGoal();
+  if (n > 0) {
+    showToast('🎯 Weekly Goal Set!', n + ' meal' + (n !== 1 ? 's' : '') + ' per week. Let\'s eat!', 'success');
+  } else {
+    showToast('Goal Cleared', 'Weekly goal widget hidden.', 'info');
+  }
+}
+
+/* ── Gallery with Visit Photos ─────────────────────────── */
+// Override the original openGallery to include visit photos
+(function _patchGallery () {
+  const _origOpenGallery = openGallery;
+  window.openGallery = function () {
+    const allPhotos = [];
+    state.restaurants.forEach(r => {
+      if (r.photo) allPhotos.push({ src: r.photo, name: r.name, id: r.id, type: 'cover' });
+      (r.visits || []).forEach(v => {
+        if (v.photo) allPhotos.push({ src: v.photo, name: r.name + ' — ' + fmtDate(v.date), id: r.id, type: 'visit' });
+      });
+    });
+    _galleryPhotos = allPhotos;
+
+    const grid = document.getElementById('gallery-grid');
+    if (!allPhotos.length) {
+      grid.innerHTML = '<div class="gallery-empty">No photos yet! Add a photo when saving a restaurant or logging a visit.</div>';
+    } else {
+      grid.innerHTML = allPhotos.map((p, i) =>
+        '<div class="gallery-item" data-idx="' + i + '">'
+        + '<img src="' + escHtml(p.src) + '" alt="' + escHtml(p.name) + '" loading="lazy" />'
+        + '<div class="gallery-item-name">' + escHtml(p.name) + '</div>'
+        + (p.type === 'visit' ? '<div class="gallery-type-badge">Visit</div>' : '')
+        + '</div>'
+      ).join('');
+      grid.querySelectorAll('.gallery-item[data-idx]').forEach(el => {
+        el.addEventListener('click', () => openLightbox(parseInt(el.dataset.idx)));
+      });
+    }
+    document.getElementById('gallery-overlay').classList.remove('hidden');
+    document.body.classList.add('overlay-open');
+  };
+})();
+
+/* ── Visit Photo Support in Check-In ───────────────────── */
+// Enhance detail modal checkin to support photos
+function openCheckinWithPhoto (id) {
+  const r = state.restaurants.find(x => x.id === id);
+  if (!r) return;
+
+  const note = prompt('Quick note for this visit (optional):') || '';
+  const ratingStr = prompt('Your rating 1-5 (optional):') || '0';
+  const rating = Math.min(5, Math.max(0, parseInt(ratingStr) || 0));
+
+  const visitEntry = { date: iso(), note, rating, photo: '' };
+  const idx = state.restaurants.findIndex(x => x.id === id);
+  if (idx === -1) return;
+
+  if (!state.restaurants[idx].visits) state.restaurants[idx].visits = [];
+  state.restaurants[idx].visits.push(visitEntry);
+  state.restaurants[idx].status = 'visited';
+  state.restaurants[idx].dateVisited = state.restaurants[idx].dateVisited || iso();
+  if (rating) state.restaurants[idx].myRating = rating;
+
+  // Offer photo upload
+  const wantPhoto = confirm('Add a photo from this visit? 📷');
+  if (wantPhoto) {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+    input.onchange = () => {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const vIdx = state.restaurants[idx].visits.length - 1;
+        state.restaurants[idx].visits[vIdx].photo = ev.target.result;
+        saveData();
+        renderAll();
+        openDetailModal(id);
+        showToast('📷 Photo Added!', 'Visit photo saved to gallery.', 'success');
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  }
+
+  saveData();
+  renderAll();
+  openDetailModal(id);
+  showToast('✅ Checked In!', 'Visit logged for ' + r.name, 'success');
+  checkConfettiMilestones(state.restaurants, state.restaurants);
+}
+
+/* ── Priority Badge Helper ──────────────────────────────── */
+function priorityBadgeHtml (r) {
+  if (!r.priority || r.status !== 'want-to-try') return '';
+  if (r.priority === 'hot')    return '<span class="priority-badge hot">🔥 Must Go!</span>';
+  if (r.priority === 'next')   return '<span class="priority-badge next">⭐ Up Next</span>';
+  if (r.priority === 'someday') return '<span class="priority-badge someday">📌 Someday</span>';
+  return '';
+}
+
+/* ── Smarter Byte Cub Responses ─────────────────────────── */
+function tasteDnaResponse () {
+  const visited = state.restaurants.filter(r => r.status === 'visited');
+  if (!visited.length) return 'Visit some restaurants first and I\'ll reveal your Taste DNA! 🧬';
+  const cuisineMap = {};
+  visited.forEach(r => { const c = r.cuisine || 'Other'; cuisineMap[c] = (cuisineMap[c] || 0) + 1; });
+  const top3 = Object.entries(cuisineMap).sort(([, a], [, b]) => b - a).slice(0, 3);
+  const uniqueCount = Object.keys(cuisineMap).length;
+  const adventureLabel = uniqueCount > 7 ? 'an Adventurous Explorer 🌍' : uniqueCount > 4 ? 'a Curious Foodie 🍽️' : 'a Comfort Loyalist 🏠';
+  const topStr = top3.map(([c, n]) => `${cuisineEmoji(c)} **${c}** (${n}x)`).join(', ');
+  return `🧬 Your Taste DNA:\n\nYou\'re **${adventureLabel}** who loves ${topStr}.\n\nHead to **Stats** for your full flavor breakdown and a shareable Taste DNA card!`;
+}
+
+function neverTriedCuisineResponse () {
+  const triedCuisines = new Set(
+    state.restaurants.filter(r => r.status === 'visited').map(r => (r.cuisine || '').toLowerCase())
+  );
+  const allKnown = ['Italian','Japanese','Mexican','Chinese','Indian','Thai','French','Mediterranean','Korean','Vietnamese','Greek','Spanish','Brazilian','Ethiopian','Turkish','Caribbean','Peruvian','Lebanese'];
+  const notTried = allKnown.filter(c => !triedCuisines.has(c.toLowerCase()));
+  if (!notTried.length) return 'Wow, you\'ve explored every cuisine on my list! You\'re a true global foodie 🌍🏆';
+  const pick = notTried[Math.floor(Math.random() * notTried.length)];
+  return `You haven\'t tried **${pick}** yet! ${cuisineEmoji(pick.toLowerCase()) || '🍽️'}\n\nPerfect time to branch out — ask me to "discover nearby" to find a ${pick} spot near you! 🔍`;
+}
+
+function timeBasedResponse (q) {
+  const hour = new Date().getHours();
+  const want = state.restaurants.filter(r => r.status === 'want-to-try');
+  const isMorning = hour < 11;
+  const isLunch   = hour >= 11 && hour < 15;
+  const isDinner  = hour >= 17;
+
+  if (q.match(/breakfast|brunch|morning/) || (isMorning && !q.match(/lunch|dinner/))) {
+    const brunch = want.filter(r => ['Breakfast','Brunch','Cafe','American'].includes(r.cuisine));
+    if (brunch.length) {
+      const pick = brunch[Math.floor(Math.random() * brunch.length)];
+      return `Good morning! ☀️ How about this for breakfast:\n<span class="chip-link" data-id="${pick.id}">${cuisineEmoji(pick.cuisine)} ${pick.name}</span>\n\nPerfect way to start the day! ☕`;
+    }
+    return `Good morning! ☕ Add some breakfast or café spots to your list and I\'ll have morning recommendations ready!`;
+  }
+  if (q.match(/lunch|noon/) || (isLunch && q.match(/eat|food|hungry/))) {
+    const quick = want.filter(r => r.priceRange <= 2 || ['Cafe','American','Mexican','Japanese','Korean'].includes(r.cuisine));
+    if (quick.length) {
+      const pick = quick[Math.floor(Math.random() * quick.length)];
+      return `Lunchtime! 🍱 A quick and delicious option:\n<span class="chip-link" data-id="${pick.id}">${cuisineEmoji(pick.cuisine)} ${pick.name} ${priceDollars(pick.priceRange) || ''}</span>`;
+    }
+  }
+  if (q.match(/dinner|tonight|evening/) || (isDinner && q.match(/eat|food|hungry/))) {
+    const topDinner = [...want].sort((a, b) => (b.googleRating || 0) - (a.googleRating || 0)).slice(0, 3);
+    if (topDinner.length) {
+      const pick = topDinner[Math.floor(Math.random() * topDinner.length)];
+      return `For dinner tonight 🌙, how about:\n<span class="chip-link" data-id="${pick.id}">${cuisineEmoji(pick.cuisine)} ${pick.name}${pick.googleRating ? ' ⭐' + pick.googleRating : ''}</span>\n\nOr ask for "Tonight\'s Pick" to get a mood-matched recommendation! 🎯`;
+    }
+  }
+  return `Tell me more about your mood or craving and I\'ll find the perfect match! 🐻`;
+}
+
+function myStatsResponse () {
+  const all     = state.restaurants;
+  const visited = all.filter(r => r.status === 'visited');
+  const want    = all.filter(r => r.status === 'want-to-try');
+  const { currentStreak } = calcStreaks();
+  const cuisineMap = {};
+  visited.forEach(r => { const c = r.cuisine || 'Other'; cuisineMap[c] = (cuisineMap[c] || 0) + 1; });
+  const topCuisine = Object.entries(cuisineMap).sort(([, a], [, b]) => b - a)[0];
+  return `📊 **Your Foodie Stats:**\n\n🍽️ ${all.length} restaurants saved\n✅ ${visited.length} visited · 🔖 ${want.length} to try\n${currentStreak > 0 ? `🔥 ${currentStreak}-week streak!\n` : ''}${topCuisine ? `❤️ Favourite cuisine: **${topCuisine[0]}** (${topCuisine[1]}x)\n` : ''}\nCheck the **Stats** tab for the full breakdown!`;
+}
+
+function funnyNoteResponse () {
+  const withNotes = state.restaurants.filter(r => r.notes);
+  if (!withNotes.length) return 'No notes saved yet! Add personal notes when saving restaurants — best dishes, funny moments, must-order items. 📝';
+  const item = withNotes[Math.floor(Math.random() * Math.min(withNotes.length, 8))];
+  return `Here\'s a gem from your notes for **${item.name}**:\n\n*"${item.notes.slice(0, 180)}${item.notes.length > 180 ? '…' : ''}"* 🗒️\n\n<span class="chip-link" data-id="${item.id}">View restaurant</span>`;
+}
+
+function goingTonightResponse () {
+  const want = state.restaurants.filter(r => r.status === 'want-to-try');
+  const hot  = want.filter(r => r.priority === 'hot');
+  const pool = hot.length ? hot : want;
+  if (!pool.length) return `Your want-to-try list is empty — add some spots and come back! 🔖`;
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  return `🎯 **Going tonight?** Here\'s my top pick:\n\n<span class="chip-link" data-id="${pick.id}">${cuisineEmoji(pick.cuisine)} **${pick.name}**</span>\n${pick.address ? '📍 ' + pick.address + '\n' : ''}${pick.googleRating ? '⭐ ' + pick.googleRating + '/5\n' : ''}\nSay "directions" to get there, or ask for another pick!`;
 }

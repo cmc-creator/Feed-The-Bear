@@ -3182,4 +3182,83 @@ body.light-mode #profile-btn {
   .ach-badges-grid { grid-template-columns: repeat(2, 1fr); }
   .digest-grid { grid-template-columns: repeat(2, 1fr); }
   .travel-city-grid { grid-template-columns: 1fr; }
+}/* ═══════════════════════════════════════════════════════════
+   PHASE 11 • NEW FEATURES
+   ═══════════════════════════════════════════════════════════ */
+
+/* -- Weekly Goal Widget ------------------------------------ */
+.weekly-goal-widget {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, rgba(255,107,53,.12), rgba(255,107,53,.06));
+  border: 1px solid rgba(255,107,53,.3);
+  border-radius: 14px;
+  margin: 8px 16px 0;
+  flex-wrap: wrap;
+  gap: 10px;
 }
+.wg-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 180px; }
+.wg-icon { font-size: 1.4rem; flex-shrink: 0; }
+.wg-text-col { display: flex; flex-direction: column; gap: 2px; }
+.wg-title { font-size: .82rem; font-weight: 600; color: var(--text); }
+.wg-label { font-size: .72rem; color: var(--text-dim); }
+.wg-right { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 140px; }
+.wg-bar-track { flex: 1; height: 8px; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; }
+.wg-bar-fill { height: 100%; background: var(--primary); border-radius: 99px; transition: width .4s ease; }
+.wg-bar-fill.complete { background: var(--green); }
+.wg-set-btn { flex-shrink: 0; font-size: .72rem; }
+.light-mode .weekly-goal-widget { background: linear-gradient(135deg, rgba(255,107,53,.07), rgba(255,107,53,.03)); border-color: rgba(255,107,53,.25); }
+
+/* -- Taste DNA Card --------------------------------------- */
+.taste-dna-section { display: flex; flex-direction: column; gap: 12px; }
+.dna-personality {
+  font-size: .82rem;
+  font-weight: 700;
+  color: var(--primary);
+  background: rgba(255,107,53,.1);
+  border: 1px solid rgba(255,107,53,.25);
+  border-radius: 20px;
+  padding: 5px 14px;
+  display: inline-block;
+  align-self: flex-start;
+}
+.dna-bar-row { display: flex; align-items: center; gap: 8px; }
+.dna-bar-label { width: 120px; font-size: .78rem; color: var(--text); flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dna-bar-track { flex: 1; height: 10px; background: rgba(255,255,255,.06); border-radius: 99px; overflow: hidden; }
+.dna-bar-fill { height: 100%; border-radius: 99px; transition: width .5s ease; }
+.dna-bar-pct { width: 34px; text-align: right; font-size: .72rem; font-weight: 700; color: var(--text-dim); }
+.dna-stats-row { display: flex; gap: 10px; margin-top: 4px; }
+.dna-stat { flex: 1; text-align: center; padding: 8px 4px; background: rgba(255,255,255,.04); border-radius: 10px; border: 1px solid var(--border); }
+.dna-stat-val { font-size: 1.3rem; font-weight: 800; color: var(--primary); }
+.dna-stat-lbl { font-size: .65rem; color: var(--text-dim); text-transform: uppercase; margin-top: 2px; }
+.dna-cuisines { display: flex; flex-direction: column; gap: 8px; }
+
+/* -- Priority Badges -------------------------------------- */
+.priority-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: .66rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-left: 4px;
+}
+.priority-badge.hot { background: rgba(255,107,53,.2); color: #FF6B35; border: 1px solid rgba(255,107,53,.35); }
+.priority-badge.next { background: rgba(255,215,0,.15); color: #F4C430; border: 1px solid rgba(255,215,0,.3); }
+.priority-badge.someday { background: rgba(149,165,166,.12); color: #95A5A6; border: 1px solid rgba(149,165,166,.25); }
+.card-priority-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+
+/* -- Visit Photo Thumbnails ------------------------------- */
+.visit-log-photo { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border); }
+.visit-log-item { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+.visit-log-text { flex: 1; }
+.visit-photo-add-btn { font-size: .68rem; background: none; border: 1px dashed var(--border); border-radius: 8px; padding: 4px 8px; color: var(--text-dim); cursor: pointer; transition: border-color .2s; }
+.visit-photo-add-btn:hover { border-color: var(--primary); color: var(--primary); }
+.gallery-type-badge { font-size: .6rem; font-weight: 700; background: rgba(0,0,0,.5); color: #fff; border-radius: 4px; padding: 1px 4px; position: absolute; bottom: 4px; left: 4px; }
+.gallery-item { position: relative; }
+
+/* -- Byte Cub Time Greeting ------------------------------ */
+.chat-time-greeting { font-size: .72rem; color: var(--text-dim); text-align: center; padding: 4px 8px; }
