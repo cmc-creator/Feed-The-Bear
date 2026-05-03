@@ -567,62 +567,6 @@ function buildCard (r) {
   return card;
 }
 
-  card.innerHTML = `
-    <div class="card-photo">
-      ${photoHtml}
-      <div class="card-photo-bg" style="${bgStyle}${r.photo ? 'display:none;' : ''}">${cuisineEmoji(r.cuisine)}</div>
-      <div class="card-img-overlay"></div>
-      <span class="card-status-badge ${r.status === 'want-to-try' ? 'want' : 'visited'}">
-        ${r.status === 'want-to-try' ? '🔖 Want to Try' : '✅ Visited'}
-      </span>
-      ${r.priceRange ? `<span class="card-price-badge">${priceDollars(r.priceRange)}</span>` : ''}
-      ${distStr ? `<span class="card-distance-badge">📍 ${distStr}</span>` : ''}
-    </div>
-    <div class="card-body">
-      ${r.cuisine ? `<div class="card-cuisine">${cuisineEmoji(r.cuisine)} ${escHtml(r.cuisine)}</div>` : ''}
-      <div class="card-name">${escHtml(r.name)}</div>
-      <div class="card-rating-row">
-        ${r.googleRating ? googleStarsHtml(r.googleRating, r.googleReviews) : ''}
-        ${r.myRating ? `<span class="my-rating-row"><span class="my-stars">${'★'.repeat(r.myRating)}${'☆'.repeat(5-r.myRating)}</span> My Rating</span>` : ''}
-      </div>
-      ${r.address ? `
-        <div class="card-address">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-          ${escHtml(r.address)}
-        </div>` : ''}
-      ${r.tags && r.tags.length ? `<div class="card-tags">${r.tags.map(t=>`<span class="card-tag">${escHtml(t)}</span>`).join('')}</div>` : ''}
-      ${r.notes ? `<div class="card-notes">"${escHtml(r.notes)}"</div>` : ''}
-      <div class="card-actions">
-        ${r.address ? `<button class="card-action-btn directions" data-action="directions" aria-label="Get directions to ${escHtml(r.name)}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-            Directions
-          </button>` : ''}
-        ${r.website ? `<button class="card-action-btn website" data-action="website" aria-label="Open website for ${escHtml(r.name)}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            Website
-          </button>` : ''}
-        <button class="card-action-btn edit-card" data-action="edit" aria-label="Edit ${escHtml(r.name)}">
-          ✏️ Edit
-        </button>
-      </div>
-    </div>`;
-
-  // Event delegation on the card
-  card.addEventListener('click', e => {
-    const action = e.target.closest('[data-action]')?.dataset.action;
-    if (action === 'directions')   { e.stopPropagation(); openDirections(r);      return; }
-    if (action === 'website')       { e.stopPropagation(); openWebsite(r);         return; }
-    if (action === 'edit')          { e.stopPropagation(); openEditModal(r.id);    return; }
-    if (action === 'mark-visited')  { e.stopPropagation(); markVisited(r.id);      return; }
-    if (_compareMode)               { e.stopPropagation(); toggleCompareCard(r.id); return; }
-    openDetailModal(r.id);
-  });
-  card.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetailModal(r.id); }
-  });
-  return card;
-}
-
 /* ── Stars HTML ──────────────────────────────────────────── */
 function googleStarsHtml (rating, reviews) {
   let stars = '';
@@ -4599,6 +4543,8 @@ async function runDiscover () {
       const address = [tags['addr:street'], tags['addr:housenumber']].filter(Boolean).join(' ');
       const matchCuisines = Object.keys(myCuisines).filter(c => (tags.cuisine||'').toLowerCase().includes(c));
       const matchTag = matchCuisines.length ? `Matches your love of ${matchCuisines[0]}` : '';
+      const safeName = name.replace(/'/g, "\\'");
+      const safeCuisine = cuisine.replace(/'/g, "\\'");
 
       return `<div class="discover-item">
         <div class="discover-item-emoji">${emoji}</div>
@@ -4609,7 +4555,7 @@ async function runDiscover () {
           ${matchTag ? `<div class="discover-item-match">? ${escHtml(matchTag)}</div>` : ''}
         </div>
         <div class="discover-item-add">
-          <button class="btn-sm btn-orange" onclick="openAddModalPreFilled('${name.replace(/'/g,'\\')}','${cuisine.replace(/'/g,'\\'')}')">Add +</button>
+          <button class="btn-sm btn-orange" onclick="openAddModalPreFilled('${safeName}','${safeCuisine}')">Add +</button>
         </div>
       </div>`;
     }).join('');
