@@ -232,9 +232,15 @@
       <!-- Taste DNA -->
       <div class="stats-charts-row">
         <div class="stats-chart-card" style="flex:1">
-          <h3>🧬 Your Taste DNA</h3>
-          <p class="chart-sub">Your unique flavor fingerprint</p>
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <div>
+              <h3>🧬 Your Taste DNA</h3>
+              <p class="chart-sub">Your unique flavor fingerprint</p>
+            </div>
+            <button id="ai-taste-profile-btn" class="btn-sm btn-ai">✨ AI Personality</button>
+          </div>
           <div id="chart-taste-dna" class="taste-dna-section"></div>
+          <div id="ai-taste-profile-result" class="ai-taste-card hidden"></div>
         </div>
       </div>
 
@@ -420,8 +426,9 @@
         <div class="form-grid">
           <!-- Name -->
           <div class="form-group form-full">
-            <label for="form-name">Restaurant Name *</label>
+            <label for="form-name">Restaurant Name * <button type="button" id="ai-smart-fill-btn" class="btn-sm btn-ai">🤖 AI Smart Fill</button></label>
             <input type="text" id="form-name" placeholder="e.g. The Golden Spoon" required />
+            <div id="ai-fill-result" class="ai-inline-result hidden"></div>
           </div>
 
           <!-- Cuisine -->
@@ -554,8 +561,9 @@
 
           <!-- Notes -->
           <div class="form-group form-full">
-            <label for="form-notes">Notes</label>
+            <label for="form-notes">Notes <button type="button" id="ai-notes-btn" class="btn-sm btn-ai">✨ AI Enrich</button></label>
             <textarea id="form-notes" rows="3" placeholder="Must try the truffle pasta! Call ahead for reservations. Great for date night…"></textarea>
+            <div id="ai-notes-result" class="ai-inline-result hidden"></div>
           </div>
         </div>
 
@@ -651,7 +659,10 @@
             📝 Debrief
           </button>
           <button id="detail-ai-btn" class="btn-secondary">
-            🤖 AI Summary
+            ✨ AI Summary
+          </button>
+          <button id="detail-dishes-ai-btn" class="btn-secondary">
+            🍽️ AI Dish Picks
           </button>
           <button id="detail-route-btn" class="btn-secondary">
             🗺️ Route
@@ -799,6 +810,7 @@
       <button id="lightbox-prev" class="lightbox-nav lightbox-prev" aria-label="Previous">‹</button>
       <img id="lightbox-img" class="lightbox-img" src="" alt="Restaurant photo" />
       <div id="lightbox-caption" class="lightbox-caption"></div>
+      <button id="lightbox-ai-caption-btn" class="btn-sm btn-ai lightbox-ai-btn">✨ AI Caption</button>
       <button id="lightbox-next" class="lightbox-nav lightbox-next" aria-label="Next">›</button>
     </div>
   </div>
@@ -876,7 +888,9 @@
         <button id="wrap-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div id="wrap-content" class="wrap-content"></div>
+      <div id="wrap-ai-digest" class="ai-digest-block hidden"></div>
       <div style="display:flex;gap:8px;margin-top:16px">
+        <button id="wrap-ai-btn" class="btn-secondary">✨ AI Narrative</button>
         <button id="wrap-share-btn" class="btn-primary" style="flex:1">📤 Share My Wrap</button>
         <button id="wrap-prev-btn" class="btn-ghost btn-sm">◀ Prev Month</button>
         <button id="wrap-next-btn" class="btn-ghost btn-sm">Next ▶</button>
@@ -963,7 +977,9 @@
         <button id="review-next-year" class="icon-btn">▶</button>
       </div>
       <div id="review-content" class="review-content"></div>
+      <div id="review-ai-digest" class="ai-digest-block hidden"></div>
       <div style="display:flex;gap:8px;margin-top:16px">
+        <button id="review-ai-btn" class="btn-secondary">✨ AI Year Recap</button>
         <button id="review-share-btn" class="btn-primary" style="flex:1">📤 Share My Wrap</button>
         <button id="review-close-btn2" class="btn-ghost">Close</button>
       </div>
@@ -1110,23 +1126,48 @@
   <div id="ai-panel-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="ai-panel-title">
     <div class="modal-card ai-panel-card">
       <div class="modal-header">
-        <h2 id="ai-panel-title">🐻 Byte Cub</h2>
+        <div style="display:flex;align-items:center;gap:8px">
+          <h2 id="ai-panel-title">🐻 Byte Cub</h2>
+          <span class="ai-provider-badge">Gemini 2.0 Flash</span>
+        </div>
         <button id="ai-panel-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="ai-panel-body">
-        <div id="ai-key-notice" class="ai-key-notice hidden">
-          ⚙️ Add your OpenAI key in <strong>Settings → AI API Key</strong> to unlock AI features.
+
+        <!-- API Key Setup -->
+        <div id="ai-key-setup" class="ai-key-setup">
+          <div class="ai-key-setup-inner">
+            <div class="ai-key-icon">✨</div>
+            <h3>Unlock Real AI</h3>
+            <p>Add your free Google Gemini API key to power every AI feature in Feed The Bear.</p>
+            <div class="ai-key-input-row">
+              <input type="password" id="ai-gemini-key-input" class="form-input" placeholder="Paste Gemini API key (AIza…)" autocomplete="off" />
+              <button id="ai-save-key-btn" class="btn-primary btn-sm">Save</button>
+            </div>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="ai-key-link">Get a free key at Google AI Studio →</a>
+          </div>
         </div>
+
+        <!-- Active state (key saved) -->
+        <div id="ai-key-active" class="ai-key-active hidden">
+          <span class="ai-status-dot"></span> Gemini connected
+          <button id="ai-change-key-btn" class="btn-ghost btn-xs">Change key</button>
+        </div>
+
         <div class="ai-quick-btns">
-          <button class="ai-quick-btn" data-prompt="summarize">📝 Summarise my list</button>
-          <button class="ai-quick-btn" data-prompt="recommend">🎯 Recommend tonight</button>
-          <button class="ai-quick-btn" data-prompt="rut">🔄 Am I in a food rut?</button>
-          <button class="ai-quick-btn" data-prompt="next-cuisine">🌍 New cuisine to try</button>
+          <button class="ai-quick-btn" data-prompt="summarize">📝 My food story</button>
+          <button class="ai-quick-btn" data-prompt="recommend">🎯 Tonight's pick</button>
+          <button class="ai-quick-btn" data-prompt="rut">🔄 Food rut check</button>
+          <button class="ai-quick-btn" data-prompt="next-cuisine">🌍 New cuisine idea</button>
+          <button class="ai-quick-btn" data-prompt="hidden-gems">💎 Hidden gems</button>
+          <button class="ai-quick-btn" data-prompt="taste-profile">🧬 My taste DNA</button>
         </div>
         <div class="ai-chat-history" id="ai-chat-history"></div>
         <div class="ai-input-row">
-          <input id="ai-chat-input" class="form-input" placeholder="Ask anything about your food journey…" type="text" />
-          <button id="ai-chat-send-btn" class="btn-primary">Send</button>
+          <input id="ai-chat-input" class="form-input" placeholder="Ask Byte Cub anything…" type="text" />
+          <button id="ai-chat-send-btn" class="btn-primary" aria-label="Send">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
         </div>
       </div>
     </div>
@@ -1330,6 +1371,7 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="ai.js"></script>
   <script src="app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {

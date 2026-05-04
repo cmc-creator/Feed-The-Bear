@@ -2465,7 +2465,7 @@ function setupEvents () {
   document.getElementById('stats2-close-btn').addEventListener('click', closeStats2);
   document.getElementById('stats2-overlay').addEventListener('click', e => { if (e.target === document.getElementById('stats2-overlay')) closeStats2(); });
 
-  // Phase 9 — AI Assistant
+  // AI Core — Byte Cub panel
   document.getElementById('ai-panel-close-btn').addEventListener('click', closeAiPanel);
   document.getElementById('ai-panel-overlay').addEventListener('click', e => { if (e.target === document.getElementById('ai-panel-overlay')) closeAiPanel(); });
   document.getElementById('ai-chat-send-btn').addEventListener('click', () => sendAiMessage(document.getElementById('ai-chat-input').value));
@@ -2475,7 +2475,157 @@ function setupEvents () {
     if (btn) handleAiQuickBtn(btn.dataset.prompt);
   });
   document.querySelectorAll('.ai-quick-btn').forEach(btn => btn.addEventListener('click', () => handleAiQuickBtn(btn.dataset.prompt)));
+
+  // AI Core — API key setup
+  document.getElementById('ai-save-key-btn').addEventListener('click', () => {
+    const val = document.getElementById('ai-gemini-key-input').value.trim();
+    if (!val.startsWith('AIza')) { showToast('Invalid Key', 'Gemini keys start with AIza\u2026', 'error'); return; }
+    AI.setKey(val);
+    _syncAiKeyUI();
+    showToast('\u2728 Gemini Connected!', 'AI features are now unlocked.', 'success');
+  });
+  document.getElementById('ai-change-key-btn').addEventListener('click', () => {
+    document.getElementById('ai-key-setup').classList.remove('hidden');
+    document.getElementById('ai-key-active').classList.add('hidden');
+  });
+
+  // AI — Detail modal
   document.getElementById('detail-ai-btn').addEventListener('click', () => { if (state.detailId) getAiDetailSummary(state.detailId); });
+  document.getElementById('detail-dishes-ai-btn').addEventListener('click', () => { if (state.detailId) getAiDishRecs(state.detailId); });
+
+  // AI — Smart Fill button in add/edit form
+  document.getElementById('ai-smart-fill-btn').addEventListener('click', async () => {
+    const name = document.getElementById('form-name').value.trim();
+    if (!name) { showToast('Name needed', 'Enter a restaurant name first.', 'info'); return; }
+    if (!AI.hasKey()) { openAiPanel(); return; }
+    const fillResult = document.getElementById('ai-fill-result');
+    fillResult.classList.remove('hidden');
+    fillResult.innerHTML = '\uD83D\uDC3B <span class="ai-thinking-inline"><span></span><span></span><span></span></span>';
+    try {
+      const addr = document.getElementById('form-address').value.trim();
+      const data = await AI.smartFill(name, addr);
+      if (data.cuisine)    { document.getElementById('form-cuisine').value = data.cuisine; }
+      if (data.priceRange) { const sel = document.getElementById('form-price'); if (sel) sel.value = data.priceRange; }
+      if (data.description) { const notesEl = document.getElementById('form-notes'); if (!notesEl.value) notesEl.value = data.description; }
+      // Tags
+      if (data.tags && data.tags.length) {
+        data.tags.forEach(tag => {
+          const cb = document.querySelector(`.tag-check[value="${escHtml(tag)}"]`);
+          if (cb) cb.checked = true;
+        });
+      }
+      fillResult.innerHTML = `\u2713 AI filled — cuisine, price & tags. Confidence: ${Math.round((data.confidence || 0.8)*100)}%`;
+      fillResult.style.color = 'var(--green)';
+    } catch (err) {
+      fillResult.innerHTML = '\u26A0 ' + escHtml(err.message || 'AI error');
+      fillResult.style.color = 'var(--primary)';
+    }
+  });
+
+  // AI — Notes enricher
+  document.getElementById('ai-notes-btn').addEventListener('click', async () => {
+    const notes = document.getElementById('form-notes').value.trim();
+    if (!notes) { showToast('Write a note first', 'Jot down something and let AI enrich it.', 'info'); return; }
+    if (!AI.hasKey()) { openAiPanel(); return; }
+    const notesResult = document.getElementById('ai-notes-result');
+    notesResult.classList.remove('hidden');
+    notesResult.innerHTML = '\uD83D\uDC3B <span class="ai-thinking-inline"><span></span><span></span><span></span></span>';
+    try {
+      const r = {
+        name: document.getElementById('form-name').value.trim(),
+        cuisine: document.getElementById('form-cuisine').value.trim(),
+        myRating: document.getElementById('form-rating').value,
+      };
+      const rich = await AI.enrichNotes(r, notes);
+      notesResult.innerHTML = `<strong>AI Enriched:</strong> ${escHtml(rich)} <button class="btn-sm btn-ai" id="notes-apply-btn" style="margin-left:8px">Apply</button>`;
+      document.getElementById('notes-apply-btn').addEventListener('click', () => {
+        document.getElementById('form-notes').value = rich;
+        notesResult.classList.add('hidden');
+      });
+    } catch (err) {
+      notesResult.innerHTML = '\u26A0 ' + escHtml(err.message || 'AI error');
+    }
+  });
+
+  // AI — Lightbox caption
+  document.getElementById('lightbox-ai-caption-btn').addEventListener('click', async () => {
+    const img = document.getElementById('lightbox-img');
+    if (!img.src || img.src === window.location.href) return;
+    if (!AI.hasKey()) { openAiPanel(); return; }
+    const captionBtn = document.getElementById('lightbox-ai-caption-btn');
+    captionBtn.disabled = true; captionBtn.textContent = '\u2728 Captioning\u2026';
+    try {
+      // Convert img src to base64
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      const b64 = canvas.toDataURL('image/jpeg').split(',')[1];
+      const rName = state.detailId ? (state.restaurants.find(r=>r.id===state.detailId)||{}).name||'' : '';
+      const caption = await AI.captionPhoto(b64, 'image/jpeg', rName);
+      const capEl = document.getElementById('lightbox-caption');
+      capEl.textContent = caption;
+      captionBtn.textContent = '\u2713 Captioned!';
+    } catch (err) {
+      captionBtn.textContent = '\u26A0 Error'; showToast('Caption failed', err.message, 'error');
+    }
+    setTimeout(() => { captionBtn.disabled = false; captionBtn.textContent = '\u2728 AI Caption'; }, 4000);
+  });
+
+  // AI — Monthly wrap narrative
+  const wrapAiBtn = document.getElementById('wrap-ai-btn');
+  if (wrapAiBtn) wrapAiBtn.addEventListener('click', async () => {
+    if (!AI.hasKey()) { openAiPanel(); return; }
+    const digestEl = document.getElementById('wrap-ai-digest');
+    digestEl.classList.remove('hidden');
+    digestEl.innerHTML = '\uD83D\uDC3B <span class="ai-thinking-inline"><span></span><span></span><span></span></span>';
+    try {
+      const monthLabel = new Date().toLocaleDateString('en-US', { month:'long', year:'numeric' });
+      const narrative = await AI.digest(state.restaurants, monthLabel);
+      digestEl.innerHTML = '<div class="ai-digest-inner">' + markdownLite(escHtml(narrative)) + '</div>';
+    } catch (err) {
+      digestEl.innerHTML = '\u26A0 ' + escHtml(err.message || 'AI error');
+    }
+  });
+
+  // AI — Year review narrative
+  const reviewAiBtn = document.getElementById('review-ai-btn');
+  if (reviewAiBtn) reviewAiBtn.addEventListener('click', async () => {
+    if (!AI.hasKey()) { openAiPanel(); return; }
+    const digestEl = document.getElementById('review-ai-digest');
+    digestEl.classList.remove('hidden');
+    digestEl.innerHTML = '\uD83D\uDC3B <span class="ai-thinking-inline"><span></span><span></span><span></span></span>';
+    try {
+      const narrative = await AI.digest(state.restaurants, new Date().getFullYear() + ' Year in Review');
+      digestEl.innerHTML = '<div class="ai-digest-inner">' + markdownLite(escHtml(narrative)) + '</div>';
+    } catch (err) {
+      digestEl.innerHTML = '\u26A0 ' + escHtml(err.message || 'AI error');
+    }
+  });
+
+  // AI — Taste Profile (stats view)
+  const tasteBtn = document.getElementById('ai-taste-profile-btn');
+  if (tasteBtn) tasteBtn.addEventListener('click', async () => {
+    if (!AI.hasKey()) { openAiPanel(); return; }
+    const card = document.getElementById('ai-taste-profile-result');
+    card.classList.remove('hidden');
+    card.innerHTML = '\uD83D\uDC3B <span class="ai-thinking-inline"><span></span><span></span><span></span></span>';
+    try {
+      const profile = await AI.tasteProfile(state.restaurants);
+      card.innerHTML = `
+        <div class="taste-profile-card">
+          <div class="taste-profile-emoji">${escHtml(profile.emoji || '\uD83C\uDF74')}</div>
+          <div class="taste-profile-body">
+            <div class="taste-profile-title">${escHtml(profile.title || 'Food Explorer')}</div>
+            <div class="taste-profile-sub">${escHtml(profile.subtitle || '')}</div>
+            <div class="taste-profile-traits">${(profile.traits || []).map(t => `<span class="taste-trait">${escHtml(t)}</span>`).join('')}</div>
+            <p class="taste-profile-insight">${escHtml(profile.insight || '')}</p>
+            ${profile.challenge ? `<p class="taste-profile-challenge"><strong>Your challenge:</strong> ${escHtml(profile.challenge)}</p>` : ''}
+          </div>
+        </div>`;
+    } catch (err) {
+      card.innerHTML = '\u26A0 ' + escHtml(err.message || 'AI error');
+    }
+  });
 
   // Phase 9 — Route Planner
   document.getElementById('route-close-btn').addEventListener('click', closeRoutePlanner);
@@ -2869,14 +3019,9 @@ function checkIncomingChallenge () {
    ------------------------------------------------------------ */
 
 async function aiPhotoFill () {
-  const apiKey = state.settings.aiApiKey || '';
-  if (!apiKey) {
-    const confirmed = confirm('AI Photo Fill uses GPT-4o to read restaurant signs and menus and auto-fill the form.\n\nAdd your OpenAI API key to enable it.\n\nClick OK to paste your key now.');
-    if (confirmed) {
-      const key = prompt('Paste your OpenAI API key (starts with sk-):');
-      if (key && key.startsWith('sk-')) { state.settings.aiApiKey = key; saveData(); alert('API key saved! Try AI Fill again.'); }
-      else if (key) { alert('That does not look like a valid OpenAI key.'); }
-    }
+  if (!AI.hasKey()) {
+    openAiPanel();
+    showToast('\uD83D\uDC3B Add API Key', 'Enter your Gemini key in the Byte Cub panel to use AI photo fill.', 'info');
     return;
   }
   const input = document.createElement('input');
@@ -2884,30 +3029,26 @@ async function aiPhotoFill () {
   input.onchange = async () => {
     const file = input.files[0];
     if (!file) return;
-    const photoGroup = document.getElementById('form-photo').parentElement;
-    let ind = photoGroup.querySelector('.ai-analyzing');
-    if (!ind) { ind = document.createElement('div'); ind.className = 'ai-analyzing'; ind.innerHTML = 'Analyzing<div class="ai-dot"></div><div class="ai-dot"></div><div class="ai-dot"></div>'; photoGroup.appendChild(ind); }
+    const nameGroup = document.getElementById('form-name').parentElement;
+    let ind = nameGroup.querySelector('.ai-analyzing');
+    if (!ind) {
+      ind = document.createElement('div');
+      ind.className = 'ai-analyzing';
+      ind.innerHTML = '\uD83D\uDC3B Analyzing photo<span class="ai-dot"></span><span class="ai-dot"></span><span class="ai-dot"></span>';
+      nameGroup.appendChild(ind);
+    }
     try {
-      const b64 = await new Promise((res,rej) => { const r = new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(file); });
-      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-        body: JSON.stringify({ model: 'gpt-4o', max_tokens: 256, messages: [{ role:'user', content: [
-          { type:'text', text: 'If this image shows a restaurant, extract name, cuisine, address. Reply ONLY with JSON like {"name":"...","cuisine":"...","address":"..."}. If nothing identifiable, reply {}.' },
-          { type:'image_url', image_url: { url: 'data:'+file.type+';base64,'+b64, detail:'low' } }
-        ]}]})
-      });
-      if (!resp.ok) throw new Error('API ' + resp.status);
-      const data = await resp.json();
-      const txt  = data.choices?.[0]?.message?.content || '{}';
-      const result = JSON.parse(txt.replace(/```json\n?|\n?```/g,'').trim());
+      const b64      = await new Promise((res,rej) => { const r = new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(file); });
+      const prompt   = 'If this image shows a restaurant, extract name, cuisine, address. Reply ONLY with JSON like {"name":"...","cuisine":"...","address":""}. If nothing identifiable, reply {}.';
+      const raw      = await AI.callVision(prompt, b64, file.type || 'image/jpeg', { maxTokens: 256, temperature: 0.2 });
+      const result   = JSON.parse(raw.replace(/```json\n?|\n?```/g,'').trim());
       if (result.name)    document.getElementById('form-name').value    = result.name;
       if (result.cuisine) document.getElementById('form-cuisine').value = result.cuisine;
       if (result.address) document.getElementById('form-address').value = result.address;
-      ind.innerHTML = 'AI filled! Review above.'; ind.style.color = 'var(--green)';
+      ind.innerHTML = '\u2713 AI filled! Review and save.'; ind.style.color = 'var(--green)';
       setTimeout(() => ind.remove(), 4000);
     } catch (err) {
-      ind.innerHTML = 'AI error: ' + escHtml(err.message); ind.style.color = 'var(--primary)';
+      ind.innerHTML = '\u26A0 ' + escHtml(err.message || 'AI error'); ind.style.color = 'var(--primary)';
       setTimeout(() => ind.remove(), 5000);
     }
   };
@@ -5017,129 +5158,136 @@ function renderVisitHeatmap (visited) {
 }
 
 /* ------------------------------------------------------------
-   PHASE 9 • 🐻 AI ASSISTANT
+   PHASE 9 • 🐻 AI ASSISTANT (Gemini-powered Byte Cub)
    ------------------------------------------------------------ */
 
 const _aiHistory = [];
 
 function openAiPanel () {
-  const key = state.settings.aiApiKey;
-  document.getElementById('ai-key-notice').classList.toggle('hidden', !!key);
+  _syncAiKeyUI();
   document.getElementById('ai-panel-overlay').classList.remove('hidden');
   document.body.classList.add('overlay-open');
-  if (!_aiHistory.length) _appendAiMsg('assistant', "Hi! I'm Byte Cub, your food AI. Ask me anything about your restaurant list, or tap a quick button above. 🐻");
+  if (!_aiHistory.length) _appendAiMsg('assistant', "Hi! I'm Byte Cub \uD83D\uDC3B\u2014your personal food guide, now powered by Gemini AI. Ask me anything about your restaurant list!");
 }
 function closeAiPanel () {
   document.getElementById('ai-panel-overlay').classList.add('hidden');
   maybeHideOverlay();
 }
 
+function _syncAiKeyUI () {
+  const hasKey = AI.hasKey();
+  document.getElementById('ai-key-setup').classList.toggle('hidden', hasKey);
+  document.getElementById('ai-key-active').classList.toggle('hidden', !hasKey);
+}
+
 function _appendAiMsg (role, text) {
   _aiHistory.push({ role, text });
   const hist = document.getElementById('ai-chat-history');
-  const div = document.createElement('div');
+  const div  = document.createElement('div');
   div.className = 'ai-msg ' + role;
-  div.innerHTML = `<div class="ai-msg-avatar">${role === 'assistant' ? '🐻' : '👤'}</div><div class="ai-msg-bubble">${escHtml(text)}</div>`;
+  const safeText = markdownLite(escHtml(text));
+  div.innerHTML  = `<div class="ai-msg-avatar">${role === 'assistant' ? '\uD83D\uDC3B' : '\uD83D\uDE0B'}</div><div class="ai-msg-bubble">${safeText}</div>`;
   hist.appendChild(div);
   hist.scrollTop = hist.scrollHeight;
+  div.querySelectorAll('.chip-link[data-id]').forEach(el =>
+    el.addEventListener('click', () => openDetailModal(el.dataset.id)));
 }
 
 function _showAiThinking () {
   const hist = document.getElementById('ai-chat-history');
-  const div = document.createElement('div');
+  const div  = document.createElement('div');
   div.className = 'ai-msg assistant';
-  div.id = 'ai-thinking-bubble';
-  div.innerHTML = `<div class="ai-msg-avatar">🐻</div><div class="ai-msg-bubble ai-thinking"><span></span><span></span><span></span></div>`;
+  div.id        = 'ai-thinking-bubble';
+  div.innerHTML = `<div class="ai-msg-avatar">\uD83D\uDC3B</div><div class="ai-msg-bubble ai-thinking"><span></span><span></span><span></span></div>`;
   hist.appendChild(div);
   hist.scrollTop = hist.scrollHeight;
   return div;
 }
 
 function _buildListContext () {
-  const visited = state.restaurants.filter(r => r.status === 'visited');
-  const wishlist = state.restaurants.filter(r => r.status === 'wishlist');
-  const topRated = visited.sort((a,b) => b.myRating - a.myRating).slice(0,5).map(r => `${r.name} (${r.cuisine}, ?${r.myRating})`).join(', ');
-  const cuisines = [...new Set(visited.map(r => r.cuisine).filter(Boolean))].join(', ');
-  return `User's food tracker summary: ${visited.length} visited, ${wishlist.length} on wishlist. Top rated: ${topRated}. Cuisines explored: ${cuisines}.`;
+  return AI.buildContext(state.restaurants);
 }
 
 async function sendAiMessage (userText) {
   if (!userText.trim()) return;
-  const key = state.settings.aiApiKey;
   _appendAiMsg('user', userText);
   document.getElementById('ai-chat-input').value = '';
 
-  if (!key) {
-    _appendAiMsg('assistant', "I need an OpenAI API key to give smart answers. Go to Settings ? AI API Key to add yours. In the meantime, here's what I can see: " + _buildListContext());
+  if (!AI.hasKey()) {
+    const ruleResp = typeof chatResponse === 'function' ? chatResponse(userText) : "I need a Gemini API key to give smart answers!";
+    _appendAiMsg('assistant', ruleResp + '\n\n*Add a Gemini API key above for full AI-powered answers!*');
     return;
   }
 
   const thinking = _showAiThinking();
-
   try {
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'You are a friendly food assistant. Answer questions about the user\'s restaurant list concisely. ' + _buildListContext() },
-          ..._aiHistory.filter(m => m.role !== 'assistant' || _aiHistory.indexOf(m) > _aiHistory.length - 8).map(m => ({ role: m.role, content: m.text }))
-        ],
-        max_tokens: 300
-      })
-    });
-    const data = await resp.json();
+    const reply = await AI.chat(userText, _aiHistory.slice(-12), state.restaurants);
     thinking.remove();
-    const reply = data.choices?.[0]?.message?.content || 'No response. Check your API key.';
     _appendAiMsg('assistant', reply);
-  } catch (_) {
+  } catch (err) {
     thinking.remove();
-    _appendAiMsg('assistant', 'Connection error. Check your internet and API key.');
+    if (err.message === 'NO_KEY') {
+      _appendAiMsg('assistant', 'Add your Gemini API key above to enable AI chat. \uD83D\uDC3B');
+    } else {
+      _appendAiMsg('assistant', '\u26A0\uFE0F ' + (err.message || 'Connection error. Check your API key and internet.'));
+    }
   }
 }
 
 function handleAiQuickBtn (prompt) {
   const prompts = {
-    summarize: 'Give me a fun summary of my food journey so far.',
-    recommend: 'Based on my taste, what should I eat tonight?',
-    rut:       'Am I stuck in a food rut? What do you suggest I try next?',
-    'next-cuisine': 'What new cuisine would suit my tastes that I haven\'t tried yet?'
+    summarize:       'Give me a fun, personalised summary of my food journey so far.',
+    recommend:       'Based on my taste profile, what should I eat tonight? Be specific!',
+    rut:             'Am I stuck in a food rut? What do you suggest I try next?',
+    'next-cuisine':  'What new cuisine would suit my tastes that I have never tried yet?',
+    'hidden-gems':   'Which of my saved restaurants are hidden gems I might be overlooking?',
+    'taste-profile': 'Give me a creative personality read on my food tastes based on my list.',
   };
   sendAiMessage(prompts[prompt] || prompt);
 }
 
 async function getAiDetailSummary (restaurantId) {
+  const r  = state.restaurants.find(x => x.id === restaurantId);
+  if (!r) return;
+  const el = document.getElementById('detail-ai-summary');
+  if (!el) return;
+  el.classList.remove('hidden');
+
+  if (!AI.hasKey()) {
+    el.innerHTML = `<span class="ai-badge">\uD83D\uDC3B Byte Cub</span> Add a Gemini API key in the Byte Cub panel to get AI summaries. <em>${escHtml(r.name)}: ${escHtml(r.cuisine || 'restaurant')}, ${r.myRating ? r.myRating + '\u2605' : 'unrated'}.</em>`;
+    return;
+  }
+
+  el.innerHTML = `<span class="ai-badge">\uD83D\uDC3B Byte Cub</span> <span class="ai-thinking-inline"><span></span><span></span><span></span></span>`;
+  try {
+    const text = await AI.restaurantSummary(r);
+    el.innerHTML = `<span class="ai-badge">\uD83D\uDC3B Byte Cub</span> ${escHtml(text)}`;
+  } catch (err) {
+    el.innerHTML = `<span class="ai-badge">\u26A0\uFE0F</span> ${escHtml(err.message || 'Could not connect to AI.')}`;
+  }
+}
+
+async function getAiDishRecs (restaurantId) {
   const r = state.restaurants.find(x => x.id === restaurantId);
   if (!r) return;
   const el = document.getElementById('detail-ai-summary');
   if (!el) return;
   el.classList.remove('hidden');
-  el.textContent = '🐻 Generating summary…';
 
-  const key = state.settings.aiApiKey;
-  if (!key) {
-    el.textContent = `🐻 ${r.name} · ${r.cuisine || 'restaurant'} · ?${r.myRating || '?'} · ${r.notes ? r.notes.slice(0,120) : 'No notes yet.'}`;
+  if (!AI.hasKey()) {
+    el.innerHTML = `<span class="ai-badge">\uD83C\uDF7D\uFE0F Dish Picks</span> Add your Gemini key in the Byte Cub panel to get AI dish recommendations.`;
     return;
   }
 
+  el.innerHTML = `<span class="ai-badge">\uD83C\uDF7D\uFE0F Dish Picks</span> <span class="ai-thinking-inline"><span></span><span></span><span></span></span>`;
   try {
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'Write a 2-sentence review vibe for a restaurant. Be warm and personal. No fluff.' },
-          { role: 'user', content: `Restaurant: ${r.name}. Cuisine: ${r.cuisine}. Rating: ${r.myRating}/5. Notes: ${r.notes || 'none'}.` }
-        ],
-        max_tokens: 100
-      })
-    });
-    const data = await resp.json();
-    el.textContent = '🐻 ' + (data.choices?.[0]?.message?.content || 'Could not generate summary.');
-  } catch (_) {
-    el.textContent = '⚠ Could not connect to AI.';
+    const dishes = await AI.dishRecs(r);
+    const html = dishes.map(d =>
+      `<div class="ai-dish-item"><strong>${escHtml(d.dish)}</strong> \u2014 ${escHtml(d.reason)}</div>`
+    ).join('');
+    el.innerHTML = `<span class="ai-badge">\uD83C\uDF7D\uFE0F AI Dish Picks for ${escHtml(r.name)}</span><div class="ai-dish-list">${html}</div>`;
+  } catch (err) {
+    el.innerHTML = `<span class="ai-badge">\u26A0\uFE0F</span> ${escHtml(err.message || 'Could not get dish recommendations.')}`;
   }
 }
 

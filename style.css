@@ -3143,7 +3143,252 @@ body.light-mode #profile-btn {
   font-size: .68rem;
   font-weight: 700;
 }
+.open-now-meta { font-size: .72rem; color: var(--text-dim); }
+.open-now-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: rgba(46,204,113,.15);
+  color: #2ecc71;
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: .68rem;
+  font-weight: 700;
+}
 .open-now-loading { text-align: center; color: var(--text-dim); font-size: .85rem; padding: 24px; }
+
+/* ============================================================
+   AI FEATURE STYLES — Gemini / Byte Cub upgrade
+   ============================================================ */
+
+/* Provider badge */
+.ai-provider-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #7c3aed22, #2563eb22);
+  border: 1px solid #7c3aed55;
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: .65rem;
+  font-weight: 700;
+  color: #a78bfa;
+  letter-spacing: .03em;
+  margin-left: auto;
+}
+
+/* Key setup card */
+.ai-key-setup {
+  background: var(--surface2);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.ai-key-setup-inner { display: flex; flex-direction: column; gap: 8px; }
+.ai-key-icon { font-size: 2rem; text-align: center; margin-bottom: 4px; }
+.ai-key-setup h4 { margin: 0 0 2px; font-size: .9rem; text-align: center; }
+.ai-key-setup p  { margin: 0; font-size: .76rem; color: var(--text-dim); text-align: center; }
+.ai-key-link {
+  font-size: .72rem;
+  color: #a78bfa;
+  text-decoration: none;
+  text-align: center;
+  display: block;
+  margin-top: 2px;
+}
+.ai-key-link:hover { text-decoration: underline; }
+
+/* Key active bar */
+.ai-key-active {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(46,204,113,.1);
+  border: 1px solid rgba(46,204,113,.3);
+  border-radius: 10px;
+  padding: 7px 12px;
+  font-size: .78rem;
+  font-weight: 600;
+  color: #2ecc71;
+  margin-bottom: 10px;
+}
+.ai-status-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: #2ecc71;
+  box-shadow: 0 0 0 0 rgba(46,204,113,.4);
+  animation: pulse-dot 2s infinite;
+  flex-shrink: 0;
+}
+@keyframes pulse-dot {
+  0%   { box-shadow: 0 0 0 0 rgba(46,204,113,.5); }
+  70%  { box-shadow: 0 0 0 7px rgba(46,204,113,.0); }
+  100% { box-shadow: 0 0 0 0 rgba(46,204,113,.0); }
+}
+
+/* Shimmer on btn-ai */
+.btn-ai {
+  background: linear-gradient(135deg, #7c3aed, #2563eb) !important;
+  color: #fff !important;
+  border: none !important;
+  font-size: .72rem;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 700;
+  margin-left: 6px;
+  vertical-align: middle;
+  position: relative;
+  overflow: hidden;
+  transition: opacity .15s, transform .1s;
+}
+.btn-ai::after {
+  content: '';
+  position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.25), transparent);
+  animation: shimmer 2.5s infinite;
+}
+@keyframes shimmer {
+  0%   { left: -60%; }
+  100% { left: 120%; }
+}
+.btn-ai:hover { opacity: .9 !important; transform: translateY(-1px); }
+.btn-ai:active { transform: translateY(0); }
+
+/* Inline AI result box */
+.ai-inline-result {
+  margin-top: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--surface2);
+  border-left: 3px solid #7c3aed;
+  font-size: .8rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+/* AI thinking inline dots */
+.ai-thinking-inline {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+.ai-thinking-inline span {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: #a78bfa;
+  display: inline-block;
+  animation: ai-bounce 1.2s infinite;
+}
+.ai-thinking-inline span:nth-child(2) { animation-delay: .2s; }
+.ai-thinking-inline span:nth-child(3) { animation-delay: .4s; }
+@keyframes ai-bounce {
+  0%,80%,100% { transform: translateY(0); }
+  40%          { transform: translateY(-5px); }
+}
+
+/* AI badge inside detail summary */
+.ai-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #7c3aed33, #2563eb33);
+  border: 1px solid #7c3aed55;
+  border-radius: 12px;
+  padding: 1px 7px;
+  font-size: .68rem;
+  font-weight: 700;
+  color: #a78bfa;
+  margin-right: 6px;
+}
+
+/* Dish recommendations */
+.ai-dish-list { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.ai-dish-item {
+  background: var(--surface2);
+  border-radius: 8px;
+  padding: 7px 11px;
+  font-size: .8rem;
+  line-height: 1.45;
+  border-left: 3px solid #f59e0b;
+}
+.ai-dish-item strong { color: var(--text); }
+
+/* Lightbox AI caption button */
+.lightbox-ai-btn {
+  position: absolute;
+  bottom: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  white-space: nowrap;
+}
+
+/* AI Digest / narrative block */
+.ai-digest-block {
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, rgba(124,58,237,.12), rgba(37,99,235,.10));
+  border: 1px solid #7c3aed44;
+  border-radius: 14px;
+  font-size: .85rem;
+  line-height: 1.65;
+  color: var(--text);
+}
+.ai-digest-inner p { margin: 0 0 8px; }
+.ai-digest-inner strong { color: #a78bfa; }
+
+/* Taste Profile card */
+#ai-taste-profile-result { margin-top: 16px; }
+.taste-profile-card {
+  display: flex;
+  gap: 14px;
+  background: linear-gradient(135deg, rgba(124,58,237,.12), rgba(37,99,235,.10));
+  border: 1px solid #7c3aed44;
+  border-radius: 16px;
+  padding: 16px;
+  align-items: flex-start;
+}
+.taste-profile-emoji { font-size: 2.8rem; line-height: 1; flex-shrink: 0; }
+.taste-profile-body  { flex: 1; min-width: 0; }
+.taste-profile-title { font-size: 1.1rem; font-weight: 800; color: var(--text); margin-bottom: 2px; }
+.taste-profile-sub   { font-size: .78rem; color: #a78bfa; font-weight: 600; margin-bottom: 8px; }
+.taste-profile-traits {
+  display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;
+}
+.taste-trait {
+  background: #7c3aed22;
+  border: 1px solid #7c3aed44;
+  border-radius: 20px;
+  padding: 2px 9px;
+  font-size: .7rem;
+  font-weight: 600;
+  color: #c4b5fd;
+}
+.taste-profile-insight { font-size: .82rem; line-height: 1.55; color: var(--text); margin: 0 0 6px; }
+.taste-profile-challenge { font-size: .78rem; color: var(--text-dim); margin: 0; }
+
+/* AI quick buttons row */
+.ai-quick-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 0;
+}
+.ai-quick-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: .74rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text);
+  transition: background .15s, border-color .15s;
+  white-space: nowrap;
+}
+.ai-quick-btn:hover {
+  background: linear-gradient(135deg, #7c3aed22, #2563eb22);
+  border-color: #7c3aed55;
+  color: #a78bfa;
+}
 
 /* -- XP level badge on header ------------------------------ */
 .xp-badge {
