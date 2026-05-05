@@ -4,6 +4,28 @@
 
 'use strict';
 
+/* ── Defensive AI stub — if ai.js failed to load (old SW cache,
+   offline, etc.) replace window.AI with a no-op stub so the app
+   still boots instead of throwing ReferenceError on first call. */
+if (typeof AI === 'undefined') {
+  window.AI = {
+    getKey: () => '', setKey: () => {}, hasKey: () => false,
+    call: () => Promise.reject(new Error('AI module not loaded')),
+    callVision: () => Promise.reject(new Error('AI module not loaded')),
+    stream: async function* () {},
+    chat: () => Promise.reject(new Error('AI module not loaded')),
+    smartFill: () => Promise.reject(new Error('AI module not loaded')),
+    enrichNotes: () => Promise.reject(new Error('AI module not loaded')),
+    dishRecs: () => Promise.reject(new Error('AI module not loaded')),
+    digest: () => Promise.reject(new Error('AI module not loaded')),
+    tasteProfile: () => Promise.reject(new Error('AI module not loaded')),
+    captionPhoto: () => Promise.reject(new Error('AI module not loaded')),
+    restaurantSummary: () => Promise.reject(new Error('AI module not loaded')),
+    cravingMatch: () => Promise.reject(new Error('AI module not loaded')),
+    buildContext: () => '',
+  };
+}
+
 /* ── Constants ───────────────────────────────────────────── */
 const STORAGE_KEY   = 'ftb_restaurants_v2';
 const SETTINGS_KEY  = 'ftb_settings_v1';

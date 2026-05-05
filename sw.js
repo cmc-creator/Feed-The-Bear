@@ -3,7 +3,7 @@
    Offline-first cache strategy
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-const CACHE  = 'ftb-v17';
+const CACHE  = 'ftb-v18';
 const ASSETS = [
   './',
   './index.html',
@@ -43,7 +43,14 @@ self.addEventListener('fetch', e => {
         caches.open(CACHE).then(c => c.put(e.request, clone));
       }
       return resp;
-    }).catch(() => caches.match('./index.html')))
+    }).catch(() => {
+      // Only return the app shell for page navigations, not for JS/CSS/image assets.
+      // Returning HTML for a .js request causes a parse error and breaks the app.
+      if (e.request.mode === 'navigate') {
+        return caches.match('./index.html');
+      }
+      return new Response('/* offline */', { status: 503, headers: { 'Content-Type': 'application/javascript' } });
+    }))
   );
 });
 
