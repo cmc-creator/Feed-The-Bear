@@ -3,7 +3,7 @@
    Offline-first cache strategy
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-const CACHE  = 'ftb-v19';
+const CACHE  = 'ftb-v20';
 const ASSETS = [
   './',
   './index.html',
@@ -31,9 +31,14 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Network-first for Nominatim geocoding; cache-first for everything else
+  // Network-first for Nominatim geocoding — results must always be fresh
   if (e.request.url.includes('nominatim.openstreetmap.org')) {
     e.respondWith(fetch(e.request).catch(() => new Response('[]', { headers: { 'Content-Type': 'application/json' } })));
+    return;
+  }
+  // Network-first for Overpass API — restaurant results must always be live, never cached
+  if (e.request.url.includes('overpass-api.de')) {
+    e.respondWith(fetch(e.request).catch(() => new Response('{"elements":[]}', { headers: { 'Content-Type': 'application/json' } })));
     return;
   }
   e.respondWith(

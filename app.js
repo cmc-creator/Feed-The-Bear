@@ -1808,7 +1808,7 @@ async function discoverNearby () {
   try {
     const { userLat: lat, userLng: lng } = state;
     const query = `[out:json][timeout:15];(node["amenity"="restaurant"](around:1000,${lat},${lng});way["amenity"="restaurant"](around:1000,${lat},${lng}););out center 20;`;
-    const res  = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:query });
+    const res  = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:query, signal: AbortSignal.timeout(15000) });
     const data = await res.json();
     const els  = (data.elements || []).slice(0, 20);
     if (!els.length) { document.getElementById('nearby-results').innerHTML = '<div class="nearby-empty">No restaurants found within 1 km. Try a different area!</div>'; return; }
@@ -1838,8 +1838,11 @@ async function discoverNearby () {
         showToast('Pre-filled!', 'Review the details and save.', 'info');
       });
     });
-  } catch {
-    document.getElementById('nearby-results').innerHTML = '<div class="nearby-empty">Could not fetch — check your connection.</div>';
+  } catch (err) {
+    const msg = (err?.name === 'TimeoutError' || err?.name === 'AbortError')
+      ? 'Request timed out — check your connection and try again.'
+      : 'Could not fetch — check your connection.';
+    document.getElementById('nearby-results').innerHTML = `<div class="nearby-empty">${msg}</div>`;
   }
 }
 
