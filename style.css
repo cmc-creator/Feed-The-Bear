@@ -3554,3 +3554,82 @@ body.light-mode #profile-btn {
 
 /* Empty state  remove giant emoji, use text-based icon */
 .empty-icon { font-size: 3rem; opacity: .4; }
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 12 - NEW FEATURES
+   ═══════════════════════════════════════════════════════════ */
+
+/* -- Restaurant Duel -- */
+.duel-card { max-width: 520px; }
+.duel-hint { color: var(--text2); font-size: .85rem; margin: 0 0 14px; }
+.duel-pickers { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; margin-bottom: 14px; }
+.duel-picker-wrap { display: flex; flex-direction: column; gap: 6px; }
+.duel-corner-label { font-size: .75rem; font-weight: 600; color: var(--text2); }
+.duel-select { width: 100%; }
+.duel-vs { font-size: 1.4rem; font-weight: 900; color: var(--primary); text-align: center; padding: 0 6px; }
+.duel-go-btn { width: 100%; margin-bottom: 14px; }
+.duel-result { background: var(--surface2); border-radius: 12px; padding: 16px; font-size: .9rem; line-height: 1.6; white-space: pre-wrap; border: 1px solid var(--border); }
+.duel-share-row { display: flex; justify-content: center; margin-top: 10px; }
+@keyframes duel-flash { 0%,100%{transform:scale(1)}50%{transform:scale(1.04)} }
+.duel-result.duel-animate { animation: duel-flash .5s ease; }
+
+/* -- Cuisine Bingo -- */
+.bingo-card { max-width: 480px; }
+.bingo-sub { color: var(--text2); font-size: .85rem; margin: 0 0 8px; }
+.bingo-progress { font-size: .8rem; color: var(--text2); margin-bottom: 10px; }
+.bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 10px; }
+.bingo-cell { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 4px; text-align: center; font-size: .65rem; line-height: 1.3; cursor: default; transition: background .25s,transform .2s; min-height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.bingo-cell .bingo-cell-emoji { font-size: 1.1rem; }
+.bingo-cell.filled { background: var(--primary); border-color: var(--primary); color: #fff; transform: scale(1.04); }
+.bingo-cell.bingo-line { background: var(--green); border-color: var(--green); color: #fff; box-shadow: 0 0 10px var(--green); }
+.bingo-cell.free { background: var(--surface3); color: var(--text2); font-style: italic; }
+.bingo-winner-banner { text-align: center; font-size: 1.3rem; font-weight: 700; color: var(--green); padding: 10px; background: rgba(0,200,100,.1); border-radius: 10px; border: 1px solid var(--green); animation: duel-flash .6s ease infinite; }
+
+/* -- Fortune Cookie -- */
+.fortune-card { max-width: 420px; text-align: center; }
+.fortune-cookie-wrap { padding: 20px 0 8px; }
+.fortune-cookie { font-size: 5rem; cursor: pointer; display: inline-block; transition: transform .2s; user-select: none; line-height: 1; }
+.fortune-cookie:hover { transform: scale(1.1) rotate(-5deg); }
+@keyframes crack { 0%{transform:scale(1) rotate(0deg)} 20%{transform:scale(1.15) rotate(-8deg)} 40%{transform:scale(.9) rotate(6deg)} 60%{transform:scale(1.05) rotate(-4deg)} 80%{transform:scale(1.1) rotate(2deg)} 100%{transform:scale(1) rotate(0deg)} }
+.fortune-cookie.cracking { animation: crack .6s ease forwards; }
+.fortune-tap-hint { color: var(--text2); font-size: .85rem; margin-top: 4px; }
+.fortune-result { margin-top: 10px; }
+.fortune-text { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 18px; font-size: 1rem; line-height: 1.6; font-style: italic; color: var(--text1); position: relative; }
+.fortune-text::before { content: '"'; font-size: 3rem; color: var(--primary); position: absolute; top: -4px; left: 10px; line-height: 1; opacity: .5; }
+
+/* -- Food Mood Calendar -- */
+.moodcal-card { max-width: 480px; }
+.moodcal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.moodcal-label { font-weight: 600; font-size: .95rem; }
+.moodcal-legend { display: flex; align-items: center; font-size: .75rem; color: var(--text2); margin-bottom: 10px; flex-wrap: wrap; gap: 4px; }
+.moodcal-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.moodcal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.moodcal-dow { text-align: center; font-size: .7rem; color: var(--text2); padding: 2px 0; font-weight: 600; }
+.moodcal-day { aspect-ratio: 1; border-radius: 6px; background: var(--surface2); border: 1px solid transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: .7rem; cursor: pointer; transition: border .15s,transform .15s; position: relative; min-height: 32px; }
+.moodcal-day:hover { border-color: var(--primary); transform: scale(1.06); }
+.moodcal-day.empty { background: transparent; border-color: transparent; cursor: default; }
+.moodcal-day.today { border-color: var(--primary) !important; }
+.moodcal-day .moodcal-dot-inner { width: 8px; height: 8px; border-radius: 50%; margin-top: 3px; }
+.moodcal-detail { margin-top: 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; font-size: .85rem; max-height: 160px; overflow-y: auto; }
+.moodcal-visit-item { padding: 4px 0; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+.moodcal-visit-item:last-child { border-bottom: none; }
+
+/* -- Daily Foodie Challenge -- */
+.dailychallenge-card { max-width: 420px; }
+.dc-streak-row { display: flex; gap: 12px; margin-bottom: 16px; }
+.dc-streak-badge, .dc-xp-badge { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 10px; text-align: center; display: flex; flex-direction: column; align-items: center; }
+.dc-streak-flame { font-size: 1.5rem; }
+.dc-streak-count, .dc-xp-count { font-size: 1.8rem; font-weight: 800; color: var(--primary); line-height: 1.1; }
+.dc-streak-label, .dc-xp-label { font-size: .7rem; color: var(--text2); text-transform: uppercase; letter-spacing: .05em; }
+.dc-challenge-card { background: linear-gradient(135deg,var(--surface2) 0%,rgba(255,107,53,.08) 100%); border: 1px solid var(--border); border-radius: 14px; padding: 20px 16px; text-align: center; margin-bottom: 14px; }
+.dc-challenge-emoji { font-size: 2.5rem; margin-bottom: 8px; }
+.dc-challenge-text { font-size: 1rem; font-weight: 600; margin-bottom: 6px; color: var(--text1); }
+.dc-challenge-desc { font-size: .82rem; color: var(--text2); line-height: 1.5; }
+.dc-actions { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.dc-complete-btn { flex: 1; }
+.dc-completed-banner { text-align: center; font-weight: 600; color: var(--green); padding: 10px; background: rgba(0,200,100,.1); border: 1px solid var(--green); border-radius: 10px; margin-bottom: 10px; }
+.dc-history { margin-top: 8px; }
+.dc-history-title { font-size: .8rem; color: var(--text2); font-weight: 600; margin-bottom: 6px; }
+.dc-history-item { font-size: .8rem; padding: 5px 8px; border-radius: 6px; background: var(--surface2); margin-bottom: 4px; display: flex; gap: 8px; align-items: center; }
+.dc-history-done { color: var(--green); }
+.dc-history-skip { color: var(--text2); }

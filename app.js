@@ -2311,6 +2311,11 @@ function setupEvents () {
       closeTravelMode();
       closeMonthlyDigest();
       closeOpenNow();
+      closeDuel();
+      closeBingo();
+      closeFortune();
+      closeMoodCal();
+      closeDailyChallenge();
       document.getElementById('nearby-overlay').classList.add('hidden');
       document.getElementById('collections-panel').classList.remove('open');
       maybeHideOverlay();
@@ -2707,6 +2712,64 @@ function setupEvents () {
   document.getElementById('open-now-close-btn').addEventListener('click', closeOpenNow);
   document.getElementById('open-now-overlay').addEventListener('click', e => { if (e.target === document.getElementById('open-now-overlay')) closeOpenNow(); });
   document.getElementById('open-now-search-btn').addEventListener('click', runOpenNowSearch);
+
+  // Phase 12 — Restaurant Duel
+  document.getElementById('duel-close-btn').addEventListener('click', closeDuel);
+  document.getElementById('duel-overlay').addEventListener('click', e => { if (e.target === document.getElementById('duel-overlay')) closeDuel(); });
+  document.getElementById('duel-go-btn').addEventListener('click', runDuel);
+
+  // Phase 12 — Cuisine Bingo
+  document.getElementById('bingo-close-btn').addEventListener('click', closeBingo);
+  document.getElementById('bingo-overlay').addEventListener('click', e => { if (e.target === document.getElementById('bingo-overlay')) closeBingo(); });
+  document.getElementById('bingo-share-btn').addEventListener('click', () => {
+    const card = _getBingoCard();
+    const visitedCuisines = new Set(state.restaurants.map(r => r.cuisine?.toLowerCase()).filter(Boolean));
+    const filled = card.filter(c => !c.free && visitedCuisines.has(c.n.toLowerCase())).length;
+    const total = card.filter(c => !c.free).length;
+    const txt = `🎯 My Cuisine Bingo: ${filled}/${total} cuisines explored! #FeedTheBear`;
+    if (navigator.share) { navigator.share({ title: 'Cuisine Bingo', text: txt }); }
+    else { navigator.clipboard?.writeText(txt); showToast('Copied!', 'Bingo result copied.', 'success'); }
+  });
+
+  // Phase 12 — Fortune Cookie
+  document.getElementById('fortune-close-btn').addEventListener('click', closeFortune);
+  document.getElementById('fortune-overlay').addEventListener('click', e => { if (e.target === document.getElementById('fortune-overlay')) closeFortune(); });
+  document.getElementById('fortune-cookie').addEventListener('click', crackFortuneCookie);
+  document.getElementById('fortune-cookie').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') crackFortuneCookie(); });
+  document.getElementById('fortune-again-btn').addEventListener('click', () => { _resetFortuneCookie(); });
+
+  // Phase 12 — Mood Calendar
+  document.getElementById('moodcal-close-btn').addEventListener('click', closeMoodCal);
+  document.getElementById('moodcal-overlay').addEventListener('click', e => { if (e.target === document.getElementById('moodcal-overlay')) closeMoodCal(); });
+  document.getElementById('moodcal-grid').addEventListener('click', e => {
+    const cell = e.target.closest('.moodcal-day[data-day]');
+    if (!cell) return;
+    const gridEl = document.getElementById('moodcal-grid');
+    const visitMap = gridEl._visitMap || {};
+    const monthName = gridEl._monthName || '';
+    const day = parseInt(cell.dataset.day);
+    const visits = visitMap[day] || [];
+    if (!visits.length) return;
+    const detailEl = document.getElementById('moodcal-detail');
+    detailEl.classList.remove('hidden');
+    detailEl.innerHTML = `<strong>${monthName} ${day}</strong><br>` +
+      visits.map(r => {
+        const stars = r.myRating ? '⭐'.repeat(Math.round(r.myRating)) : '—';
+        return `<div class="moodcal-visit-item">${stars} <span>${escHtml(r.name)}${r.cuisine ? ' · ' + escHtml(r.cuisine) : ''}</span></div>`;
+      }).join('');
+  });
+  document.getElementById('moodcal-prev').addEventListener('click', () => {
+    _moodCalMonth--; if (_moodCalMonth < 0) { _moodCalMonth = 11; _moodCalYear--; } _renderMoodCal();
+  });
+  document.getElementById('moodcal-next').addEventListener('click', () => {
+    _moodCalMonth++; if (_moodCalMonth > 11) { _moodCalMonth = 0; _moodCalYear++; } _renderMoodCal();
+  });
+
+  // Phase 12 — Daily Challenge
+  document.getElementById('dailychallenge-close-btn').addEventListener('click', closeDailyChallenge);
+  document.getElementById('dailychallenge-overlay').addEventListener('click', e => { if (e.target === document.getElementById('dailychallenge-overlay')) closeDailyChallenge(); });
+  document.getElementById('dc-complete-btn').addEventListener('click', completeDailyChallenge);
+  document.getElementById('dc-skip-btn').addEventListener('click', skipDailyChallenge);
 
   // Phase 11 — Weekly Goal
   const wgBtn = document.getElementById('wg-set-btn');
@@ -4292,6 +4355,11 @@ function initMoreMenu () {
       'spin':             openSpinWheel,
       'achievements':     openAchievements,
       'digest':           openMonthlyDigest,
+      'duel':             openDuel,
+      'bingo':            openBingo,
+      'fortune':          openFortune,
+      'moodcal':          openMoodCal,
+      'dailychallenge':   openDailyChallenge,
       'wrap':             () => document.getElementById('wrap-btn').click(),
       'export':           () => document.getElementById('export-btn').click(),
       'import-bookmarks': () => document.getElementById('import-bookmarks-btn').click(),
@@ -6579,3 +6647,385 @@ function goingTonightResponse () {
   const pick = pool[Math.floor(Math.random() * pool.length)];
   return `🎯 **Going tonight?** Here\'s my top pick:\n\n<span class="chip-link" data-id="${pick.id}">${cuisineEmoji(pick.cuisine)} **${pick.name}**</span>\n${pick.address ? '📍 ' + pick.address + '\n' : ''}${pick.googleRating ? '⭐ ' + pick.googleRating + '/5\n' : ''}\nSay "directions" to get there, or ask for another pick!`;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 12 — Feature: 🥊 AI RESTAURANT DUEL
+   ═══════════════════════════════════════════════════════════ */
+function openDuel () {
+  const overlay = document.getElementById('duel-overlay');
+  overlay.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  _populateDuelPickers();
+  document.getElementById('duel-result').classList.add('hidden');
+  document.getElementById('duel-share-row').classList.add('hidden');
+}
+function closeDuel () {
+  document.getElementById('duel-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function _populateDuelPickers () {
+  const opts = state.restaurants
+    .slice()
+    .sort((a,b) => a.name.localeCompare(b.name))
+    .map(r => `<option value="${r.id}">${escHtml(r.name)}${r.cuisine ? ' (' + escHtml(r.cuisine) + ')' : ''}</option>`)
+    .join('');
+  ['duel-pick-a','duel-pick-b'].forEach(id => {
+    const sel = document.getElementById(id);
+    sel.innerHTML = '<option value="">Choose a restaurant…</option>' + opts;
+  });
+}
+async function runDuel () {
+  const idA = document.getElementById('duel-pick-a').value;
+  const idB = document.getElementById('duel-pick-b').value;
+  if (!idA || !idB) { showToast('Pick two', 'Select both restaurants first.', 'info'); return; }
+  if (idA === idB) { showToast('Same restaurant!', 'Pick two different spots.', 'info'); return; }
+  if (!AI.hasKey()) { showToast('AI key needed', 'Add your Gemini key in Settings → AI Key.', 'info'); return; }
+  const rA = state.restaurants.find(r => r.id === idA);
+  const rB = state.restaurants.find(r => r.id === idB);
+  if (!rA || !rB) return;
+  const resultEl = document.getElementById('duel-result');
+  const goBtn = document.getElementById('duel-go-btn');
+  resultEl.classList.remove('hidden');
+  resultEl.classList.remove('duel-animate');
+  resultEl.innerHTML = '<span class="ai-thinking-inline"><span></span><span></span><span></span></span> Byte Cub is judging…';
+  goBtn.disabled = true;
+  const describe = r => `Name: ${r.name}\nCuisine: ${r.cuisine||'unknown'}\nMy rating: ${r.myRating||'unrated'}/5\nPrice: ${r.priceRange||'unknown'}\nStatus: ${r.status||''}\nNotes: ${r.notes||'none'}`;
+  const prompt = `You are a dramatic foodie sports commentator. Two restaurants are entering the ring for an epic duel!\n\nCORNER ONE — ${rA.name}:\n${describe(rA)}\n\nCORNER TWO — ${rB.name}:\n${describe(rB)}\n\nGive a fun, dramatic 6-8 sentence head-to-head breakdown covering: cuisine & vibe, value, overall experience based on the notes & ratings. End with a clear winner declaration on its own line starting with "🏆 WINNER:". Keep it under 200 words and make it entertaining!`;
+  try {
+    const text = await AI.call(prompt);
+    const escaped = escHtml(text);
+    const html = escaped.replace(/🏆 WINNER:[^\n]*/g, m => `<div class="duel-winner">${m}</div>`);
+    resultEl.innerHTML = html;
+    void resultEl.offsetWidth;
+    resultEl.classList.add('duel-animate');
+    document.getElementById('duel-share-row').classList.remove('hidden');
+    document.getElementById('duel-share-btn').onclick = () => {
+      const txt = `🥊 Restaurant Duel: ${rA.name} vs ${rB.name}\n\n${text}`;
+      if (navigator.share) { navigator.share({ title: 'Restaurant Duel', text: txt }); }
+      else { navigator.clipboard?.writeText(txt); showToast('Copied!', 'Fight card copied to clipboard.', 'success'); }
+    };
+  } catch (err) {
+    resultEl.innerHTML = '⚠ ' + escHtml(err.message || 'AI error');
+  }
+  goBtn.disabled = false;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 12 — Feature: 🎯 CUISINE BINGO
+   ═══════════════════════════════════════════════════════════ */
+const _BINGO_POOL = [
+  {e:'🍕',n:'Italian'},{e:'🌮',n:'Mexican'},{e:'🍣',n:'Japanese'},{e:'🥘',n:'Indian'},
+  {e:'🥡',n:'Chinese'},{e:'🥐',n:'French'},{e:'🥙',n:'Mediterranean'},{e:'🍔',n:'American'},
+  {e:'🧆',n:'Middle Eastern'},{e:'🍜',n:'Thai'},{e:'🥩',n:'Steakhouse'},{e:'🍤',n:'Seafood'},
+  {e:'🌯',n:'Vietnamese'},{e:'🥗',n:'Salad/Healthy'},{e:'🍺',n:'Pub/Bar'},{e:'🥞',n:'Breakfast'},
+  {e:'🍛',n:'Korean'},{e:'🌶',n:'Ethiopian'},{e:'🥨',n:'German'},{e:'🫔',n:'Peruvian'},
+  {e:'🧇',n:'Brunch'},{e:'🥟',n:'Dim Sum'},{e:'🍖',n:'BBQ'},{e:'🥬',n:'Vegan'},
+  {e:'🫕',n:'Spanish'},{e:'🍝',n:'Pasta'},{e:'🍟',n:'Fast Food'},{e:'🥫',n:'Soul Food'},
+  {e:'🌸',n:'Hawaiian'},{e:'🧁',n:'Bakery/Cafe'}
+];
+function _getBingoCard () {
+  if (!state.settings.bingoCard) { _newBingoCard(); }
+  return state.settings.bingoCard;
+}
+function _newBingoCard () {
+  const userCuisines = [...new Set(state.restaurants.map(r => r.cuisine).filter(Boolean))];
+  const poolNames = _BINGO_POOL.map(b => b.n);
+  const extras = userCuisines.filter(c => !poolNames.includes(c)).slice(0, 5);
+  const extraCells = extras.map(n => ({ e: '🍽', n }));
+  const fullPool = [..._BINGO_POOL, ...extraCells];
+  const shuffled = fullPool.sort(() => Math.random() - .5).slice(0, 24);
+  const card = [...shuffled.slice(0, 12), { e: '⭐', n: 'FREE', free: true }, ...shuffled.slice(12)];
+  state.settings.bingoCard = card;
+  saveData();
+  return card;
+}
+function openBingo () {
+  document.getElementById('bingo-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  _renderBingoGrid();
+}
+function closeBingo () {
+  document.getElementById('bingo-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function _renderBingoGrid () {
+  const card = _getBingoCard();
+  const visitedCuisines = new Set(state.restaurants.map(r => r.cuisine?.toLowerCase()).filter(Boolean));
+  const gridEl = document.getElementById('bingo-grid');
+  const filledIndices = new Set();
+  gridEl.innerHTML = card.map((cell, i) => {
+    const filled = cell.free || visitedCuisines.has(cell.n.toLowerCase());
+    if (filled) filledIndices.add(i);
+    return `<div class="bingo-cell${filled ? ' filled' : ''}${cell.free ? ' free' : ''}" data-idx="${i}">
+      <span class="bingo-cell-emoji">${cell.e}</span>
+      <span>${escHtml(cell.n)}</span>
+    </div>`;
+  }).join('');
+  const totalFilled = [...filledIndices].filter(i => !card[i].free).length;
+  const total = card.filter(c => !c.free).length;
+  document.getElementById('bingo-progress').textContent = `${totalFilled} / ${total} cuisines visited`;
+  const winner = _checkBingoLines(filledIndices);
+  const banner = document.getElementById('bingo-winner-banner');
+  if (winner) {
+    banner.classList.remove('hidden');
+    winner.forEach(idx => {
+      const el = gridEl.children[idx];
+      if (el) el.classList.add('bingo-line');
+    });
+  } else {
+    banner.classList.add('hidden');
+  }
+}
+function _checkBingoLines (filledSet) {
+  const rows = [
+    [0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24]
+  ];
+  const cols = [
+    [0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24]
+  ];
+  const diags = [[0,6,12,18,24],[4,8,12,16,20]];
+  for (const line of [...rows,...cols,...diags]) {
+    if (line.every(i => filledSet.has(i))) return line;
+  }
+  return null;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 12 — Feature: 🥠 AI FOOD FORTUNE COOKIE
+   ═══════════════════════════════════════════════════════════ */
+const _FORTUNE_FALLBACKS = [
+  'The best meal you have not yet tasted is waiting just around the corner.',
+  'Your adventurous palate will lead you to an unexpected culinary gem this week.',
+  'A cuisine you have never tried holds your next favorite dish.',
+  'Sharing a meal with good company turns ordinary food into a feast.',
+  'Trust your instincts at the menu — your gut feeling is hungry for a reason.',
+  'The secret ingredient in every unforgettable meal is the story behind it.',
+  'Your five-star experience is one reservation away.',
+  'New flavors await those bold enough to order off-menu.',
+];
+let _fortuneLoading = false;
+function openFortune () {
+  const overlay = document.getElementById('fortune-overlay');
+  overlay.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  _resetFortuneCookie();
+}
+function closeFortune () {
+  document.getElementById('fortune-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function _resetFortuneCookie () {
+  const cookie = document.getElementById('fortune-cookie');
+  const hint = document.getElementById('fortune-tap-hint');
+  const result = document.getElementById('fortune-result');
+  cookie.classList.remove('cracking');
+  cookie.textContent = '🥠';
+  hint.classList.remove('hidden');
+  result.classList.add('hidden');
+  _fortuneLoading = false;
+}
+async function crackFortuneCookie () {
+  if (_fortuneLoading) return;
+  _fortuneLoading = true;
+  const cookie = document.getElementById('fortune-cookie');
+  const hint = document.getElementById('fortune-tap-hint');
+  const result = document.getElementById('fortune-result');
+  const textEl = document.getElementById('fortune-text');
+  cookie.classList.add('cracking');
+  hint.classList.add('hidden');
+  textEl.innerHTML = '<span class="ai-thinking-inline"><span></span><span></span><span></span></span>';
+  result.classList.remove('hidden');
+  try {
+    let fortune;
+    if (AI.hasKey() && state.restaurants.length > 0) {
+      const top = state.restaurants
+        .filter(r => r.myRating >= 4)
+        .slice(0, 5)
+        .map(r => r.name + (r.cuisine ? ' (' + r.cuisine + ')' : ''))
+        .join(', ');
+      const cuisines = [...new Set(state.restaurants.map(r => r.cuisine).filter(Boolean))].slice(0, 8).join(', ');
+      const prompt = `You are a mystical food fortune cookie oracle. Based on this foodie's taste profile, craft ONE short, witty, personal food fortune (2-3 sentences max). Make it fun, insightful, and food-themed.\n\nFoodie profile:\n- Favorite restaurants: ${top || 'none yet'}\n- Cuisines explored: ${cuisines || 'none yet'}\n- Total restaurants tracked: ${state.restaurants.length}\n\nWrite only the fortune text, no quotes, no label, no extra commentary.`;
+      fortune = await AI.call(prompt);
+    } else {
+      fortune = _FORTUNE_FALLBACKS[Math.floor(Math.random() * _FORTUNE_FALLBACKS.length)];
+    }
+    textEl.textContent = fortune;
+    document.getElementById('fortune-share-btn').onclick = () => {
+      const txt = '🥠 My food fortune: ' + fortune;
+      if (navigator.share) { navigator.share({ title: 'Food Fortune', text: txt }); }
+      else { navigator.clipboard?.writeText(txt); showToast('Copied!', 'Fortune copied.', 'success'); }
+    };
+  } catch (err) {
+    const fb = _FORTUNE_FALLBACKS[Math.floor(Math.random() * _FORTUNE_FALLBACKS.length)];
+    textEl.textContent = fb;
+  }
+  _fortuneLoading = false;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 12 — Feature: 📅 FOOD MOOD CALENDAR
+   ═══════════════════════════════════════════════════════════ */
+let _moodCalYear  = new Date().getFullYear();
+let _moodCalMonth = new Date().getMonth();
+function openMoodCal () {
+  _moodCalYear  = new Date().getFullYear();
+  _moodCalMonth = new Date().getMonth();
+  document.getElementById('moodcal-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  _renderMoodCal();
+}
+function closeMoodCal () {
+  document.getElementById('moodcal-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function _renderMoodCal () {
+  const y = _moodCalYear, m = _moodCalMonth;
+  const monthName = new Date(y, m, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  document.getElementById('moodcal-label').textContent = monthName;
+  const firstDay = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const today = new Date();
+  const visitMap = {};
+  state.restaurants.forEach(r => {
+    const dateStr = r.visitedAt || r.updatedAt || r.createdAt || null;
+    if (!dateStr) return;
+    const d = new Date(dateStr);
+    if (d.getFullYear() === y && d.getMonth() === m) {
+      const day = d.getDate();
+      if (!visitMap[day]) visitMap[day] = [];
+      visitMap[day].push(r);
+    }
+  });
+  const dows = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  let html = dows.map(d => `<div class="moodcal-dow">${d}</div>`).join('');
+  for (let i = 0; i < firstDay; i++) html += '<div class="moodcal-day empty"></div>';
+  for (let day = 1; day <= daysInMonth; day++) {
+    const visits = visitMap[day] || [];
+    const isToday = today.getFullYear() === y && today.getMonth() === m && today.getDate() === day;
+    let dotHtml = '';
+    if (visits.length) {
+      const avgRating = visits.reduce((s, r) => s + (r.myRating || 0), 0) / visits.length;
+      const dotColor = avgRating >= 4 ? 'var(--green)' : avgRating >= 3 ? '#f5a623' : avgRating > 0 ? 'var(--primary)' : 'var(--surface3)';
+      dotHtml = `<div class="moodcal-dot-inner" style="background:${dotColor}"></div>`;
+    }
+    html += `<div class="moodcal-day${isToday ? ' today' : ''}${visits.length ? ' has-visit' : ''}" data-day="${day}">${day}${dotHtml}</div>`;
+  }
+  const gridEl2 = document.getElementById('moodcal-grid');
+  gridEl2.innerHTML = html;
+  gridEl2._visitMap = visitMap;
+  gridEl2._monthName = monthName;
+  document.getElementById('moodcal-detail').classList.add('hidden');
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 12 — Feature: 🔥 DAILY FOODIE CHALLENGE
+   ═══════════════════════════════════════════════════════════ */
+const _DC_CHALLENGES = [
+  { e: '🗺', t: 'New territory', d: 'Visit a cuisine type you have never rated before.' },
+  { e: '📸', t: 'Snap & rate', d: 'Add a photo to one of your saved restaurants today.' },
+  { e: '⭐', t: 'Rate something', d: 'Rate a restaurant you visited but never scored.' },
+  { e: '📝', t: 'Leave a note', d: 'Add personal tasting notes to a restaurant with none.' },
+  { e: '🔍', t: 'Hidden gem', d: 'Find and add a restaurant with under 100 Google reviews.' },
+  { e: '🌶', t: 'Spice it up', d: 'Try or add a restaurant serving spicy cuisine.' },
+  { e: '💸', t: 'Budget bite', d: 'Visit a $ price-range restaurant you have never tried.' },
+  { e: '🥂', t: 'Special occasion', d: 'Book a fine dining ($$$+) spot for an upcoming occasion.' },
+  { e: '🏆', t: 'Top the list', d: 'Rate a restaurant 5 stars and add a note on why.' },
+  { e: '🔁', t: 'Return visit', d: 'Revisit a restaurant you rated 4+ stars over 3 months ago.' },
+  { e: '🌍', t: 'World tour', d: 'Add a restaurant of a cuisine from a continent you have not tracked yet.' },
+  { e: '👥', t: 'Squad goals', d: 'Plan a group outing to one of your want-to-try spots.' },
+  { e: '🕵', t: 'Foodie detective', d: 'Find a restaurant in your city that opened in the last 6 months.' },
+  { e: '🥗', t: 'Green & lean', d: 'Try a plant-based or vegan restaurant today.' },
+  { e: '🍳', t: 'Breakfast club', d: 'Track a breakfast or brunch spot you love.' },
+  { e: '🎲', t: 'Spin the wheel', d: 'Use Spin the Wheel to pick a restaurant and actually go.' },
+  { e: '📖', t: 'Story time', d: 'Add a funny memory or story to a restaurant\'s notes.' },
+  { e: '🗓', t: 'Monthly review', d: 'Open Monthly Digest and reflect on last month\'s visits.' },
+  { e: '🤝', t: 'Share the love', d: 'Export your Food Passport and share it with a friend.' },
+  { e: '🎯', t: 'Bucket list', d: 'Add 3 restaurants to your want-to-try list right now.' },
+];
+function _getDCState () {
+  return state.settings.dailyChallenge || { date: '', text: '', emoji: '', completed: false, streak: 0, xp: 0, history: [] };
+}
+function _getTodayStr () { return new Date().toISOString().slice(0, 10); }
+function _initDailyChallenge () {
+  const dc = _getDCState();
+  const today = _getTodayStr();
+  if (dc.date !== today) {
+    const pick = _DC_CHALLENGES[Math.floor(Math.random() * _DC_CHALLENGES.length)];
+    dc.date = today;
+    dc.text = pick.t;
+    dc.desc = pick.d;
+    dc.emoji = pick.e;
+    dc.completed = false;
+    state.settings.dailyChallenge = dc;
+    saveData();
+  }
+  return dc;
+}
+function openDailyChallenge () {
+  document.getElementById('dailychallenge-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  _renderDailyChallenge();
+}
+function closeDailyChallenge () {
+  document.getElementById('dailychallenge-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function _renderDailyChallenge () {
+  const dc = _initDailyChallenge();
+  document.getElementById('dc-streak-count').textContent = dc.streak || 0;
+  document.getElementById('dc-xp-count').textContent = dc.xp || 0;
+  document.getElementById('dc-emoji').textContent = dc.emoji || '🎯';
+  document.getElementById('dc-text').textContent = dc.text || 'Challenge loading…';
+  document.getElementById('dc-desc').textContent = dc.desc || '';
+  const completeBtn = document.getElementById('dc-complete-btn');
+  const banner = document.getElementById('dc-completed-banner');
+  if (dc.completed) {
+    completeBtn.disabled = true;
+    completeBtn.textContent = '✅ Completed!';
+    banner.classList.remove('hidden');
+  } else {
+    completeBtn.disabled = false;
+    completeBtn.textContent = '✅ Mark Complete';
+    banner.classList.add('hidden');
+  }
+  _renderDCHistory(dc);
+}
+function _renderDCHistory (dc) {
+  const hist = (dc.history || []).slice(-7).reverse();
+  const el = document.getElementById('dc-history');
+  if (!hist.length) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="dc-history-title">Last 7 days</div>' +
+    hist.map(h => `<div class="dc-history-item"><span class="${h.done ? 'dc-history-done' : 'dc-history-skip'}">${h.done ? '✅' : '⏭'}</span><span>${escHtml(h.text)}</span><span style="margin-left:auto;color:var(--text2)">${h.date}</span></div>`).join('');
+}
+function completeDailyChallenge () {
+  const dc = _getDCState();
+  const today = _getTodayStr();
+  if (dc.completed) { showToast('Already done!', 'Come back tomorrow for a new challenge.', 'info'); return; }
+  dc.completed = true;
+  dc.streak = (dc.streak || 0) + 1;
+  dc.xp = (dc.xp || 0) + 25;
+  if (!dc.history) dc.history = [];
+  dc.history.push({ date: today, done: true, text: dc.text });
+  state.settings.dailyChallenge = dc;
+  saveData();
+  showToast('🔥 Challenge complete!', `+25 XP · ${dc.streak} day streak!`, 'success');
+  _renderDailyChallenge();
+}
+function skipDailyChallenge () {
+  const dc = _getDCState();
+  const today = _getTodayStr();
+  if (dc.completed) return;
+  dc.streak = 0;
+  if (!dc.history) dc.history = [];
+  dc.history.push({ date: today, done: false, text: dc.text });
+  const pick = _DC_CHALLENGES[Math.floor(Math.random() * _DC_CHALLENGES.length)];
+  dc.date = today;
+  dc.text = pick.t;
+  dc.desc = pick.d;
+  dc.emoji = pick.e;
+  dc.completed = false;
+  state.settings.dailyChallenge = dc;
+  saveData();
+  showToast('Skipped', 'Streak reset. New challenge loaded!', 'info');
+  _renderDailyChallenge();
+}
+

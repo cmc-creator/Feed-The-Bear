@@ -93,6 +93,11 @@
           <button class="more-menu-item" data-more="swipe">🃏 Swipe to Decide</button>
           <button class="more-menu-item" data-more="spin">🎯 Spin the Wheel</button>
           <button class="more-menu-item" data-more="achievements">🏅 Achievements</button>
+          <button class="more-menu-item" data-more="duel">🥊 Restaurant Duel</button>
+          <button class="more-menu-item" data-more="bingo">🎯 Cuisine Bingo</button>
+          <button class="more-menu-item" data-more="fortune">🥠 Fortune Cookie</button>
+          <button class="more-menu-item" data-more="dailychallenge">🔥 Daily Challenge</button>
+          <button class="more-menu-item" data-more="moodcal">📅 Mood Calendar</button>
           <div class="more-menu-section">Track</div>
           <button class="more-menu-item" data-more="gallery">🖼️ Photo Gallery</button>
           <button class="more-menu-item" data-more="compare">⚖️ Compare</button>
@@ -1367,6 +1372,128 @@
         </div>
         <div id="open-now-results" class="open-now-results"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- 🥊 AI Restaurant Duel -->
+  <div id="duel-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="duel-title">
+    <div class="modal-card duel-card">
+      <div class="modal-header">
+        <h2 id="duel-title">🥊 Restaurant Duel</h2>
+        <button id="duel-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="duel-hint">Pick two restaurants — Byte Cub judges the ultimate showdown.</p>
+      <div class="duel-pickers">
+        <div class="duel-picker-wrap">
+          <div class="duel-corner-label">🔴 Corner One</div>
+          <select id="duel-pick-a" class="form-input duel-select">
+            <option value="">Choose a restaurant…</option>
+          </select>
+        </div>
+        <div class="duel-vs">VS</div>
+        <div class="duel-picker-wrap">
+          <div class="duel-corner-label">🔵 Corner Two</div>
+          <select id="duel-pick-b" class="form-input duel-select">
+            <option value="">Choose a restaurant…</option>
+          </select>
+        </div>
+      </div>
+      <button id="duel-go-btn" class="btn-primary duel-go-btn">🥊 Fight!</button>
+      <div id="duel-result" class="duel-result hidden"></div>
+      <div id="duel-share-row" class="duel-share-row hidden">
+        <button id="duel-share-btn" class="btn-sm">📤 Share Fight Card</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🎯 Cuisine Bingo -->
+  <div id="bingo-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="bingo-title">
+    <div class="modal-card bingo-card">
+      <div class="modal-header">
+        <h2 id="bingo-title">🎯 Cuisine Bingo</h2>
+        <button id="bingo-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="bingo-sub">Visit a restaurant of each cuisine to fill your card.</p>
+      <div id="bingo-progress" class="bingo-progress"></div>
+      <div id="bingo-grid" class="bingo-grid"></div>
+      <div id="bingo-winner-banner" class="bingo-winner-banner hidden">🎉 BINGO! You got a full line!</div>
+      <button id="bingo-share-btn" class="btn-sm" style="margin-top:10px">📤 Share Card</button>
+    </div>
+  </div>
+
+  <!-- 🥠 AI Food Fortune Cookie -->
+  <div id="fortune-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="fortune-title">
+    <div class="modal-card fortune-card">
+      <div class="modal-header">
+        <h2 id="fortune-title">🥠 Food Fortune</h2>
+        <button id="fortune-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="fortune-cookie-wrap">
+        <div id="fortune-cookie" class="fortune-cookie" role="button" tabindex="0" aria-label="Tap to crack open fortune cookie">🥠</div>
+        <p id="fortune-tap-hint" class="fortune-tap-hint">Tap the cookie for your food fortune…</p>
+      </div>
+      <div id="fortune-result" class="fortune-result hidden">
+        <div id="fortune-text" class="fortune-text"></div>
+        <button id="fortune-again-btn" class="btn-sm" style="margin-top:12px">🥠 Another Fortune</button>
+        <button id="fortune-share-btn" class="btn-sm" style="margin-left:6px">📤 Share</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📅 Food Mood Calendar -->
+  <div id="moodcal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="moodcal-title">
+    <div class="modal-card moodcal-card">
+      <div class="modal-header">
+        <h2 id="moodcal-title">📅 Food Mood Calendar</h2>
+        <button id="moodcal-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="moodcal-nav">
+        <button id="moodcal-prev" class="icon-btn">‹</button>
+        <span id="moodcal-label" class="moodcal-label"></span>
+        <button id="moodcal-next" class="icon-btn">›</button>
+      </div>
+      <div class="moodcal-legend">
+        <span class="moodcal-dot" style="background:var(--green)"></span>Great
+        <span class="moodcal-dot" style="background:#f5a623;margin-left:10px"></span>OK
+        <span class="moodcal-dot" style="background:var(--primary);margin-left:10px"></span>Meh
+        <span class="moodcal-dot" style="background:var(--surface3);margin-left:10px"></span>No rating
+      </div>
+      <div id="moodcal-grid" class="moodcal-grid"></div>
+      <div id="moodcal-detail" class="moodcal-detail hidden"></div>
+    </div>
+  </div>
+
+  <!-- 🔥 Daily Foodie Challenge -->
+  <div id="dailychallenge-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="dailychallenge-title">
+    <div class="modal-card dailychallenge-card">
+      <div class="modal-header">
+        <h2 id="dailychallenge-title">🔥 Daily Challenge</h2>
+        <button id="dailychallenge-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="dc-streak-row">
+        <div class="dc-streak-badge">
+          <span class="dc-streak-flame">🔥</span>
+          <span id="dc-streak-count" class="dc-streak-count">0</span>
+          <span class="dc-streak-label">day streak</span>
+        </div>
+        <div class="dc-xp-badge">
+          <span id="dc-xp-count" class="dc-xp-count">0</span>
+          <span class="dc-xp-label">XP</span>
+        </div>
+      </div>
+      <div id="dc-challenge-card" class="dc-challenge-card">
+        <div class="dc-challenge-emoji" id="dc-emoji">🎯</div>
+        <div class="dc-challenge-text" id="dc-text">Loading today's challenge…</div>
+        <div class="dc-challenge-desc" id="dc-desc"></div>
+      </div>
+      <div class="dc-actions">
+        <button id="dc-complete-btn" class="btn-primary dc-complete-btn">✅ Mark Complete</button>
+        <button id="dc-skip-btn" class="btn-sm">Skip today</button>
+      </div>
+      <div id="dc-completed-banner" class="dc-completed-banner hidden">
+        <span>🎉 Challenge completed! +25 XP</span>
+      </div>
+      <div id="dc-history" class="dc-history"></div>
     </div>
   </div>
 
