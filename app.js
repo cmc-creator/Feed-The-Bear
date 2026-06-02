@@ -2316,6 +2316,13 @@ function setupEvents () {
       closeFortune();
       closeMoodCal();
       closeDailyChallenge();
+      closeVisitLog();
+      closeSpendTracker();
+      closeBeenaWhile();
+      closeMealPlanner();
+      closeGroupVote();
+      closeWorldMap();
+      closePassport();
       document.getElementById('nearby-overlay').classList.add('hidden');
       document.getElementById('collections-panel').classList.remove('open');
       maybeHideOverlay();
@@ -2770,6 +2777,58 @@ function setupEvents () {
   document.getElementById('dailychallenge-overlay').addEventListener('click', e => { if (e.target === document.getElementById('dailychallenge-overlay')) closeDailyChallenge(); });
   document.getElementById('dc-complete-btn').addEventListener('click', completeDailyChallenge);
   document.getElementById('dc-skip-btn').addEventListener('click', skipDailyChallenge);
+
+  // Phase 13 — Visit Log
+  document.getElementById('visitlog-close-btn').addEventListener('click', closeVisitLog);
+  document.getElementById('visitlog-overlay').addEventListener('click', e => { if (e.target === document.getElementById('visitlog-overlay')) closeVisitLog(); });
+  document.getElementById('visitlog-load-btn').addEventListener('click', _loadVisitLogEntries);
+  document.getElementById('vl-save-btn').addEventListener('click', _saveVisitLogEntry);
+  document.getElementById('vl-star-row').addEventListener('click', e => {
+    const btn = e.target.closest('.vl-star');
+    if (btn) _setVlStars(parseInt(btn.dataset.val));
+  });
+
+  // Phase 13 — Spend Tracker
+  document.getElementById('spend-close-btn').addEventListener('click', closeSpendTracker);
+  document.getElementById('spend-overlay').addEventListener('click', e => { if (e.target === document.getElementById('spend-overlay')) closeSpendTracker(); });
+
+  // Phase 13 — Been a While
+  document.getElementById('beenawhile-close-btn').addEventListener('click', closeBeenaWhile);
+  document.getElementById('beenawhile-overlay').addEventListener('click', e => { if (e.target === document.getElementById('beenawhile-overlay')) closeBeenaWhile(); });
+
+  // Phase 13 — Meal Planner
+  document.getElementById('mealplanner-close-btn').addEventListener('click', closeMealPlanner);
+  document.getElementById('mealplanner-overlay').addEventListener('click', e => { if (e.target === document.getElementById('mealplanner-overlay')) closeMealPlanner(); });
+  document.getElementById('mp-generate-btn').addEventListener('click', generateMealPlan);
+
+  // Phase 13 — Group Vote
+  document.getElementById('groupvote-close-btn').addEventListener('click', closeGroupVote);
+  document.getElementById('groupvote-overlay').addEventListener('click', e => { if (e.target === document.getElementById('groupvote-overlay')) closeGroupVote(); });
+  document.getElementById('groupvote-generate-btn').addEventListener('click', _generateVoteLink);
+  document.getElementById('groupvote-copy-btn').addEventListener('click', () => {
+    const val = document.getElementById('groupvote-link-input').value;
+    navigator.clipboard?.writeText(val);
+    showToast('Copied!', 'Vote link copied to clipboard.', 'success');
+  });
+  document.getElementById('groupvote-share-btn').addEventListener('click', () => {
+    const val = document.getElementById('groupvote-link-input').value;
+    if (navigator.share) navigator.share({ title: 'Vote for our restaurant!', url: val });
+    else { navigator.clipboard?.writeText(val); showToast('Copied!', 'Vote link copied.', 'success'); }
+  });
+
+  // Phase 13 — World Map
+  document.getElementById('worldmap-close-btn').addEventListener('click', closeWorldMap);
+  document.getElementById('worldmap-overlay').addEventListener('click', e => { if (e.target === document.getElementById('worldmap-overlay')) closeWorldMap(); });
+  document.getElementById('worldmap-share-btn').addEventListener('click', () => {
+    const { countries, cuisineVisits } = _getVisitedCountries();
+    const txt = `🌍 I've tasted ${countries.size} countries & ${Object.keys(cuisineVisits).length} cuisines! #FeedTheBear`;
+    if (navigator.share) navigator.share({ title: 'My Food World Map', text: txt });
+    else { navigator.clipboard?.writeText(txt); showToast('Copied!', 'Map summary copied.', 'success'); }
+  });
+
+  // Phase 13 — Passport
+  document.getElementById('passport-close-btn').addEventListener('click', closePassport);
+  document.getElementById('passport-overlay').addEventListener('click', e => { if (e.target === document.getElementById('passport-overlay')) closePassport(); });
 
   // Phase 11 — Weekly Goal
   const wgBtn = document.getElementById('wg-set-btn');
@@ -4360,6 +4419,13 @@ function initMoreMenu () {
       'fortune':          openFortune,
       'moodcal':          openMoodCal,
       'dailychallenge':   openDailyChallenge,
+      'passport':         openPassport,
+      'worldmap':         openWorldMap,
+      'visitlog':         openVisitLog,
+      'spend':            openSpendTracker,
+      'beenawhile':       openBeenaWhile,
+      'mealplanner':      openMealPlanner,
+      'groupvote':        openGroupVote,
       'wrap':             () => document.getElementById('wrap-btn').click(),
       'export':           () => document.getElementById('export-btn').click(),
       'import-bookmarks': () => document.getElementById('import-bookmarks-btn').click(),
@@ -7029,3 +7095,1099 @@ function skipDailyChallenge () {
   _renderDailyChallenge();
 }
 
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 13 — Feature: 📋 VISIT LOG
+   ═══════════════════════════════════════════════════════════ */
+let _vlRestaurantId = null;
+let _vlStarVal = 0;
+
+function openVisitLog () {
+  _vlRestaurantId = null;
+  _vlStarVal = 0;
+  document.getElementById('visitlog-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  _populateVisitLogSelect();
+  document.getElementById('visitlog-entries').classList.add('hidden');
+  document.getElementById('vl-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('vl-spend').value = '';
+  document.getElementById('vl-dish').value = '';
+  document.getElementById('vl-notes').value = '';
+  _setVlStars(0);
+}
+function closeVisitLog () {
+  document.getElementById('visitlog-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function _populateVisitLogSelect () {
+  const sel = document.getElementById('visitlog-restaurant-select');
+  const sorted = state.restaurants.slice().sort((a, b) => a.name.localeCompare(b.name));
+  sel.innerHTML = '<option value="">Select a restaurant…</option>' +
+    sorted.map(r => `<option value="${r.id}">${escHtml(r.name)}${r.cuisine ? ' (' + escHtml(r.cuisine) + ')' : ''}</option>`).join('');
+}
+function _loadVisitLogEntries () {
+  const id = document.getElementById('visitlog-restaurant-select').value;
+  if (!id) { showToast('Choose a restaurant', 'Select one from the list first.', 'info'); return; }
+  _vlRestaurantId = id;
+  const r = state.restaurants.find(x => x.id === id);
+  if (!r) return;
+  if (!r.visitLog) r.visitLog = [];
+  document.getElementById('visitlog-entries').classList.remove('hidden');
+  _renderVisitLogList(r);
+}
+function _renderVisitLogList (r) {
+  const listEl = document.getElementById('visitlog-list');
+  if (!r.visitLog || !r.visitLog.length) {
+    listEl.innerHTML = '<div style="color:var(--text2);font-size:.82rem;padding:8px 0">No visits logged yet.</div>';
+    return;
+  }
+  listEl.innerHTML = r.visitLog.slice().reverse().map((v, i) => {
+    const realIdx = r.visitLog.length - 1 - i;
+    const stars = v.rating ? '⭐'.repeat(v.rating) : '';
+    return `<div class="visitlog-entry">
+      <div class="visitlog-entry-header">
+        <span class="visitlog-entry-date">${v.date || ''}</span>
+        ${v.spend ? `<span class="visitlog-entry-spend">$${parseFloat(v.spend).toFixed(2)}</span>` : ''}
+        <button class="visitlog-entry-del" data-idx="${realIdx}" title="Delete">✕</button>
+      </div>
+      ${v.dish ? `<div class="visitlog-entry-dish">🍴 ${escHtml(v.dish)}</div>` : ''}
+      ${stars ? `<div class="visitlog-entry-stars">${stars}</div>` : ''}
+      ${v.notes ? `<div class="visitlog-entry-notes">${escHtml(v.notes)}</div>` : ''}
+    </div>`;
+  }).join('');
+  listEl.querySelectorAll('.visitlog-entry-del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx);
+      r.visitLog.splice(idx, 1);
+      saveData();
+      _renderVisitLogList(r);
+      _invalidateSpendCache();
+    });
+  });
+}
+function _setVlStars (n) {
+  _vlStarVal = n;
+  document.querySelectorAll('.vl-star').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.val) <= n);
+  });
+}
+function _saveVisitLogEntry () {
+  if (!_vlRestaurantId) { showToast('Load a restaurant first', '', 'info'); return; }
+  const r = state.restaurants.find(x => x.id === _vlRestaurantId);
+  if (!r) return;
+  const date  = document.getElementById('vl-date').value;
+  const spend = document.getElementById('vl-spend').value;
+  const dish  = document.getElementById('vl-dish').value.trim();
+  const notes = document.getElementById('vl-notes').value.trim();
+  if (!date) { showToast('Pick a date', '', 'info'); return; }
+  if (!r.visitLog) r.visitLog = [];
+  r.visitLog.push({ date, spend: spend ? parseFloat(spend) : null, dish, notes, rating: _vlStarVal || null });
+  // Bump updatedAt so Mood Calendar picks it up
+  r.updatedAt = new Date(date).toISOString();
+  saveData();
+  renderAll();
+  _renderVisitLogList(r);
+  _invalidateSpendCache();
+  document.getElementById('vl-dish').value = '';
+  document.getElementById('vl-notes').value = '';
+  document.getElementById('vl-spend').value = '';
+  _setVlStars(0);
+  showToast('Visit saved!', `Logged a visit to ${escHtml(r.name)}.`, 'success');
+}
+function _invalidateSpendCache () { _spendCacheValid = false; }
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 13 — Feature: 💸 SPEND TRACKER
+   ═══════════════════════════════════════════════════════════ */
+let _spendCacheValid = false;
+
+function openSpendTracker () {
+  document.getElementById('spend-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  _renderSpendTracker();
+}
+function closeSpendTracker () {
+  document.getElementById('spend-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function _getAllVisits () {
+  const visits = [];
+  state.restaurants.forEach(r => {
+    (r.visitLog || []).forEach(v => {
+      if (v.spend != null && v.spend > 0) {
+        visits.push({ name: r.name, cuisine: r.cuisine, rating: r.myRating, visitRating: v.rating, spend: parseFloat(v.spend), date: v.date || '' });
+      }
+    });
+  });
+  return visits;
+}
+function _renderSpendTracker () {
+  const visits = _getAllVisits();
+  const now = new Date();
+  const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  let totalMonth = 0, totalAll = 0;
+  const byMonth = {};
+  const byRestaurant = {};
+  visits.forEach(v => {
+    totalAll += v.spend;
+    const mk = v.date ? v.date.slice(0, 7) : 'unknown';
+    if (mk === thisMonthKey) totalMonth += v.spend;
+    byMonth[mk] = (byMonth[mk] || 0) + v.spend;
+    if (!byRestaurant[v.name]) byRestaurant[v.name] = { total: 0, count: 0, rating: v.rating || 0 };
+    byRestaurant[v.name].total += v.spend;
+    byRestaurant[v.name].count++;
+    if (v.rating) byRestaurant[v.name].rating = Math.max(byRestaurant[v.name].rating, v.rating);
+  });
+  const avgVisit = visits.length ? totalAll / visits.length : 0;
+  document.getElementById('spend-total-month').textContent = '$' + totalMonth.toFixed(2);
+  document.getElementById('spend-total-all').textContent   = '$' + totalAll.toFixed(2);
+  document.getElementById('spend-avg-visit').textContent   = '$' + avgVisit.toFixed(2);
+
+  // Best value: cost per star
+  const valueItems = Object.entries(byRestaurant)
+    .filter(([, d]) => d.rating > 0)
+    .map(([name, d]) => ({ name, perStar: d.total / d.rating, count: d.count }))
+    .sort((a, b) => a.perStar - b.perStar)
+    .slice(0, 8);
+  document.getElementById('spend-value-list').innerHTML = valueItems.length
+    ? valueItems.map(v => `<div class="spend-value-item"><span>${escHtml(v.name)}</span><span class="spend-value-score">$${v.perStar.toFixed(0)}/⭐</span></div>`).join('')
+    : '<div style="color:var(--text2);font-size:.82rem">Log visits with ratings to see value scores.</div>';
+
+  // Monthly bars
+  const sortedMonths = Object.entries(byMonth).filter(([k]) => k !== 'unknown').sort(([a], [b]) => a.localeCompare(b)).slice(-6);
+  const maxAmt = Math.max(...sortedMonths.map(([, v]) => v), 1);
+  document.getElementById('spend-monthly-bars').innerHTML = sortedMonths.length
+    ? sortedMonths.map(([mk, amt]) => {
+        const label = mk.slice(0, 7);
+        const pct = Math.round((amt / maxAmt) * 100);
+        return `<div class="spend-bar-row">
+          <span class="spend-bar-label">${label}</span>
+          <div class="spend-bar-track"><div class="spend-bar-fill" style="width:${pct}%"></div></div>
+          <span class="spend-bar-amt">$${amt.toFixed(0)}</span>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--text2);font-size:.82rem">No spend data yet. Log visits with amounts via Visit Log.</div>';
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 13 — Feature: ⏰ IT'S BEEN A WHILE
+   ═══════════════════════════════════════════════════════════ */
+function openBeenaWhile () {
+  document.getElementById('beenawhile-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  _renderBeenaWhile();
+}
+function closeBeenaWhile () {
+  document.getElementById('beenawhile-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function _renderBeenaWhile () {
+  const now = Date.now();
+  const MS_90 = 90 * 24 * 60 * 60 * 1000;
+  const candidates = state.restaurants
+    .filter(r => r.myRating >= 4 && (r.status === 'visited' || (r.visitLog && r.visitLog.length)))
+    .map(r => {
+      const lastLogDate = r.visitLog && r.visitLog.length
+        ? r.visitLog.reduce((best, v) => (!best || v.date > best) ? v.date : best, null)
+        : null;
+      const dateStr = lastLogDate || r.dateVisited || r.visitedAt || r.updatedAt || null;
+      const ms = dateStr ? now - new Date(dateStr).getTime() : Infinity;
+      return { r, ms, dateStr };
+    })
+    .filter(x => x.ms >= MS_90)
+    .sort((a, b) => b.ms - a.ms)
+    .slice(0, 20);
+
+  const listEl = document.getElementById('beenawhile-list');
+  if (!candidates.length) {
+    listEl.innerHTML = '<div class="beenawhile-empty">🎉 You\'re on top of it! All your faves have been visited recently.</div>';
+    return;
+  }
+  const cuisineEmoji = { Italian:'🍕', Mexican:'🌮', Japanese:'🍣', Indian:'🥘', Chinese:'🥡', French:'🥐', American:'🍔', Thai:'🍜', Mediterranean:'🥙' };
+  listEl.innerHTML = candidates.map(({ r, ms }) => {
+    const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+    const ago = days > 365 ? `${Math.floor(days/365)}y ago` : `${days}d ago`;
+    const emoji = (r.cuisine && cuisineEmoji[r.cuisine]) || '🍽';
+    const stars = '⭐'.repeat(Math.round(r.myRating || 0));
+    return `<div class="beenawhile-item" data-id="${r.id}">
+      <div class="beenawhile-emoji">${emoji}</div>
+      <div class="beenawhile-info">
+        <div class="beenawhile-name">${escHtml(r.name)}</div>
+        <div class="beenawhile-meta">${stars}${r.cuisine ? ' · ' + escHtml(r.cuisine) : ''}</div>
+      </div>
+      <div class="beenawhile-ago">${ago}</div>
+    </div>`;
+  }).join('');
+  listEl.querySelectorAll('.beenawhile-item[data-id]').forEach(el => {
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', () => {
+      closeBeenaWhile();
+      openDetailModal(el.dataset.id);
+    });
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 13 — Feature: 📆 AI MEAL PLANNER
+   ═══════════════════════════════════════════════════════════ */
+function openMealPlanner () {
+  document.getElementById('mealplanner-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  document.getElementById('mp-result').classList.add('hidden');
+  document.getElementById('mp-share-btn').classList.add('hidden');
+}
+function closeMealPlanner () {
+  document.getElementById('mealplanner-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+async function generateMealPlan () {
+  if (!AI.hasKey()) { showToast('AI key needed', 'Add your Gemini key in Settings → AI Key.', 'info'); return; }
+  const days   = document.getElementById('mp-days').value;
+  const budget = document.getElementById('mp-budget').value;
+  const vibe   = document.getElementById('mp-vibe').value.trim();
+  const btn    = document.getElementById('mp-generate-btn');
+  const result = document.getElementById('mp-result');
+  result.classList.remove('hidden');
+  result.innerHTML = '<span class="ai-thinking-inline"><span></span><span></span><span></span></span> Planning your foodie week…';
+  btn.disabled = true;
+  const wantToTry = state.restaurants.filter(r => r.status === 'want-to-try').slice(0, 10).map(r => r.name + (r.cuisine ? ' (' + r.cuisine + ')' : '')).join(', ');
+  const faves = state.restaurants.filter(r => r.myRating >= 4).slice(0, 8).map(r => r.name + (r.cuisine ? ' (' + r.cuisine + ')' : '')).join(', ');
+  const prompt = `You are a personal dining concierge. Create a ${days}-day dining plan for this week.
+
+User profile:
+- Favourite restaurants: ${faves || 'not specified'}
+- Want to try: ${wantToTry || 'not specified'}
+- Weekly budget: ${budget ? '$' + budget : 'flexible'}
+- Vibe: ${vibe || 'whatever feels good'}
+- Total restaurants in their list: ${state.restaurants.length}
+
+Write a clear day-by-day dining plan. For each day use this format:
+DAY [number] — [Day name]: [Restaurant name] ([cuisine]) — [1-2 sentence reason]
+
+End with a 1-sentence budget note if budget was given. Keep total response under 300 words. Be enthusiastic and personal!`;
+  try {
+    const text = await AI.call(prompt);
+    const html = escHtml(text).replace(/DAY \d[^\n]*/g, m => `<div class="mp-day-block"><div class="mp-day-heading">${m}</div></div>`);
+    result.innerHTML = html;
+    document.getElementById('mp-share-btn').classList.remove('hidden');
+    document.getElementById('mp-share-btn').onclick = () => {
+      if (navigator.share) navigator.share({ title: 'My Dining Plan', text });
+      else { navigator.clipboard?.writeText(text); showToast('Copied!', 'Plan copied to clipboard.', 'success'); }
+    };
+  } catch (err) {
+    result.innerHTML = '⚠ ' + escHtml(err.message || 'AI error');
+  }
+  btn.disabled = false;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 13 — Feature: 🗳 GROUP VOTE
+   ═══════════════════════════════════════════════════════════ */
+const _GV_MAX = 5;
+let _gvSelected = new Set();
+
+function openGroupVote () {
+  _gvSelected.clear();
+  document.getElementById('groupvote-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  document.getElementById('groupvote-link-row').classList.add('hidden');
+  document.getElementById('groupvote-results').classList.add('hidden');
+  _renderGroupVotePicker();
+  // Check if arriving via ?vote= link
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('vote')) { _loadGroupVoteResults(params.get('vote')); }
+}
+function closeGroupVote () {
+  document.getElementById('groupvote-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function _renderGroupVotePicker () {
+  const sorted = state.restaurants.slice().sort((a, b) => (b.myRating || 0) - (a.myRating || 0)).slice(0, 30);
+  document.getElementById('groupvote-picker').innerHTML = sorted.map(r =>
+    `<div class="groupvote-pick-item${_gvSelected.has(r.id) ? ' selected' : ''}" data-id="${r.id}">
+      <div class="groupvote-pick-check">${_gvSelected.has(r.id) ? '✓' : ''}</div>
+      <span class="groupvote-pick-name">${escHtml(r.name)}</span>
+      <span class="groupvote-pick-cuisine">${r.cuisine ? escHtml(r.cuisine) : ''}</span>
+    </div>`
+  ).join('');
+  document.getElementById('groupvote-picker').querySelectorAll('.groupvote-pick-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = el.dataset.id;
+      if (_gvSelected.has(id)) { _gvSelected.delete(id); }
+      else if (_gvSelected.size >= _GV_MAX) { showToast('Max 5 options', 'Remove one first.', 'info'); return; }
+      else { _gvSelected.add(id); }
+      _renderGroupVotePicker();
+    });
+  });
+}
+function _generateVoteLink () {
+  if (_gvSelected.size < 2) { showToast('Pick at least 2', 'Select 2–5 restaurants to vote on.', 'info'); return; }
+  const ids = [..._gvSelected];
+  const payload = ids.map(id => {
+    const r = state.restaurants.find(x => x.id === id);
+    return r ? { id: r.id, n: r.name.slice(0, 40), c: r.cuisine || '' } : null;
+  }).filter(Boolean);
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  const url = window.location.origin + window.location.pathname + '?vote=' + encoded;
+  document.getElementById('groupvote-link-input').value = url;
+  document.getElementById('groupvote-link-row').classList.remove('hidden');
+}
+function _loadGroupVoteResults (encoded) {
+  try {
+    const items = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+    document.getElementById('groupvote-results').classList.remove('hidden');
+    // Show as vote options with click-to-vote
+    document.getElementById('groupvote-bars').innerHTML = items.map(item =>
+      `<div class="groupvote-bar-row">
+        <span class="groupvote-bar-name">${escHtml(item.n)}${item.c ? ' <small style="color:var(--text2)">(' + escHtml(item.c) + ')</small>' : ''}</span>
+        <button class="btn-sm btn-orange" style="font-size:.72rem;padding:3px 10px" onclick="_castVote('${escHtml(item.id)}', '${encoded}')">Vote</button>
+      </div>`
+    ).join('');
+  } catch (e) { /* ignore bad encoded */ }
+}
+function _castVote (id, encoded) {
+  const key = 'ftb_votes_' + encoded.slice(0, 16);
+  if (localStorage.getItem(key) === id) { showToast('Already voted!', 'You already voted for this spot.', 'info'); return; }
+  localStorage.setItem(key, id);
+  showToast('Vote cast! 🗳', 'Your choice has been recorded.', 'success');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 13 — Feature: 🌍 CUISINE WORLD MAP
+   ═══════════════════════════════════════════════════════════ */
+
+// Cuisine → ISO country code(s) mapping
+const _CUISINE_COUNTRY_MAP = {
+  'Italian': ['ITA'], 'Mexican': ['MEX'], 'Japanese': ['JPN'], 'Indian': ['IND'],
+  'Chinese': ['CHN'], 'French': ['FRA'], 'Mediterranean': ['GRC','TUR','ESP'],
+  'American': ['USA'], 'Middle Eastern': ['LBN','ISR','JOR'], 'Thai': ['THA'],
+  'Korean': ['KOR'], 'Vietnamese': ['VNM'], 'German': ['DEU'], 'Spanish': ['ESP'],
+  'Peruvian': ['PER'], 'Ethiopian': ['ETH'], 'Hawaiian': ['USA'], 'Brazilian': ['BRA'],
+  'Greek': ['GRC'], 'Turkish': ['TUR'], 'Moroccan': ['MAR'], 'Lebanese': ['LBN'],
+  'Israeli': ['ISR'], 'Pakistani': ['PAK'], 'Sri Lankan': ['LKA'], 'Malaysian': ['MYS'],
+  'Indonesian': ['IDN'], 'Filipino': ['PHL'], 'Cambodian': ['KHM'], 'Burmese': ['MMR'],
+  'Singaporean': ['SGP'], 'Australian': ['AUS'], 'British': ['GBR'], 'Irish': ['IRL'],
+  'Portuguese': ['PRT'], 'Dutch': ['NLD'], 'Belgian': ['BEL'], 'Swiss': ['CHE'],
+  'Austrian': ['AUT'], 'Polish': ['POL'], 'Russian': ['RUS'], 'Ukrainian': ['UKR'],
+  'Swedish': ['SWE'], 'Norwegian': ['NOR'], 'Danish': ['DNK'], 'Finnish': ['FIN'],
+  'Argentinian': ['ARG'], 'Colombian': ['COL'], 'Venezuelan': ['VEN'], 'Cuban': ['CUB'],
+  'Jamaican': ['JAM'], 'Caribbean': ['CUB','JAM','DOM'], 'Egyptian': ['EGY'],
+  'Nigerian': ['NGA'], 'Ghanaian': ['GHA'], 'South African': ['ZAF'],
+  'Afghan': ['AFG'], 'Iranian': ['IRN'], 'Iraqi': ['IRQ'], 'Saudi': ['SAU'],
+  'Nepalese': ['NPL'], 'Tibetan': ['CHN'], 'Taiwanese': ['TWN'],
+  'Dim Sum': ['CHN'], 'Sushi': ['JPN'], 'Steakhouse': ['USA'], 'BBQ': ['USA'],
+  'Seafood': ['NOR'], 'Vegan': ['USA'], 'Bakery/Cafe': ['FRA'], 'Brunch': ['USA'],
+  'Breakfast': ['USA'], 'Fast Food': ['USA'], 'Pub/Bar': ['GBR'],
+};
+
+function openWorldMap () {
+  document.getElementById('worldmap-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  _renderWorldMap();
+}
+function closeWorldMap () {
+  document.getElementById('worldmap-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function _getVisitedCountries () {
+  const countries = new Set();
+  const cuisineVisits = {};
+  state.restaurants.forEach(r => {
+    if (!r.cuisine) return;
+    const codes = _CUISINE_COUNTRY_MAP[r.cuisine];
+    if (!codes) return;
+    codes.forEach(c => countries.add(c));
+    if (!cuisineVisits[r.cuisine]) cuisineVisits[r.cuisine] = 0;
+    cuisineVisits[r.cuisine]++;
+  });
+  return { countries, cuisineVisits };
+}
+function _renderWorldMap () {
+  const { countries, cuisineVisits } = _getVisitedCountries();
+  const total = Object.keys(_CUISINE_COUNTRY_MAP).length;
+  const visited = [...new Set(Object.keys(cuisineVisits))].length;
+
+  document.getElementById('worldmap-stats').innerHTML =
+    `<span>🌍 <strong>${countries.size}</strong> countries tasted</span>` +
+    `<span>🍽 <strong>${visited}</strong> cuisine styles</span>` +
+    `<span>📍 <strong>${state.restaurants.length}</strong> restaurants logged</span>`;
+
+  // Build a simplified SVG world map using country outlines
+  // We use a simplified rectangle-based representation for each region
+  const svgRegions = _buildWorldMapSVG(countries);
+  document.getElementById('worldmap-svg-container').innerHTML = svgRegions;
+
+  // Legend: top visited cuisines
+  const topCuisines = Object.entries(cuisineVisits).sort(([,a],[,b]) => b-a).slice(0,6);
+  document.getElementById('worldmap-legend').innerHTML =
+    '<div class="worldmap-legend-item"><div class="worldmap-legend-dot" style="background:var(--primary)"></div><span>Visited</span></div>' +
+    '<div class="worldmap-legend-item"><div class="worldmap-legend-dot" style="background:var(--surface3)"></div><span>Not yet</span></div>' +
+    (topCuisines.length ? ' <span style="margin-left:8px;color:var(--text2)">Top: ' + topCuisines.map(([c,n]) => escHtml(c) + ' ×' + n).join(', ') + '</span>' : '');
+}
+function _buildWorldMapSVG (visitedCountries) {
+  // Simplified continent/country blocks for a quick visual map
+  // Each entry: [id, label, cx, cy, w, h]
+  const blocks = [
+    // North America
+    ['USA','USA',60,90,55,35],['CAN','CAN',60,55,60,35],['MEX','MEX',55,127,30,25],
+    // Central America / Caribbean
+    ['CUB','Cuba',100,130,18,8],['JAM','Jamaica',108,140,8,5],['DOM','DR',118,133,8,6],
+    // South America
+    ['COL','Colombia',80,160,22,22],['VEN','Venezuela',100,157,22,18],['BRA','Brazil',95,185,50,50],
+    ['ARG','Argentina',85,238,25,40],['PER','Peru',68,190,22,30],
+    // Europe
+    ['GBR','UK',205,60,14,18],['IRL','Ireland',193,60,10,12],['FRA','France',212,74,20,20],
+    ['ESP','Spain',200,88,24,18],['PRT','Portugal',190,88,10,18],['DEU','Germany',225,64,18,18],
+    ['ITA','Italy',230,82,14,26],['NLD','Netherlands',218,58,10,10],['BEL','Belgium',216,66,10,10],
+    ['CHE','Switzerland',224,74,10,8],['AUT','Austria',232,72,14,10],['POL','Poland',238,60,18,16],
+    ['SWE','Sweden',238,42,14,22],['NOR','Norway',232,30,16,22],['DNK','Denmark',230,50,10,10],
+    ['FIN','Finland',248,30,16,22],['GRC','Greece',245,90,14,16],['TUR','Turkey',262,80,28,18],
+    ['RUS','Russia',268,30,80,45],['UKR','Ukraine',260,65,28,16],
+    // Middle East / Africa
+    ['LBN','Lebanon',280,88,8,8],['ISR','Israel',278,92,8,10],['JOR','Jordan',286,92,12,12],
+    ['SAU','Saudi',284,100,26,24],['IRN','Iran',292,80,30,24],['IRQ','Iraq',282,80,14,18],
+    ['AFG','Afghan',318,76,20,18],['EGY','Egypt',258,108,24,22],['MAR','Morocco',200,106,22,18],
+    ['ETH','Ethiopia',268,138,24,22],['NGA','Nigeria',220,148,22,20],['GHA','Ghana',208,148,12,14],
+    ['ZAF','S.Africa',230,198,26,24],
+    // South Asia
+    ['IND','India',332,98,30,36],['PAK','Pakistan',316,88,18,22],['NPL','Nepal',338,88,14,10],
+    ['LKA','Sri Lanka',340,138,8,10],['BGD','Bangladesh',352,98,10,12],
+    // Southeast Asia
+    ['THA','Thailand',365,118,18,22],['VNM','Vietnam',376,118,12,26],['MYS','Malaysia',372,140,22,14],
+    ['IDN','Indonesia',378,152,40,14],['PHL','Philippines',396,124,14,18],
+    ['KHM','Cambodia',370,130,12,12],['MMR','Myanmar',356,108,14,18],['SGP','Singapore',382,146,6,6],
+    // East Asia
+    ['CHN','China',358,76,48,38],['JPN','Japan',406,76,14,22],['KOR','Korea',400,78,12,16],
+    ['TWN','Taiwan',404,96,8,10],
+    // Oceania
+    ['AUS','Australia',396,200,44,34],
+  ];
+  const vCodes = new Set(visitedCountries);
+  const W = 460, H = 260;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="background:var(--surface2);border-radius:10px">`;
+  blocks.forEach(([id, label, cx, cy, w, h]) => {
+    const fill = vCodes.has(id) ? 'var(--primary)' : 'var(--surface3)';
+    const stroke = vCodes.has(id) ? '#ff8c5a' : 'var(--border)';
+    const opacity = vCodes.has(id) ? '1' : '0.6';
+    svg += `<rect x="${cx}" y="${cy}" width="${w}" height="${h}" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="0.8" opacity="${opacity}">`;
+    svg += `<title>${label}${vCodes.has(id) ? ' ✓' : ''}</title></rect>`;
+    if (w >= 16 && h >= 10) {
+      svg += `<text x="${cx + w/2}" y="${cy + h/2 + 3}" text-anchor="middle" font-size="5" fill="${vCodes.has(id) ? '#fff' : 'var(--text2)'}" opacity="0.9">${label}</text>`;
+    }
+  });
+  svg += '</svg>';
+  return svg;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 13 — Feature: 🛂 FOODIE PASSPORT
+   ═══════════════════════════════════════════════════════════ */
+const _PASSPORT_CUISINES = [
+  {e:'🍕',n:'Italian'},{e:'🌮',n:'Mexican'},{e:'🍣',n:'Japanese'},{e:'🥘',n:'Indian'},
+  {e:'🥡',n:'Chinese'},{e:'🥐',n:'French'},{e:'🥙',n:'Mediterranean'},{e:'🍔',n:'American'},
+  {e:'🧆',n:'Middle Eastern'},{e:'🍜',n:'Thai'},{e:'🍛',n:'Korean'},{e:'🌯',n:'Vietnamese'},
+  {e:'🥩',n:'Steakhouse'},{e:'🍤',n:'Seafood'},{e:'🍺',n:'Pub/Bar'},{e:'🥞',n:'Breakfast'},
+  {e:'🌶',n:'Ethiopian'},{e:'🥨',n:'German'},{e:'🫕',n:'Spanish'},{e:'🫔',n:'Peruvian'},
+  {e:'🧇',n:'Brunch'},{e:'🥟',n:'Dim Sum'},{e:'🍖',n:'BBQ'},{e:'🥬',n:'Vegan'},
+  {e:'🍝',n:'Pasta'},{e:'🍟',n:'Fast Food'},{e:'🌸',n:'Hawaiian'},{e:'🧁',n:'Bakery/Cafe'},
+  {e:'🥗',n:'Salad/Healthy'},{e:'🥫',n:'Soul Food'},{e:'🇧🇷',n:'Brazilian'},{e:'🥩',n:'Greek'},
+  {e:'🫙',n:'Turkish'},{e:'🍲',n:'Moroccan'},{e:'🫕',n:'Lebanese'},{e:'🌿',n:'Sri Lankan'},
+  {e:'🍱',n:'Singaporean'},{e:'🥜',n:'Malaysian'},{e:'🥘',n:'Filipino'},{e:'🌾',n:'Nepalese'},
+];
+function openPassport () {
+  document.getElementById('passport-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  _renderPassport();
+}
+function closePassport () {
+  document.getElementById('passport-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function _renderPassport () {
+  const visitedCuisines = {};
+  state.restaurants.forEach(r => {
+    if (r.cuisine) {
+      visitedCuisines[r.cuisine] = (visitedCuisines[r.cuisine] || 0) + 1;
+    }
+  });
+  const earnedCount = _PASSPORT_CUISINES.filter(p => visitedCuisines[p.n]).length;
+  const totalCuisines = Object.keys(visitedCuisines).length;
+
+  document.getElementById('passport-stats-row').innerHTML =
+    `<div class="passport-stat"><div class="passport-stat-num">${earnedCount}</div><div class="passport-stat-label">Stamps earned</div></div>` +
+    `<div class="passport-stat"><div class="passport-stat-num">${totalCuisines}</div><div class="passport-stat-label">Cuisines tried</div></div>` +
+    `<div class="passport-stat"><div class="passport-stat-num">${state.restaurants.length}</div><div class="passport-stat-label">Restaurants</div></div>`;
+
+  // Show all passport stamps (earned first, then unearned)
+  const allStamps = [
+    ..._PASSPORT_CUISINES.filter(p => visitedCuisines[p.n]),
+    ..._PASSPORT_CUISINES.filter(p => !visitedCuisines[p.n]),
+    // Add user cuisines not in the list
+    ...Object.keys(visitedCuisines)
+      .filter(c => !_PASSPORT_CUISINES.find(p => p.n === c))
+      .map(c => ({ e: '🍽', n: c }))
+  ];
+  document.getElementById('passport-stamps').innerHTML = allStamps.map(p => {
+    const count = visitedCuisines[p.n] || 0;
+    const earned = count > 0;
+    return `<div class="passport-stamp${earned ? ' earned' : ''}">
+      <div class="passport-stamp-emoji">${p.e}</div>
+      <div class="passport-stamp-name">${escHtml(p.n)}</div>
+      ${earned ? `<div class="passport-stamp-count">${count}×</div>` : ''}
+    </div>`;
+  }).join('');
+
+  document.getElementById('passport-share-btn').onclick = () => {
+    const txt = `🛂 My Foodie Passport: ${earnedCount} cuisine stamps, ${totalCuisines} cuisines explored, ${state.restaurants.length} restaurants. #FeedTheBear`;
+    if (navigator.share) navigator.share({ title: 'My Foodie Passport', text: txt });
+    else { navigator.clipboard?.writeText(txt); showToast('Copied!', 'Passport summary copied.', 'success'); }
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 13 — Feature: 📋 VISIT LOG
+   ═══════════════════════════════════════════════════════════ */
+let _vlRestaurantId = null;
+let _vlStarVal = 0;
+
+function openVisitLog () {
+  _vlRestaurantId = null;
+  _vlStarVal = 0;
+  document.getElementById('visitlog-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  _populateVisitLogSelect();
+  document.getElementById('visitlog-entries').classList.add('hidden');
+  document.getElementById('vl-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('vl-spend').value = '';
+  document.getElementById('vl-dish').value = '';
+  document.getElementById('vl-notes').value = '';
+  _setVlStars(0);
+}
+function closeVisitLog () {
+  document.getElementById('visitlog-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function _populateVisitLogSelect () {
+  const sel = document.getElementById('visitlog-restaurant-select');
+  const sorted = state.restaurants.slice().sort((a, b) => a.name.localeCompare(b.name));
+  sel.innerHTML = '<option value="">Select a restaurant…</option>' +
+    sorted.map(r => `<option value="${r.id}">${escHtml(r.name)}${r.cuisine ? ' (' + escHtml(r.cuisine) + ')' : ''}</option>`).join('');
+}
+function _loadVisitLogEntries () {
+  const id = document.getElementById('visitlog-restaurant-select').value;
+  if (!id) { showToast('Choose a restaurant', 'Select one from the list first.', 'info'); return; }
+  _vlRestaurantId = id;
+  const r = state.restaurants.find(x => x.id === id);
+  if (!r) return;
+  if (!r.visitLog) r.visitLog = [];
+  document.getElementById('visitlog-entries').classList.remove('hidden');
+  _renderVisitLogList(r);
+}
+function _renderVisitLogList (r) {
+  const listEl = document.getElementById('visitlog-list');
+  if (!r.visitLog || !r.visitLog.length) {
+    listEl.innerHTML = '<div style="color:var(--text2);font-size:.82rem;padding:8px 0">No visits logged yet.</div>';
+    return;
+  }
+  listEl.innerHTML = r.visitLog.slice().reverse().map((v, i) => {
+    const realIdx = r.visitLog.length - 1 - i;
+    const stars = v.rating ? '⭐'.repeat(v.rating) : '';
+    return `<div class="visitlog-entry">
+      <div class="visitlog-entry-header">
+        <span class="visitlog-entry-date">${v.date || ''}</span>
+        ${v.spend ? `<span class="visitlog-entry-spend">$${parseFloat(v.spend).toFixed(2)}</span>` : ''}
+        <button class="visitlog-entry-del" data-idx="${realIdx}" title="Delete">✕</button>
+      </div>
+      ${v.dish ? `<div class="visitlog-entry-dish">🍴 ${escHtml(v.dish)}</div>` : ''}
+      ${stars ? `<div class="visitlog-entry-stars">${stars}</div>` : ''}
+      ${v.notes ? `<div class="visitlog-entry-notes">${escHtml(v.notes)}</div>` : ''}
+    </div>`;
+  }).join('');
+  listEl.querySelectorAll('.visitlog-entry-del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx);
+      r.visitLog.splice(idx, 1);
+      saveData();
+      _renderVisitLogList(r);
+      _invalidateSpendCache();
+    });
+  });
+}
+function _setVlStars (n) {
+  _vlStarVal = n;
+  document.querySelectorAll('.vl-star').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.val) <= n);
+  });
+}
+function _saveVisitLogEntry () {
+  if (!_vlRestaurantId) { showToast('Load a restaurant first', '', 'info'); return; }
+  const r = state.restaurants.find(x => x.id === _vlRestaurantId);
+  if (!r) return;
+  const date  = document.getElementById('vl-date').value;
+  const spend = document.getElementById('vl-spend').value;
+  const dish  = document.getElementById('vl-dish').value.trim();
+  const notes = document.getElementById('vl-notes').value.trim();
+  if (!date) { showToast('Pick a date', '', 'info'); return; }
+  if (!r.visitLog) r.visitLog = [];
+  r.visitLog.push({ date, spend: spend ? parseFloat(spend) : null, dish, notes, rating: _vlStarVal || null });
+  // Bump updatedAt so Mood Calendar picks it up
+  r.updatedAt = new Date(date).toISOString();
+  saveData();
+  renderAll();
+  _renderVisitLogList(r);
+  _invalidateSpendCache();
+  document.getElementById('vl-dish').value = '';
+  document.getElementById('vl-notes').value = '';
+  document.getElementById('vl-spend').value = '';
+  _setVlStars(0);
+  showToast('Visit saved!', `Logged a visit to ${escHtml(r.name)}.`, 'success');
+}
+function _invalidateSpendCache () { _spendCacheValid = false; }
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 13 — Feature: 💸 SPEND TRACKER
+   ═══════════════════════════════════════════════════════════ */
+let _spendCacheValid = false;
+
+function openSpendTracker () {
+  document.getElementById('spend-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  _renderSpendTracker();
+}
+function closeSpendTracker () {
+  document.getElementById('spend-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function _getAllVisits () {
+  const visits = [];
+  state.restaurants.forEach(r => {
+    (r.visitLog || []).forEach(v => {
+      if (v.spend != null && v.spend > 0) {
+        visits.push({ name: r.name, cuisine: r.cuisine, rating: r.myRating, visitRating: v.rating, spend: parseFloat(v.spend), date: v.date || '' });
+      }
+    });
+  });
+  return visits;
+}
+function _renderSpendTracker () {
+  const visits = _getAllVisits();
+  const now = new Date();
+  const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  let totalMonth = 0, totalAll = 0;
+  const byMonth = {};
+  const byRestaurant = {};
+  visits.forEach(v => {
+    totalAll += v.spend;
+    const mk = v.date ? v.date.slice(0, 7) : 'unknown';
+    if (mk === thisMonthKey) totalMonth += v.spend;
+    byMonth[mk] = (byMonth[mk] || 0) + v.spend;
+    if (!byRestaurant[v.name]) byRestaurant[v.name] = { total: 0, count: 0, rating: v.rating || 0 };
+    byRestaurant[v.name].total += v.spend;
+    byRestaurant[v.name].count++;
+    if (v.rating) byRestaurant[v.name].rating = Math.max(byRestaurant[v.name].rating, v.rating);
+  });
+  const avgVisit = visits.length ? totalAll / visits.length : 0;
+  document.getElementById('spend-total-month').textContent = '$' + totalMonth.toFixed(2);
+  document.getElementById('spend-total-all').textContent   = '$' + totalAll.toFixed(2);
+  document.getElementById('spend-avg-visit').textContent   = '$' + avgVisit.toFixed(2);
+
+  // Best value: cost per star
+  const valueItems = Object.entries(byRestaurant)
+    .filter(([, d]) => d.rating > 0)
+    .map(([name, d]) => ({ name, perStar: d.total / d.rating, count: d.count }))
+    .sort((a, b) => a.perStar - b.perStar)
+    .slice(0, 8);
+  document.getElementById('spend-value-list').innerHTML = valueItems.length
+    ? valueItems.map(v => `<div class="spend-value-item"><span>${escHtml(v.name)}</span><span class="spend-value-score">$${v.perStar.toFixed(0)}/⭐</span></div>`).join('')
+    : '<div style="color:var(--text2);font-size:.82rem">Log visits with ratings to see value scores.</div>';
+
+  // Monthly bars
+  const sortedMonths = Object.entries(byMonth).filter(([k]) => k !== 'unknown').sort(([a], [b]) => a.localeCompare(b)).slice(-6);
+  const maxAmt = Math.max(...sortedMonths.map(([, v]) => v), 1);
+  document.getElementById('spend-monthly-bars').innerHTML = sortedMonths.length
+    ? sortedMonths.map(([mk, amt]) => {
+        const label = mk.slice(0, 7);
+        const pct = Math.round((amt / maxAmt) * 100);
+        return `<div class="spend-bar-row">
+          <span class="spend-bar-label">${label}</span>
+          <div class="spend-bar-track"><div class="spend-bar-fill" style="width:${pct}%"></div></div>
+          <span class="spend-bar-amt">$${amt.toFixed(0)}</span>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--text2);font-size:.82rem">No spend data yet. Log visits with amounts via Visit Log.</div>';
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 13 — Feature: ⏰ IT'S BEEN A WHILE
+   ═══════════════════════════════════════════════════════════ */
+function openBeenaWhile () {
+  document.getElementById('beenawhile-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  _renderBeenaWhile();
+}
+function closeBeenaWhile () {
+  document.getElementById('beenawhile-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function _renderBeenaWhile () {
+  const now = Date.now();
+  const MS_90 = 90 * 24 * 60 * 60 * 1000;
+  const candidates = state.restaurants
+    .filter(r => r.myRating >= 4 && (r.status === 'visited' || (r.visitLog && r.visitLog.length)))
+    .map(r => {
+      const lastLogDate = r.visitLog && r.visitLog.length
+        ? r.visitLog.reduce((best, v) => (!best || v.date > best) ? v.date : best, null)
+        : null;
+      const dateStr = lastLogDate || r.dateVisited || r.visitedAt || r.updatedAt || null;
+      const ms = dateStr ? now - new Date(dateStr).getTime() : Infinity;
+      return { r, ms, dateStr };
+    })
+    .filter(x => x.ms >= MS_90)
+    .sort((a, b) => b.ms - a.ms)
+    .slice(0, 20);
+
+  const listEl = document.getElementById('beenawhile-list');
+  if (!candidates.length) {
+    listEl.innerHTML = '<div class="beenawhile-empty">🎉 You\'re on top of it! All your faves have been visited recently.</div>';
+    return;
+  }
+  const cuisineEmoji = { Italian:'🍕', Mexican:'🌮', Japanese:'🍣', Indian:'🥘', Chinese:'🥡', French:'🥐', American:'🍔', Thai:'🍜', Mediterranean:'🥙' };
+  listEl.innerHTML = candidates.map(({ r, ms }) => {
+    const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+    const ago = days > 365 ? `${Math.floor(days/365)}y ago` : `${days}d ago`;
+    const emoji = (r.cuisine && cuisineEmoji[r.cuisine]) || '🍽';
+    const stars = '⭐'.repeat(Math.round(r.myRating || 0));
+    return `<div class="beenawhile-item" data-id="${r.id}">
+      <div class="beenawhile-emoji">${emoji}</div>
+      <div class="beenawhile-info">
+        <div class="beenawhile-name">${escHtml(r.name)}</div>
+        <div class="beenawhile-meta">${stars}${r.cuisine ? ' · ' + escHtml(r.cuisine) : ''}</div>
+      </div>
+      <div class="beenawhile-ago">${ago}</div>
+    </div>`;
+  }).join('');
+  listEl.querySelectorAll('.beenawhile-item[data-id]').forEach(el => {
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', () => {
+      closeBeenaWhile();
+      openDetailModal(el.dataset.id);
+    });
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 13 — Feature: 📆 AI MEAL PLANNER
+   ═══════════════════════════════════════════════════════════ */
+function openMealPlanner () {
+  document.getElementById('mealplanner-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  document.getElementById('mp-result').classList.add('hidden');
+  document.getElementById('mp-share-btn').classList.add('hidden');
+}
+function closeMealPlanner () {
+  document.getElementById('mealplanner-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+async function generateMealPlan () {
+  if (!AI.hasKey()) { showToast('AI key needed', 'Add your Gemini key in Settings → AI Key.', 'info'); return; }
+  const days   = document.getElementById('mp-days').value;
+  const budget = document.getElementById('mp-budget').value;
+  const vibe   = document.getElementById('mp-vibe').value.trim();
+  const btn    = document.getElementById('mp-generate-btn');
+  const result = document.getElementById('mp-result');
+  result.classList.remove('hidden');
+  result.innerHTML = '<span class="ai-thinking-inline"><span></span><span></span><span></span></span> Planning your foodie week…';
+  btn.disabled = true;
+  const wantToTry = state.restaurants.filter(r => r.status === 'want-to-try').slice(0, 10).map(r => r.name + (r.cuisine ? ' (' + r.cuisine + ')' : '')).join(', ');
+  const faves = state.restaurants.filter(r => r.myRating >= 4).slice(0, 8).map(r => r.name + (r.cuisine ? ' (' + r.cuisine + ')' : '')).join(', ');
+  const prompt = `You are a personal dining concierge. Create a ${days}-day dining plan for this week.
+
+User profile:
+- Favourite restaurants: ${faves || 'not specified'}
+- Want to try: ${wantToTry || 'not specified'}
+- Weekly budget: ${budget ? '$' + budget : 'flexible'}
+- Vibe: ${vibe || 'whatever feels good'}
+- Total restaurants in their list: ${state.restaurants.length}
+
+Write a clear day-by-day dining plan. For each day use this format:
+DAY [number] — [Day name]: [Restaurant name] ([cuisine]) — [1-2 sentence reason]
+
+End with a 1-sentence budget note if budget was given. Keep total response under 300 words. Be enthusiastic and personal!`;
+  try {
+    const text = await AI.call(prompt);
+    const html = escHtml(text).replace(/DAY \d[^\n]*/g, m => `<div class="mp-day-block"><div class="mp-day-heading">${m}</div></div>`);
+    result.innerHTML = html;
+    document.getElementById('mp-share-btn').classList.remove('hidden');
+    document.getElementById('mp-share-btn').onclick = () => {
+      if (navigator.share) navigator.share({ title: 'My Dining Plan', text });
+      else { navigator.clipboard?.writeText(text); showToast('Copied!', 'Plan copied to clipboard.', 'success'); }
+    };
+  } catch (err) {
+    result.innerHTML = '⚠ ' + escHtml(err.message || 'AI error');
+  }
+  btn.disabled = false;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 13 — Feature: 🗳 GROUP VOTE
+   ═══════════════════════════════════════════════════════════ */
+const _GV_MAX = 5;
+let _gvSelected = new Set();
+
+function openGroupVote () {
+  _gvSelected.clear();
+  document.getElementById('groupvote-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  document.getElementById('groupvote-link-row').classList.add('hidden');
+  document.getElementById('groupvote-results').classList.add('hidden');
+  _renderGroupVotePicker();
+  // Check if arriving via ?vote= link
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('vote')) { _loadGroupVoteResults(params.get('vote')); }
+}
+function closeGroupVote () {
+  document.getElementById('groupvote-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function _renderGroupVotePicker () {
+  const sorted = state.restaurants.slice().sort((a, b) => (b.myRating || 0) - (a.myRating || 0)).slice(0, 30);
+  document.getElementById('groupvote-picker').innerHTML = sorted.map(r =>
+    `<div class="groupvote-pick-item${_gvSelected.has(r.id) ? ' selected' : ''}" data-id="${r.id}">
+      <div class="groupvote-pick-check">${_gvSelected.has(r.id) ? '✓' : ''}</div>
+      <span class="groupvote-pick-name">${escHtml(r.name)}</span>
+      <span class="groupvote-pick-cuisine">${r.cuisine ? escHtml(r.cuisine) : ''}</span>
+    </div>`
+  ).join('');
+  document.getElementById('groupvote-picker').querySelectorAll('.groupvote-pick-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = el.dataset.id;
+      if (_gvSelected.has(id)) { _gvSelected.delete(id); }
+      else if (_gvSelected.size >= _GV_MAX) { showToast('Max 5 options', 'Remove one first.', 'info'); return; }
+      else { _gvSelected.add(id); }
+      _renderGroupVotePicker();
+    });
+  });
+}
+function _generateVoteLink () {
+  if (_gvSelected.size < 2) { showToast('Pick at least 2', 'Select 2–5 restaurants to vote on.', 'info'); return; }
+  const ids = [..._gvSelected];
+  const payload = ids.map(id => {
+    const r = state.restaurants.find(x => x.id === id);
+    return r ? { id: r.id, n: r.name.slice(0, 40), c: r.cuisine || '' } : null;
+  }).filter(Boolean);
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  const url = window.location.origin + window.location.pathname + '?vote=' + encoded;
+  document.getElementById('groupvote-link-input').value = url;
+  document.getElementById('groupvote-link-row').classList.remove('hidden');
+}
+function _loadGroupVoteResults (encoded) {
+  try {
+    const items = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+    document.getElementById('groupvote-results').classList.remove('hidden');
+    // Show as vote options with click-to-vote
+    document.getElementById('groupvote-bars').innerHTML = items.map(item =>
+      `<div class="groupvote-bar-row">
+        <span class="groupvote-bar-name">${escHtml(item.n)}${item.c ? ' <small style="color:var(--text2)">(' + escHtml(item.c) + ')</small>' : ''}</span>
+        <button class="btn-sm btn-orange" style="font-size:.72rem;padding:3px 10px" onclick="_castVote('${escHtml(item.id)}', '${encoded}')">Vote</button>
+      </div>`
+    ).join('');
+  } catch (e) { /* ignore bad encoded */ }
+}
+function _castVote (id, encoded) {
+  const key = 'ftb_votes_' + encoded.slice(0, 16);
+  if (localStorage.getItem(key) === id) { showToast('Already voted!', 'You already voted for this spot.', 'info'); return; }
+  localStorage.setItem(key, id);
+  showToast('Vote cast! 🗳', 'Your choice has been recorded.', 'success');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 13 — Feature: 🌍 CUISINE WORLD MAP
+   ═══════════════════════════════════════════════════════════ */
+
+// Cuisine → ISO country code(s) mapping
+const _CUISINE_COUNTRY_MAP = {
+  'Italian': ['ITA'], 'Mexican': ['MEX'], 'Japanese': ['JPN'], 'Indian': ['IND'],
+  'Chinese': ['CHN'], 'French': ['FRA'], 'Mediterranean': ['GRC','TUR','ESP'],
+  'American': ['USA'], 'Middle Eastern': ['LBN','ISR','JOR'], 'Thai': ['THA'],
+  'Korean': ['KOR'], 'Vietnamese': ['VNM'], 'German': ['DEU'], 'Spanish': ['ESP'],
+  'Peruvian': ['PER'], 'Ethiopian': ['ETH'], 'Hawaiian': ['USA'], 'Brazilian': ['BRA'],
+  'Greek': ['GRC'], 'Turkish': ['TUR'], 'Moroccan': ['MAR'], 'Lebanese': ['LBN'],
+  'Israeli': ['ISR'], 'Pakistani': ['PAK'], 'Sri Lankan': ['LKA'], 'Malaysian': ['MYS'],
+  'Indonesian': ['IDN'], 'Filipino': ['PHL'], 'Cambodian': ['KHM'], 'Burmese': ['MMR'],
+  'Singaporean': ['SGP'], 'Australian': ['AUS'], 'British': ['GBR'], 'Irish': ['IRL'],
+  'Portuguese': ['PRT'], 'Dutch': ['NLD'], 'Belgian': ['BEL'], 'Swiss': ['CHE'],
+  'Austrian': ['AUT'], 'Polish': ['POL'], 'Russian': ['RUS'], 'Ukrainian': ['UKR'],
+  'Swedish': ['SWE'], 'Norwegian': ['NOR'], 'Danish': ['DNK'], 'Finnish': ['FIN'],
+  'Argentinian': ['ARG'], 'Colombian': ['COL'], 'Venezuelan': ['VEN'], 'Cuban': ['CUB'],
+  'Jamaican': ['JAM'], 'Caribbean': ['CUB','JAM','DOM'], 'Egyptian': ['EGY'],
+  'Nigerian': ['NGA'], 'Ghanaian': ['GHA'], 'South African': ['ZAF'],
+  'Afghan': ['AFG'], 'Iranian': ['IRN'], 'Iraqi': ['IRQ'], 'Saudi': ['SAU'],
+  'Nepalese': ['NPL'], 'Tibetan': ['CHN'], 'Taiwanese': ['TWN'],
+  'Dim Sum': ['CHN'], 'Sushi': ['JPN'], 'Steakhouse': ['USA'], 'BBQ': ['USA'],
+  'Seafood': ['NOR'], 'Vegan': ['USA'], 'Bakery/Cafe': ['FRA'], 'Brunch': ['USA'],
+  'Breakfast': ['USA'], 'Fast Food': ['USA'], 'Pub/Bar': ['GBR'],
+};
+
+function openWorldMap () {
+  document.getElementById('worldmap-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  _renderWorldMap();
+}
+function closeWorldMap () {
+  document.getElementById('worldmap-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function _getVisitedCountries () {
+  const countries = new Set();
+  const cuisineVisits = {};
+  state.restaurants.forEach(r => {
+    if (!r.cuisine) return;
+    const codes = _CUISINE_COUNTRY_MAP[r.cuisine];
+    if (!codes) return;
+    codes.forEach(c => countries.add(c));
+    if (!cuisineVisits[r.cuisine]) cuisineVisits[r.cuisine] = 0;
+    cuisineVisits[r.cuisine]++;
+  });
+  return { countries, cuisineVisits };
+}
+function _renderWorldMap () {
+  const { countries, cuisineVisits } = _getVisitedCountries();
+  const total = Object.keys(_CUISINE_COUNTRY_MAP).length;
+  const visited = [...new Set(Object.keys(cuisineVisits))].length;
+
+  document.getElementById('worldmap-stats').innerHTML =
+    `<span>🌍 <strong>${countries.size}</strong> countries tasted</span>` +
+    `<span>🍽 <strong>${visited}</strong> cuisine styles</span>` +
+    `<span>📍 <strong>${state.restaurants.length}</strong> restaurants logged</span>`;
+
+  // Build a simplified SVG world map using country outlines
+  // We use a simplified rectangle-based representation for each region
+  const svgRegions = _buildWorldMapSVG(countries);
+  document.getElementById('worldmap-svg-container').innerHTML = svgRegions;
+
+  // Legend: top visited cuisines
+  const topCuisines = Object.entries(cuisineVisits).sort(([,a],[,b]) => b-a).slice(0,6);
+  document.getElementById('worldmap-legend').innerHTML =
+    '<div class="worldmap-legend-item"><div class="worldmap-legend-dot" style="background:var(--primary)"></div><span>Visited</span></div>' +
+    '<div class="worldmap-legend-item"><div class="worldmap-legend-dot" style="background:var(--surface3)"></div><span>Not yet</span></div>' +
+    (topCuisines.length ? ' <span style="margin-left:8px;color:var(--text2)">Top: ' + topCuisines.map(([c,n]) => escHtml(c) + ' ×' + n).join(', ') + '</span>' : '');
+}
+function _buildWorldMapSVG (visitedCountries) {
+  // Simplified continent/country blocks for a quick visual map
+  // Each entry: [id, label, cx, cy, w, h]
+  const blocks = [
+    // North America
+    ['USA','USA',60,90,55,35],['CAN','CAN',60,55,60,35],['MEX','MEX',55,127,30,25],
+    // Central America / Caribbean
+    ['CUB','Cuba',100,130,18,8],['JAM','Jamaica',108,140,8,5],['DOM','DR',118,133,8,6],
+    // South America
+    ['COL','Colombia',80,160,22,22],['VEN','Venezuela',100,157,22,18],['BRA','Brazil',95,185,50,50],
+    ['ARG','Argentina',85,238,25,40],['PER','Peru',68,190,22,30],
+    // Europe
+    ['GBR','UK',205,60,14,18],['IRL','Ireland',193,60,10,12],['FRA','France',212,74,20,20],
+    ['ESP','Spain',200,88,24,18],['PRT','Portugal',190,88,10,18],['DEU','Germany',225,64,18,18],
+    ['ITA','Italy',230,82,14,26],['NLD','Netherlands',218,58,10,10],['BEL','Belgium',216,66,10,10],
+    ['CHE','Switzerland',224,74,10,8],['AUT','Austria',232,72,14,10],['POL','Poland',238,60,18,16],
+    ['SWE','Sweden',238,42,14,22],['NOR','Norway',232,30,16,22],['DNK','Denmark',230,50,10,10],
+    ['FIN','Finland',248,30,16,22],['GRC','Greece',245,90,14,16],['TUR','Turkey',262,80,28,18],
+    ['RUS','Russia',268,30,80,45],['UKR','Ukraine',260,65,28,16],
+    // Middle East / Africa
+    ['LBN','Lebanon',280,88,8,8],['ISR','Israel',278,92,8,10],['JOR','Jordan',286,92,12,12],
+    ['SAU','Saudi',284,100,26,24],['IRN','Iran',292,80,30,24],['IRQ','Iraq',282,80,14,18],
+    ['AFG','Afghan',318,76,20,18],['EGY','Egypt',258,108,24,22],['MAR','Morocco',200,106,22,18],
+    ['ETH','Ethiopia',268,138,24,22],['NGA','Nigeria',220,148,22,20],['GHA','Ghana',208,148,12,14],
+    ['ZAF','S.Africa',230,198,26,24],
+    // South Asia
+    ['IND','India',332,98,30,36],['PAK','Pakistan',316,88,18,22],['NPL','Nepal',338,88,14,10],
+    ['LKA','Sri Lanka',340,138,8,10],['BGD','Bangladesh',352,98,10,12],
+    // Southeast Asia
+    ['THA','Thailand',365,118,18,22],['VNM','Vietnam',376,118,12,26],['MYS','Malaysia',372,140,22,14],
+    ['IDN','Indonesia',378,152,40,14],['PHL','Philippines',396,124,14,18],
+    ['KHM','Cambodia',370,130,12,12],['MMR','Myanmar',356,108,14,18],['SGP','Singapore',382,146,6,6],
+    // East Asia
+    ['CHN','China',358,76,48,38],['JPN','Japan',406,76,14,22],['KOR','Korea',400,78,12,16],
+    ['TWN','Taiwan',404,96,8,10],
+    // Oceania
+    ['AUS','Australia',396,200,44,34],
+  ];
+  const vCodes = new Set(visitedCountries);
+  const W = 460, H = 260;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="background:var(--surface2);border-radius:10px">`;
+  blocks.forEach(([id, label, cx, cy, w, h]) => {
+    const fill = vCodes.has(id) ? 'var(--primary)' : 'var(--surface3)';
+    const stroke = vCodes.has(id) ? '#ff8c5a' : 'var(--border)';
+    const opacity = vCodes.has(id) ? '1' : '0.6';
+    svg += `<rect x="${cx}" y="${cy}" width="${w}" height="${h}" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="0.8" opacity="${opacity}">`;
+    svg += `<title>${label}${vCodes.has(id) ? ' ✓' : ''}</title></rect>`;
+    if (w >= 16 && h >= 10) {
+      svg += `<text x="${cx + w/2}" y="${cy + h/2 + 3}" text-anchor="middle" font-size="5" fill="${vCodes.has(id) ? '#fff' : 'var(--text2)'}" opacity="0.9">${label}</text>`;
+    }
+  });
+  svg += '</svg>';
+  return svg;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 13 — Feature: 🛂 FOODIE PASSPORT
+   ═══════════════════════════════════════════════════════════ */
+const _PASSPORT_CUISINES = [
+  {e:'🍕',n:'Italian'},{e:'🌮',n:'Mexican'},{e:'🍣',n:'Japanese'},{e:'🥘',n:'Indian'},
+  {e:'🥡',n:'Chinese'},{e:'🥐',n:'French'},{e:'🥙',n:'Mediterranean'},{e:'🍔',n:'American'},
+  {e:'🧆',n:'Middle Eastern'},{e:'🍜',n:'Thai'},{e:'🍛',n:'Korean'},{e:'🌯',n:'Vietnamese'},
+  {e:'🥩',n:'Steakhouse'},{e:'🍤',n:'Seafood'},{e:'🍺',n:'Pub/Bar'},{e:'🥞',n:'Breakfast'},
+  {e:'🌶',n:'Ethiopian'},{e:'🥨',n:'German'},{e:'🫕',n:'Spanish'},{e:'🫔',n:'Peruvian'},
+  {e:'🧇',n:'Brunch'},{e:'🥟',n:'Dim Sum'},{e:'🍖',n:'BBQ'},{e:'🥬',n:'Vegan'},
+  {e:'🍝',n:'Pasta'},{e:'🍟',n:'Fast Food'},{e:'🌸',n:'Hawaiian'},{e:'🧁',n:'Bakery/Cafe'},
+  {e:'🥗',n:'Salad/Healthy'},{e:'🥫',n:'Soul Food'},{e:'🇧🇷',n:'Brazilian'},{e:'🥩',n:'Greek'},
+  {e:'🫙',n:'Turkish'},{e:'🍲',n:'Moroccan'},{e:'🫕',n:'Lebanese'},{e:'🌿',n:'Sri Lankan'},
+  {e:'🍱',n:'Singaporean'},{e:'🥜',n:'Malaysian'},{e:'🥘',n:'Filipino'},{e:'🌾',n:'Nepalese'},
+];
+function openPassport () {
+  document.getElementById('passport-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  _renderPassport();
+}
+function closePassport () {
+  document.getElementById('passport-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+function _renderPassport () {
+  const visitedCuisines = {};
+  state.restaurants.forEach(r => {
+    if (r.cuisine) {
+      visitedCuisines[r.cuisine] = (visitedCuisines[r.cuisine] || 0) + 1;
+    }
+  });
+  const earnedCount = _PASSPORT_CUISINES.filter(p => visitedCuisines[p.n]).length;
+  const totalCuisines = Object.keys(visitedCuisines).length;
+
+  document.getElementById('passport-stats-row').innerHTML =
+    `<div class="passport-stat"><div class="passport-stat-num">${earnedCount}</div><div class="passport-stat-label">Stamps earned</div></div>` +
+    `<div class="passport-stat"><div class="passport-stat-num">${totalCuisines}</div><div class="passport-stat-label">Cuisines tried</div></div>` +
+    `<div class="passport-stat"><div class="passport-stat-num">${state.restaurants.length}</div><div class="passport-stat-label">Restaurants</div></div>`;
+
+  // Show all passport stamps (earned first, then unearned)
+  const allStamps = [
+    ..._PASSPORT_CUISINES.filter(p => visitedCuisines[p.n]),
+    ..._PASSPORT_CUISINES.filter(p => !visitedCuisines[p.n]),
+    // Add user cuisines not in the list
+    ...Object.keys(visitedCuisines)
+      .filter(c => !_PASSPORT_CUISINES.find(p => p.n === c))
+      .map(c => ({ e: '🍽', n: c }))
+  ];
+  document.getElementById('passport-stamps').innerHTML = allStamps.map(p => {
+    const count = visitedCuisines[p.n] || 0;
+    const earned = count > 0;
+    return `<div class="passport-stamp${earned ? ' earned' : ''}">
+      <div class="passport-stamp-emoji">${p.e}</div>
+      <div class="passport-stamp-name">${escHtml(p.n)}</div>
+      ${earned ? `<div class="passport-stamp-count">${count}×</div>` : ''}
+    </div>`;
+  }).join('');
+
+  document.getElementById('passport-share-btn').onclick = () => {
+    const txt = `🛂 My Foodie Passport: ${earnedCount} cuisine stamps, ${totalCuisines} cuisines explored, ${state.restaurants.length} restaurants. #FeedTheBear`;
+    if (navigator.share) navigator.share({ title: 'My Foodie Passport', text: txt });
+    else { navigator.clipboard?.writeText(txt); showToast('Copied!', 'Passport summary copied.', 'success'); }
+  };
+}

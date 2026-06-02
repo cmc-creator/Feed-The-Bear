@@ -98,20 +98,27 @@
           <button class="more-menu-item" data-more="fortune">🥠 Fortune Cookie</button>
           <button class="more-menu-item" data-more="dailychallenge">🔥 Daily Challenge</button>
           <button class="more-menu-item" data-more="moodcal">📅 Mood Calendar</button>
+          <button class="more-menu-item" data-more="passport">🛂 Foodie Passport</button>
+          <button class="more-menu-item" data-more="worldmap">🌍 Cuisine World Map</button>
           <div class="more-menu-section">Track</div>
           <button class="more-menu-item" data-more="gallery">🖼️ Photo Gallery</button>
           <button class="more-menu-item" data-more="compare">⚖️ Compare</button>
           <button class="more-menu-item" data-more="budget">💰 Budget</button>
           <button class="more-menu-item" data-more="dishes">🍽️ Dish Tracker</button>
+          <button class="more-menu-item" data-more="visitlog">📋 Visit Log</button>
+          <button class="more-menu-item" data-more="spend">💸 Spend Tracker</button>
+          <button class="more-menu-item" data-more="beenawhile">⏰ It's Been a While</button>
           <button class="more-menu-item" data-more="review">📊 Year in Review</button>
           <div class="more-menu-section">Social</div>
           <button class="more-menu-item" data-more="profile">🌐 My Profile</button>
           <button class="more-menu-item" data-more="friends">👥 Foodie Friends</button>
+          <button class="more-menu-item" data-more="groupvote">🗳 Group Vote</button>
           <button class="more-menu-item" data-more="wrap">🎁 Monthly Wrap</button>
           <button class="more-menu-item" data-more="digest">📅 Monthly Digest</button>
           <div class="more-menu-section">Analyse</div>
           <button class="more-menu-item" data-more="stats2">📊 Deep Stats</button>
           <button class="more-menu-item" data-more="ai-panel">🐻 Byte Cub</button>
+          <button class="more-menu-item" data-more="mealplanner">📆 AI Meal Planner</button>
           <button class="more-menu-item" data-more="route">🗺️ Route Planner</button>
           <div class="more-menu-section">Data</div>
           <button class="more-menu-item" data-more="export2">📦 Export Passport</button>
@@ -1494,6 +1501,160 @@
         <span>🎉 Challenge completed! +25 XP</span>
       </div>
       <div id="dc-history" class="dc-history"></div>
+    </div>
+  </div>
+
+  <!-- ══ PHASE 13 MODALS ══════════════════════════════════════ -->
+
+  <!-- 📋 Visit Log -->
+  <div id="visitlog-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="visitlog-title">
+    <div class="modal-card visitlog-card">
+      <div class="modal-header">
+        <h2 id="visitlog-title">📋 Visit Log</h2>
+        <button id="visitlog-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="visitlog-sub">Track every visit to a restaurant — what you ordered, how much you spent, your thoughts.</p>
+      <div class="visitlog-search-row">
+        <select id="visitlog-restaurant-select" class="form-input" style="flex:1"></select>
+        <button id="visitlog-load-btn" class="btn-sm btn-orange">Load</button>
+      </div>
+      <div id="visitlog-entries" class="visitlog-entries hidden">
+        <div id="visitlog-list" class="visitlog-list"></div>
+        <div class="visitlog-add-form">
+          <h4 style="margin:0 0 8px">+ Log a visit</h4>
+          <div class="visitlog-form-row">
+            <input type="date" id="vl-date" class="form-input" style="flex:1" />
+            <input type="number" id="vl-spend" class="form-input" placeholder="$ spent" min="0" step="0.01" style="flex:1;max-width:120px" />
+          </div>
+          <input type="text" id="vl-dish" class="form-input" placeholder="What did you order?" style="margin-top:6px" />
+          <textarea id="vl-notes" class="form-input" placeholder="Notes, memories, impressions…" rows="2" style="margin-top:6px;resize:none"></textarea>
+          <div class="visitlog-stars-row">
+            <span style="font-size:.82rem;color:var(--text2)">Visit rating:</span>
+            <div id="vl-star-row" class="vl-star-row">
+              <button class="vl-star" data-val="1">★</button><button class="vl-star" data-val="2">★</button><button class="vl-star" data-val="3">★</button><button class="vl-star" data-val="4">★</button><button class="vl-star" data-val="5">★</button>
+            </div>
+          </div>
+          <button id="vl-save-btn" class="btn-primary" style="width:100%;margin-top:10px">Save Visit</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 💸 Spend Tracker -->
+  <div id="spend-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="spend-title">
+    <div class="modal-card spend-card">
+      <div class="modal-header">
+        <h2 id="spend-title">💸 Spend Tracker</h2>
+        <button id="spend-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="spend-summary-row">
+        <div class="spend-stat-box"><div class="spend-stat-num" id="spend-total-month">$0</div><div class="spend-stat-label">This month</div></div>
+        <div class="spend-stat-box"><div class="spend-stat-num" id="spend-total-all">$0</div><div class="spend-stat-label">All time</div></div>
+        <div class="spend-stat-box"><div class="spend-stat-num" id="spend-avg-visit">$0</div><div class="spend-stat-label">Avg / visit</div></div>
+      </div>
+      <h4 style="margin:14px 0 6px;font-size:.9rem">Best value ($ per ⭐)</h4>
+      <div id="spend-value-list" class="spend-value-list"></div>
+      <h4 style="margin:14px 0 6px;font-size:.9rem">Monthly breakdown</h4>
+      <div id="spend-monthly-bars" class="spend-monthly-bars"></div>
+    </div>
+  </div>
+
+  <!-- ⏰ It's Been a While -->
+  <div id="beenawhile-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="beenawhile-title">
+    <div class="modal-card beenawhile-card">
+      <div class="modal-header">
+        <h2 id="beenawhile-title">⏰ It's Been a While…</h2>
+        <button id="beenawhile-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="beenawhile-sub">Your favourite spots you haven't visited in a while. Time to go back!</p>
+      <div id="beenawhile-list" class="beenawhile-list"></div>
+    </div>
+  </div>
+
+  <!-- 📆 AI Meal Planner -->
+  <div id="mealplanner-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="mealplanner-title">
+    <div class="modal-card mealplanner-card">
+      <div class="modal-header">
+        <h2 id="mealplanner-title">📆 AI Meal Planner</h2>
+        <button id="mealplanner-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="mealplanner-sub">Tell Byte Cub your week and budget — get a personalised dining plan.</p>
+      <div class="mealplanner-controls">
+        <div class="mealplanner-row">
+          <label class="mealplanner-label">Dining out days</label>
+          <select id="mp-days" class="form-input" style="width:auto">
+            <option value="2">2 days</option>
+            <option value="3" selected>3 days</option>
+            <option value="4">4 days</option>
+            <option value="5">5 days</option>
+            <option value="7">Every day!</option>
+          </select>
+        </div>
+        <div class="mealplanner-row">
+          <label class="mealplanner-label">Weekly budget</label>
+          <input type="number" id="mp-budget" class="form-input" style="width:120px" placeholder="e.g. 150" min="0" step="5" />
+        </div>
+        <div class="mealplanner-row">
+          <label class="mealplanner-label">Vibe this week</label>
+          <input type="text" id="mp-vibe" class="form-input" style="flex:1" placeholder="e.g. comfort food, exploring, healthy…" />
+        </div>
+      </div>
+      <button id="mp-generate-btn" class="btn-primary" style="width:100%;margin-top:12px">✨ Plan My Week</button>
+      <div id="mp-result" class="mp-result hidden"></div>
+      <button id="mp-share-btn" class="btn-sm hidden" style="margin-top:10px;width:100%">📤 Share Plan</button>
+    </div>
+  </div>
+
+  <!-- 🗳 Group Vote -->
+  <div id="groupvote-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="groupvote-title">
+    <div class="modal-card groupvote-card">
+      <div class="modal-header">
+        <h2 id="groupvote-title">🗳 Group Vote</h2>
+        <button id="groupvote-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="groupvote-sub">Can't decide as a group? Pick up to 5 restaurants, share the link — everyone votes.</p>
+      <div id="groupvote-picker" class="groupvote-picker"></div>
+      <div class="groupvote-btn-row">
+        <button id="groupvote-generate-btn" class="btn-primary" style="flex:1">🔗 Generate Vote Link</button>
+      </div>
+      <div id="groupvote-link-row" class="groupvote-link-row hidden">
+        <input id="groupvote-link-input" class="form-input" readonly style="flex:1" />
+        <button id="groupvote-copy-btn" class="btn-sm btn-orange">Copy</button>
+        <button id="groupvote-share-btn" class="btn-sm">Share</button>
+      </div>
+      <div id="groupvote-results" class="groupvote-results hidden">
+        <h4 style="margin:14px 0 6px">Live Results</h4>
+        <div id="groupvote-bars" class="groupvote-bars"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🌍 Cuisine World Map -->
+  <div id="worldmap-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="worldmap-title">
+    <div class="modal-card worldmap-card">
+      <div class="modal-header">
+        <h2 id="worldmap-title">🌍 Cuisine World Map</h2>
+        <button id="worldmap-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="worldmap-sub">Countries you've tasted lit up 🔥 — how much of the world have you eaten?</p>
+      <div id="worldmap-stats" class="worldmap-stats"></div>
+      <div id="worldmap-svg-container" class="worldmap-svg-container"></div>
+      <div id="worldmap-legend" class="worldmap-legend"></div>
+      <button id="worldmap-share-btn" class="btn-primary" style="width:100%;margin-top:12px">📤 Share My Food Map</button>
+    </div>
+  </div>
+
+  <!-- 🛂 Foodie Passport -->
+  <div id="passport-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="passport-title">
+    <div class="modal-card passport-card">
+      <div class="modal-header">
+        <h2 id="passport-title">🛂 Foodie Passport</h2>
+        <button id="passport-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="passport-sub">A rubber-stamp badge for every cuisine you've explored.</p>
+      <div id="passport-stats-row" class="passport-stats-row"></div>
+      <div id="passport-stamps" class="passport-stamps"></div>
+      <button id="passport-share-btn" class="btn-primary" style="width:100%;margin-top:14px">📤 Share Passport</button>
     </div>
   </div>
 

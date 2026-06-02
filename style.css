@@ -3633,3 +3633,116 @@ body.light-mode #profile-btn {
 .dc-history-item { font-size: .8rem; padding: 5px 8px; border-radius: 6px; background: var(--surface2); margin-bottom: 4px; display: flex; gap: 8px; align-items: center; }
 .dc-history-done { color: var(--green); }
 .dc-history-skip { color: var(--text2); }
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 13 CSS
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Visit Log ─────────────────────────────────────────────── */
+.visitlog-card { padding: 20px; }
+.visitlog-sub  { font-size: .82rem; color: var(--text2); margin: 0 0 14px; }
+.visitlog-search-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.visitlog-entries { margin-top: 8px; }
+.visitlog-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.visitlog-entry { background: var(--surface2); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.visitlog-entry-header { display: flex; justify-content: space-between; align-items: center; }
+.visitlog-entry-date { font-size: .78rem; color: var(--text2); }
+.visitlog-entry-spend { font-size: .82rem; font-weight: 600; color: var(--green); }
+.visitlog-entry-dish { font-size: .85rem; }
+.visitlog-entry-notes { font-size: .78rem; color: var(--text2); }
+.visitlog-entry-stars { font-size: .78rem; color: #f5a623; }
+.visitlog-entry-del { background: none; border: none; color: var(--text2); cursor: pointer; font-size: .8rem; padding: 2px 6px; margin-left: auto; }
+.visitlog-add-form { border-top: 1px solid var(--border); padding-top: 14px; }
+.visitlog-form-row { display: flex; gap: 8px; }
+.visitlog-stars-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.vl-star-row { display: flex; gap: 4px; }
+.vl-star { background: none; border: none; cursor: pointer; font-size: 1.4rem; color: var(--surface3); transition: color .15s; }
+.vl-star.active { color: #f5a623; }
+
+/* ── Spend Tracker ─────────────────────────────────────────── */
+.spend-card { padding: 20px; }
+.spend-summary-row { display: flex; gap: 10px; margin-bottom: 4px; }
+.spend-stat-box { flex: 1; background: var(--surface2); border-radius: 10px; padding: 12px 8px; text-align: center; }
+.spend-stat-num { font-size: 1.3rem; font-weight: 700; color: var(--primary); }
+.spend-stat-label { font-size: .7rem; color: var(--text2); margin-top: 2px; }
+.spend-value-list { display: flex; flex-direction: column; gap: 6px; max-height: 150px; overflow-y: auto; }
+.spend-value-item { display: flex; justify-content: space-between; align-items: center; background: var(--surface2); border-radius: 8px; padding: 7px 10px; font-size: .83rem; }
+.spend-value-score { font-weight: 700; color: var(--green); font-size: .9rem; }
+.spend-monthly-bars { display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow-y: auto; }
+.spend-bar-row { display: flex; align-items: center; gap: 8px; font-size: .8rem; }
+.spend-bar-label { width: 52px; color: var(--text2); flex-shrink: 0; }
+.spend-bar-track { flex: 1; height: 8px; background: var(--surface3); border-radius: 4px; overflow: hidden; }
+.spend-bar-fill { height: 100%; background: var(--primary); border-radius: 4px; transition: width .4s; }
+.spend-bar-amt { width: 48px; text-align: right; font-weight: 600; color: var(--text); }
+
+/* ── Been a While ──────────────────────────────────────────── */
+.beenawhile-card { padding: 20px; }
+.beenawhile-sub { font-size: .82rem; color: var(--text2); margin: 0 0 14px; }
+.beenawhile-list { display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; }
+.beenawhile-item { display: flex; align-items: center; gap: 12px; background: var(--surface2); border-radius: 12px; padding: 12px 14px; }
+.beenawhile-emoji { font-size: 1.6rem; flex-shrink: 0; }
+.beenawhile-info { flex: 1; min-width: 0; }
+.beenawhile-name { font-weight: 600; font-size: .92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.beenawhile-meta { font-size: .75rem; color: var(--text2); margin-top: 2px; }
+.beenawhile-ago  { font-size: .75rem; color: var(--primary); font-weight: 600; white-space: nowrap; }
+.beenawhile-empty { text-align: center; padding: 32px 16px; color: var(--text2); font-size: .88rem; }
+
+/* ── AI Meal Planner ───────────────────────────────────────── */
+.mealplanner-card { padding: 20px; }
+.mealplanner-sub { font-size: .82rem; color: var(--text2); margin: 0 0 14px; }
+.mealplanner-controls { display: flex; flex-direction: column; gap: 8px; }
+.mealplanner-row { display: flex; align-items: center; gap: 10px; }
+.mealplanner-label { font-size: .82rem; color: var(--text2); width: 120px; flex-shrink: 0; }
+.mp-result { background: var(--surface2); border-radius: 12px; padding: 14px; font-size: .85rem; line-height: 1.65; margin-top: 12px; white-space: pre-wrap; }
+.mp-day-block { background: var(--surface3); border-left: 3px solid var(--primary); border-radius: 0 8px 8px 0; padding: 8px 12px; margin: 6px 0; font-size: .84rem; }
+.mp-day-heading { font-weight: 700; color: var(--primary); font-size: .85rem; margin-bottom: 3px; }
+
+/* ── Group Vote ────────────────────────────────────────────── */
+.groupvote-card { padding: 20px; }
+.groupvote-sub { font-size: .82rem; color: var(--text2); margin: 0 0 14px; }
+.groupvote-picker { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; margin-bottom: 12px; }
+.groupvote-pick-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--surface2); border-radius: 8px; cursor: pointer; user-select: none; }
+.groupvote-pick-item.selected { background: rgba(255,107,53,.18); border: 1px solid var(--primary); }
+.groupvote-pick-check { width: 18px; height: 18px; border: 2px solid var(--border); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: .75rem; flex-shrink: 0; }
+.groupvote-pick-item.selected .groupvote-pick-check { background: var(--primary); border-color: var(--primary); color: #fff; }
+.groupvote-pick-name { font-size: .87rem; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.groupvote-pick-cuisine { font-size: .75rem; color: var(--text2); }
+.groupvote-btn-row { display: flex; gap: 8px; }
+.groupvote-link-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.groupvote-results { margin-top: 4px; }
+.groupvote-bars { display: flex; flex-direction: column; gap: 8px; }
+.groupvote-bar-row { display: flex; align-items: center; gap: 8px; font-size: .83rem; }
+.groupvote-bar-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.groupvote-bar-track { width: 120px; height: 8px; background: var(--surface3); border-radius: 4px; overflow: hidden; }
+.groupvote-bar-fill { height: 100%; background: var(--primary); border-radius: 4px; transition: width .4s; }
+.groupvote-bar-count { width: 28px; text-align: right; font-weight: 700; color: var(--primary); }
+
+/* ── Cuisine World Map ─────────────────────────────────────── */
+.worldmap-card { padding: 20px; max-width: 680px; }
+.worldmap-sub { font-size: .82rem; color: var(--text2); margin: 0 0 10px; }
+.worldmap-stats { display: flex; gap: 16px; margin-bottom: 12px; font-size: .82rem; color: var(--text2); flex-wrap: wrap; }
+.worldmap-stats span { background: var(--surface2); border-radius: 20px; padding: 4px 12px; }
+.worldmap-stats strong { color: var(--primary); }
+.worldmap-svg-container { width: 100%; overflow-x: auto; border-radius: 10px; background: var(--surface2); }
+.worldmap-svg-container svg { width: 100%; height: auto; display: block; }
+.worldmap-country { fill: var(--surface3); transition: fill .3s; }
+.worldmap-country.visited { fill: var(--primary); }
+.worldmap-country.visited:hover { fill: #ff8c5a; cursor: pointer; }
+.worldmap-legend { display: flex; gap: 14px; margin-top: 10px; font-size: .78rem; color: var(--text2); flex-wrap: wrap; }
+.worldmap-legend-item { display: flex; align-items: center; gap: 5px; }
+.worldmap-legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+
+/* ── Foodie Passport ───────────────────────────────────────── */
+.passport-card { padding: 20px; }
+.passport-sub { font-size: .82rem; color: var(--text2); margin: 0 0 12px; }
+.passport-stats-row { display: flex; gap: 10px; margin-bottom: 16px; }
+.passport-stat { flex: 1; background: var(--surface2); border-radius: 10px; padding: 10px; text-align: center; }
+.passport-stat-num  { font-size: 1.4rem; font-weight: 800; color: var(--primary); }
+.passport-stat-label { font-size: .7rem; color: var(--text2); }
+.passport-stamps { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 10px; max-height: 360px; overflow-y: auto; }
+.passport-stamp { display: flex; flex-direction: column; align-items: center; gap: 4px; background: var(--surface2); border-radius: 12px; padding: 12px 8px; border: 2px solid transparent; position: relative; }
+.passport-stamp.earned { border-color: var(--primary); background: rgba(255,107,53,.1); }
+.passport-stamp.earned::after { content: '✓'; position: absolute; top: 4px; right: 6px; font-size: .7rem; color: var(--primary); font-weight: 800; }
+.passport-stamp-emoji { font-size: 1.8rem; }
+.passport-stamp-name { font-size: .68rem; text-align: center; color: var(--text2); line-height: 1.2; }
+.passport-stamp-count { font-size: .65rem; color: var(--primary); font-weight: 700; }
