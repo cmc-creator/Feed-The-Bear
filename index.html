@@ -1375,7 +1375,30 @@
   <script src="app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});
+      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+        .then(reg => {
+          // Force the browser to check for a new SW on every launch (bypasses
+          // the default 24-hour check interval — critical for installed PWAs).
+          reg.update();
+
+          // When a new SW finishes installing, reload once it activates so the
+          // fresh assets are served immediately instead of on the next cold open.
+          reg.addEventListener('updatefound', () => {
+            const sw = reg.installing;
+            sw.addEventListener('statechange', () => {
+              if (sw.state === 'activated' && navigator.serviceWorker.controller) {
+                window.location.reload();
+              }
+            });
+          });
+        })
+        .catch(() => {});
+
+      // Guard against a double-reload if controllerchange fires more than once.
+      let _swRefreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!_swRefreshing) { _swRefreshing = true; window.location.reload(); }
+      });
     }
   </script>
 </body>
