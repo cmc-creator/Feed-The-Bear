@@ -3746,3 +3746,34 @@ body.light-mode #profile-btn {
 .passport-stamp-emoji { font-size: 1.8rem; }
 .passport-stamp-name { font-size: .68rem; text-align: center; color: var(--text2); line-height: 1.2; }
 .passport-stamp-count { font-size: .65rem; color: var(--primary); font-weight: 700; }
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 14 — 🐻 FEED THE BEAR GAME
+   ═══════════════════════════════════════════════════════════ */
+.feedbear-card {
+  padding: 14px 14px 10px;
+  max-width: 420px;
+  width: 100%;
+}
+.feedbear-canvas-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 8px 0 6px;
+}
+#feedbear-canvas {
+  border-radius: 12px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  display: block;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+}
+.feedbear-hint {
+  text-align: center;
+  font-size: .72rem;
+  color: var(--text-dim);
+  padding: 2px 0 4px;
+  letter-spacing: .02em;
+}

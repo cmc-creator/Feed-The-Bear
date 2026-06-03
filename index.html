@@ -98,6 +98,7 @@
           <button class="more-menu-item" data-more="fortune">🥠 Fortune Cookie</button>
           <button class="more-menu-item" data-more="dailychallenge">🔥 Daily Challenge</button>
           <button class="more-menu-item" data-more="moodcal">📅 Mood Calendar</button>
+          <button class="more-menu-item" data-more="feedbear">🐻 Feed the Bear!</button>
           <button class="more-menu-item" data-more="passport">🛂 Foodie Passport</button>
           <button class="more-menu-item" data-more="worldmap">🌍 Cuisine World Map</button>
           <div class="more-menu-section">Track</div>
@@ -1655,6 +1656,22 @@
       <div id="passport-stats-row" class="passport-stats-row"></div>
       <div id="passport-stamps" class="passport-stamps"></div>
       <button id="passport-share-btn" class="btn-primary" style="width:100%;margin-top:14px">📤 Share Passport</button>
+    </div>
+  </div>
+
+  <!-- Phase 14 — Feed the Bear Game -->
+  <div id="feedbear-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="feedbear-title">
+    <div class="modal-card feedbear-card">
+      <div class="modal-header">
+        <h2 id="feedbear-title">🐻 Feed the Bear!</h2>
+        <button id="feedbear-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="feedbear-canvas-wrap">
+        <canvas id="feedbear-canvas"></canvas>
+      </div>
+      <div class="feedbear-hint">
+        <span>← → / A D keys &nbsp;•&nbsp; Touch or click to move</span>
+      </div>
     </div>
   </div>
 

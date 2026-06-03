@@ -2323,6 +2323,7 @@ function setupEvents () {
       closeGroupVote();
       closeWorldMap();
       closePassport();
+      closeFeedBearGame();
       document.getElementById('nearby-overlay').classList.add('hidden');
       document.getElementById('collections-panel').classList.remove('open');
       maybeHideOverlay();
@@ -2829,6 +2830,15 @@ function setupEvents () {
   // Phase 13 — Passport
   document.getElementById('passport-close-btn').addEventListener('click', closePassport);
   document.getElementById('passport-overlay').addEventListener('click', e => { if (e.target === document.getElementById('passport-overlay')) closePassport(); });
+
+  // Phase 14 — Feed the Bear Game
+  document.getElementById('feedbear-close-btn').addEventListener('click', closeFeedBearGame);
+  document.getElementById('feedbear-overlay').addEventListener('click', e => { if (e.target === document.getElementById('feedbear-overlay')) closeFeedBearGame(); });
+  document.getElementById('feedbear-canvas').addEventListener('click', _ftbHandleCanvasTap);
+  document.getElementById('feedbear-canvas').addEventListener('touchstart', _ftbHandleTouch, { passive: false });
+  document.getElementById('feedbear-canvas').addEventListener('touchmove', _ftbHandleTouch, { passive: false });
+  document.addEventListener('keydown', _ftbHandleKey);
+  document.addEventListener('keyup',   _ftbHandleKey);
 
   // Phase 11 — Weekly Goal
   const wgBtn = document.getElementById('wg-set-btn');
@@ -4418,6 +4428,7 @@ function initMoreMenu () {
       'bingo':            openBingo,
       'fortune':          openFortune,
       'moodcal':          openMoodCal,
+      'feedbear':         openFeedBearGame,
       'dailychallenge':   openDailyChallenge,
       'passport':         openPassport,
       'worldmap':         openWorldMap,
@@ -8191,3 +8202,398 @@ function _renderPassport () {
     else { navigator.clipboard?.writeText(txt); showToast('Copied!', 'Passport summary copied.', 'success'); }
   };
 }
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 14 — 🐻 FEED THE BEAR GAME
+   ═══════════════════════════════════════════════════════════ */
+
+const _FTB = {
+  canvas: null, ctx: null,
+  state: 'idle',   // 'idle' | 'playing' | 'gameover'
+  score: 0, lives: 3, level: 1, hiScore: 0,
+  frame: 0, raf: null,
+  bear: { x: 0, y: 0, w: 68, speed: 6 },
+  foods: [],
+  popups: [],
+  spawnIn: 70,
+  keys: { left: false, right: false },
+  touchTargetX: null,
+  _flashColor: null, _flashTimer: 0,
+};
+
+const _FTB_GOOD = [
+  '🍕','🍣','🌮','🍔','🍜','🥘','🥐','🍱','🍤',
+  '🍝','🍛','🥩','🌯','🍦','🍰','🧁','🍩','🍪',
+  '🥞','🍗','🥪','🍙','🥟','🍢','🍡',
+];
+const _FTB_BONUS  = ['⭐','🌟','💎'];  // +50 pts each
+const _FTB_BAD    = ['🪲','🗑️','🤮'];  // dodge! -1 life if caught
+
+function _ftbPts(e) {
+  if (_FTB_BONUS.includes(e)) return 50;
+  if (_FTB_BAD.includes(e))   return -99;
+  return 10;
+}
+
+/* ---- open / close ---- */
+function openFeedBearGame() {
+  const g = _FTB;
+  g.hiScore = parseInt(localStorage.getItem('ftb_bear_hi') || '0');
+  document.getElementById('feedbear-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  _ftbInitCanvas();
+  _ftbDrawIdle();
+}
+
+function closeFeedBearGame() {
+  const g = _FTB;
+  if (g.raf) { cancelAnimationFrame(g.raf); g.raf = null; }
+  g.state = 'idle';
+  g.keys.left = g.keys.right = false;
+  g.touchTargetX = null;
+  document.getElementById('feedbear-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+
+/* ---- canvas init ---- */
+function _ftbInitCanvas() {
+  const g = _FTB;
+  const el = document.getElementById('feedbear-canvas');
+  g.canvas = el;
+  g.ctx = el.getContext('2d');
+  const maxW = Math.min(340, window.innerWidth - 56);
+  el.width  = maxW;
+  el.height = Math.round(maxW * 1.4);
+  g.bear.x  = el.width / 2;
+  g.bear.y  = el.height - 44;
+  g.bear.speed = Math.max(5, Math.round(el.width * 0.022));
+}
+
+/* ---- start / restart ---- */
+function _ftbStart() {
+  const g = _FTB;
+  if (g.raf) cancelAnimationFrame(g.raf);
+  Object.assign(g, {
+    state: 'playing', score: 0, lives: 3, level: 1,
+    frame: 0, foods: [], popups: [], spawnIn: 70,
+    _flashColor: null, _flashTimer: 0,
+  });
+  g.bear.x = g.canvas.width / 2;
+  _ftbLoop();
+}
+
+/* ---- main loop ---- */
+function _ftbLoop() {
+  const g = _FTB;
+  if (g.state !== 'playing') return;
+  g.frame++;
+  const { ctx, canvas } = g;
+
+  /* level & difficulty */
+  g.level = 1 + Math.floor(g.score / 60);
+  const fallSpd    = Math.min(6, 1.6 + g.level * 0.35);
+  const spawnBase  = Math.max(28, 75 - g.level * 7);
+
+  /* move bear — keyboard */
+  const bHalf = g.bear.w / 2;
+  if (g.keys.left)  g.bear.x = Math.max(bHalf,              g.bear.x - g.bear.speed);
+  if (g.keys.right) g.bear.x = Math.min(canvas.width - bHalf, g.bear.x + g.bear.speed);
+
+  /* move bear — touch (smooth lerp) */
+  if (g.touchTargetX !== null) {
+    const dx = g.touchTargetX - g.bear.x;
+    g.bear.x += dx * 0.28;
+    if (Math.abs(dx) < 1) g.touchTargetX = null;
+  }
+
+  /* spawn food */
+  g.spawnIn--;
+  if (g.spawnIn <= 0) {
+    const isBad = Math.random() < 0.14;
+    let emoji;
+    if (isBad) {
+      emoji = _FTB_BAD[Math.floor(Math.random() * _FTB_BAD.length)];
+    } else if (Math.random() < 0.08) {
+      emoji = _FTB_BONUS[Math.floor(Math.random() * _FTB_BONUS.length)];
+    } else {
+      emoji = _FTB_GOOD[Math.floor(Math.random() * _FTB_GOOD.length)];
+    }
+    const pts  = _ftbPts(emoji);
+    const margin = 20;
+    g.foods.push({
+      e: emoji, pts,
+      x: margin + Math.random() * (canvas.width - margin * 2),
+      y: -24,
+      speed: (fallSpd + Math.random() * 1.2) * (pts < 0 ? 0.85 : 1),
+      size: pts < 0 ? 22 : (pts >= 50 ? 30 : 24),
+    });
+    g.spawnIn = spawnBase + Math.floor(Math.random() * 18) - 9;
+  }
+
+  /* update & collide food */
+  const catchY   = g.bear.y - 28;
+  const catchH   = 30;
+  for (let i = g.foods.length - 1; i >= 0; i--) {
+    const f = g.foods[i];
+    f.y += f.speed;
+
+    /* hit check */
+    const inX = Math.abs(f.x - g.bear.x) < bHalf + f.size * 0.4 - 6;
+    const inY = f.y >= catchY && f.y <= catchY + catchH;
+    if (inX && inY) {
+      if (f.pts < 0) {
+        g.lives--;
+        g._flashColor = 'red'; g._flashTimer = 9;
+        g.popups.push({ t: '-💔', x: f.x, y: f.y, a: 1, c: '#ff4444' });
+      } else {
+        g.score += f.pts;
+        const big = f.pts >= 50;
+        g._flashColor = big ? 'gold' : null; if (big) g._flashTimer = 7;
+        g.popups.push({ t: '+' + f.pts, x: f.x, y: f.y, a: 1, c: big ? '#ffd700' : '#4ade80' });
+      }
+      g.foods.splice(i, 1);
+      continue;
+    }
+
+    /* missed */
+    if (f.y > canvas.height + 12) {
+      if (f.pts > 0) {
+        g.lives--;
+        g._flashColor = 'red'; g._flashTimer = 9;
+        g.popups.push({ t: 'Miss!', x: f.x, y: canvas.height - 20, a: 1, c: '#ff8888' });
+      }
+      g.foods.splice(i, 1);
+    }
+  }
+
+  /* game over */
+  if (g.lives <= 0) {
+    g.lives = 0;
+    g.state = 'gameover';
+    if (g.score > g.hiScore) {
+      g.hiScore = g.score;
+      localStorage.setItem('ftb_bear_hi', g.hiScore);
+    }
+    _ftbDrawGameOver();
+    return;
+  }
+
+  /* draw frame */
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  _ftbBg();
+  _ftbHUD();
+  _ftbDrawItems();
+  _ftbDrawPopups();
+  _ftbDrawBear();
+
+  g.raf = requestAnimationFrame(_ftbLoop);
+}
+
+/* ---- draw helpers ---- */
+function _ftbBg() {
+  const { ctx, canvas, _flashColor, _flashTimer } = _FTB;
+  const gr = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  gr.addColorStop(0, '#0f1923');
+  gr.addColorStop(1, '#1a1f2e');
+  ctx.fillStyle = gr;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (_flashTimer > 0) {
+    ctx.fillStyle = _flashColor === 'red' ? 'rgba(255,60,60,0.18)' : 'rgba(255,215,0,0.2)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    _FTB._flashTimer--;
+  }
+
+  /* ground line */
+  ctx.strokeStyle = 'rgba(255,107,53,0.25)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 6]);
+  ctx.beginPath();
+  ctx.moveTo(0, canvas.height - 6);
+  ctx.lineTo(canvas.width, canvas.height - 6);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function _ftbHUD() {
+  const g = _FTB;
+  const { ctx, canvas } = g;
+  const fs = Math.max(13, Math.round(canvas.width * 0.046));
+
+  ctx.textAlign = 'left';
+  ctx.font = `bold ${fs}px sans-serif`;
+  ctx.fillStyle = '#ff6b35';
+  ctx.fillText('Score: ' + g.score, 10, fs + 4);
+  ctx.font = `${Math.round(fs * 0.78)}px sans-serif`;
+  ctx.fillStyle = '#666';
+  ctx.fillText('Best: ' + g.hiScore, 10, fs * 2 + 2);
+
+  /* hearts */
+  const hfs = Math.round(fs * 1.05);
+  ctx.font = `${hfs}px serif`;
+  ctx.textAlign = 'right';
+  ctx.fillText('❤️'.repeat(Math.max(0, g.lives)), canvas.width - 8, fs + 4);
+
+  /* level */
+  ctx.font = `${Math.round(fs * 0.78)}px sans-serif`;
+  ctx.fillStyle = '#666';
+  ctx.fillText('Lv ' + g.level, canvas.width - 8, fs * 2 + 2);
+}
+
+function _ftbDrawItems() {
+  const { ctx, foods } = _FTB;
+  foods.forEach(f => {
+    ctx.font = `${f.size}px serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(f.e, f.x, f.y);
+  });
+}
+
+function _ftbDrawPopups() {
+  const { ctx, popups } = _FTB;
+  for (let i = popups.length - 1; i >= 0; i--) {
+    const p = popups[i];
+    p.y -= 1.4;
+    p.a -= 0.028;
+    if (p.a <= 0) { popups.splice(i, 1); continue; }
+    ctx.globalAlpha = p.a;
+    ctx.font = `bold 15px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = p.c;
+    ctx.fillText(p.t, p.x, p.y);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function _ftbDrawBear() {
+  const { ctx, canvas, bear } = _FTB;
+  const sz = Math.round(canvas.width * 0.17);
+  ctx.font = `${sz}px serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('🐻', bear.x, bear.y);
+}
+
+function _ftbDrawIdle() {
+  const g = _FTB;
+  const { ctx, canvas } = g;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  _ftbBg();
+
+  const W = canvas.width, H = canvas.height;
+  const bearSz = Math.round(W * 0.22);
+  ctx.font = `${bearSz}px serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('🐻', W / 2, H * 0.52);
+
+  ctx.font = `bold ${Math.round(W * 0.088)}px sans-serif`;
+  ctx.fillStyle = '#ff6b35';
+  ctx.fillText('FEED THE BEAR!', W / 2, H * 0.22);
+
+  ctx.font = `${Math.round(W * 0.052)}px sans-serif`;
+  ctx.fillStyle = '#aaa';
+  ctx.fillText('Catch food · Dodge pests', W / 2, H * 0.31);
+
+  if (g.hiScore > 0) {
+    ctx.font = `${Math.round(W * 0.048)}px sans-serif`;
+    ctx.fillStyle = '#ffd700';
+    ctx.fillText('🏆 Best: ' + g.hiScore, W / 2, H * 0.38);
+  }
+
+  /* food preview strip */
+  const previews = ['🍕','🍣','🌮','🍔','🍜','🥐','⭐'];
+  const gap = W / (previews.length + 1);
+  ctx.font = '20px serif';
+  previews.forEach((e, i) => ctx.fillText(e, gap * (i + 1), H * 0.65));
+
+  ctx.font = `bold ${Math.round(W * 0.062)}px sans-serif`;
+  ctx.fillStyle = '#ff6b35';
+  ctx.fillText('Tap to Start!', W / 2, H * 0.78);
+}
+
+function _ftbDrawGameOver() {
+  const g = _FTB;
+  const { ctx, canvas } = g;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  _ftbBg();
+  _ftbDrawItems();
+  _ftbDrawBear();
+
+  const W = canvas.width, H = canvas.height;
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.textAlign = 'center';
+  ctx.font = `bold ${Math.round(W * 0.095)}px sans-serif`;
+  ctx.fillStyle = '#ff4444';
+  ctx.fillText('GAME OVER', W / 2, H * 0.27);
+
+  ctx.font = `bold ${Math.round(W * 0.07)}px sans-serif`;
+  ctx.fillStyle = '#ff6b35';
+  ctx.fillText('Score: ' + g.score, W / 2, H * 0.4);
+
+  const isHi = g.score > 0 && g.score >= g.hiScore;
+  if (isHi) {
+    ctx.font = `bold ${Math.round(W * 0.056)}px sans-serif`;
+    ctx.fillStyle = '#ffd700';
+    ctx.fillText('🏆 NEW HIGH SCORE!', W / 2, H * 0.5);
+  } else if (g.hiScore > 0) {
+    ctx.font = `${Math.round(W * 0.05)}px sans-serif`;
+    ctx.fillStyle = '#888';
+    ctx.fillText('Best: ' + g.hiScore, W / 2, H * 0.5);
+  }
+
+  ctx.font = `bold ${Math.round(W * 0.062)}px sans-serif`;
+  ctx.fillStyle = '#ff6b35';
+  ctx.fillText('Tap to Play Again', W / 2, H * 0.64);
+
+  ctx.font = `${Math.round(W * 0.044)}px sans-serif`;
+  ctx.fillStyle = '#555';
+  ctx.fillText('Lv ' + g.level + ' reached', W / 2, H * 0.71);
+}
+
+
+/* ---- keyboard handler ---- */
+function _ftbHandleKey(e) {
+  const g = _FTB;
+  if (g.state !== 'playing') return;
+  const dn = e.type === 'keydown';
+  if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') { g.keys.left  = dn; e.preventDefault(); }
+  if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { g.keys.right = dn; e.preventDefault(); }
+}
+
+/* ---- canvas tap (start / restart) ---- */
+function _ftbHandleCanvasTap(e) {
+  const g = _FTB;
+  if (g.state === 'idle' || g.state === 'gameover') {
+    g.keys.left = g.keys.right = false;
+    g.touchTargetX = null;
+    _ftbStart();
+    return;
+  }
+  /* during play: click left/right half to move */
+  if (g.state === 'playing') {
+    const rect = g.canvas.getBoundingClientRect();
+    const cx = (e.clientX - rect.left) * (g.canvas.width / rect.width);
+    g.touchTargetX = cx;
+  }
+}
+
+/* ---- touch handler ---- */
+function _ftbHandleTouch(e) {
+  const g = _FTB;
+  e.preventDefault();
+  const t = e.touches[0];
+  if (!t) return;
+  if (g.state === 'idle' || g.state === 'gameover') {
+    g.keys.left = g.keys.right = false;
+    g.touchTargetX = null;
+    _ftbStart();
+    return;
+  }
+  if (g.state === 'playing') {
+    const rect = g.canvas.getBoundingClientRect();
+    const cx = (t.clientX - rect.left) * (g.canvas.width / rect.width);
+    g.touchTargetX = Math.max(g.bear.w / 2, Math.min(g.canvas.width - g.bear.w / 2, cx));
+  }
+}
+
