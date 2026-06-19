@@ -4143,6 +4143,40 @@ body.light-mode #profile-btn {
   color: var(--text-dim);
 }
 
+/* Mobile overrides for signup + account portal */
+@media (max-width: 480px) {
+  .signup-fullscreen {
+    align-items: flex-start;
+    padding: 16px 14px;
+    min-height: 100dvh;
+    min-height: 100vh; /* fallback */
+    box-sizing: border-box;
+  }
+  .signup-inner { padding-bottom: 32px; }
+  .signup-brand-row { margin-bottom: 14px; }
+  .signup-brand-bear { font-size: 1.8rem; }
+  .signup-brand-name { font-size: 1.1rem; }
+  .signup-headline { font-size: 1.35rem; margin-bottom: 8px; }
+  .signup-subline { font-size: .82rem; margin-bottom: 14px; }
+  .signup-avatar-big { font-size: 3.5rem; }
+  .signup-avatar-wrap { margin-bottom: 10px; }
+  .signup-cta-btn { padding: 13px; margin-top: 14px; }
+  .avatar-emoji-grid { grid-template-columns: repeat(5, 1fr) !important; gap: 5px; }
+  .avatar-option { font-size: 1.25rem; }
+  .signup-features { margin-top: 16px; gap: 6px; }
+  .signup-feature-pill { font-size: .7rem; padding: 4px 10px; }
+  /* Account portal: full-width card on small screens */
+  #account-overlay .account-portal-card {
+    max-width: 100%;
+    width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    margin-top: auto;
+  }
+  #account-overlay.modal-overlay {
+    align-items: flex-end;
+  }
+}
+
 /* ════════════════════════════════════════════════════════════
    ACCOUNT PORTAL (full dashboard modal)
    ════════════════════════════════════════════════════════════ */

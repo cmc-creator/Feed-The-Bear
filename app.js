@@ -307,7 +307,6 @@ function openProfileSetup () {
     setTimeout(() => {
       state.settings.onboardingDone = false;
       showOnboarding();
-      state.settings.onboardingDone = false;
     }, 600);
   };
 
@@ -340,7 +339,7 @@ function openAccountModal () {
     const joined = profile.joinDate
       ? new Date(profile.joinDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
       : 'recently';
-    sinceEl.textContent = `Foodie since ${joined}`;
+    sinceEl.textContent = `Part of the pack since ${joined} 🐾`;
   }
 
   if (statsEl) {
@@ -417,7 +416,7 @@ function enableLocation () {
       updateLocationBtn();
       hideBanner('location-banner');
       renderCards();
-      showToast('📍 Location On', 'You\'ll get alerts when near restaurants on your list!', 'success');
+      showToast('📍 Bearings locked! 🐻', 'You\'ll get a nudge when you\'re near spots on your list!', 'success');
       // Request notification permission
       if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
@@ -425,8 +424,6 @@ function enableLocation () {
       startWatching();
       // Load home discovery strip + AI rec
       loadHomeDiscovery();
-      // Auto-open nearby discovery so the user sees restaurants right away
-      setTimeout(() => discoverNearby(), 300);
     },
     err => {
       showToast('Location Error', err.message || 'Unable to get location.', 'error');
@@ -1136,11 +1133,11 @@ function handleFormSubmit (e) {
     entry.lng = orig?.lng || null;
     entry.visits = orig?.visits || [];
     state.restaurants = state.restaurants.map(r => r.id === state.editingId ? entry : r);
-    showToast('Updated! ✏️', `"${name}" has been updated.`, 'success');
+    showToast('Updated! 🐻', `"${name}" is looking better than ever in your den.`, 'success');
   } else {
     entry.visits = [];
     state.restaurants.unshift(entry);
-    showToast('Added! 🍽️', `"${name}" added to your list.`, 'success');
+    showToast('Paws up! 🐾', `"${name}" is now saved in your den.`, 'success');
   }
 
   // Geocode in background if address provided
@@ -1862,12 +1859,10 @@ function hideBanner (id) {
 }
 
 function maybeHideOverlay () {
-  const anyOpen =
-    !document.getElementById('modal-overlay').classList.contains('hidden') ||
-    !document.getElementById('detail-overlay').classList.contains('hidden') ||
-    !document.getElementById('chat-panel').classList.contains('hidden');
+  const anyOpen = !!document.querySelector('.modal-overlay:not(.hidden), #chat-panel:not(.hidden)');
   if (!anyOpen) {
     document.getElementById('ui-overlay').classList.add('hidden');
+    document.body.classList.remove('overlay-open');
   }
 }
 
@@ -1989,7 +1984,7 @@ async function discoverNearby () {
     const res  = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:query });
     const data = await res.json();
     const els  = (data.elements || []).slice(0, 20);
-    if (!els.length) { document.getElementById('nearby-results').innerHTML = '<div class="nearby-empty">No restaurants found within 1 mile. Try a different area!</div>'; return; }
+    if (!els.length) { document.getElementById('nearby-results').innerHTML = '<div class="nearby-empty">🐻 No spots sniffed out within 1 mile — try a different area!</div>'; return; }
     const html = els.map(el => {
       const tags = el.tags || {};
       const elLat = el.lat ?? el.center?.lat, elLon = el.lon ?? el.center?.lon;
@@ -5093,7 +5088,7 @@ async function loadHomeDiscovery () {
     const q = `[out:json][timeout:15];(node["amenity"~"restaurant|cafe|fast_food|bar"](around:1609,${lat},${lng}););out body 30;`;
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 12000);
-    const resp = await fetch('https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(q), { signal: ctrl.signal });
+    const resp = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: q, signal: ctrl.signal });
     clearTimeout(t);
     const json = await resp.json();
     const raw = (json.elements || []).filter(el => el.tags?.name);
@@ -5108,15 +5103,17 @@ async function loadHomeDiscovery () {
     _homeDiscCacheTime = Date.now();
     renderHomeDiscovery(_homeDiscCache);
     loadAiRec(_homeDiscCache);
-  } catch {
-    list.innerHTML = '<div class="nearby-home-loading">Could not load nearby restaurants — check your connection.</div>';
+  } catch (err) {
+    list.innerHTML = err?.name === 'AbortError'
+      ? '<div class="nearby-home-loading">🐻 Took too long to sniff out spots — bear with us and try again!</div>'
+      : '<div class="nearby-home-loading">🐾 Couldn\'t sniff out nearby restaurants — check your connection.</div>';
   }
 }
 
 function renderHomeDiscovery ({ elements }) {
   const list = document.getElementById('nearby-home-list');
   if (!list || !elements.length) {
-    if (list) list.innerHTML = '<div class="nearby-home-loading">No restaurants found within 1 mile.</div>';
+    if (list) list.innerHTML = '<div class="nearby-home-loading">🐻 No spots sniffed out within 1 mile — the den must be remote.</div>';
     return;
   }
   const savedNames = new Set(state.restaurants.map(r => normalizeName(r.name)));
@@ -6033,6 +6030,14 @@ function _isInStandaloneMode () {
 function initInstallPrompt () {
   // If already installed, do nothing
   if (_isInStandaloneMode()) return;
+
+  // If beforeinstallprompt already fired before this function ran, use it now
+  if (_pwaPromptEvent && !_deferredInstallPrompt) {
+    _deferredInstallPrompt = _pwaPromptEvent;
+    if (!localStorage.getItem('ftb_install_dismissed')) {
+      setTimeout(showInstallBanner, 2000);
+    }
+  }
 
   // iOS: show manual instructions after 5s on first visit
   if (_isIos()) {
@@ -7593,7 +7598,7 @@ function _saveVisitLogEntry () {
   document.getElementById('vl-notes').value = '';
   document.getElementById('vl-spend').value = '';
   _setVlStars(0);
-  showToast('Visit saved!', `Logged a visit to ${escHtml(r.name)}.`, 'success');
+  showToast('🐻 Grizzly good visit!', `Logged your trip to ${escHtml(r.name)}.`, 'success');
 }
 function _invalidateSpendCache () { _spendCacheValid = false; }
 
