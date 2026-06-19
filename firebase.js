@@ -19,11 +19,11 @@ const _FB_CONFIG = {
   measurementId:     'G-2R1LWK111N',
 };
 
-const _STRIPE_PK = 'REPLACE_WITH_YOUR_STRIPE_PUBLISHABLE_KEY';   // pk_live_… or pk_test_…
+const _STRIPE_PK = 'pk_live_51Tk95ILzFIsRCvKRhcGFReLfSCM0AkX6I2jyN7qjjHEPce8sycXOZVvCxxeNsT84yysNdxxzeiDFHXhyB45BewaK00ne0FeBR4';
 
 const _PRICES = {
-  monthly: 'REPLACE_WITH_STRIPE_MONTHLY_PRICE_ID',   // price_…
-  yearly:  'REPLACE_WITH_STRIPE_YEARLY_PRICE_ID',    // price_…
+  monthly: 'price_1Tk9n0LzFIsRCvKRQpBwQRjN',
+  yearly:  'price_1Tk9ntLzFIsRCvKRgn4KnUZm',
 };
 
 // ─── INIT ─────────────────────────────────────────────────────
