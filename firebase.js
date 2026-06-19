@@ -66,8 +66,7 @@ async function fbSignOut () {
   window._ftbPlan = 'free';
   localStorage.removeItem('ftb_plan_v1');
   localStorage.removeItem('ftb_uid_v1');
-  updateAuthUI(null);
-  showToast('👋 Signed out', 'Your data is still saved locally, bear.', 'info');
+  window.location.href = 'index.html';
 }
 
 // ─── FIRESTORE SYNC ───────────────────────────────────────────
@@ -349,7 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('upgrade-cta-btn')?.addEventListener('click',    _handleUpgradeClick);
 
   // Account portal additional rows
-  document.getElementById('account-signin-row')?.addEventListener('click',  () => { closeAccountModal(); setTimeout(openAuthModal,     150); });
+  document.getElementById('account-signin-row')?.addEventListener('click',  () => { window.location.href = 'auth.html?mode=signin'; });
   document.getElementById('account-signout-row')?.addEventListener('click', () => { closeAccountModal(); setTimeout(fbSignOut,          150); });
   document.getElementById('account-upgrade-row')?.addEventListener('click', () => { closeAccountModal(); setTimeout(openUpgradeModal,   150); });
 });

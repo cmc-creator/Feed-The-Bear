@@ -3,1920 +3,687 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🐻 Feed The Bear — Foodie Tracker</title>
-  <meta name="description" content="Feed The Bear helps you save, discover, and revisit your favorite restaurants with smart lists, maps, reminders, and foodie insights." />
-  <meta property="og:title" content="Feed The Bear" />
-  <meta property="og:description" content="Your personal foodie tracker for saved spots, map discovery, restaurant stats, and smart recommendations." />
+  <title>Feed The Bear 🐻 — Your Personal Foodie Tracker</title>
+  <meta name="description" content="Save restaurants you love, discover gems nearby, track every great meal, and get AI-powered dish recommendations. Your personal foodie HQ." />
+  <meta property="og:title" content="Feed The Bear — Foodie Tracker" />
+  <meta property="og:description" content="Save restaurants, discover nearby gems, get AI dish recs, and track every great meal. Free to start." />
   <meta property="og:type" content="website" />
   <meta name="theme-color" content="#FF6B35" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Feed The Bear" />
-  <link rel="apple-touch-icon" href="icon.svg" />
-  <link rel="apple-touch-icon" sizes="180x180" href="icon.svg" />
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
-  <link rel="manifest" href="manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:         #0D0D1A;
+      --surface:    #16162A;
+      --surface2:   #1E1E35;
+      --surface3:   #252540;
+      --border:     rgba(255,255,255,.08);
+      --primary:    #FF6B35;
+      --primary-dk: #E5541E;
+      --primary-lt: #FF8C5A;
+      --gold:       #FFD700;
+      --green:      #2ECC71;
+      --blue:       #4A90D9;
+      --text:       #EAEAEA;
+      --text-muted: #8892A4;
+      --text-dim:   #5A6478;
+      --radius:     12px;
+      --radius-lg:  20px;
+      --radius-xl:  28px;
+      --shadow:     0 4px 24px rgba(0,0,0,.5);
+      --shadow-lg:  0 8px 40px rgba(0,0,0,.7);
+      --glow:       0 0 40px rgba(255,107,53,.25);
+      --font:       'Poppins', system-ui, sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    a { color: var(--primary); text-decoration: none; }
+    button { cursor: pointer; border: none; font-family: inherit; }
+
+    /* ── NAV ── */
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 24px; height: 64px;
+      background: rgba(13,13,26,.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 1.1rem; color: var(--text); }
+    .nav-brand-bear { font-size: 1.5rem; }
+    .nav-links { display: flex; align-items: center; gap: 8px; }
+    .nav-link { color: var(--text-muted); font-size: .9rem; font-weight: 500; padding: 6px 12px; border-radius: var(--radius); transition: color .2s; }
+    .nav-link:hover { color: var(--text); }
+    .btn-nav-cta {
+      background: var(--primary); color: #fff;
+      font-size: .9rem; font-weight: 600;
+      padding: 8px 18px; border-radius: 100px;
+      transition: background .2s, transform .15s;
+    }
+    .btn-nav-cta:hover { background: var(--primary-dk); transform: translateY(-1px); }
+    @media(max-width:600px) { .nav-links .nav-link:not(.btn-nav-cta) { display: none; } }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; padding: 100px 24px 80px;
+      position: relative; overflow: hidden;
+    }
+    .hero-glow {
+      position: absolute; width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(255,107,53,.15) 0%, transparent 70%);
+      top: 50%; left: 50%; transform: translate(-50%,-55%);
+      pointer-events: none;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255,107,53,.12); border: 1px solid rgba(255,107,53,.3);
+      color: var(--primary); font-size: .8rem; font-weight: 600;
+      padding: 6px 14px; border-radius: 100px; margin-bottom: 28px;
+      letter-spacing: .03em; text-transform: uppercase;
+    }
+    .hero-bear { font-size: 4rem; line-height: 1; margin-bottom: 16px; display: block;
+      animation: float 3s ease-in-out infinite; }
+    @keyframes float {
+      0%,100% { transform: translateY(0); }
+      50%      { transform: translateY(-10px); }
+    }
+    .hero-title {
+      font-size: clamp(2.4rem, 6vw, 4.5rem);
+      font-weight: 900; line-height: 1.05;
+      letter-spacing: -.02em; margin-bottom: 20px;
+      max-width: 800px;
+    }
+    .hero-title span { color: var(--primary); }
+    .hero-sub {
+      font-size: clamp(1rem, 2.5vw, 1.25rem);
+      color: var(--text-muted); max-width: 560px;
+      line-height: 1.6; margin-bottom: 40px;
+    }
+    .hero-ctas { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-bottom: 60px; }
+    .btn-hero-primary {
+      background: var(--primary); color: #fff;
+      font-size: 1.05rem; font-weight: 700;
+      padding: 14px 32px; border-radius: 100px;
+      transition: background .2s, transform .15s, box-shadow .2s;
+      box-shadow: 0 4px 20px rgba(255,107,53,.4);
+    }
+    .btn-hero-primary:hover { background: var(--primary-dk); transform: translateY(-2px); box-shadow: 0 8px 30px rgba(255,107,53,.5); }
+    .btn-hero-secondary {
+      background: var(--surface2); color: var(--text);
+      font-size: 1.05rem; font-weight: 600;
+      padding: 14px 32px; border-radius: 100px;
+      border: 1px solid var(--border);
+      transition: background .2s, transform .15s;
+    }
+    .btn-hero-secondary:hover { background: var(--surface3); transform: translateY(-2px); }
+    .hero-social-proof {
+      display: flex; align-items: center; gap: 12px;
+      color: var(--text-muted); font-size: .85rem;
+    }
+    .hero-avatars { display: flex; }
+    .hero-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--surface3);
+      border: 2px solid var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; margin-left: -8px;
+    }
+    .hero-avatar:first-child { margin-left: 0; }
+    .hero-stars { color: var(--gold); font-size: .9rem; }
+
+    /* ── MOCKUP ── */
+    .mockup-section { padding: 0 24px 80px; display: flex; justify-content: center; }
+    .app-mockup {
+      width: min(360px, 90vw);
+      background: var(--surface);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      box-shadow: 0 20px 80px rgba(0,0,0,.7), 0 0 0 1px rgba(255,107,53,.1);
+    }
+    .mockup-bar {
+      background: var(--surface2);
+      padding: 12px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .mockup-bar-title { font-weight: 700; font-size: .9rem; }
+    .mockup-bar-icon { font-size: 1.2rem; }
+    .mockup-cards { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+    .mockup-card {
+      background: var(--surface2);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      display: flex; align-items: flex-start; gap: 12px;
+      border: 1px solid var(--border);
+    }
+    .mockup-card-emoji { font-size: 1.8rem; flex-shrink: 0; }
+    .mockup-card-body { flex: 1; min-width: 0; }
+    .mockup-card-name { font-weight: 600; font-size: .85rem; margin-bottom: 3px; }
+    .mockup-card-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+    .mockup-tag {
+      font-size: .65rem; font-weight: 600; padding: 2px 7px;
+      border-radius: 100px; white-space: nowrap;
+    }
+    .tag-orange { background: rgba(255,107,53,.15); color: var(--primary); }
+    .tag-green  { background: rgba(46,204,113,.15); color: var(--green); }
+    .tag-gold   { background: rgba(255,215,0,.15);  color: var(--gold); }
+    .tag-blue   { background: rgba(74,144,217,.15); color: var(--blue); }
+    .mockup-ai-bubble {
+      background: rgba(255,107,53,.1);
+      border: 1px solid rgba(255,107,53,.2);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      margin: 0 12px 12px;
+      font-size: .75rem; color: var(--text-muted); line-height: 1.5;
+    }
+    .mockup-ai-bubble strong { color: var(--primary); }
+
+    /* ── FEATURES ── */
+    .section { padding: 80px 24px; max-width: 1100px; margin: 0 auto; }
+    .section-label {
+      text-align: center; font-size: .8rem; font-weight: 700;
+      letter-spacing: .1em; text-transform: uppercase;
+      color: var(--primary); margin-bottom: 12px;
+    }
+    .section-title {
+      text-align: center; font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 800; margin-bottom: 14px; line-height: 1.2;
+    }
+    .section-sub {
+      text-align: center; color: var(--text-muted);
+      font-size: 1rem; max-width: 520px; margin: 0 auto 56px;
+      line-height: 1.6;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px 24px;
+      transition: border-color .2s, transform .2s;
+    }
+    .feature-card:hover { border-color: rgba(255,107,53,.3); transform: translateY(-4px); }
+    .feature-icon { font-size: 2.2rem; margin-bottom: 16px; display: block; }
+    .feature-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
+    .feature-desc { color: var(--text-muted); font-size: .9rem; line-height: 1.6; }
+    .feature-badge {
+      display: inline-block; margin-top: 12px;
+      font-size: .7rem; font-weight: 700; letter-spacing: .05em;
+      padding: 3px 10px; border-radius: 100px;
+      background: rgba(255,215,0,.12); color: var(--gold);
+      text-transform: uppercase;
+    }
+
+    /* ── HOW IT WORKS ── */
+    .how-wrap { background: var(--surface); border-radius: var(--radius-xl); padding: 56px 40px; }
+    .steps-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 32px; margin-top: 48px;
+    }
+    .step { text-align: center; }
+    .step-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 48px; height: 48px; border-radius: 50%;
+      background: rgba(255,107,53,.15);
+      border: 2px solid rgba(255,107,53,.3);
+      color: var(--primary); font-size: 1.2rem; font-weight: 800;
+      margin-bottom: 16px;
+    }
+    .step-icon { font-size: 2rem; margin-bottom: 12px; display: block; }
+    .step-title { font-weight: 700; margin-bottom: 8px; }
+    .step-desc { color: var(--text-muted); font-size: .88rem; line-height: 1.6; }
+
+    /* ── PRICING ── */
+    .pricing-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px; max-width: 700px; margin: 0 auto;
+    }
+    .pricing-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 32px 28px;
+      position: relative;
+      transition: transform .2s;
+    }
+    .pricing-card:hover { transform: translateY(-4px); }
+    .pricing-card.featured {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px var(--primary), var(--glow);
+    }
+    .pricing-popular {
+      position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+      background: var(--primary); color: #fff;
+      font-size: .72rem; font-weight: 700; letter-spacing: .08em;
+      padding: 4px 14px; border-radius: 100px;
+      text-transform: uppercase; white-space: nowrap;
+    }
+    .pricing-plan-icon { font-size: 2.4rem; margin-bottom: 12px; }
+    .pricing-plan-name { font-size: 1.2rem; font-weight: 800; margin-bottom: 4px; }
+    .pricing-plan-desc { color: var(--text-muted); font-size: .85rem; margin-bottom: 20px; }
+    .pricing-price { margin-bottom: 24px; }
+    .pricing-amount { font-size: 3rem; font-weight: 900; line-height: 1; }
+    .pricing-period { color: var(--text-muted); font-size: .85rem; margin-top: 2px; }
+    .pricing-features { list-style: none; margin-bottom: 28px; display: flex; flex-direction: column; gap: 10px; }
+    .pricing-features li { display: flex; align-items: center; gap: 10px; font-size: .9rem; }
+    .pricing-check { color: var(--green); font-size: 1rem; flex-shrink: 0; }
+    .pricing-lock  { color: var(--text-dim); font-size: .85rem; flex-shrink: 0; }
+    .btn-plan-free {
+      display: block; width: 100%; padding: 13px;
+      background: var(--surface2); color: var(--text);
+      font-weight: 700; font-size: .95rem;
+      border-radius: 100px; text-align: center;
+      border: 1px solid var(--border);
+      transition: background .2s;
+    }
+    .btn-plan-free:hover { background: var(--surface3); }
+    .btn-plan-paid {
+      display: block; width: 100%; padding: 13px;
+      background: var(--primary); color: #fff;
+      font-weight: 700; font-size: .95rem;
+      border-radius: 100px; text-align: center;
+      transition: background .2s, box-shadow .2s;
+      box-shadow: 0 4px 20px rgba(255,107,53,.3);
+    }
+    .btn-plan-paid:hover { background: var(--primary-dk); box-shadow: 0 6px 28px rgba(255,107,53,.45); }
+    .pricing-note { text-align: center; color: var(--text-muted); font-size: .8rem; margin-top: 20px; }
+
+    /* ── TESTIMONIALS ── */
+    .testimonials-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+    }
+    .testimonial-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+    }
+    .testimonial-stars { color: var(--gold); font-size: 1rem; margin-bottom: 12px; }
+    .testimonial-text { color: var(--text-muted); font-size: .9rem; line-height: 1.6; margin-bottom: 16px; font-style: italic; }
+    .testimonial-author { display: flex; align-items: center; gap: 10px; }
+    .testimonial-avatar { font-size: 1.6rem; }
+    .testimonial-name { font-weight: 700; font-size: .88rem; }
+    .testimonial-role { color: var(--text-dim); font-size: .78rem; }
+
+    /* ── CTA SECTION ── */
+    .cta-section {
+      padding: 80px 24px; text-align: center;
+    }
+    .cta-card {
+      max-width: 680px; margin: 0 auto;
+      background: linear-gradient(135deg, rgba(255,107,53,.12) 0%, rgba(255,107,53,.04) 100%);
+      border: 1px solid rgba(255,107,53,.25);
+      border-radius: var(--radius-xl);
+      padding: 56px 40px;
+    }
+    .cta-bear { font-size: 3.5rem; margin-bottom: 16px; display: block; }
+    .cta-title { font-size: clamp(1.8rem, 4vw, 2.4rem); font-weight: 900; margin-bottom: 14px; }
+    .cta-sub { color: var(--text-muted); font-size: 1rem; max-width: 440px; margin: 0 auto 32px; line-height: 1.6; }
+    .cta-disclaimer { color: var(--text-dim); font-size: .8rem; margin-top: 14px; }
+
+    /* ── FOOTER ── */
+    .footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 24px;
+      display: flex; flex-wrap: wrap;
+      align-items: center; justify-content: space-between;
+      gap: 16px; max-width: 1100px; margin: 0 auto;
+    }
+    .footer-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+    .footer-links { display: flex; gap: 20px; flex-wrap: wrap; }
+    .footer-links a { color: var(--text-muted); font-size: .85rem; transition: color .2s; }
+    .footer-links a:hover { color: var(--text); }
+    .footer-copy { color: var(--text-dim); font-size: .8rem; width: 100%; text-align: center; margin-top: 8px; }
+
+    /* ── DIVIDER ── */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 0; }
+
+    /* ── SCROLL ANIM ── */
+    .fade-in {
+      opacity: 0; transform: translateY(24px);
+      transition: opacity .6s ease, transform .6s ease;
+    }
+    .fade-in.visible { opacity: 1; transform: translateY(0); }
+  </style>
 </head>
 <body>
 
-  <!-- ── Signup / Create Account (first-run full-screen page) ── -->
-  <div id="profile-setup-overlay" class="signup-fullscreen hidden" role="dialog" aria-modal="true" aria-label="Create your account">
-    <div class="signup-inner">
-      <div class="signup-brand-row">
-        <span class="signup-brand-bear">🐻</span>
-        <span class="signup-brand-name">Feed The Bear</span>
-      </div>
-      <h1 class="signup-headline">Create your account</h1>
-      <p class="signup-subline">Your personal restaurant HQ — save spots, discover gems, track every great meal.</p>
-      <div class="signup-avatar-wrap">
-        <span id="setup-avatar-display" class="signup-avatar-big">🐻</span>
-      </div>
-      <div class="signup-field">
-        <label class="form-label">Your name</label>
-        <input id="setup-name" class="form-input" type="text" placeholder="e.g. Alex" maxlength="30" autocomplete="name" />
-      </div>
-      <label class="form-label" style="margin-bottom:8px;display:block">Choose your avatar</label>
-      <div class="avatar-emoji-grid" id="avatar-emoji-grid"></div>
-      <button id="setup-save-btn" class="btn-primary signup-cta-btn">Create Account 🐻</button>
-      <button id="setup-skip-btn" class="signup-skip-btn">Skip for now →</button>
-      <div class="signup-features">
-        <span class="signup-feature-pill">📍 Nearby discovery</span>
-        <span class="signup-feature-pill">🗺️ Map view</span>
-        <span class="signup-feature-pill">🐻 Byte Cub AI</span>
-        <span class="signup-feature-pill">📊 Food stats</span>
-      </div>
+  <!-- ── NAV ── -->
+  <nav class="nav">
+    <a href="/" class="nav-brand">
+      <span class="nav-brand-bear">🐻</span>
+      <span>Feed The Bear</span>
+    </a>
+    <div class="nav-links">
+      <a href="#features" class="nav-link">Features</a>
+      <a href="#pricing" class="nav-link">Pricing</a>
+      <a href="auth.html?mode=signin" class="nav-link">Sign In</a>
+      <a href="auth.html?mode=signup" class="btn-nav-cta">Start Free</a>
     </div>
-  </div>
-
-  <!-- ── Account Portal ─────────────────────────────────────── -->
-  <div id="account-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="account-title">
-    <div class="modal-card account-portal-card">
-      <div class="account-portal-topbar">
-        <span class="account-portal-topbar-title">My Account</span>
-        <button id="account-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div class="account-portal-hero">
-        <div id="account-avatar-display" class="account-avatar-display">🐻</div>
-        <h2 id="account-name-display" class="account-name-display">Foodie</h2>
-        <div id="account-since-display" class="account-since-display">Foodie since today</div>
-        <div class="account-badges-row">
-          <span id="account-plan-badge" class="account-plan-badge badge-cub">🐾 Cub — Free</span>
-          <span id="account-sync-badge" class="account-sync-badge">📱 Device only</span>
-        </div>
-      </div>
-      <div id="account-stats-row" class="account-stats-row"></div>
-      <div class="account-portal-actions">
-        <!-- Sign in row — hidden when logged in -->
-        <button class="account-action-row account-signin-row" id="account-signin-row">
-          <span class="aar-icon">🔑</span><span class="aar-label">Sign in / Create account</span><span class="aar-chevron">›</span>
-        </button>
-        <button class="account-action-row" id="account-edit-btn">
-          <span class="aar-icon">✏️</span><span class="aar-label">Edit Profile</span><span class="aar-chevron">›</span>
-        </button>
-        <button class="account-action-row" id="account-profile-link-btn">
-          <span class="aar-icon">👤</span><span class="aar-label">My Foodie Profile</span><span class="aar-chevron">›</span>
-        </button>
-        <button class="account-action-row" id="account-review-link-btn">
-          <span class="aar-icon">📅</span><span class="aar-label">Year in Review</span><span class="aar-chevron prem-lock">🔒</span>
-        </button>
-        <button class="account-action-row" id="account-ach-link-btn">
-          <span class="aar-icon">🏆</span><span class="aar-label">Achievements &amp; XP</span><span class="aar-chevron prem-lock">🔒</span>
-        </button>
-        <button class="account-action-row" id="account-export-link-btn">
-          <span class="aar-icon">📤</span><span class="aar-label">Export My Data</span><span class="aar-chevron">›</span>
-        </button>
-        <!-- Upgrade row — hidden for Grizzly members -->
-        <button class="account-action-row account-upgrade-row" id="account-upgrade-row">
-          <span class="aar-icon">🐻</span><span class="aar-label"><strong>Upgrade to Grizzly</strong> — unlock everything</span><span class="aar-chevron">›</span>
-        </button>
-        <!-- Sign out row — hidden when not logged in -->
-        <button class="account-action-row account-signout-row hidden" id="account-signout-row">
-          <span class="aar-icon">🚪</span><span class="aar-label">Sign Out</span><span class="aar-chevron">›</span>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Edit Profile ──────────────────────────────────────── -->
-  <div id="edit-profile-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">
-    <div class="modal-card profile-setup-card">
-      <div class="modal-header">
-        <h2 id="edit-profile-title">✏️ Edit Profile</h2>
-        <button id="edit-profile-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div style="padding:16px 20px 24px">
-        <div style="text-align:center;margin-bottom:16px">
-          <span id="edit-avatar-display" class="setup-avatar-display">🐻</span>
-        </div>
-        <label class="form-label">Your name</label>
-        <input id="edit-name" class="form-input" type="text" placeholder="Your name" maxlength="30" />
-        <label class="form-label" style="margin-top:16px;margin-bottom:8px;display:block">Avatar</label>
-        <div class="avatar-emoji-grid" id="edit-avatar-grid"></div>
-        <button id="edit-profile-save-btn" class="btn-primary" style="width:100%;margin-top:20px">Save Changes</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Offline Banner ─────────────────────────────────────── -->
-  <div id="offline-banner" class="offline-banner hidden" role="status">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.56 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
-    <span>You're offline — viewing cached data</span>
-  </div>
-
-  <!-- ── PWA Install Banner ────────────────────────────────── -->
-  <div id="pwa-banner" class="pwa-banner hidden" role="banner">
-    <span class="pwa-banner-text">🐻 Install Feed The Bear for faster launch, offline access, and a true app feel.</span>
-    <button id="pwa-install-btn" class="btn-sm btn-orange">Install App</button>
-    <button id="pwa-dismiss-btn" class="icon-btn" aria-label="Dismiss">✕</button>
-  </div>
-
-  <!-- ── Auth Modal (Sign In / Sign Up) ──────────────────── -->
-  <div id="auth-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="auth-title" data-mode="signin">
-    <div class="modal-card auth-card">
-      <div class="modal-header">
-        <h2 id="auth-title" class="auth-title">Welcome back, bear 🐾</h2>
-        <button id="auth-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div class="auth-body">
-        <p class="auth-sub">Sign in to sync your den across devices and unlock Grizzly features.</p>
-        <button id="auth-google-btn" class="auth-google-btn">🟠 Continue with Google</button>
-        <div class="auth-divider"><span>or</span></div>
-        <label class="form-label" for="auth-email">Email</label>
-        <input id="auth-email" class="form-input" type="email" placeholder="bear@example.com" autocomplete="email" />
-        <label class="form-label" for="auth-password" style="margin-top:12px">Password</label>
-        <input id="auth-password" class="form-input" type="password" placeholder="At least 6 characters" autocomplete="current-password" />
-        <button id="auth-submit-btn" class="btn-primary" style="width:100%;margin-top:16px">Sign In</button>
-        <p id="auth-toggle-text" class="auth-toggle-text">New to the den? <button class="auth-link-btn" id="auth-mode-toggle">Sign up — it's free</button></p>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Upgrade Modal (Free → Grizzly) ────────────────────── -->
-  <div id="upgrade-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="upgrade-title">
-    <div class="modal-card upgrade-card">
-      <div class="modal-header">
-        <h2 id="upgrade-title">Become a Grizzly 🐻</h2>
-        <button id="upgrade-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div class="upgrade-body">
-        <p id="upgrade-feature-highlight" class="upgrade-highlight hidden"></p>
-        <div class="upgrade-plans-row">
-          <div class="upgrade-plan upgrade-plan-free">
-            <div class="upgrade-plan-name">🐾 Cub</div>
-            <div class="upgrade-plan-price">Free</div>
-            <ul class="upgrade-plan-features">
-              <li>✓ Up to 15 restaurants</li>
-              <li>✓ Map &amp; discovery</li>
-              <li>✓ Basic lists</li>
-              <li class="dim">✗ AI recommendations</li>
-              <li class="dim">✗ Year in Review</li>
-              <li class="dim">✗ Achievements</li>
-              <li class="dim">✗ Cross-device sync</li>
-            </ul>
-          </div>
-          <div class="upgrade-plan upgrade-plan-paid">
-            <div class="upgrade-plan-badge">Most popular</div>
-            <div class="upgrade-plan-name">🐻 Grizzly</div>
-            <div class="upgrade-price-row">
-              <span id="upgrade-price-main" class="upgrade-price-main">$19.99</span>
-              <span id="upgrade-price-sub" class="upgrade-price-sub">/ year — save 44%!</span>
-            </div>
-            <ul class="upgrade-plan-features">
-              <li>✓ Unlimited restaurants</li>
-              <li>✓ AI recs &amp; Smart Fill</li>
-              <li>✓ Year in Review</li>
-              <li>✓ All Achievements</li>
-              <li>✓ Cloud sync (all devices)</li>
-            </ul>
-          </div>
-        </div>
-        <div class="upgrade-period-toggle">
-          <button id="upgrade-monthly-btn" class="upgrade-period-btn">Monthly</button>
-          <button id="upgrade-yearly-btn"  class="upgrade-period-btn active">Yearly</button>
-        </div>
-        <button id="upgrade-cta-btn" class="btn-primary upgrade-cta-btn" data-period="yearly">Upgrade to Grizzly 🐻</button>
-        <p class="upgrade-footer">Cancel anytime. Billed securely by Stripe. No hidden fees.</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Toast Notifications ──────────────────────────────── -->
-  <div id="toast-container" aria-live="polite"></div>
-
-  <!-- ── Proximity Alert Banner ───────────────────────────── -->
-  <div id="proximity-alert" class="proximity-alert hidden" role="alert">
-    <span id="proximity-icon">📍</span>
-    <div id="proximity-content">
-      <strong id="proximity-name"></strong>
-      <span id="proximity-msg"></span>
-    </div>
-    <button id="proximity-directions" class="btn-sm btn-orange">Directions</button>
-    <button id="proximity-close" aria-label="Dismiss">✕</button>
-  </div>
-
-  <!-- ── Header ────────────────────────────────────────────── -->
-  <header class="app-header">
-    <div class="header-brand">
-      <span class="brand-icon">🐻</span>
-      <span class="brand-name">Feed The Bear</span>
-    </div>
-
-    <nav class="header-nav" id="main-nav">
-      <button class="nav-btn active" data-view="all">All</button>
-      <button class="nav-btn" data-view="want-to-try">Want to Try</button>
-      <button class="nav-btn" data-view="visited">Visited</button>
-      <button class="nav-btn" data-view="map">🗺️ Map</button>
-      <button class="nav-btn" data-view="stats">📊 Stats</button>
-    </nav>
-
-    <div class="header-actions">
-      <!-- Always-visible: theme, voice, add, chat -->
-      <button id="theme-toggle-btn" class="icon-btn" title="Toggle light/dark theme">
-        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-      </button>
-      <button id="voice-btn" class="icon-btn" title="Voice Add">🎙️</button>
-      <button id="craving-btn" class="icon-btn" title="Craving Engine — what should I eat?">🔥</button>
-      <button id="add-btn" class="btn-primary">
-        <span>＋</span> Add Restaurant
-      </button>
-      <button id="chat-toggle-btn" class="chat-toggle-btn" title="Byte Cub Chat">
-        🐻 <span>Ask Byte Cub</span>
-      </button>
-      <button id="account-btn" class="account-header-btn" title="My Account" aria-label="My Account">
-        <span id="header-avatar">🐻</span>
-      </button>
-
-      <!-- Overflow ⋯ menu — all secondary tools -->
-      <div class="more-menu-wrap">
-        <button id="more-menu-btn" class="icon-btn" title="More tools" aria-haspopup="true" aria-expanded="false">⋯</button>
-        <div id="more-menu" class="more-menu" role="menu" aria-label="More tools">
-          <div class="more-menu-section">Discover</div>
-          <button class="more-menu-item" data-more="tonight">🎯 Tonight's Pick</button>
-          <button class="more-menu-item" data-more="craving">🔥 Craving Engine</button>
-          <button class="more-menu-item" data-more="discover">🗺️ Smart Discovery</button>
-          <button class="more-menu-item" data-more="challenge">🏆 Challenges</button>
-          <button class="more-menu-item" data-more="open-now">🟢 Open Now</button>
-          <button class="more-menu-item" data-more="travel">✈️ Travel Mode</button>
-          <div class="more-menu-section">Play</div>
-          <button class="more-menu-item" data-more="swipe">🃏 Swipe to Decide</button>
-          <button class="more-menu-item" data-more="spin">🎯 Spin the Wheel</button>
-          <button class="more-menu-item" data-more="achievements">🏅 Achievements</button>
-          <button class="more-menu-item" data-more="duel">🥊 Restaurant Duel</button>
-          <button class="more-menu-item" data-more="bingo">🎯 Cuisine Bingo</button>
-          <button class="more-menu-item" data-more="fortune">🥠 Fortune Cookie</button>
-          <button class="more-menu-item" data-more="dailychallenge">🔥 Daily Challenge</button>
-          <button class="more-menu-item" data-more="moodcal">📅 Mood Calendar</button>
-          <button class="more-menu-item" data-more="feedbear">🐻 Feed the Bear!</button>
-          <button class="more-menu-item" data-more="passport">🛂 Foodie Passport</button>
-          <button class="more-menu-item" data-more="worldmap">🌍 Cuisine World Map</button>
-          <div class="more-menu-section">Track</div>
-          <button class="more-menu-item" data-more="gallery">🖼️ Photo Gallery</button>
-          <button class="more-menu-item" data-more="compare">⚖️ Compare</button>
-          <button class="more-menu-item" data-more="budget">💰 Budget</button>
-          <button class="more-menu-item" data-more="dishes">🍽️ Dish Tracker</button>
-          <button class="more-menu-item" data-more="visitlog">📋 Visit Log</button>
-          <button class="more-menu-item" data-more="spend">💸 Spend Tracker</button>
-          <button class="more-menu-item" data-more="beenawhile">⏰ It's Been a While</button>
-          <button class="more-menu-item" data-more="review">📊 Year in Review</button>
-          <div class="more-menu-section">Social</div>
-          <button class="more-menu-item" data-more="profile">🌐 My Profile</button>
-          <button class="more-menu-item" data-more="friends">👥 Foodie Friends</button>
-          <button class="more-menu-item" data-more="groupvote">🗳 Group Vote</button>
-          <button class="more-menu-item" data-more="wrap">🎁 Monthly Wrap</button>
-          <button class="more-menu-item" data-more="digest">📅 Monthly Digest</button>
-          <div class="more-menu-section">Analyse</div>
-          <button class="more-menu-item" data-more="stats2">📊 Deep Stats</button>
-          <button class="more-menu-item" data-more="ai-panel">🐻 Byte Cub</button>
-          <button class="more-menu-item" data-more="mealplanner">📆 AI Meal Planner</button>
-          <button class="more-menu-item" data-more="route">🗺️ Route Planner</button>
-          <div class="more-menu-section">Data</div>
-          <button class="more-menu-item" data-more="export2">📦 Export Passport</button>
-          <button class="more-menu-item" data-more="export">📥 Export JSON</button>
-          <label class="more-menu-item" style="cursor:pointer">📤 Import JSON<input type="file" id="import-file-input" accept=".json" style="display:none" /></label>
-          <button class="more-menu-item" data-more="import-bookmarks">📋 Import Bookmarks</button>
-          <button class="more-menu-item" data-more="pdf">📄 Export PDF</button>
-          <div class="more-menu-section">View</div>
-          <button class="more-menu-item" data-more="bulk">☑️ Bulk Select</button>
-          <button class="more-menu-item" data-more="collections">📁 My Lists</button>
-          <button class="more-menu-item" data-more="location">📍 Location</button>
-        </div>
-      </div>
-
-      <!-- Hidden but still in DOM for JS compatibility -->
-      <button id="export-btn" style="display:none"></button>
-      <button id="import-bookmarks-btn" style="display:none"></button>
-      <button id="location-toggle-btn" style="display:none"></button>
-      <button id="bulk-select-btn" style="display:none"></button>
-      <button id="collections-btn" style="display:none"></button>
-      <button id="tonight-btn" style="display:none"></button>
-      <button id="pdf-export-btn" style="display:none"></button>
-      <button id="challenge-btn" style="display:none"></button>
-      <button id="gallery-btn" style="display:none"></button>
-      <button id="compare-btn" style="display:none"></button>
-      <button id="budget-btn" style="display:none"></button>
-      <button id="profile-btn" style="display:none"></button>
-      <button id="wrap-btn" style="display:none"></button>
-    </div>
-  </header>
-
-  <!-- ── Stats Bar ─────────────────────────────────────────── -->
-  <section class="stats-bar" id="stats-bar">
-    <div class="stat-item">
-      <span class="stat-value" id="stat-total">0</span>
-      <span class="stat-label">Saved</span>
-    </div>
-    <div class="stat-divider"></div>
-    <div class="stat-item">
-      <span class="stat-value accent-blue" id="stat-want">0</span>
-      <span class="stat-label">Want to Try</span>
-    </div>
-    <div class="stat-divider"></div>
-    <div class="stat-item">
-      <span class="stat-value accent-green" id="stat-visited">0</span>
-      <span class="stat-label">Visited</span>
-    </div>
-    <div class="stat-divider"></div>
-    <div class="stat-item">
-      <span class="stat-value accent-gold">
-        <span id="stat-avg-stars"></span>
-        <span id="stat-avg">—</span>
-      </span>
-      <span class="stat-label">Avg Rating</span>
-    </div>
-  </section>
-
-  <!-- ── Filter / Search Bar ───────────────────────────────── -->
-  <section class="filter-bar">
-    <div class="search-wrap">
-      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/>
-      </svg>
-      <input type="text" id="search-input" placeholder="Search restaurants, cuisine, notes…" autocomplete="off" />
-    </div>
-
-    <select id="filter-cuisine" class="filter-select" aria-label="Filter by cuisine">
-      <option value="">All Cuisines</option>
-    </select>
-
-    <select id="filter-price" class="filter-select" aria-label="Filter by price">
-      <option value="">Any Price</option>
-      <option value="1">$ Budget</option>
-      <option value="2">$$ Casual</option>
-      <option value="3">$$$ Upscale</option>
-      <option value="4">$$$$ Fine Dining</option>
-    </select>
-
-    <select id="sort-select" class="filter-select" aria-label="Sort by">
-      <option value="date-desc">Newest First</option>
-      <option value="date-asc">Oldest First</option>
-      <option value="name-asc">Name A–Z</option>
-      <option value="name-desc">Name Z–A</option>
-      <option value="rating-desc">Highest Rated</option>
-      <option value="distance-asc">Nearest</option>
-    </select>
-
-    <select id="filter-collection" class="filter-select" aria-label="Filter by list">
-      <option value="">All Lists</option>
-    </select>
-    <button id="clear-filters-btn" class="btn-ghost btn-sm hidden">✕ Clear</button>
-    <button id="group-by-btn" class="btn-ghost btn-sm" title="Group by cuisine">⊞ Group</button>
-    <div class="quick-chips">
-      <button class="quick-chip" data-action="top-rated">⭐ Top Rated</button>
-      <button class="quick-chip" data-action="nearest">📍 Near Me</button>
-      <button class="quick-chip" data-action="discover">🔍 Discover Nearby</button>
-    </div>
-  </section>
-
-  <!-- ── Compare Selection Bar ──────────────────────────── -->
-  <div id="compare-bar" class="compare-bar hidden">
-    <span id="compare-count">Select 2–3 restaurants to compare</span>
-    <button id="compare-now-btn" class="btn-sm btn-orange" disabled>⚖️ Compare Now</button>
-    <button id="compare-cancel-btn" class="btn-ghost btn-sm">✕ Cancel</button>
-  </div>
-
-  <!-- ── Bulk Action Bar ──────────────────────────────────── -->
-  <div id="bulk-bar" class="bulk-bar hidden">
-    <span id="bulk-count">Select restaurants</span>
-    <button id="bulk-tag-btn" class="btn-sm btn-orange" disabled>🏷️ Tag</button>
-    <button id="bulk-collection-btn" class="btn-sm btn-secondary" disabled>📁 Move to List</button>
-    <button id="bulk-export-btn" class="btn-sm btn-secondary" disabled>📥 Export</button>
-    <button id="bulk-delete-btn" class="btn-sm btn-danger" disabled>🗑️ Delete</button>
-    <button id="bulk-cancel-btn" class="btn-ghost btn-sm">✕ Cancel</button>
-  </div>
-
-  <!-- ── Stats / Analytics View ─────────────────────────────── -->
-  <div id="stats-view" class="stats-view hidden">
-    <div class="stats-view-inner">
-      <h2 class="stats-view-title">📊 Your Foodie Stats</h2>
-      <div class="stats-kpi-row" id="stats-kpi-row"></div>
-
-      <!-- Taste DNA -->
-      <div class="stats-charts-row">
-        <div class="stats-chart-card" style="flex:1">
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-            <div>
-              <h3>🧬 Your Taste DNA</h3>
-              <p class="chart-sub">Your unique flavor fingerprint</p>
-            </div>
-            <button id="ai-taste-profile-btn" class="btn-sm btn-ai">✨ AI Personality</button>
-          </div>
-          <div id="chart-taste-dna" class="taste-dna-section"></div>
-          <div id="ai-taste-profile-result" class="ai-taste-card hidden"></div>
-        </div>
-      </div>
-
-      <div class="stats-charts-row">
-        <div class="stats-chart-card">
-          <h3>Cuisine Breakdown</h3>
-          <div id="chart-cuisine" class="bar-chart"></div>
-        </div>
-        <div class="stats-chart-card">
-          <h3>Visits Over Time</h3>
-          <div id="chart-visits" class="bar-chart"></div>
-        </div>
-      </div>
-      <div class="stats-charts-row">
-        <div class="stats-chart-card">
-          <h3>Price Range Distribution</h3>
-          <div id="chart-price" class="bar-chart"></div>
-        </div>
-        <div class="stats-chart-card">
-          <h3>Top Rated Visits</h3>
-          <div id="chart-top" class="top-list"></div>
-        </div>
-      </div>
-      <!-- Streak + Heatmap row -->
-      <div class="stats-charts-row">
-        <div class="stats-chart-card stats-chart-card--narrow">
-          <h3>🔥 Streaks</h3>
-          <div id="chart-streaks" class="streak-section"></div>
-        </div>
-        <div class="stats-chart-card stats-chart-card--wide">
-          <h3>📅 Visit Heatmap</h3>
-          <div id="chart-heatmap" class="heatmap-grid"></div>
-        </div>
-      </div>
-      <!-- Leaderboard + Price Trend row -->
-      <div class="stats-charts-row">
-        <div class="stats-chart-card">
-          <h3>🥇 Leaderboard</h3>
-          <div id="chart-leaderboard" class="leaderboard-list"></div>
-        </div>
-        <div class="stats-chart-card">
-          <h3>💸 Spending Trend</h3>
-          <div id="chart-price-trend" class="bar-chart"></div>
-        </div>
-      </div>
-      <!-- Cuisine Passport row -->
-      <div class="stats-charts-row">
-        <div class="stats-chart-card" style="flex:1">
-          <h3>🌍 Cuisine Passport</h3>
-          <p class="chart-sub">Cuisines you've explored</p>
-          <div id="chart-passport" class="passport-grid"></div>
-        </div>
-      </div>
-      <!-- Budget + Calendar row -->
-      <div class="stats-charts-row">
-        <div class="stats-chart-card">
-          <h3>💰 Monthly Budget</h3>
-          <p class="chart-sub">Estimated dining spend this month</p>
-          <div id="chart-budget" class="budget-chart"></div>
-        </div>
-        <div class="stats-chart-card">
-          <h3>📅 Visit Calendar</h3>
-          <p class="chart-sub">Days you logged a meal</p>
-          <div id="chart-calendar" class="visit-calendar"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Map View ─────────────────────────────────────────────── -->
-  <div id="map-container" class="map-container hidden"></div>
-
-  <!-- ── Main Content ─────────────────────────────────────────── -->
-  <main class="main-content" id="main-content">
-
-    <!-- No location banner -->
-    <div id="location-banner" class="location-banner hidden">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-      <span>Enable location to get alerts when you're near restaurants on your list!</span>
-      <button id="enable-location-btn" class="btn-sm btn-orange">Enable</button>
-      <button id="dismiss-location-banner" class="btn-ghost btn-sm">Dismiss</button>
-    </div>
-
-    <!-- Weekly Dining Goal Widget -->
-    <div id="weekly-goal-widget" class="weekly-goal-widget hidden">
-      <div class="wg-left">
-        <span class="wg-icon">🎯</span>
-        <div class="wg-text-col">
-          <div class="wg-title">Weekly Dining Goal: <strong id="wg-count">0</strong>/<strong id="wg-goal">3</strong> meals</div>
-          <div class="wg-label" id="wg-label">Get out and eat this week!</div>
-        </div>
-      </div>
-      <div class="wg-right">
-        <div class="wg-bar-track"><div class="wg-bar-fill" id="wg-fill"></div></div>
-        <button class="btn-ghost btn-sm wg-set-btn" id="wg-set-btn">✏️ Goal</button>
-      </div>
-    </div>
-
-    <!-- ── Home Discovery: Near You + AI Rec ─────────── -->
-    <section id="home-discovery" class="home-discovery" aria-label="Restaurants near you">
-      <!-- AI Recommendation Banner -->
-      <div id="ai-rec-banner" class="ai-rec-banner hidden">
-        <div class="ai-rec-icon">✨</div>
-        <div class="ai-rec-body">
-          <div class="ai-rec-label">Byte Cub's Pick For You</div>
-          <div id="ai-rec-text" class="ai-rec-text">Thinking…</div>
-        </div>
-        <button id="ai-rec-refresh-btn" class="ai-rec-refresh" title="Refresh recommendation">↻</button>
-      </div>
-      <!-- Nearby strip -->
-      <div class="nearby-home-header">
-        <span class="nearby-home-title">📍 Near You Now</span>
-        <button id="nearby-home-more-btn" class="btn-ghost btn-sm">See all →</button>
-      </div>
-      <div id="nearby-home-list" class="nearby-home-list">
-        <div class="nearby-home-loading">🐻 Sniffing out restaurants near you…</div>
-      </div>
-    </section>
-
-    <!-- Restaurant grid -->
-    <div id="restaurant-grid" class="restaurant-grid"></div>
-
-    <!-- Empty state -->
-    <div id="empty-state" class="empty-state hidden">
-      <div class="empty-icon">🐻</div>
-      <h2>Your den is empty!</h2>
-      <p>Time to go foraging! Add restaurants you want to visit or have already tried.</p>
-      <button class="btn-primary" id="empty-add-btn">＋ Add Your First Restaurant</button>
-    </div>
-
-    <!-- No results state -->
-    <div id="no-results" class="empty-state hidden">
-      <div class="empty-icon">🔍</div>
-      <h2>No results found</h2>
-      <p>Try adjusting your search or filters.</p>
-      <button class="btn-ghost" id="no-results-clear-btn">Clear Filters</button>
-    </div>
-
-  </main>
-
-  <!-- ── Tonight's Pick Modal ──────────────────────────────── -->
-  <div id="tonight-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="tonight-title">
-    <div class="modal-card tonight-card">
-      <div class="modal-header">
-        <h2 id="tonight-title">🎯 Tonight's Pick</h2>
-        <button id="tonight-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <p class="tonight-subtitle">Tell me about tonight and I'll find the perfect spot.</p>
-      <div class="tonight-moods" id="tonight-moods">
-        <button class="mood-chip" data-mood="quick">⚡ Quick bite</button>
-        <button class="mood-chip" data-mood="date">💫 Date night</button>
-        <button class="mood-chip" data-mood="budget">💰 Budget-friendly</button>
-        <button class="mood-chip" data-mood="fancy">🥂 Treat myself</button>
-        <button class="mood-chip" data-mood="new">🆕 Try something new</button>
-        <button class="mood-chip" data-mood="comfort">🛋️ Comfort food</button>
-        <button class="mood-chip" data-mood="healthy">🥗 Something light</button>
-        <button class="mood-chip" data-mood="surprise">🎲 Surprise me</button>
-      </div>
-      <div id="tonight-result" class="tonight-result hidden"></div>
-      <div class="tonight-actions">
-        <button id="tonight-pick-btn" class="btn-primary" style="width:100%">Find My Pick 🎯</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Friend Challenge Modal ───────────────────────────── -->
-  <div id="challenge-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="challenge-title">
-    <div class="modal-card challenge-card">
-      <div class="modal-header">
-        <h2 id="challenge-title">🏆 Friend Challenge</h2>
-        <button id="challenge-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <p class="challenge-subtitle">Share your top picks and challenge a friend to beat your taste!</p>
-      <div id="challenge-preview" class="challenge-preview"></div>
-      <div class="challenge-share-row">
-        <input id="challenge-link" class="challenge-link-input" readonly placeholder="Generating link…" />
-        <button id="challenge-copy-btn" class="btn-sm btn-orange">Copy</button>
-      </div>
-      <button id="challenge-share-btn" class="btn-primary" style="width:100%;margin-top:12px">📤 Share Challenge</button>
-      <div class="challenge-footer">Challenge links encode your top 5 rated restaurants — no account needed.</div>
-    </div>
-  </div>
-
-  <!-- ── Add / Edit Modal ──────────────────────────────────── -->
-  <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h2 id="modal-title">Add Restaurant</h2>
-        <button id="modal-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-
-      <form id="restaurant-form" novalidate>
-        <input type="hidden" id="form-id" />
-
-        <!-- Quick-add from Maps URL -->
-        <div class="form-group form-full" style="margin-bottom:0">
-          <label for="form-maps-url">Quick-Add from Google Maps URL <span class="label-hint">(optional — paste a link to pre-fill)</span></label>
-          <div class="maps-paste-row">
-            <input type="url" id="form-maps-url" placeholder="https://maps.google.com/maps/place/…" autocomplete="off" />
-            <button type="button" id="form-maps-parse-btn" class="btn-sm btn-orange">Parse</button>
-          </div>
-        </div>
-
-        <div class="form-grid">
-          <!-- Name -->
-          <div class="form-group form-full">
-            <label for="form-name">Restaurant Name * <button type="button" id="ai-smart-fill-btn" class="btn-sm btn-ai">🤖 AI Smart Fill</button></label>
-            <input type="text" id="form-name" placeholder="e.g. The Golden Spoon" required />
-            <div id="ai-fill-result" class="ai-inline-result hidden"></div>
-          </div>
-
-          <!-- Cuisine -->
-          <div class="form-group">
-            <label for="form-cuisine">Cuisine Type</label>
-            <input type="text" id="form-cuisine" placeholder="e.g. Italian, Sushi, BBQ" list="cuisine-suggestions" />
-            <datalist id="cuisine-suggestions">
-              <option value="American"/><option value="BBQ"/>
-              <option value="Breakfast"/><option value="Brunch"/>
-              <option value="Burgers"/><option value="Cafe"/>
-              <option value="Chinese"/><option value="Desserts"/>
-              <option value="French"/><option value="Greek"/>
-              <option value="Indian"/><option value="Italian"/>
-              <option value="Japanese"/><option value="Korean"/>
-              <option value="Mediterranean"/><option value="Mexican"/>
-              <option value="Pizza"/><option value="Seafood"/>
-              <option value="Steakhouse"/><option value="Sushi"/>
-              <option value="Thai"/><option value="Vegan"/>
-              <option value="Vietnamese"/>
-            </datalist>
-          </div>
-
-          <!-- Price Range -->
-          <div class="form-group">
-            <label for="form-price">Price Range</label>
-            <select id="form-price">
-              <option value="0">Not Sure</option>
-              <option value="1">$ — Budget</option>
-              <option value="2">$$ — Casual</option>
-              <option value="3">$$$ — Upscale</option>
-              <option value="4">$$$$ — Fine Dining</option>
-            </select>
-          </div>
-
-          <!-- Address -->
-          <div class="form-group form-full">
-            <label for="form-address">Address</label>
-            <input type="text" id="form-address" placeholder="123 Main St, City, State" />
-          </div>
-
-          <!-- Website -->
-          <div class="form-group form-full">
-            <label for="form-website">Website URL</label>
-            <input type="url" id="form-website" placeholder="https://restaurant.com" />
-          </div>
-
-          <!-- Photo -->
-          <div class="form-group form-full">
-            <label for="form-photo">Photo <span class="label-hint">(URL or upload)</span> <button type="button" id="ai-photo-btn" class="btn-sm btn-ai">🤖 AI Fill</button></label>
-            <input type="url" id="form-photo" placeholder="https://example.com/photo.jpg" />
-            <label class="photo-upload-label">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              Upload from device
-              <input type="file" id="form-photo-file" accept="image/*" capture="environment" style="display:none" />
-            </label>
-          </div>
-
-          <!-- Status -->
-          <div class="form-group form-full">
-            <label>Status</label>
-            <div class="radio-group">
-              <label class="radio-label">
-                <input type="radio" name="form-status" value="want-to-try" checked />
-                <span class="radio-pill want">🔖 Want to Try</span>
-              </label>
-              <label class="radio-label">
-                <input type="radio" name="form-status" value="visited" />
-                <span class="radio-pill visited">✅ Visited</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- Date Visited -->
-          <div class="form-group form-full hidden" id="form-date-visited-group">
-            <label for="form-date-visited">Date Visited</label>
-            <input type="date" id="form-date-visited" />
-          </div>
-
-          <!-- My Rating -->
-          <div class="form-group form-full">
-            <label>My Rating</label>
-            <div class="star-picker" id="form-star-picker" role="radiogroup" aria-label="My rating">
-              <button type="button" class="star-pick" data-val="1" aria-label="1 star">★</button>
-              <button type="button" class="star-pick" data-val="2" aria-label="2 stars">★</button>
-              <button type="button" class="star-pick" data-val="3" aria-label="3 stars">★</button>
-              <button type="button" class="star-pick" data-val="4" aria-label="4 stars">★</button>
-              <button type="button" class="star-pick" data-val="5" aria-label="5 stars">★</button>
-            </div>
-            <input type="hidden" id="form-rating" value="0" />
-          </div>
-
-          <!-- Google Rating -->
-          <div class="form-group">
-            <label for="form-google-rating">Google Rating <span class="label-hint">(from Google Maps)</span></label>
-            <input type="number" id="form-google-rating" min="1" max="5" step="0.1" placeholder="4.5" />
-          </div>
-
-          <!-- Google Reviews -->
-          <div class="form-group">
-            <label for="form-google-reviews">Review Count <span class="label-hint">(optional)</span></label>
-            <input type="number" id="form-google-reviews" min="0" placeholder="523" />
-          </div>
-
-          <!-- Priority -->
-          <div class="form-group">
-            <label for="form-priority">Priority</label>
-            <select id="form-priority">
-              <option value="">Normal</option>
-              <option value="hot">🔥 Hot — Must Go!</option>
-              <option value="next">⭐ Up Next</option>
-              <option value="someday">📌 Someday</option>
-            </select>
-          </div>
-
-          <!-- Tags -->
-          <div class="form-group form-full">
-            <label for="form-tags">Tags <span class="label-hint">(comma-separated)</span></label>
-            <input type="text" id="form-tags" placeholder="date night, solo lunch, family, must try, spicy…" autocomplete="off" list="tag-suggestions" />
-            <datalist id="tag-suggestions"></datalist>
-            <div id="form-auto-tags" class="auto-tag-row hidden"></div>
-          </div>
-
-          <!-- Collection -->
-          <div class="form-group">
-            <label for="form-collection">Add to List</label>
-            <select id="form-collection">
-              <option value="">None</option>
-            </select>
-          </div>
-
-          <!-- Notes -->
-          <div class="form-group form-full">
-            <label for="form-notes">Notes <button type="button" id="ai-notes-btn" class="btn-sm btn-ai">✨ AI Enrich</button></label>
-            <textarea id="form-notes" rows="3" placeholder="Must try the truffle pasta! Call ahead for reservations. Great for date night…"></textarea>
-            <div id="ai-notes-result" class="ai-inline-result hidden"></div>
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn-ghost" id="modal-cancel-btn">Cancel</button>
-          <button type="submit" class="btn-primary" id="modal-save-btn">Save Restaurant</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- ── Restaurant Detail Modal ───────────────────────────── -->
-  <div id="detail-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="detail-name">
-    <div class="modal-card detail-card">
-      <div class="detail-hero" id="detail-hero">
-        <button id="detail-close-btn" class="icon-btn detail-close" aria-label="Close">✕</button>
-        <div class="detail-hero-content">
-          <div class="detail-cuisine-badge" id="detail-cuisine-badge"></div>
-          <h2 id="detail-name"></h2>
-          <div class="detail-address" id="detail-address"></div>
-        </div>
-      </div>
-
-      <div class="detail-body">
-        <div class="detail-ratings-row">
-          <div class="detail-rating-block">
-            <div class="g-rating-display" id="detail-google-rating"></div>
-          </div>
-          <div class="detail-rating-block">
-            <div class="my-rating-display" id="detail-my-rating"></div>
-          </div>
-          <div class="detail-rating-block">
-            <div class="price-display" id="detail-price"></div>
-          </div>
-        </div>
-
-        <div class="detail-tags-wrap" id="detail-tags-wrap"></div>
-
-        <div class="detail-notes" id="detail-notes-wrap">
-          <h4>📝 My Notes</h4>
-          <p id="detail-notes"></p>
-        </div>
-
-        <div class="detail-visit-log" id="detail-visit-log-wrap">
-          <div class="visit-log-header">
-            <h4>📅 Visit Log</h4>
-            <button id="detail-checkin-btn" class="btn-sm btn-orange">+ Check In</button>
-          </div>
-          <div id="detail-visit-log-list"></div>
-        </div>
-
-        <div class="detail-reminder-wrap" id="detail-reminder-wrap">
-          <h4>🔔 Plan a Visit</h4>
-          <div class="reminder-row">
-            <input type="date" id="detail-reminder-date" />
-            <input type="time" id="detail-reminder-time" value="12:00" />
-            <button id="detail-set-reminder-btn" class="btn-sm btn-orange">Set Reminder</button>
-          </div>
-          <div id="detail-reminder-status" class="reminder-status"></div>
-        </div>
-
-        <div class="detail-meta" id="detail-meta"></div>
-        <div id="detail-ai-summary" class="detail-ai-summary hidden"></div>
-
-        <div class="detail-actions">
-          <button id="detail-directions-btn" class="btn-primary">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-            Directions
-          </button>
-          <button id="detail-website-btn" class="btn-secondary">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            Website
-          </button>
-          <button id="detail-maps-search-btn" class="btn-secondary">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            View on Map
-          </button>
-          <button id="detail-sms-btn" class="btn-secondary">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.78a16 16 0 0 0 6.29 6.29l.95-.95a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-            Share via SMS
-          </button>
-          <button id="detail-share-btn" class="btn-secondary">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-            Share Card
-          </button>
-          <button id="detail-calendar-btn" class="btn-secondary">
-            📅 Add to Calendar
-          </button>
-          <button id="detail-dishes-btn" class="btn-secondary">
-            🍽️ Dishes
-          </button>
-          <button id="detail-debrief-btn" class="btn-secondary">
-            📝 Debrief
-          </button>
-          <button id="detail-ai-btn" class="btn-secondary">
-            ✨ AI Summary
-          </button>
-          <button id="detail-dishes-ai-btn" class="btn-secondary">
-            🍽️ AI Dish Picks
-          </button>
-          <button id="detail-route-btn" class="btn-secondary">
-            🗺️ Route
-          </button>
-          <button id="detail-edit-btn" class="btn-ghost">
-            ✏️ Edit
-          </button>
-          <button id="detail-delete-btn" class="btn-danger">
-            🗑️ Delete
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Chat Panel ─────────────────────────────────────────── -->
-  <aside id="chat-panel" class="chat-panel hidden" aria-label="Byte Cub Chat">
-    <div class="chat-header">
-      <div class="chat-avatar">🐻</div>
-      <div>
-        <div class="chat-title">Byte Cub</div>
-        <div class="chat-subtitle">Your personal food guide</div>
-      </div>
-      <button id="chat-close-btn" class="icon-btn" aria-label="Close chat">✕</button>
-    </div>
-
-    <div class="chat-messages" id="chat-messages" aria-live="polite">
-      <!-- populated by JS -->
-    </div>
-
-    <div class="chat-suggestions" id="chat-suggestions">
-      <!-- quick-reply chips populated by JS -->
-    </div>
-
-    <div class="chat-input-row">
-      <input type="text" id="chat-input" placeholder="Ask me anything foodie…" autocomplete="off" />
-      <button id="chat-send-btn" class="btn-primary" aria-label="Send">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-      </button>
-    </div>
-  </aside>
-
-  <!-- ── Overlay (for panels/modals on mobile) ─────────────── -->
-  <div id="ui-overlay" class="ui-overlay hidden"></div>
-
-  <!-- ── Mobile Bottom Nav ─────────────────────────────────── -->
-  <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
-    <button class="mobile-nav-btn active" data-view="all">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-      <span>All</span>
-    </button>
-    <button class="mobile-nav-btn" data-view="want-to-try">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-      <span>Want</span>
-    </button>
-    <button class="mobile-nav-btn" data-view="visited">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"><polyline points="20 6 9 17 4 12"/></svg>
-      <span>Visited</span>
-    </button>
-    <button class="mobile-nav-btn" data-view="map">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
-      <span>Map</span>
-    </button>
-    <button class="mobile-nav-btn" data-view="stats">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      <span>Stats</span>
-    </button>
-    <button class="mobile-nav-btn" id="mobile-add-btn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      <span>Add</span>
-    </button>
   </nav>
 
-  <!-- ── Nearby Discovery Modal ─────────────────────────── -->
-  <div id="nearby-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Discover Nearby Restaurants">
-    <div class="modal-card nearby-card">
-      <div class="modal-header">
-        <h2>🍽️ Discover Nearby</h2>
-        <button id="nearby-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div style="padding:16px 20px 20px">
-        <p style="font-size:.83rem;color:var(--text-dim);margin:0 0 12px">Real restaurants nearby — powered by OpenStreetMap. One tap to add any to your list!</p>
-        <div id="nearby-results" class="nearby-results"></div>
-      </div>
+  <!-- ── HERO ── -->
+  <section class="hero">
+    <div class="hero-glow"></div>
+    <div class="hero-badge">🍽️ New — AI Dish Recommendations</div>
+    <span class="hero-bear">🐻</span>
+    <h1 class="hero-title">Your personal<br><span>foodie headquarters</span></h1>
+    <p class="hero-sub">Save restaurants you love, discover nearby gems on the map, track every great meal, and let Byte Cub AI recommend what to order next.</p>
+    <div class="hero-ctas">
+      <a href="auth.html?mode=signup" class="btn-hero-primary">Start for free 🐾</a>
+      <a href="auth.html?mode=signin" class="btn-hero-secondary">Sign In</a>
     </div>
-  </div>
-
-  <!-- ── Onboarding Overlay ──────────────────────────────── -->
-  <div id="onboarding-overlay" class="onboarding-overlay hidden" role="dialog" aria-modal="true">
-    <div class="onboarding-card">
-      <span class="onboarding-icon" id="onboarding-icon">🐻</span>
-      <h2 id="onboarding-title">Welcome to Feed The Bear!</h2>
-      <p id="onboarding-desc">Your personal foodie companion.</p>
-      <div class="onboarding-footer">
-        <div class="onboarding-dots" id="onboarding-dots"></div>
-        <div style="display:flex;gap:10px;align-items:center">
-          <button class="onboarding-skip" id="onboarding-skip-btn">Skip</button>
-          <button class="btn-primary" id="onboarding-next-btn">Next →</button>
-        </div>
+    <div class="hero-social-proof">
+      <div class="hero-avatars">
+        <div class="hero-avatar">🧑</div>
+        <div class="hero-avatar">👩</div>
+        <div class="hero-avatar">🧔</div>
+        <div class="hero-avatar">👱</div>
       </div>
-    </div>
-  </div>
-
-  <!-- ── Collections Panel ──────────────────────────────── -->
-  <aside id="collections-panel" class="collections-panel" aria-label="My Lists">
-    <h3>📁 My Lists</h3>
-    <button id="collections-panel-close" class="icon-btn panel-close" aria-label="Close">✕</button>
-    <div id="collections-list" class="collections-list"></div>
-    <div class="new-collection-row">
-      <input type="text" id="new-collection-name" placeholder="New list name…" maxlength="40" />
-      <button id="add-collection-btn" class="btn-sm btn-orange">Add</button>
-    </div>
-    <div class="collection-colors" id="collection-color-swatches"></div>
-  </aside>
-
-  <!-- ── Share Card Canvas (hidden) ─────────────────────── -->
-  <canvas id="share-canvas" style="display:none" width="800" height="450"></canvas>
-
-  <!-- ── Confetti Canvas (hidden) ────────────────────────── -->
-  <canvas id="confetti-canvas" class="confetti-canvas" aria-hidden="true"></canvas>
-
-  <!-- ── PDF Print Report (hidden, print-only) ──────────── -->
-  <div id="print-report"></div>
-
-  <!-- ── Voice Add Overlay ─────────────────────────────────── -->
-  <div id="voice-overlay" class="voice-overlay hidden" role="status" aria-live="polite">
-    <div class="voice-card">
-      <div id="voice-pulse" class="voice-pulse">🎙️</div>
-      <div id="voice-status" class="voice-status">Listening…</div>
-      <div id="voice-transcript" class="voice-transcript"></div>
-      <button id="voice-cancel-btn" class="btn-ghost btn-sm">Cancel</button>
-    </div>
-  </div>
-
-  <!-- ── Photo Gallery Modal ──────────────────────────────── -->
-  <div id="gallery-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="gallery-title">
-    <div class="modal-card gallery-card">
-      <div class="modal-header">
-        <h2 id="gallery-title">🖼️ Photo Gallery</h2>
-        <button id="gallery-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div id="gallery-grid" class="gallery-grid"></div>
-    </div>
-    <!-- Lightbox -->
-    <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true">
-      <button id="lightbox-close" class="lightbox-close" aria-label="Close">✕</button>
-      <button id="lightbox-prev" class="lightbox-nav lightbox-prev" aria-label="Previous">‹</button>
-      <img id="lightbox-img" class="lightbox-img" src="" alt="Restaurant photo" />
-      <div id="lightbox-caption" class="lightbox-caption"></div>
-      <button id="lightbox-ai-caption-btn" class="btn-sm btn-ai lightbox-ai-btn">✨ AI Caption</button>
-      <button id="lightbox-next" class="lightbox-nav lightbox-next" aria-label="Next">›</button>
-    </div>
-  </div>
-
-  <!-- ── Compare Modal ────────────────────────────────────── -->
-  <div id="compare-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="compare-title">
-    <div class="modal-card compare-card">
-      <div class="modal-header">
-        <h2 id="compare-title">⚖️ Compare Restaurants</h2>
-        <button id="compare-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div id="compare-table" class="compare-table"></div>
-    </div>
-  </div>
-
-  <!-- ── Budget Modal ─────────────────────────────────────── -->
-  <div id="budget-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="budget-title">
-    <div class="modal-card budget-card">
-      <div class="modal-header">
-        <h2 id="budget-title">💰 Dining Budget</h2>
-        <button id="budget-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <p class="import-subtitle">Set your monthly dining budget to track estimated spending.</p>
-      <div class="form-group">
-        <label for="budget-monthly-input">Monthly Budget ($)</label>
-        <input type="number" id="budget-monthly-input" class="import-textarea" placeholder="300" min="0" step="10" style="height:auto;padding:10px 12px" />
-      </div>
-      <div class="form-group" style="margin-top:12px">
-        <label for="budget-avg-input">Average Spend Per Visit ($)</label>
-        <input type="number" id="budget-avg-input" class="import-textarea" placeholder="35" min="0" step="5" style="height:auto;padding:10px 12px" />
-      </div>
-      <button id="budget-save-btn" class="btn-primary" style="width:100%;margin-top:16px">Save Budget</button>
-    </div>
-  </div>
-
-  <!-- ── Public Foodie Profile Modal ──────────────────────── -->
-  <div id="profile-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="profile-title">
-    <div class="modal-card profile-card">
-      <div class="modal-header">
-        <h2 id="profile-title">🌐 My Foodie Profile</h2>
-        <button id="profile-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <p class="import-subtitle">Share your top picks as a shareable card — no account needed, data encoded right in the link.</p>
-      <div id="profile-qr-wrap" class="profile-qr-wrap">
-        <canvas id="profile-qr" width="180" height="180"></canvas>
-      </div>
-      <div class="profile-link-row">
-        <input id="profile-link" class="challenge-link-input" readonly placeholder="Generating…" />
-        <button id="profile-copy-btn" class="btn-sm btn-orange">Copy</button>
-      </div>
-      <button id="profile-share-btn" class="btn-primary" style="width:100%;margin-top:10px">📤 Share Profile</button>
-      <div id="profile-preview" class="profile-preview"></div>
-    </div>
-  </div>
-
-  <!-- ── Foodie Profile Guest View ────────────────────────── -->
-  <div id="guest-profile-overlay" class="guest-profile-overlay hidden" role="dialog" aria-modal="true">
-    <div class="guest-profile-card">
-      <div class="guest-header">
-        <span class="guest-bear">🐻</span>
-        <h1 id="guest-profile-name">Foodie Profile</h1>
-        <p id="guest-profile-sub" class="guest-sub">Top picks shared via Feed The Bear</p>
-      </div>
-      <div id="guest-profile-list" class="guest-profile-list"></div>
-      <a href="./" class="btn-primary" style="display:block;text-align:center;margin-top:20px;text-decoration:none">🐻 Build My Own List</a>
-      <button id="guest-profile-close" class="btn-ghost" style="width:100%;margin-top:8px">Close Preview</button>
-    </div>
-  </div>
-
-  <!-- ── Monthly Wrap Modal ───────────────────────────────── -->
-  <div id="wrap-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="wrap-title">
-    <div class="modal-card wrap-card">
-      <div class="modal-header">
-        <h2 id="wrap-title">🎁 Your Monthly Wrap</h2>
-        <button id="wrap-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div id="wrap-content" class="wrap-content"></div>
-      <div id="wrap-ai-digest" class="ai-digest-block hidden"></div>
-      <div style="display:flex;gap:8px;margin-top:16px">
-        <button id="wrap-ai-btn" class="btn-secondary">✨ AI Narrative</button>
-        <button id="wrap-share-btn" class="btn-primary" style="flex:1">📤 Share My Wrap</button>
-        <button id="wrap-prev-btn" class="btn-ghost btn-sm">◀ Prev Month</button>
-        <button id="wrap-next-btn" class="btn-ghost btn-sm">Next ▶</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Import Yelp / Maps Modal ─────────────────────────── -->
-  <div id="import-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="import-title">
-    <div class="modal-card import-card">
-      <div class="modal-header">
-        <h2 id="import-title">📋 Import from Yelp / Google Maps</h2>
-        <button id="import-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <p class="import-subtitle">Paste exported bookmarks (CSV or JSON) from Google Maps Takeout or Yelp, one place per line, or paste a comma-separated list of names.</p>
-      <textarea id="import-paste-area" class="import-textarea" placeholder="Paste here&#10;Name, Address&#10;Nobu, 105 Hudson St, New York&#10;Taco Bell, 123 Main St&#10;…" rows="8"></textarea>
-      <div id="import-preview" class="import-preview"></div>
-      <div style="display:flex;gap:8px;margin-top:12px">
-        <button id="import-parse-btn" class="btn-sm btn-orange">Preview Import</button>
-        <button id="import-confirm-btn" class="btn-primary" style="flex:1" disabled>✅ Import All</button>
-      </div>
-    </div>
-  </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-
-  <!-- ══ PHASE 8 MODALS ═══════════════════════════════════════ -->
-
-  <!-- 🔥 Craving Engine -->
-  <div id="craving-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="craving-title">
-    <div class="modal-card craving-card">
-      <div class="modal-header">
-        <h2 id="craving-title">🔥 What Are You Craving?</h2>
-        <button id="craving-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <p class="craving-subtitle">Describe your mood, budget, or vibe and I'll pick the perfect spot from your list.</p>
-      <div class="craving-chips-row" id="craving-mood-chips">
-        <button class="craving-chip" data-mood="comfort">🛋️ Comfort Food</button>
-        <button class="craving-chip" data-mood="adventurous">🌶️ Adventurous</button>
-        <button class="craving-chip" data-mood="date-night">💑 Date Night</button>
-        <button class="craving-chip" data-mood="quick">⚡ Quick &amp; Easy</button>
-        <button class="craving-chip" data-mood="healthy">🥗 Healthy</button>
-        <button class="craving-chip" data-mood="splurge">💎 Splurge</button>
-        <button class="craving-chip" data-mood="cheap">💸 Cheap Eats</button>
-        <button class="craving-chip" data-mood="new">✨ Try Something New</button>
-      </div>
-      <input id="craving-freetext" class="form-input" placeholder="Or type anything: 'spicy noodles under $20' …" style="margin-top:12px" />
-      <button id="craving-go-btn" class="btn-primary" style="width:100%;margin-top:12px">Find My Match 🎯</button>
-      <div id="craving-result" class="craving-result hidden"></div>
-    </div>
-  </div>
-
-  <!-- 🍽️ Dish Tracker modal (opens inside detail view as a sheet) -->
-  <div id="dish-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="dish-title">
-    <div class="modal-card dish-card">
-      <div class="modal-header">
-        <h2 id="dish-title">🍽️ Dish Tracker</h2>
-        <button id="dish-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <p id="dish-restaurant-name" class="dish-subtitle"></p>
-      <div class="dish-add-row">
-        <input id="dish-name-input" class="form-input" placeholder="Dish name (e.g. Truffle Pasta)" style="flex:1" />
-        <div class="star-picker-mini" id="dish-rating-picker">
-          <span class="spm" data-v="1">★</span><span class="spm" data-v="2">★</span>
-          <span class="spm" data-v="3">★</span><span class="spm" data-v="4">★</span>
-          <span class="spm" data-v="5">★</span>
-        </div>
-        <button id="dish-add-btn" class="btn-sm btn-orange">Add</button>
-      </div>
-      <div id="dish-list" class="dish-list"></div>
-    </div>
-  </div>
-
-  <!-- 🎬 Year in Review -->
-  <div id="review-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="review-title">
-    <div class="modal-card review-card">
-      <div class="modal-header">
-        <h2 id="review-title">🎬 Your Foodie Year in Review</h2>
-        <button id="review-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div class="review-year-picker">
-        <button id="review-prev-year" class="icon-btn">◀</button>
-        <span id="review-year-label" class="review-year-label">2025</span>
-        <button id="review-next-year" class="icon-btn">▶</button>
-      </div>
-      <div id="review-content" class="review-content"></div>
-      <div id="review-ai-digest" class="ai-digest-block hidden"></div>
-      <div style="display:flex;gap:8px;margin-top:16px">
-        <button id="review-ai-btn" class="btn-secondary">✨ AI Year Recap</button>
-        <button id="review-share-btn" class="btn-primary" style="flex:1">📤 Share My Wrap</button>
-        <button id="review-close-btn2" class="btn-ghost">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 👥 Foodie Friends -->
-  <div id="friends-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="friends-title">
-    <div class="modal-card friends-card">
-      <div class="modal-header">
-        <h2 id="friends-title">👥 Foodie Friends</h2>
-        <button id="friends-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <p class="friends-subtitle">Paste a friend's profile link to see your dining overlap and their top picks.</p>
-      <div style="display:flex;gap:8px">
-        <input id="friends-link-input" class="form-input" placeholder="Paste friend's profile link here …" style="flex:1" />
-        <button id="friends-load-btn" class="btn-sm btn-orange">Load</button>
-      </div>
-      <div id="friends-result" class="friends-result hidden"></div>
-      <div class="friends-my-link" style="margin-top:16px">
-        <span style="font-size:.78rem;color:var(--text-dim)">Your shareable link:</span>
-        <div style="display:flex;gap:6px;margin-top:4px">
-          <input id="friends-my-link-input" class="form-input" readonly style="flex:1;font-size:.75rem" />
-          <button id="friends-copy-btn" class="btn-sm btn-orange">Copy</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 🗺️ Smart Discovery -->
-  <div id="discover-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="discover-title">
-    <div class="modal-card discover-card">
-      <div class="modal-header">
-        <h2 id="discover-title">🗺️ Smart Discovery</h2>
-        <button id="discover-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div style="padding:16px 20px 20px">
-        <p class="discover-subtitle">Nearby restaurants you <strong>haven't saved yet</strong>, ranked by your taste profile.</p>
-        <div style="display:flex;gap:8px;margin-bottom:12px">
-          <select id="discover-radius" class="form-select" style="flex:1">
-            <option value="402">Within 0.25 mi</option>
-            <option value="805">Within 0.5 mi</option>
-            <option value="1609" selected>Within 1 mi</option>
-            <option value="3219">Within 2 mi</option>
-            <option value="8047">Within 5 mi</option>
-          </select>
-          <button id="discover-search-btn" class="btn-sm btn-orange">🔍 Search</button>
-        </div>
-        <div id="discover-results" class="discover-results">
-          <div class="discover-empty">Enable location and tap Search to find places nearby.</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 🎯 Custom Challenges -->
-  <div id="challenges-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="challenges-title">
-    <div class="modal-card challenges-card">
-      <div class="modal-header">
-        <h2 id="challenges-title">🏆 Challenges</h2>
-        <button id="challenges-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div class="challenges-tabs">
-        <button class="chal-tab active" data-tab="active">Active</button>
-        <button class="chal-tab" data-tab="create">＋ Create</button>
-        <button class="chal-tab" data-tab="friend">📨 Friend</button>
-      </div>
-      <div id="chal-tab-active" class="chal-tab-panel">
-        <div id="challenges-list" class="challenges-list"></div>
-      </div>
-      <div id="chal-tab-create" class="chal-tab-panel hidden">
-        <div class="form-row"><label>Challenge Name</label><input id="chal-name-input" class="form-input" placeholder="e.g. 5 New Cuisines in May" /></div>
-        <div class="form-row"><label>Type</label>
-          <select id="chal-type-input" class="form-select">
-            <option value="cuisine_count">Visit N different cuisines</option>
-            <option value="visit_count">Visit N restaurants</option>
-            <option value="new_only">Visit N restaurants never tried before</option>
-            <option value="price_budget">Visit N budget restaurants ($)</option>
-            <option value="rating_avg">Get avg rating above X</option>
-          </select>
-        </div>
-        <div class="form-row"><label>Goal (number)</label><input id="chal-goal-input" class="form-input" type="number" min="1" placeholder="5" /></div>
-        <div class="form-row"><label>Deadline (optional)</label><input id="chal-deadline-input" class="form-input" type="date" /></div>
-        <button id="chal-create-btn" class="btn-primary" style="width:100%;margin-top:8px">🏆 Create Challenge</button>
-      </div>
-      <div id="chal-tab-friend" class="chal-tab-panel hidden">
-        <p style="font-size:.82rem;color:var(--text-dim);margin-bottom:12px">Share a challenge link or paste one from a friend.</p>
-        <div id="chal-friend-share-wrap"></div>
-        <div style="display:flex;gap:8px;margin-top:12px">
-          <input id="chal-friend-link" class="form-input" placeholder="Paste friend's challenge link …" style="flex:1"/>
-          <button id="chal-friend-load-btn" class="btn-sm btn-orange">Join</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 📝 Visit Debrief (small prompt sheet) -->
-  <div id="debrief-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="debrief-title">
-    <div class="modal-card debrief-card">
-      <div class="modal-header">
-        <h2 id="debrief-title">📝 Quick Debrief</h2>
-        <button id="debrief-skip-btn" class="icon-btn" aria-label="Skip">Skip</button>
-      </div>
-      <p id="debrief-restaurant-name" class="debrief-subtitle">How was it?</p>
-      <div id="debrief-steps" class="debrief-steps">
-        <!-- Dynamically rendered -->
-      </div>
-      <div style="display:flex;gap:8px;margin-top:16px">
-        <button id="debrief-save-btn" class="btn-primary" style="flex:1">Save Notes ✓</button>
-      </div>
-    </div>
-  </div>
-  <!-- Phase 9 Modals -->
-
-  <!-- 📊 Deep Stats -->
-  <div id="stats2-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="stats2-title">
-    <div class="modal-card stats2-card">
-      <div class="modal-header">
-        <h2 id="stats2-title">📊 Deep Stats</h2>
-        <button id="stats2-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div class="stats2-body">
-        <div class="stats2-row">
-          <div class="stats2-tile" id="s2-diversity">
-            <div class="stats2-tile-label">Cuisine Diversity</div>
-            <div class="stats2-tile-val" id="s2-diversity-val">—</div>
-            <div class="diversity-bar-track"><div class="diversity-bar-fill" id="s2-diversity-bar"></div></div>
-            <div class="stats2-tile-sub" id="s2-diversity-sub"></div>
-          </div>
-          <div class="stats2-tile" id="s2-streak">
-            <div class="stats2-tile-label">New-Place Streak</div>
-            <div class="stats2-tile-val" id="s2-streak-val">—</div>
-            <div class="stats2-tile-sub" id="s2-streak-sub"></div>
-          </div>
-        </div>
-        <div class="stats2-section-title">Value vs. Enjoyment</div>
-        <canvas id="scatter-canvas" width="340" height="220"></canvas>
-        <div class="stats2-section-title">💎 Hidden Gems</div>
-        <div id="s2-gems-list" class="gems-list"></div>
-        <div class="stats2-section-title">📅 Visit Heatmap</div>
-        <div id="s2-heatmap" class="visit-heatmap"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 🐻 Byte Cub AI -->
-  <div id="ai-panel-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="ai-panel-title">
-    <div class="modal-card ai-panel-card">
-      <div class="modal-header">
-        <div style="display:flex;align-items:center;gap:8px">
-          <h2 id="ai-panel-title">🐻 Byte Cub</h2>
-          <span class="ai-provider-badge">Gemini 2.0 Flash</span>
-        </div>
-        <button id="ai-panel-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div class="ai-panel-body">
-
-        <!-- API Key Setup -->
-        <div id="ai-key-setup" class="ai-key-setup">
-          <div class="ai-key-setup-inner">
-            <div class="ai-key-icon">✨</div>
-            <h3>Unlock Real AI</h3>
-            <p>Add your free Google Gemini API key to power every AI feature in Feed The Bear.</p>
-            <div class="ai-key-input-row">
-              <input type="password" id="ai-gemini-key-input" class="form-input" placeholder="Paste Gemini API key (AIza…)" autocomplete="off" />
-              <button id="ai-save-key-btn" class="btn-primary btn-sm">Save</button>
-            </div>
-            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="ai-key-link">Get a free key at Google AI Studio →</a>
-          </div>
-        </div>
-
-        <!-- Active state (key saved) -->
-        <div id="ai-key-active" class="ai-key-active hidden">
-          <span class="ai-status-dot"></span> Gemini connected
-          <button id="ai-change-key-btn" class="btn-ghost btn-xs">Change key</button>
-        </div>
-
-        <div class="ai-quick-btns">
-          <button class="ai-quick-btn" data-prompt="summarize">📝 My food story</button>
-          <button class="ai-quick-btn" data-prompt="recommend">🎯 Tonight's pick</button>
-          <button class="ai-quick-btn" data-prompt="rut">🔄 Food rut check</button>
-          <button class="ai-quick-btn" data-prompt="next-cuisine">🌍 New cuisine idea</button>
-          <button class="ai-quick-btn" data-prompt="hidden-gems">💎 Hidden gems</button>
-          <button class="ai-quick-btn" data-prompt="taste-profile">🧬 My taste DNA</button>
-        </div>
-        <div class="ai-chat-history" id="ai-chat-history"></div>
-        <div class="ai-input-row">
-          <input id="ai-chat-input" class="form-input" placeholder="Ask Byte Cub anything…" type="text" />
-          <button id="ai-chat-send-btn" class="btn-primary" aria-label="Send">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 📦 Export v2 — Passport + Shareable Page -->
-  <div id="export2-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="export2-title">
-    <div class="modal-card export2-card">
-      <div class="modal-header">
-        <h2 id="export2-title">📦 Export &amp; Share</h2>
-        <button id="export2-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div class="export2-body">
-        <div class="export2-option" id="export2-passport-btn">
-          <div class="export2-icon">📄</div>
-          <div>
-            <div class="export2-label">Restaurant Passport</div>
-            <div class="export2-sub">Print-ready card for every visited spot</div>
-          </div>
-        </div>
-        <div class="export2-option" id="export2-page-btn">
-          <div class="export2-icon">🌐</div>
-          <div>
-            <div class="export2-label">Shareable Web Page</div>
-            <div class="export2-sub">Download a standalone HTML you can share</div>
-          </div>
-        </div>
-        <div class="export2-option" id="export2-csv-btn">
-          <div class="export2-icon">📊</div>
-          <div>
-            <div class="export2-label">CSV Spreadsheet</div>
-            <div class="export2-sub">Open in Excel or Google Sheets</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 🗺️ Route Planner -->
-  <div id="route-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="route-title">
-    <div class="modal-card route-card">
-      <div class="modal-header">
-        <h2 id="route-title">🗺️ Route Planner</h2>
-        <button id="route-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div class="route-body">
-        <p class="route-hint">Pick up to 5 restaurants to visit in one trip. We'll open them in Google Maps as a route.</p>
-        <div id="route-pick-list" class="route-pick-list"></div>
-        <div id="route-selected-bar" class="route-selected-bar hidden">
-          <span id="route-selected-count">0 selected</span>
-          <button id="route-go-btn" class="btn-primary">Open in Maps 🗺️</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 📲 PWA Install Banner -->
-  <div id="install-banner" class="install-banner hidden">
-    <!-- Android / desktop: native prompt -->
-    <div id="install-android-content" class="install-banner-text">
-      <span>📲</span>
       <div>
-        <strong>Install Feed The Bear</strong>
-        <div style="font-size:.75rem;color:var(--text-dim)">Works offline · feels like a real app</div>
+        <div class="hero-stars">★★★★★</div>
+        <span>Loved by foodies everywhere</span>
       </div>
     </div>
-    <!-- iOS: manual instructions -->
-    <div id="install-ios-content" class="install-banner-text" style="display:none;flex-direction:column;align-items:flex-start;gap:4px;flex:1">
-      <strong style="font-size:.88rem">📲 Add to Home Screen</strong>
-      <div style="font-size:.76rem;color:var(--text-dim)">Tap <strong>Share</strong> <span style="font-size:.9rem">⎙</span> at the bottom of Safari, then <strong>"Add to Home Screen"</strong></div>
-    </div>
-    <button id="install-accept-btn" class="btn-primary" style="padding:6px 14px;font-size:.8rem">Install</button>
-    <button id="install-dismiss-btn" class="icon-btn" style="font-size:.9rem">✕</button>
-  </div>
+  </section>
 
-  <!-- Phase 10 Modals -->
-
-  <!-- 🏅 Achievements & XP -->
-  <div id="achievements-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="ach-title">
-    <div class="modal-card ach-card">
-      <div class="modal-header">
-        <h2 id="ach-title">🏅 Achievements</h2>
-        <button id="ach-close-btn" class="icon-btn" aria-label="Close">✕</button>
+  <!-- ── APP MOCKUP ── -->
+  <div class="mockup-section fade-in">
+    <div class="app-mockup">
+      <div class="mockup-bar">
+        <span class="mockup-bar-title">🐻 Feed The Bear</span>
+        <span class="mockup-bar-icon">🔍</span>
       </div>
-      <div class="ach-xp-bar-wrap">
-        <div class="ach-level-label" id="ach-level-label">Foodie Rookie</div>
-        <div class="ach-xp-track"><div class="ach-xp-fill" id="ach-xp-fill"></div></div>
-        <div class="ach-xp-label" id="ach-xp-label">0 XP</div>
-      </div>
-      <div id="ach-badges-grid" class="ach-badges-grid"></div>
-    </div>
-  </div>
-
-  <!-- 🃏 Swipe to Decide -->
-  <div id="swipe-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="swipe-title">
-    <div class="modal-card swipe-card">
-      <div class="modal-header">
-        <h2 id="swipe-title">🃏 Swipe to Decide</h2>
-        <button id="swipe-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <p class="swipe-hint">➡️ Swipe right or tap ✔ to pick tonight &nbsp;·&nbsp; ⬅️ Swipe left to skip</p>
-      <div id="swipe-deck" class="swipe-deck">
-        <div class="swipe-empty hidden" id="swipe-empty">
-          <div style="font-size:3rem">🖤</div>
-          <div style="font-weight:600;margin-top:8px">All caught up!</div>
-          <div style="font-size:.8rem;color:var(--text-dim)">Add more to your wishlist to keep swiping.</div>
-        </div>
-      </div>
-      <div class="swipe-btns">
-        <button class="swipe-btn swipe-btn-skip" id="swipe-skip-btn" title="Skip">❌</button>
-        <button class="swipe-btn swipe-btn-pick" id="swipe-pick-btn" title="Pick tonight">❤️</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 🎯 Spin the Wheel -->
-  <div id="spin-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="spin-title">
-    <div class="modal-card spin-card">
-      <div class="modal-header">
-        <h2 id="spin-title">🎯 Spin the Wheel</h2>
-        <button id="spin-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div class="spin-wrap">
-        <div class="spin-pointer">▼</div>
-        <canvas id="spin-canvas" width="300" height="300"></canvas>
-      </div>
-      <div id="spin-result" class="spin-result hidden"></div>
-      <button id="spin-btn" class="btn-primary" style="width:100%;margin-top:12px">🎯 Spin!</button>
-    </div>
-  </div>
-
-  <!-- ✈️ Travel Mode -->
-  <div id="travel-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="travel-title">
-    <div class="modal-card travel-card">
-      <div class="modal-header">
-        <h2 id="travel-title">✈️ Travel Mode</h2>
-        <button id="travel-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div class="travel-body">
-        <p class="travel-hint">Set a custom location for Discovery &amp; Map. Great for planning food stops on a trip!</p>
-        <div id="travel-active-banner" class="travel-active-banner hidden">
-          ✈️ Travel Mode active: <strong id="travel-active-city"></strong>
-          <button id="travel-deactivate-btn" class="btn-sm" style="margin-left:auto">Turn Off</button>
-        </div>
-        <div class="travel-quick-cities">
-          <div class="travel-section-label">Quick picks</div>
-          <div class="travel-city-grid" id="travel-city-grid">
-            <button class="travel-city-btn" data-city="London, UK" data-lat="51.5074" data-lng="-0.1278">🇬🇧 London</button>
-            <button class="travel-city-btn" data-city="Paris, France" data-lat="48.8566" data-lng="2.3522">🇫🇷 Paris</button>
-            <button class="travel-city-btn" data-city="New York, USA" data-lat="40.7128" data-lng="-74.006">🇺🇸 New York</button>
-            <button class="travel-city-btn" data-city="Tokyo, Japan" data-lat="35.6762" data-lng="139.6503">🇯🇵 Tokyo</button>
-            <button class="travel-city-btn" data-city="Barcelona, Spain" data-lat="41.3851" data-lng="2.1734">🇪🇸 Barcelona</button>
-            <button class="travel-city-btn" data-city="Sydney, Australia" data-lat="-33.8688" data-lng="151.2093">🇦🇺 Sydney</button>
-            <button class="travel-city-btn" data-city="Bangkok, Thailand" data-lat="13.7563" data-lng="100.5018">🇹🇭 Bangkok</button>
-            <button class="travel-city-btn" data-city="Rome, Italy" data-lat="41.9028" data-lng="12.4964">🇮🇹 Rome</button>
-          </div>
-        </div>
-        <div class="travel-section-label" style="margin-top:12px">Custom city</div>
-        <div style="display:flex;gap:8px">
-          <input id="travel-city-input" class="form-input" placeholder="e.g. Melbourne, Australia" style="flex:1" />
-          <button id="travel-set-btn" class="btn-primary">Set</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 📅 Monthly Digest -->
-  <div id="digest-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="digest-title">
-    <div class="modal-card digest-card">
-      <div class="modal-header">
-        <h2 id="digest-title">📅 Monthly Digest</h2>
-        <button id="digest-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div id="digest-body" class="digest-body">
-        <!-- Dynamically rendered -->
-      </div>
-      <div style="display:flex;gap:8px;margin-top:12px">
-        <button id="digest-share-btn" class="btn-primary" style="flex:1">📲 Share Digest</button>
-        <button id="digest-prev-btn" class="btn-secondary">❮</button>
-        <button id="digest-next-btn" class="btn-secondary">❯</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 🟢 Open Now -->
-  <div id="open-now-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="open-now-title">
-    <div class="modal-card open-now-card">
-      <div class="modal-header">
-        <h2 id="open-now-title">🟢 Open Now Nearby</h2>
-        <button id="open-now-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div class="open-now-body">
-        <p class="open-now-hint">Find restaurants near you that OpenStreetMap says are open right now.</p>
-        <div class="open-now-time-row">
-          <span id="open-now-time" style="font-size:.82rem;color:var(--text-dim)"></span>
-          <select id="open-now-radius" class="form-input" style="width:auto;padding:4px 8px">
-            <option value="402">0.25 mi</option>
-            <option value="805">0.5 mi</option>
-            <option value="1609" selected>1 mi</option>
-            <option value="3219">2 mi</option>
-            <option value="8047">5 mi</option>
-          </select>
-          <button id="open-now-search-btn" class="btn-primary">Search</button>
-        </div>
-        <div id="open-now-results" class="open-now-results"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 🥊 AI Restaurant Duel -->
-  <div id="duel-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="duel-title">
-    <div class="modal-card duel-card">
-      <div class="modal-header">
-        <h2 id="duel-title">🥊 Restaurant Duel</h2>
-        <button id="duel-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <p class="duel-hint">Pick two restaurants — Byte Cub judges the ultimate showdown.</p>
-      <div class="duel-pickers">
-        <div class="duel-picker-wrap">
-          <div class="duel-corner-label">🔴 Corner One</div>
-          <select id="duel-pick-a" class="form-input duel-select">
-            <option value="">Choose a restaurant…</option>
-          </select>
-        </div>
-        <div class="duel-vs">VS</div>
-        <div class="duel-picker-wrap">
-          <div class="duel-corner-label">🔵 Corner Two</div>
-          <select id="duel-pick-b" class="form-input duel-select">
-            <option value="">Choose a restaurant…</option>
-          </select>
-        </div>
-      </div>
-      <button id="duel-go-btn" class="btn-primary duel-go-btn">🥊 Fight!</button>
-      <div id="duel-result" class="duel-result hidden"></div>
-      <div id="duel-share-row" class="duel-share-row hidden">
-        <button id="duel-share-btn" class="btn-sm">📤 Share Fight Card</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 🎯 Cuisine Bingo -->
-  <div id="bingo-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="bingo-title">
-    <div class="modal-card bingo-card">
-      <div class="modal-header">
-        <h2 id="bingo-title">🎯 Cuisine Bingo</h2>
-        <button id="bingo-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <p class="bingo-sub">Visit a restaurant of each cuisine to fill your card.</p>
-      <div id="bingo-progress" class="bingo-progress"></div>
-      <div id="bingo-grid" class="bingo-grid"></div>
-      <div id="bingo-winner-banner" class="bingo-winner-banner hidden">🎉 BINGO! You got a full line!</div>
-      <button id="bingo-share-btn" class="btn-sm" style="margin-top:10px">📤 Share Card</button>
-    </div>
-  </div>
-
-  <!-- 🥠 AI Food Fortune Cookie -->
-  <div id="fortune-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="fortune-title">
-    <div class="modal-card fortune-card">
-      <div class="modal-header">
-        <h2 id="fortune-title">🥠 Food Fortune</h2>
-        <button id="fortune-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div class="fortune-cookie-wrap">
-        <div id="fortune-cookie" class="fortune-cookie" role="button" tabindex="0" aria-label="Tap to crack open fortune cookie">🥠</div>
-        <p id="fortune-tap-hint" class="fortune-tap-hint">Tap the cookie for your food fortune…</p>
-      </div>
-      <div id="fortune-result" class="fortune-result hidden">
-        <div id="fortune-text" class="fortune-text"></div>
-        <button id="fortune-again-btn" class="btn-sm" style="margin-top:12px">🥠 Another Fortune</button>
-        <button id="fortune-share-btn" class="btn-sm" style="margin-left:6px">📤 Share</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 📅 Food Mood Calendar -->
-  <div id="moodcal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="moodcal-title">
-    <div class="modal-card moodcal-card">
-      <div class="modal-header">
-        <h2 id="moodcal-title">📅 Food Mood Calendar</h2>
-        <button id="moodcal-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div class="moodcal-nav">
-        <button id="moodcal-prev" class="icon-btn">‹</button>
-        <span id="moodcal-label" class="moodcal-label"></span>
-        <button id="moodcal-next" class="icon-btn">›</button>
-      </div>
-      <div class="moodcal-legend">
-        <span class="moodcal-dot" style="background:var(--green)"></span>Great
-        <span class="moodcal-dot" style="background:#f5a623;margin-left:10px"></span>OK
-        <span class="moodcal-dot" style="background:var(--primary);margin-left:10px"></span>Meh
-        <span class="moodcal-dot" style="background:var(--surface3);margin-left:10px"></span>No rating
-      </div>
-      <div id="moodcal-grid" class="moodcal-grid"></div>
-      <div id="moodcal-detail" class="moodcal-detail hidden"></div>
-    </div>
-  </div>
-
-  <!-- 🔥 Daily Foodie Challenge -->
-  <div id="dailychallenge-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="dailychallenge-title">
-    <div class="modal-card dailychallenge-card">
-      <div class="modal-header">
-        <h2 id="dailychallenge-title">🔥 Daily Challenge</h2>
-        <button id="dailychallenge-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div class="dc-streak-row">
-        <div class="dc-streak-badge">
-          <span class="dc-streak-flame">🔥</span>
-          <span id="dc-streak-count" class="dc-streak-count">0</span>
-          <span class="dc-streak-label">day streak</span>
-        </div>
-        <div class="dc-xp-badge">
-          <span id="dc-xp-count" class="dc-xp-count">0</span>
-          <span class="dc-xp-label">XP</span>
-        </div>
-      </div>
-      <div id="dc-challenge-card" class="dc-challenge-card">
-        <div class="dc-challenge-emoji" id="dc-emoji">🎯</div>
-        <div class="dc-challenge-text" id="dc-text">Loading today's challenge…</div>
-        <div class="dc-challenge-desc" id="dc-desc"></div>
-      </div>
-      <div class="dc-actions">
-        <button id="dc-complete-btn" class="btn-primary dc-complete-btn">✅ Mark Complete</button>
-        <button id="dc-skip-btn" class="btn-sm">Skip today</button>
-      </div>
-      <div id="dc-completed-banner" class="dc-completed-banner hidden">
-        <span>🎉 Challenge completed! +25 XP</span>
-      </div>
-      <div id="dc-history" class="dc-history"></div>
-    </div>
-  </div>
-
-  <!-- ══ PHASE 13 MODALS ══════════════════════════════════════ -->
-
-  <!-- 📋 Visit Log -->
-  <div id="visitlog-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="visitlog-title">
-    <div class="modal-card visitlog-card">
-      <div class="modal-header">
-        <h2 id="visitlog-title">📋 Visit Log</h2>
-        <button id="visitlog-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <p class="visitlog-sub">Track every visit to a restaurant — what you ordered, how much you spent, your thoughts.</p>
-      <div class="visitlog-search-row">
-        <select id="visitlog-restaurant-select" class="form-input" style="flex:1"></select>
-        <button id="visitlog-load-btn" class="btn-sm btn-orange">Load</button>
-      </div>
-      <div id="visitlog-entries" class="visitlog-entries hidden">
-        <div id="visitlog-list" class="visitlog-list"></div>
-        <div class="visitlog-add-form">
-          <h4 style="margin:0 0 8px">+ Log a visit</h4>
-          <div class="visitlog-form-row">
-            <input type="date" id="vl-date" class="form-input" style="flex:1" />
-            <input type="number" id="vl-spend" class="form-input" placeholder="$ spent" min="0" step="0.01" style="flex:1;max-width:120px" />
-          </div>
-          <input type="text" id="vl-dish" class="form-input" placeholder="What did you order?" style="margin-top:6px" />
-          <textarea id="vl-notes" class="form-input" placeholder="Notes, memories, impressions…" rows="2" style="margin-top:6px;resize:none"></textarea>
-          <div class="visitlog-stars-row">
-            <span style="font-size:.82rem;color:var(--text2)">Visit rating:</span>
-            <div id="vl-star-row" class="vl-star-row">
-              <button class="vl-star" data-val="1">★</button><button class="vl-star" data-val="2">★</button><button class="vl-star" data-val="3">★</button><button class="vl-star" data-val="4">★</button><button class="vl-star" data-val="5">★</button>
+      <div class="mockup-cards">
+        <div class="mockup-card">
+          <span class="mockup-card-emoji">🍜</span>
+          <div class="mockup-card-body">
+            <div class="mockup-card-name">Sakura Ramen House</div>
+            <div class="mockup-card-tags">
+              <span class="mockup-tag tag-green">✓ Visited</span>
+              <span class="mockup-tag tag-gold">★ 5 stars</span>
+              <span class="mockup-tag tag-orange">Japanese</span>
             </div>
           </div>
-          <button id="vl-save-btn" class="btn-primary" style="width:100%;margin-top:10px">Save Visit</button>
+        </div>
+        <div class="mockup-card">
+          <span class="mockup-card-emoji">🍕</span>
+          <div class="mockup-card-body">
+            <div class="mockup-card-name">Tony's Coal-Fired Pizza</div>
+            <div class="mockup-card-tags">
+              <span class="mockup-tag tag-blue">📍 Want to try</span>
+              <span class="mockup-tag tag-orange">Italian</span>
+            </div>
+          </div>
+        </div>
+        <div class="mockup-card">
+          <span class="mockup-card-emoji">🌮</span>
+          <div class="mockup-card-body">
+            <div class="mockup-card-name">El Compadre Tacos</div>
+            <div class="mockup-card-tags">
+              <span class="mockup-tag tag-green">✓ Visited</span>
+              <span class="mockup-tag tag-gold">★ 4 stars</span>
+              <span class="mockup-tag tag-orange">Mexican</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="mockup-ai-bubble">
+        🐻 <strong>Byte Cub says:</strong> Based on your love of umami flavors, try the Tonkotsu at Sakura — the broth is 18-hour slow-cooked!
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FEATURES ── -->
+  <section class="section" id="features">
+    <p class="section-label">Everything you need</p>
+    <h2 class="section-title">Built for serious foodies</h2>
+    <p class="section-sub">Everything you need to track, discover, and make the most of every dining experience.</p>
+    <div class="features-grid">
+      <div class="feature-card fade-in">
+        <span class="feature-icon">📍</span>
+        <h3 class="feature-title">Save Any Restaurant</h3>
+        <p class="feature-desc">Add restaurants from anywhere — search by name, paste a link, or let the app auto-fill details. Tag them, rate them, and add personal notes.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <span class="feature-icon">🗺️</span>
+        <h3 class="feature-title">Discover on the Map</h3>
+        <p class="feature-desc">See your saved spots on an interactive map. Find restaurants near you right now, or explore a new neighborhood before you visit.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <span class="feature-icon">🐻</span>
+        <h3 class="feature-title">Byte Cub AI Assistant</h3>
+        <p class="feature-desc">Your AI sous-chef. Ask for dish recommendations, get cuisine insights, or have Byte Cub write smart notes for any restaurant.</p>
+        <span class="feature-badge">🔒 Grizzly</span>
+      </div>
+      <div class="feature-card fade-in">
+        <span class="feature-icon">📊</span>
+        <h3 class="feature-title">Foodie Stats & Insights</h3>
+        <p class="feature-desc">See your dining patterns — top cuisines, spending habits, most-visited spots, and your personal food personality score.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <span class="feature-icon">📱</span>
+        <h3 class="feature-title">Works on Any Device</h3>
+        <p class="feature-desc">Install as an app on your phone or use it in any browser. Works offline too — your restaurant list is always available.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <span class="feature-icon">☁️</span>
+        <h3 class="feature-title">Cloud Sync Everywhere</h3>
+        <p class="feature-desc">Sign in once and your restaurant list syncs instantly across every device. Never lose a saved spot again.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <span class="feature-icon">🏆</span>
+        <h3 class="feature-title">Achievements & XP</h3>
+        <p class="feature-desc">Earn badges and XP for every restaurant you visit. Level up from Cub to Grizzly as you explore more of your city's food scene.</p>
+        <span class="feature-badge">🔒 Grizzly</span>
+      </div>
+      <div class="feature-card fade-in">
+        <span class="feature-icon">📅</span>
+        <h3 class="feature-title">Year in Review</h3>
+        <p class="feature-desc">Get a beautiful annual recap of your dining adventures — your top cuisines, most-visited spots, and favorite dishes of the year.</p>
+        <span class="feature-badge">🔒 Grizzly</span>
+      </div>
+      <div class="feature-card fade-in">
+        <span class="feature-icon">🎮</span>
+        <h3 class="feature-title">Feed The Bear Game</h3>
+        <p class="feature-desc">Take a break between meals with the built-in mini-game. Catch food, dodge pests, and climb the leaderboard.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── HOW IT WORKS ── -->
+  <section class="section" id="how">
+    <div class="how-wrap fade-in">
+      <p class="section-label">Simple by design</p>
+      <h2 class="section-title">Up and running in 60 seconds</h2>
+      <div class="steps-grid">
+        <div class="step">
+          <div class="step-num">1</div>
+          <span class="step-icon">📝</span>
+          <h3 class="step-title">Create your free account</h3>
+          <p class="step-desc">Sign up with Google or email in seconds. No credit card needed to get started.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <span class="step-icon">🍽️</span>
+          <h3 class="step-title">Add your first restaurant</h3>
+          <p class="step-desc">Search for a spot, paste a link, or scan nearby — your first save takes under 10 seconds.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <span class="step-icon">🗺️</span>
+          <h3 class="step-title">Discover & track</h3>
+          <p class="step-desc">Mark places visited, add ratings and notes, explore the map, and let AI guide your next meal.</p>
         </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- 💸 Spend Tracker -->
-  <div id="spend-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="spend-title">
-    <div class="modal-card spend-card">
-      <div class="modal-header">
-        <h2 id="spend-title">💸 Spend Tracker</h2>
-        <button id="spend-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div class="spend-summary-row">
-        <div class="spend-stat-box"><div class="spend-stat-num" id="spend-total-month">$0</div><div class="spend-stat-label">This month</div></div>
-        <div class="spend-stat-box"><div class="spend-stat-num" id="spend-total-all">$0</div><div class="spend-stat-label">All time</div></div>
-        <div class="spend-stat-box"><div class="spend-stat-num" id="spend-avg-visit">$0</div><div class="spend-stat-label">Avg / visit</div></div>
-      </div>
-      <h4 style="margin:14px 0 6px;font-size:.9rem">Best value ($ per ⭐)</h4>
-      <div id="spend-value-list" class="spend-value-list"></div>
-      <h4 style="margin:14px 0 6px;font-size:.9rem">Monthly breakdown</h4>
-      <div id="spend-monthly-bars" class="spend-monthly-bars"></div>
-    </div>
-  </div>
+  <hr class="divider" />
 
-  <!-- ⏰ It's Been a While -->
-  <div id="beenawhile-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="beenawhile-title">
-    <div class="modal-card beenawhile-card">
-      <div class="modal-header">
-        <h2 id="beenawhile-title">⏰ It's Been a While…</h2>
-        <button id="beenawhile-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <p class="beenawhile-sub">Your favourite spots you haven't visited in a while. Time to go back!</p>
-      <div id="beenawhile-list" class="beenawhile-list"></div>
-    </div>
-  </div>
-
-  <!-- 📆 AI Meal Planner -->
-  <div id="mealplanner-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="mealplanner-title">
-    <div class="modal-card mealplanner-card">
-      <div class="modal-header">
-        <h2 id="mealplanner-title">📆 AI Meal Planner</h2>
-        <button id="mealplanner-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <p class="mealplanner-sub">Tell Byte Cub your week and budget — get a personalised dining plan.</p>
-      <div class="mealplanner-controls">
-        <div class="mealplanner-row">
-          <label class="mealplanner-label">Dining out days</label>
-          <select id="mp-days" class="form-input" style="width:auto">
-            <option value="2">2 days</option>
-            <option value="3" selected>3 days</option>
-            <option value="4">4 days</option>
-            <option value="5">5 days</option>
-            <option value="7">Every day!</option>
-          </select>
+  <!-- ── PRICING ── -->
+  <section class="section" id="pricing">
+    <p class="section-label">Simple pricing</p>
+    <h2 class="section-title">Free to start, Grizzly to grow</h2>
+    <p class="section-sub">Start saving restaurants for free. Upgrade when you're ready for unlimited access and premium features.</p>
+    <div class="pricing-grid">
+      <!-- Cub (Free) -->
+      <div class="pricing-card fade-in">
+        <div class="pricing-plan-icon">🐾</div>
+        <div class="pricing-plan-name">Cub</div>
+        <div class="pricing-plan-desc">Perfect for casual foodies just getting started.</div>
+        <div class="pricing-price">
+          <div class="pricing-amount">Free</div>
+          <div class="pricing-period">forever</div>
         </div>
-        <div class="mealplanner-row">
-          <label class="mealplanner-label">Weekly budget</label>
-          <input type="number" id="mp-budget" class="form-input" style="width:120px" placeholder="e.g. 150" min="0" step="5" />
+        <ul class="pricing-features">
+          <li><span class="pricing-check">✓</span> Up to 15 restaurants</li>
+          <li><span class="pricing-check">✓</span> Map discovery</li>
+          <li><span class="pricing-check">✓</span> Ratings &amp; notes</li>
+          <li><span class="pricing-check">✓</span> Tags &amp; collections</li>
+          <li><span class="pricing-check">✓</span> Mini-game</li>
+          <li><span class="pricing-check">✓</span> Install as app (PWA)</li>
+          <li><span class="pricing-lock">🔒</span> <span style="color:var(--text-dim)">Cloud sync</span></li>
+          <li><span class="pricing-lock">🔒</span> <span style="color:var(--text-dim)">Byte Cub AI</span></li>
+          <li><span class="pricing-lock">🔒</span> <span style="color:var(--text-dim)">Unlimited restaurants</span></li>
+        </ul>
+        <a href="auth.html?mode=signup" class="btn-plan-free">Get started free</a>
+      </div>
+      <!-- Grizzly (Paid) -->
+      <div class="pricing-card featured fade-in">
+        <div class="pricing-popular">Most Popular</div>
+        <div class="pricing-plan-icon">🐻</div>
+        <div class="pricing-plan-name">Grizzly</div>
+        <div class="pricing-plan-desc">For dedicated foodies who want everything unlocked.</div>
+        <div class="pricing-price">
+          <div class="pricing-amount">$4<span style="font-size:1.4rem;font-weight:600">.99</span></div>
+          <div class="pricing-period">per month · cancel anytime</div>
         </div>
-        <div class="mealplanner-row">
-          <label class="mealplanner-label">Vibe this week</label>
-          <input type="text" id="mp-vibe" class="form-input" style="flex:1" placeholder="e.g. comfort food, exploring, healthy…" />
+        <ul class="pricing-features">
+          <li><span class="pricing-check">✓</span> <strong>Unlimited</strong> restaurants</li>
+          <li><span class="pricing-check">✓</span> Everything in Cub</li>
+          <li><span class="pricing-check">✓</span> Cloud sync across devices</li>
+          <li><span class="pricing-check">✓</span> Byte Cub AI assistant</li>
+          <li><span class="pricing-check">✓</span> AI dish recommendations</li>
+          <li><span class="pricing-check">✓</span> Achievements &amp; XP</li>
+          <li><span class="pricing-check">✓</span> Year in Review</li>
+          <li><span class="pricing-check">✓</span> Foodie profile page</li>
+          <li><span class="pricing-check">✓</span> Priority support</li>
+        </ul>
+        <a href="auth.html?mode=signup" class="btn-plan-paid">Start Grizzly — $4.99/mo</a>
+      </div>
+    </div>
+    <p class="pricing-note">💳 Secure payments via Stripe · 🔒 Cancel anytime · No hidden fees</p>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── TESTIMONIALS ── -->
+  <section class="section" id="reviews">
+    <p class="section-label">What foodies say</p>
+    <h2 class="section-title">Built for people who love food</h2>
+    <p class="section-sub">Join foodies who've replaced scattered notes and forgotten lists with one beautiful app.</p>
+    <div class="testimonials-grid">
+      <div class="testimonial-card fade-in">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-text">"I used to screenshot restaurant menus and forget about them. Feed The Bear finally gave me a real system — and Byte Cub's dish recs are surprisingly great."</p>
+        <div class="testimonial-author">
+          <span class="testimonial-avatar">👩</span>
+          <div>
+            <div class="testimonial-name">Sarah M.</div>
+            <div class="testimonial-role">Food blogger, NYC</div>
+          </div>
         </div>
       </div>
-      <button id="mp-generate-btn" class="btn-primary" style="width:100%;margin-top:12px">✨ Plan My Week</button>
-      <div id="mp-result" class="mp-result hidden"></div>
-      <button id="mp-share-btn" class="btn-sm hidden" style="margin-top:10px;width:100%">📤 Share Plan</button>
-    </div>
-  </div>
-
-  <!-- 🗳 Group Vote -->
-  <div id="groupvote-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="groupvote-title">
-    <div class="modal-card groupvote-card">
-      <div class="modal-header">
-        <h2 id="groupvote-title">🗳 Group Vote</h2>
-        <button id="groupvote-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      <div class="testimonial-card fade-in">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-text">"The map view is a game-changer. When I'm in a new city, I open Feed The Bear and immediately see every spot I've saved nearby. Saved me so many times."</p>
+        <div class="testimonial-author">
+          <span class="testimonial-avatar">🧔</span>
+          <div>
+            <div class="testimonial-name">James K.</div>
+            <div class="testimonial-role">Frequent traveler</div>
+          </div>
+        </div>
       </div>
-      <p class="groupvote-sub">Can't decide as a group? Pick up to 5 restaurants, share the link — everyone votes.</p>
-      <div id="groupvote-picker" class="groupvote-picker"></div>
-      <div class="groupvote-btn-row">
-        <button id="groupvote-generate-btn" class="btn-primary" style="flex:1">🔗 Generate Vote Link</button>
-      </div>
-      <div id="groupvote-link-row" class="groupvote-link-row hidden">
-        <input id="groupvote-link-input" class="form-input" readonly style="flex:1" />
-        <button id="groupvote-copy-btn" class="btn-sm btn-orange">Copy</button>
-        <button id="groupvote-share-btn" class="btn-sm">Share</button>
-      </div>
-      <div id="groupvote-results" class="groupvote-results hidden">
-        <h4 style="margin:14px 0 6px">Live Results</h4>
-        <div id="groupvote-bars" class="groupvote-bars"></div>
+      <div class="testimonial-card fade-in">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-text">"I upgraded to Grizzly after the first week. The cloud sync between my phone and tablet alone was worth it. My partner and I share our lists now — love it."</p>
+        <div class="testimonial-author">
+          <span class="testimonial-avatar">🧑</span>
+          <div>
+            <div class="testimonial-name">Alex T.</div>
+            <div class="testimonial-role">Grizzly member</div>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- 🌍 Cuisine World Map -->
-  <div id="worldmap-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="worldmap-title">
-    <div class="modal-card worldmap-card">
-      <div class="modal-header">
-        <h2 id="worldmap-title">🌍 Cuisine World Map</h2>
-        <button id="worldmap-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <p class="worldmap-sub">Countries you've tasted lit up 🔥 — how much of the world have you eaten?</p>
-      <div id="worldmap-stats" class="worldmap-stats"></div>
-      <div id="worldmap-svg-container" class="worldmap-svg-container"></div>
-      <div id="worldmap-legend" class="worldmap-legend"></div>
-      <button id="worldmap-share-btn" class="btn-primary" style="width:100%;margin-top:12px">📤 Share My Food Map</button>
+  <!-- ── FINAL CTA ── -->
+  <section class="cta-section">
+    <div class="cta-card fade-in">
+      <span class="cta-bear">🐻</span>
+      <h2 class="cta-title">Ready to feed the bear?</h2>
+      <p class="cta-sub">Join thousands of foodies who track their restaurant adventures with Feed The Bear. Free to start, takes 60 seconds.</p>
+      <a href="auth.html?mode=signup" class="btn-hero-primary">Create your free account →</a>
+      <p class="cta-disclaimer">No credit card required · Free plan available forever</p>
     </div>
-  </div>
+  </section>
 
-  <!-- 🛂 Foodie Passport -->
-  <div id="passport-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="passport-title">
-    <div class="modal-card passport-card">
-      <div class="modal-header">
-        <h2 id="passport-title">🛂 Foodie Passport</h2>
-        <button id="passport-close-btn" class="icon-btn" aria-label="Close">✕</button>
+  <!-- ── FOOTER ── -->
+  <footer>
+    <div class="footer">
+      <div class="footer-brand">
+        <span>🐻</span>
+        <span>Feed The Bear</span>
       </div>
-      <p class="passport-sub">A rubber-stamp badge for every cuisine you've explored.</p>
-      <div id="passport-stats-row" class="passport-stats-row"></div>
-      <div id="passport-stamps" class="passport-stamps"></div>
-      <button id="passport-share-btn" class="btn-primary" style="width:100%;margin-top:14px">📤 Share Passport</button>
+      <div class="footer-links">
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="auth.html?mode=signin">Sign In</a>
+        <a href="app.html">Open App</a>
+      </div>
+      <p class="footer-copy">© 2025 Feed The Bear. Made with 🐻 and good food.</p>
     </div>
-  </div>
+  </footer>
 
-  <!-- Phase 14 — Feed the Bear Game -->
-  <div id="feedbear-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="feedbear-title">
-    <div class="modal-card feedbear-card">
-      <div class="modal-header">
-        <h2 id="feedbear-title">🐻 Feed the Bear!</h2>
-        <button id="feedbear-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div class="feedbear-canvas-wrap">
-        <canvas id="feedbear-canvas"></canvas>
-      </div>
-      <div class="feedbear-hint">
-        <span>← → / A D keys &nbsp;•&nbsp; Touch or click to move</span>
-      </div>
-    </div>
-  </div>
-
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="ai.js"></script>
-  <script src="app.js"></script>
-  <!-- Firebase SDK (compat layer — no build step required) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <script src="firebase.js"></script>
   <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
-        .then(reg => {
-          // Force the browser to check for a new SW on every launch (bypasses
-          // the default 24-hour check interval — critical for installed PWAs).
-          reg.update();
+    // Scroll-triggered fade-in
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
 
-          // When a new SW finishes installing, reload once it activates so the
-          // fresh assets are served immediately instead of on the next cold open.
-          reg.addEventListener('updatefound', () => {
-            const sw = reg.installing;
-            sw.addEventListener('statechange', () => {
-              if (sw.state === 'activated' && navigator.serviceWorker.controller) {
-                window.location.reload();
-              }
-            });
-          });
-        })
-        .catch(() => {});
-
-      // Guard against a double-reload if controllerchange fires more than once.
-      let _swRefreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!_swRefreshing) { _swRefreshing = true; window.location.reload(); }
-      });
-    }
+    // Redirect logged-in users straight to the app
+    try {
+      const saved = localStorage.getItem('ftb_profile_v2') || localStorage.getItem('ftb_restaurants_v3');
+      if (saved && window.location.search !== '?landing=1') {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (!urlParams.has('landing')) {
+          // Only redirect if they have data and aren't explicitly viewing the landing page
+        }
+      }
+    } catch (e) {}
   </script>
 </body>
 </html>

@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign In — Feed The Bear 🐻</title>
+  <meta name="description" content="Sign in or create your free Feed The Bear account to track restaurants, sync across devices, and unlock Grizzly features." />
+  <meta name="theme-color" content="#FF6B35" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:         #0D0D1A;
+      --surface:    #16162A;
+      --surface2:   #1E1E35;
+      --surface3:   #252540;
+      --border:     rgba(255,255,255,.08);
+      --primary:    #FF6B35;
+      --primary-dk: #E5541E;
+      --primary-lt: #FF8C5A;
+      --green:      #2ECC71;
+      --red:        #E74C3C;
+      --text:       #EAEAEA;
+      --text-muted: #8892A4;
+      --text-dim:   #5A6478;
+      --radius:     12px;
+      --radius-lg:  20px;
+      --font:       'Poppins', system-ui, sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { height: 100%; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    a { color: var(--primary); text-decoration: none; }
+    button { cursor: pointer; border: none; font-family: inherit; }
+    input { font-family: inherit; }
+
+    /* ── BACK LINK ── */
+    .back-link {
+      position: fixed; top: 20px; left: 20px;
+      color: var(--text-muted); font-size: .85rem; font-weight: 500;
+      display: flex; align-items: center; gap: 6px;
+      transition: color .2s;
+    }
+    .back-link:hover { color: var(--text); }
+
+    /* ── AUTH CARD ── */
+    .auth-card {
+      width: 100%; max-width: 420px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 40px 36px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.6);
+    }
+    .auth-brand {
+      text-align: center; margin-bottom: 28px;
+    }
+    .auth-bear { font-size: 2.8rem; display: block; margin-bottom: 8px; }
+    .auth-brand-name { font-weight: 800; font-size: 1.2rem; }
+
+    /* ── TABS ── */
+    .auth-tabs {
+      display: flex; background: var(--surface2);
+      border-radius: var(--radius); padding: 4px;
+      margin-bottom: 28px;
+    }
+    .auth-tab {
+      flex: 1; padding: 9px; text-align: center;
+      font-size: .9rem; font-weight: 600; color: var(--text-muted);
+      border-radius: 9px;
+      transition: background .2s, color .2s;
+    }
+    .auth-tab.active { background: var(--surface3); color: var(--text); }
+    .auth-tab:hover:not(.active) { color: var(--text); }
+
+    /* ── FORM ── */
+    .form-group { margin-bottom: 16px; }
+    .form-label {
+      display: block; font-size: .82rem; font-weight: 600;
+      color: var(--text-muted); margin-bottom: 6px;
+      text-transform: uppercase; letter-spacing: .04em;
+    }
+    .form-input {
+      width: 100%; padding: 12px 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text); font-size: .95rem;
+      transition: border-color .2s, box-shadow .2s;
+      outline: none;
+    }
+    .form-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(255,107,53,.12);
+    }
+    .form-input::placeholder { color: var(--text-dim); }
+
+    /* ── BUTTONS ── */
+    .btn-primary {
+      display: flex; align-items: center; justify-content: center;
+      width: 100%; padding: 13px;
+      background: var(--primary); color: #fff;
+      font-size: 1rem; font-weight: 700;
+      border-radius: 100px;
+      transition: background .2s, box-shadow .2s, transform .15s;
+      box-shadow: 0 4px 16px rgba(255,107,53,.3);
+      margin-top: 4px;
+    }
+    .btn-primary:hover { background: var(--primary-dk); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(255,107,53,.4); }
+    .btn-primary:disabled { opacity: .6; transform: none; cursor: not-allowed; }
+
+    .btn-google {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; padding: 12px;
+      background: var(--surface2); color: var(--text);
+      font-size: .95rem; font-weight: 600;
+      border-radius: 100px;
+      border: 1px solid var(--border);
+      transition: background .2s, transform .15s;
+    }
+    .btn-google:hover { background: var(--surface3); transform: translateY(-1px); }
+    .google-icon { font-size: 1.1rem; }
+
+    /* ── DIVIDER ── */
+    .auth-divider {
+      display: flex; align-items: center; gap: 12px;
+      color: var(--text-dim); font-size: .8rem;
+      margin: 20px 0;
+    }
+    .auth-divider::before, .auth-divider::after {
+      content: ''; flex: 1;
+      height: 1px; background: var(--border);
+    }
+
+    /* ── ERROR / SUCCESS ── */
+    .auth-message {
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      font-size: .85rem; font-weight: 500;
+      margin-bottom: 16px; display: none;
+    }
+    .auth-message.error   { background: rgba(231,76,60,.12); border: 1px solid rgba(231,76,60,.3); color: #f09090; }
+    .auth-message.success { background: rgba(46,204,113,.12); border: 1px solid rgba(46,204,113,.3); color: #7edba0; }
+    .auth-message.show    { display: block; }
+
+    /* ── FOOTER LINKS ── */
+    .auth-footer { text-align: center; margin-top: 20px; color: var(--text-muted); font-size: .85rem; }
+    .auth-footer a { color: var(--primary); font-weight: 600; }
+
+    /* ── FORGOT / RESET ── */
+    .forgot-link {
+      text-align: right; margin-top: -8px; margin-bottom: 16px;
+    }
+    .forgot-link a { font-size: .8rem; color: var(--text-muted); }
+    .forgot-link a:hover { color: var(--primary); }
+
+    /* ── SPINNER ── */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin-right: 8px; display: none;
+    }
+    .spinner.show { display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── BENEFITS ── */
+    .auth-benefits {
+      margin-top: 28px; padding-top: 24px;
+      border-top: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .benefit-row {
+      display: flex; align-items: center; gap: 10px;
+      font-size: .82rem; color: var(--text-muted);
+    }
+    .benefit-icon { font-size: 1rem; flex-shrink: 0; }
+
+    /* ── RESET PANEL ── */
+    .reset-panel { display: none; }
+    .reset-panel.show { display: block; }
+    .main-panel { }
+    .main-panel.hide { display: none; }
+  </style>
+</head>
+<body>
+
+  <a href="index.html" class="back-link">← Back to home</a>
+
+  <div class="auth-card">
+    <div class="auth-brand">
+      <span class="auth-bear">🐻</span>
+      <div class="auth-brand-name">Feed The Bear</div>
+    </div>
+
+    <!-- Password Reset Panel -->
+    <div class="reset-panel" id="resetPanel">
+      <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:6px">Reset your password</h2>
+      <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:20px">Enter your email and we'll send a reset link.</p>
+      <div id="resetMsg" class="auth-message"></div>
+      <div class="form-group">
+        <label class="form-label" for="resetEmail">Email</label>
+        <input id="resetEmail" class="form-input" type="email" placeholder="you@example.com" autocomplete="email" />
+      </div>
+      <button id="resetSubmitBtn" class="btn-primary" style="margin-top:8px">
+        <span class="spinner" id="resetSpinner"></span>
+        Send Reset Link
+      </button>
+      <div class="auth-footer" style="margin-top:16px">
+        <a href="#" id="backToSignin">← Back to sign in</a>
+      </div>
+    </div>
+
+    <!-- Main Auth Panel -->
+    <div class="main-panel" id="mainPanel">
+      <!-- Tabs -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tabSignin" onclick="switchTab('signin')">Sign In</button>
+        <button class="auth-tab" id="tabSignup" onclick="switchTab('signup')">Sign Up</button>
+      </div>
+
+      <div id="authMsg" class="auth-message"></div>
+
+      <!-- Google -->
+      <button class="btn-google" id="googleBtn" onclick="handleGoogle()">
+        <span class="google-icon">🟠</span>
+        Continue with Google
+      </button>
+
+      <div class="auth-divider">or</div>
+
+      <!-- Sign In Form -->
+      <form id="signinForm" onsubmit="handleSignin(event)">
+        <div class="form-group">
+          <label class="form-label" for="siEmail">Email</label>
+          <input id="siEmail" class="form-input" type="email" placeholder="you@example.com" autocomplete="email" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="siPassword">Password</label>
+          <input id="siPassword" class="form-input" type="password" placeholder="Your password" autocomplete="current-password" required />
+        </div>
+        <div class="forgot-link">
+          <a href="#" id="forgotLink">Forgot password?</a>
+        </div>
+        <button type="submit" class="btn-primary" id="signinBtn">
+          <span class="spinner" id="signinSpinner"></span>
+          Sign In
+        </button>
+      </form>
+
+      <!-- Sign Up Form -->
+      <form id="signupForm" style="display:none" onsubmit="handleSignup(event)">
+        <div class="form-group">
+          <label class="form-label" for="suName">Your Name</label>
+          <input id="suName" class="form-input" type="text" placeholder="e.g. Alex" autocomplete="name" maxlength="30" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="suEmail">Email</label>
+          <input id="suEmail" class="form-input" type="email" placeholder="you@example.com" autocomplete="email" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="suPassword">Password</label>
+          <input id="suPassword" class="form-input" type="password" placeholder="At least 8 characters" autocomplete="new-password" required minlength="8" />
+        </div>
+        <button type="submit" class="btn-primary" id="signupBtn">
+          <span class="spinner" id="signupSpinner"></span>
+          Create Account 🐾
+        </button>
+      </form>
+
+      <!-- Benefits (shown on signup tab) -->
+      <div class="auth-benefits" id="benefitsRow" style="display:none">
+        <div class="benefit-row"><span class="benefit-icon">📍</span> Save unlimited restaurants (Grizzly)</div>
+        <div class="benefit-row"><span class="benefit-icon">☁️</span> Sync across all your devices</div>
+        <div class="benefit-row"><span class="benefit-icon">🐻</span> Byte Cub AI dish recommendations</div>
+        <div class="benefit-row"><span class="benefit-icon">🔒</span> No credit card needed to start</div>
+      </div>
+
+      <div class="auth-footer">
+        <span id="footerSignin">Don't have an account? <a href="#" onclick="switchTab('signup');return false;">Sign up free</a></span>
+        <span id="footerSignup" style="display:none">Already have an account? <a href="#" onclick="switchTab('signin');return false;">Sign in</a></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+  <script>
+    // ── Firebase Init ──
+    const _FB_CONFIG = {
+      apiKey:            'AIzaSyDH4b9L-CmVsyl2xn2K6peQ3CRmeM6VKI4',
+      authDomain:        'feedthebear-3ab9c.firebaseapp.com',
+      projectId:         'feedthebear-3ab9c',
+      storageBucket:     'feedthebear-3ab9c.firebasestorage.app',
+      messagingSenderId: '143862557009',
+      appId:             '1:143862557009:web:f9605b80e2344c0d9e4b70',
+    };
+    firebase.initializeApp(_FB_CONFIG);
+    const auth = firebase.auth();
+
+    // ── Read URL mode ──
+    const urlParams = new URLSearchParams(window.location.search);
+    const initMode  = urlParams.get('mode') || 'signin';
+    if (initMode === 'signup') switchTab('signup');
+
+    // ── Redirect if already signed in ──
+    auth.onAuthStateChanged(user => {
+      if (user) redirectToApp();
+    });
+
+    function redirectToApp () {
+      window.location.href = 'app.html';
+    }
+
+    // ── Tab switching ──
+    function switchTab (tab) {
+      clearMsg();
+      const isSignin = tab === 'signin';
+      document.getElementById('signinForm').style.display   = isSignin ? '' : 'none';
+      document.getElementById('signupForm').style.display   = isSignin ? 'none' : '';
+      document.getElementById('benefitsRow').style.display  = isSignin ? 'none' : '';
+      document.getElementById('tabSignin').classList.toggle('active', isSignin);
+      document.getElementById('tabSignup').classList.toggle('active', !isSignin);
+      document.getElementById('footerSignin').style.display = isSignin ? '' : 'none';
+      document.getElementById('footerSignup').style.display = isSignin ? 'none' : '';
+      document.title = isSignin ? 'Sign In — Feed The Bear 🐻' : 'Sign Up — Feed The Bear 🐻';
+    }
+
+    // ── Message helpers ──
+    function showMsg (text, type = 'error', el = 'authMsg') {
+      const m = document.getElementById(el);
+      m.textContent = text;
+      m.className = `auth-message ${type} show`;
+    }
+    function clearMsg (el = 'authMsg') {
+      const m = document.getElementById(el);
+      m.className = 'auth-message';
+    }
+
+    function setLoading (btnId, spinnerId, loading) {
+      const btn = document.getElementById(btnId);
+      const sp  = document.getElementById(spinnerId);
+      btn.disabled = loading;
+      sp.classList.toggle('show', loading);
+    }
+
+    // ── Google Sign In ──
+    async function handleGoogle () {
+      clearMsg();
+      const provider = new firebase.auth.GoogleAuthProvider();
+      try {
+        await auth.signInWithPopup(provider);
+        redirectToApp();
+      } catch (err) {
+        if (err.code !== 'auth/popup-closed-by-user') {
+          showMsg(friendlyError(err.code));
+        }
+      }
+    }
+
+    // ── Email Sign In ──
+    async function handleSignin (e) {
+      e.preventDefault();
+      clearMsg();
+      const email    = document.getElementById('siEmail').value.trim();
+      const password = document.getElementById('siPassword').value;
+      setLoading('signinBtn', 'signinSpinner', true);
+      try {
+        await auth.signInWithEmailAndPassword(email, password);
+        redirectToApp();
+      } catch (err) {
+        showMsg(friendlyError(err.code));
+        setLoading('signinBtn', 'signinSpinner', false);
+      }
+    }
+
+    // ── Email Sign Up ──
+    async function handleSignup (e) {
+      e.preventDefault();
+      clearMsg();
+      const name     = document.getElementById('suName').value.trim();
+      const email    = document.getElementById('suEmail').value.trim();
+      const password = document.getElementById('suPassword').value;
+      if (password.length < 8) { showMsg('Password must be at least 8 characters.'); return; }
+      setLoading('signupBtn', 'signupSpinner', true);
+      try {
+        const cred = await auth.createUserWithEmailAndPassword(email, password);
+        if (name) await cred.user.updateProfile({ displayName: name });
+        redirectToApp();
+      } catch (err) {
+        showMsg(friendlyError(err.code));
+        setLoading('signupBtn', 'signupSpinner', false);
+      }
+    }
+
+    // ── Password Reset ──
+    document.getElementById('forgotLink').addEventListener('click', e => {
+      e.preventDefault();
+      document.getElementById('mainPanel').classList.add('hide');
+      document.getElementById('resetPanel').classList.add('show');
+    });
+    document.getElementById('backToSignin').addEventListener('click', e => {
+      e.preventDefault();
+      document.getElementById('mainPanel').classList.remove('hide');
+      document.getElementById('resetPanel').classList.remove('show');
+      clearMsg('resetMsg');
+    });
+    document.getElementById('resetSubmitBtn').addEventListener('click', async () => {
+      clearMsg('resetMsg');
+      const email = document.getElementById('resetEmail').value.trim();
+      if (!email) { showMsg('Please enter your email address.', 'error', 'resetMsg'); return; }
+      setLoading('resetSubmitBtn', 'resetSpinner', true);
+      try {
+        await auth.sendPasswordResetEmail(email);
+        showMsg('Check your inbox — reset email sent!', 'success', 'resetMsg');
+      } catch (err) {
+        showMsg(friendlyError(err.code), 'error', 'resetMsg');
+      }
+      setLoading('resetSubmitBtn', 'resetSpinner', false);
+    });
+
+    // ── Friendly error messages ──
+    function friendlyError (code) {
+      const map = {
+        'auth/user-not-found':      'No account found with that email. Sign up instead?',
+        'auth/wrong-password':      'Incorrect password. Try again or reset it.',
+        'auth/invalid-email':       'That doesn\'t look like a valid email address.',
+        'auth/email-already-in-use':'An account already exists with that email. Sign in instead?',
+        'auth/weak-password':       'Password is too weak — use at least 8 characters.',
+        'auth/too-many-requests':   'Too many attempts. Try again in a few minutes.',
+        'auth/network-request-failed': 'Network error — check your connection and try again.',
+        'auth/invalid-credential':  'Email or password is incorrect. Try again.',
+        'auth/popup-blocked':       'Popup was blocked. Please allow popups and try again.',
+      };
+      return map[code] || 'Something went wrong. Please try again.';
+    }
+  </script>
+</body>
+</html>

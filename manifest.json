@@ -2,7 +2,7 @@
   "name": "Feed The Bear — Foodie Tracker",
   "short_name": "Feed The Bear",
   "description": "Track restaurants you want to try and places you've visited. Your personal foodie companion.",
-  "start_url": "./",
+  "start_url": "./app.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0D0D1A",
@@ -40,19 +40,19 @@
       "name": "Add Restaurant",
       "short_name": "Add",
       "description": "Add a new restaurant to your list",
-      "url": "/Feed-The-Bear/?action=add",
+      "url": "/Feed-The-Bear/app.html?action=add",
       "icons": [{"src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text y='80' font-size='80'>➕</text></svg>", "sizes": "96x96"}]
     },
     {
       "name": "Discover Nearby",
       "short_name": "Nearby",
       "description": "Find restaurants near you",
-      "url": "/Feed-The-Bear/?action=discover",
+      "url": "/Feed-The-Bear/app.html?action=discover",
       "icons": [{"src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text y='80' font-size='80'>📍</text></svg>", "sizes": "96x96"}]
     }
   ],
   "share_target": {
-    "action": "/Feed-The-Bear/",
+    "action": "/Feed-The-Bear/app.html",
     "method": "GET",
     "enctype": "application/x-www-form-urlencoded",
     "params": {
