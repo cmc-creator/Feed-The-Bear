@@ -21,6 +21,60 @@
 </head>
 <body>
 
+  <!-- ── Profile Setup (first run) ──────────────────────────── -->
+  <div id="profile-setup-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+    <div class="modal-card profile-setup-card">
+      <div class="setup-top">
+        <span id="setup-avatar-display" class="setup-avatar-display">🐻</span>
+        <h2 id="setup-title">Welcome to Feed The Bear!</h2>
+        <p class="setup-sub">Set up your foodie profile to get started.</p>
+      </div>
+      <div style="padding:0 20px 24px">
+        <label class="form-label">Your name</label>
+        <input id="setup-name" class="form-input" type="text" placeholder="e.g. Alex" maxlength="30" autocomplete="name" />
+        <label class="form-label" style="margin-top:16px;margin-bottom:8px;display:block">Pick your avatar</label>
+        <div class="avatar-emoji-grid" id="avatar-emoji-grid"></div>
+        <button id="setup-save-btn" class="btn-primary" style="width:100%;margin-top:20px">Let's Eat! 🐻</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Account Panel ─────────────────────────────────────── -->
+  <div id="account-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="account-title">
+    <div class="modal-card account-card">
+      <div class="account-hero">
+        <div id="account-avatar-display" class="account-avatar-display">🐻</div>
+        <h2 id="account-name-display" class="account-name-display">Foodie</h2>
+        <div id="account-since-display" class="account-since-display">Member since today</div>
+      </div>
+      <div id="account-stats-row" class="account-stats-row"></div>
+      <div style="padding:0 20px 24px;display:flex;flex-direction:column;gap:10px">
+        <button id="account-edit-btn" class="btn-secondary">✏️ Edit Profile</button>
+        <button id="account-close-btn" class="btn-ghost">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Edit Profile ──────────────────────────────────────── -->
+  <div id="edit-profile-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">
+    <div class="modal-card profile-setup-card">
+      <div class="modal-header">
+        <h2 id="edit-profile-title">✏️ Edit Profile</h2>
+        <button id="edit-profile-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div style="padding:16px 20px 24px">
+        <div style="text-align:center;margin-bottom:16px">
+          <span id="edit-avatar-display" class="setup-avatar-display">🐻</span>
+        </div>
+        <label class="form-label">Your name</label>
+        <input id="edit-name" class="form-input" type="text" placeholder="Your name" maxlength="30" />
+        <label class="form-label" style="margin-top:16px;margin-bottom:8px;display:block">Avatar</label>
+        <div class="avatar-emoji-grid" id="edit-avatar-grid"></div>
+        <button id="edit-profile-save-btn" class="btn-primary" style="width:100%;margin-top:20px">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Offline Banner ─────────────────────────────────────── -->
   <div id="offline-banner" class="offline-banner hidden" role="status">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.56 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
@@ -76,6 +130,9 @@
       </button>
       <button id="chat-toggle-btn" class="chat-toggle-btn" title="Byte Cub Chat">
         🐻 <span>Ask Byte Cub</span>
+      </button>
+      <button id="account-btn" class="account-header-btn" title="My Account" aria-label="My Account">
+        <span id="header-avatar">🐻</span>
       </button>
 
       <!-- Overflow ⋯ menu — all secondary tools -->
@@ -353,7 +410,7 @@
     </div>
 
     <!-- ── Home Discovery: Near You + AI Rec ─────────── -->
-    <section id="home-discovery" class="home-discovery hidden" aria-label="Restaurants near you">
+    <section id="home-discovery" class="home-discovery" aria-label="Restaurants near you">
       <!-- AI Recommendation Banner -->
       <div id="ai-rec-banner" class="ai-rec-banner hidden">
         <div class="ai-rec-icon">✨</div>

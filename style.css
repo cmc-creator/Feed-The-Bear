@@ -3876,3 +3876,167 @@ body.light-mode #profile-btn {
 .nearby-home-card-dist { font-size: .72rem; color: var(--primary); font-weight: 600; }
 .nearby-home-card-saved { font-size: .69rem; font-weight: 700; color: var(--green); margin-top: 4px; }
 .nearby-home-card-add { margin-top: 6px; width: 100%; }
+
+/* ════════════════════════════════════════════════════════════
+   USER PROFILE — Account Button, Setup, Account Panel
+   ════════════════════════════════════════════════════════════ */
+
+/* Header account button */
+.account-header-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dk));
+  border: 2px solid rgba(255,107,53,.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(255,107,53,.3);
+}
+.account-header-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 3px 14px rgba(255,107,53,.5);
+}
+
+/* Profile setup card */
+.profile-setup-card { max-width: 420px; }
+.setup-top {
+  text-align: center;
+  padding: 28px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.setup-avatar-display {
+  display: block;
+  font-size: 4rem;
+  margin-bottom: 10px;
+  line-height: 1;
+}
+.setup-sub {
+  font-size: .84rem;
+  color: var(--text-dim);
+  margin-top: 6px;
+}
+
+/* Avatar emoji grid */
+.avatar-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+.avatar-option {
+  font-size: 1.5rem;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  background: var(--surface2);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all .12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.avatar-option:hover { background: var(--surface3); transform: scale(1.1); }
+.avatar-option.selected {
+  border-color: var(--primary);
+  background: rgba(255,107,53,.15);
+  transform: scale(1.08);
+}
+
+/* Account panel */
+.account-card { max-width: 400px; }
+.account-hero {
+  text-align: center;
+  padding: 28px 20px 20px;
+  background: linear-gradient(180deg, rgba(255,107,53,.1) 0%, transparent 100%);
+  border-bottom: 1px solid var(--border);
+}
+.account-avatar-display {
+  font-size: 4.5rem;
+  line-height: 1;
+  margin-bottom: 10px;
+  display: block;
+}
+.account-name-display {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.account-since-display {
+  font-size: .78rem;
+  color: var(--text-dim);
+}
+
+/* Account stats row */
+.account-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.account-stat {
+  text-align: center;
+  padding: 14px 8px;
+  border-right: 1px solid var(--border);
+}
+.account-stat:last-child { border-right: none; }
+.account-stat-val {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--primary);
+  display: block;
+}
+.account-stat-label {
+  font-size: .68rem;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* Form label/input (reused from app) */
+.form-label {
+  display: block;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.form-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: .9rem;
+  transition: border-color .15s;
+}
+.form-input:focus { outline: none; border-color: var(--primary); }
+
+/* Home discovery teaser (no location) */
+.nearby-home-teaser {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--surface2);
+  border: 1px dashed rgba(255,107,53,.3);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.nearby-home-teaser:hover { background: var(--surface3); }
+.nearby-home-teaser-icon { font-size: 1.8rem; flex-shrink: 0; }
+.nearby-home-teaser-body { flex: 1; }
+.nearby-home-teaser-title { font-size: .88rem; font-weight: 700; color: var(--text); }
+.nearby-home-teaser-sub { font-size: .76rem; color: var(--text-dim); margin-top: 2px; }
+.nearby-home-teaser-btn { flex-shrink: 0; }

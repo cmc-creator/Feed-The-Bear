@@ -29,6 +29,7 @@ if (typeof AI === 'undefined') {
 /* ── Constants ───────────────────────────────────────────── */
 const STORAGE_KEY   = 'ftb_restaurants_v2';
 const SETTINGS_KEY  = 'ftb_settings_v1';
+const USER_KEY      = 'ftb_user_v1';
 const ALERT_RADIUS  = 805;   // ~0.5 miles — show proximity alert
 const NOTIFY_RADIUS = 1609;  // ~1 mile — browser notification
 const NOTIFY_COOLDOWN = 10 * 60 * 1000; // 10 min between alerts for same place
@@ -230,6 +231,135 @@ function iso (offsetDays = 0) {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
   return d.toISOString().split('T')[0];
+}
+
+/* ════════════════════════════════════════════════════════════
+   USER PROFILE
+   ════════════════════════════════════════════════════════════ */
+const AVATAR_OPTIONS = ['🐻','🍕','🌮','🍣','🍔','🥗','🍜','🍝','🥩','🦞','🍰','☕','🍖','🥐','🎯','⭐','🔥','🏆','🌟','🍦','🥞','🍟','🥑','🍱'];
+
+function loadUserProfile () {
+  try { return JSON.parse(localStorage.getItem(USER_KEY)) || null; } catch { return null; }
+}
+function saveUserProfile (profile) {
+  localStorage.setItem(USER_KEY, JSON.stringify(profile));
+}
+
+function initUserProfile () {
+  const profile = loadUserProfile();
+  if (!profile) {
+    // Wait for onboarding to finish before showing profile setup
+    const tryShow = () => {
+      const ob = document.getElementById('onboarding-overlay');
+      if (ob && !ob.classList.contains('hidden')) {
+        setTimeout(tryShow, 1200);
+      } else {
+        openProfileSetup();
+      }
+    };
+    setTimeout(tryShow, 1000);
+  } else {
+    updateHeaderAvatar(profile.avatar);
+  }
+}
+
+function updateHeaderAvatar (emoji) {
+  const el = document.getElementById('header-avatar');
+  if (el) el.textContent = emoji || '🐻';
+}
+
+function buildAvatarGrid (gridId, currentAvatar, onSelect) {
+  const grid = document.getElementById(gridId);
+  if (!grid) return;
+  let selected = currentAvatar || AVATAR_OPTIONS[0];
+  grid.innerHTML = AVATAR_OPTIONS.map(e =>
+    `<button class="avatar-option${e === selected ? ' selected' : ''}" data-emoji="${e}" type="button">${e}</button>`
+  ).join('');
+  grid.addEventListener('click', e => {
+    const btn = e.target.closest('.avatar-option');
+    if (!btn) return;
+    grid.querySelectorAll('.avatar-option').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selected = btn.dataset.emoji;
+    onSelect(selected);
+  });
+}
+
+function openProfileSetup () {
+  const overlay = document.getElementById('profile-setup-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  let chosenAvatar = '🐻';
+  document.getElementById('setup-avatar-display').textContent = chosenAvatar;
+  buildAvatarGrid('avatar-emoji-grid', chosenAvatar, emoji => {
+    chosenAvatar = emoji;
+    document.getElementById('setup-avatar-display').textContent = emoji;
+  });
+  document.getElementById('setup-name').focus();
+  document.getElementById('setup-save-btn').onclick = () => {
+    const name = document.getElementById('setup-name').value.trim() || 'Foodie';
+    const profile = { name, avatar: chosenAvatar, joinDate: new Date().toISOString() };
+    saveUserProfile(profile);
+    updateHeaderAvatar(profile.avatar);
+    overlay.classList.add('hidden');
+    maybeHideOverlay();
+    showToast(`Welcome, ${name}! 🐻`, 'Your profile is set. Now let\'s find some food!', 'success');
+  };
+}
+
+function openAccountModal () {
+  const overlay = document.getElementById('account-overlay');
+  if (!overlay) return;
+  const profile = loadUserProfile() || { name: 'Foodie', avatar: '🐻', joinDate: new Date().toISOString() };
+  document.getElementById('account-avatar-display').textContent = profile.avatar || '🐻';
+  document.getElementById('account-name-display').textContent  = profile.name  || 'Foodie';
+  const joined = profile.joinDate ? new Date(profile.joinDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'recently';
+  document.getElementById('account-since-display').textContent = `Foodie since ${joined}`;
+
+  const all = state.restaurants;
+  const visited = all.filter(r => r.status === 'visited').length;
+  const wtt     = all.filter(r => r.status === 'want-to-try').length;
+  const avgRating = all.filter(r => r.myRating > 0).length
+    ? (all.reduce((s, r) => s + (r.myRating || 0), 0) / all.filter(r => r.myRating > 0).length).toFixed(1)
+    : '—';
+  document.getElementById('account-stats-row').innerHTML = `
+    <div class="account-stat"><span class="account-stat-val">${all.length}</span><span class="account-stat-label">Saved</span></div>
+    <div class="account-stat"><span class="account-stat-val">${visited}</span><span class="account-stat-label">Visited</span></div>
+    <div class="account-stat"><span class="account-stat-val">${avgRating}</span><span class="account-stat-label">Avg Rating</span></div>
+  `;
+
+  overlay.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeAccountModal () {
+  document.getElementById('account-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function openEditProfile () {
+  closeAccountModal();
+  const overlay = document.getElementById('edit-profile-overlay');
+  if (!overlay) return;
+  const profile = loadUserProfile() || { name: 'Foodie', avatar: '🐻' };
+  let chosenAvatar = profile.avatar || '🐻';
+  document.getElementById('edit-name').value = profile.name || '';
+  document.getElementById('edit-avatar-display').textContent = chosenAvatar;
+  buildAvatarGrid('edit-avatar-grid', chosenAvatar, emoji => {
+    chosenAvatar = emoji;
+    document.getElementById('edit-avatar-display').textContent = emoji;
+  });
+  overlay.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  document.getElementById('edit-profile-save-btn').onclick = () => {
+    const name = document.getElementById('edit-name').value.trim() || profile.name || 'Foodie';
+    const updated = { ...profile, name, avatar: chosenAvatar };
+    saveUserProfile(updated);
+    updateHeaderAvatar(updated.avatar);
+    overlay.classList.add('hidden');
+    maybeHideOverlay();
+    showToast('Profile updated!', '', 'success');
+  };
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -2940,6 +3070,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (textEl) textEl.textContent = 'Thinking…';
     if (_homeDiscCache) loadAiRec(_homeDiscCache);
   });
+  // Wire account/profile buttons
+  document.getElementById('account-btn')?.addEventListener('click', openAccountModal);
+  document.getElementById('account-close-btn')?.addEventListener('click', closeAccountModal);
+  document.getElementById('account-overlay')?.addEventListener('click', e => { if (e.target === document.getElementById('account-overlay')) closeAccountModal(); });
+  document.getElementById('account-edit-btn')?.addEventListener('click', openEditProfile);
+  document.getElementById('edit-profile-close-btn')?.addEventListener('click', () => {
+    document.getElementById('edit-profile-overlay').classList.add('hidden'); maybeHideOverlay();
+  });
+  document.getElementById('edit-profile-overlay')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('edit-profile-overlay')) {
+      document.getElementById('edit-profile-overlay').classList.add('hidden'); maybeHideOverlay();
+    }
+  });
+  // Init user profile (shows setup on first run)
+  initUserProfile();
+  // Show home discovery teaser or load if location ready
+  initHomeDiscoverySection();
 });
 /* ------------------------------------------------------------
    PHASE 5 • STREAK TRACKER
@@ -4867,6 +5014,25 @@ function openAddModalPreFilled (name, cuisine) {
 let _homeDiscCache = null;
 let _homeDiscCacheTime = 0;
 const HOME_DISC_TTL = 15 * 60 * 1000; // 15 min
+
+function initHomeDiscoverySection () {
+  const list = document.getElementById('nearby-home-list');
+  if (!list) return;
+  if (state.userLat && state.userLng) {
+    loadHomeDiscovery();
+  } else {
+    // Show teaser CTA when location is not yet enabled
+    list.innerHTML = `<div class="nearby-home-teaser" id="nearby-home-teaser">
+      <div class="nearby-home-teaser-icon">📍</div>
+      <div class="nearby-home-teaser-body">
+        <div class="nearby-home-teaser-title">See what's near you right now</div>
+        <div class="nearby-home-teaser-sub">Real restaurants within 1 mile — one tap to discover</div>
+      </div>
+      <button class="btn-sm btn-orange nearby-home-teaser-btn" id="nearby-teaser-enable-btn">Enable</button>
+    </div>`;
+    document.getElementById('nearby-teaser-enable-btn')?.addEventListener('click', enableLocation);
+  }
+}
 
 async function loadHomeDiscovery () {
   if (!state.userLat || !state.userLng) return;
