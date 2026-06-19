@@ -661,29 +661,28 @@
         <a href="#features">Features</a>
         <a href="#pricing">Pricing</a>
         <a href="auth.html?mode=signin">Sign In</a>
-        <a href="app.html">Open App</a>
+        <a href="app.html">Open App 🐻</a>
       </div>
       <p class="footer-copy">© 2025 Feed The Bear. Made with 🐻 and good food.</p>
     </div>
   </footer>
 
   <script>
+    // Redirect returning users straight into the app (skip marketing page)
+    // ?landing=1 lets them force-view the landing page (e.g. from footer link)
+    (function () {
+      try {
+        if (new URLSearchParams(window.location.search).has('landing')) return;
+        const hasData = Object.keys(localStorage).some(k => k.startsWith('ftb_'));
+        if (hasData) { window.location.replace('app.html'); return; }
+      } catch (e) {}
+    })();
+
     // Scroll-triggered fade-in
     const observer = new IntersectionObserver(entries => {
       entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
     }, { threshold: 0.1 });
     document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
-
-    // Redirect logged-in users straight to the app
-    try {
-      const saved = localStorage.getItem('ftb_profile_v2') || localStorage.getItem('ftb_restaurants_v3');
-      if (saved && window.location.search !== '?landing=1') {
-        const urlParams = new URLSearchParams(window.location.search);
-        if (!urlParams.has('landing')) {
-          // Only redirect if they have data and aren't explicitly viewing the landing page
-        }
-      }
-    } catch (e) {}
   </script>
 </body>
 </html>
