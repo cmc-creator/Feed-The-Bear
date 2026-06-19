@@ -12,6 +12,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Feed The Bear" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="apple-touch-icon" sizes="180x180" href="icon.svg" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
   <link rel="manifest" href="manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -1322,12 +1325,18 @@
 
   <!-- 📲 PWA Install Banner -->
   <div id="install-banner" class="install-banner hidden">
-    <div class="install-banner-text">
+    <!-- Android / desktop: native prompt -->
+    <div id="install-android-content" class="install-banner-text">
       <span>📲</span>
       <div>
-        <strong>Add to Home Screen</strong>
-        <div style="font-size:.75rem;color:var(--text-dim)">Works offline, feels native</div>
+        <strong>Install Feed The Bear</strong>
+        <div style="font-size:.75rem;color:var(--text-dim)">Works offline · feels like a real app</div>
       </div>
+    </div>
+    <!-- iOS: manual instructions -->
+    <div id="install-ios-content" class="install-banner-text" style="display:none;flex-direction:column;align-items:flex-start;gap:4px;flex:1">
+      <strong style="font-size:.88rem">📲 Add to Home Screen</strong>
+      <div style="font-size:.76rem;color:var(--text-dim)">Tap <strong>Share</strong> <span style="font-size:.9rem">⎙</span> at the bottom of Safari, then <strong>"Add to Home Screen"</strong></div>
     </div>
     <button id="install-accept-btn" class="btn-primary" style="padding:6px 14px;font-size:.8rem">Install</button>
     <button id="install-dismiss-btn" class="icon-btn" style="font-size:.9rem">✕</button>

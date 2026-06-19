@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#0D0D1A"/>
+  <rect width="512" height="512" rx="112" fill="url(#grad)"/>
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1A1A2E"/>
+      <stop offset="100%" style="stop-color:#0D0D1A"/>
+    </linearGradient>
+  </defs>
+  <!-- Bear emoji rendered as text -->
+  <text y="370" x="256" text-anchor="middle" font-size="340" font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif">🐻</text>
+  <!-- Orange accent ring -->
+  <rect width="512" height="512" rx="112" fill="none" stroke="#FF6B35" stroke-width="18" stroke-opacity="0.35"/>
+</svg>

@@ -5984,13 +5984,36 @@ function exportCSV () {
 
 let _deferredInstallPrompt = null;
 
+function _isIos () {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+}
+function _isInStandaloneMode () {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
 function initInstallPrompt () {
+  // If already installed, do nothing
+  if (_isInStandaloneMode()) return;
+
+  // iOS: show manual instructions after 5s on first visit
+  if (_isIos()) {
+    if (!localStorage.getItem('ftb_install_dismissed')) {
+      setTimeout(() => {
+        const banner = document.getElementById('install-banner');
+        document.getElementById('install-android-content').style.display = 'none';
+        document.getElementById('install-ios-content').style.display = 'flex';
+        document.getElementById('install-accept-btn').style.display = 'none';
+        banner.classList.remove('hidden');
+      }, 5000);
+    }
+  }
+
+  // Android/desktop: capture beforeinstallprompt
   window.addEventListener('beforeinstallprompt', e => {
     e.preventDefault();
     _deferredInstallPrompt = e;
-    // Show banner after 30 seconds if not dismissed
     if (!localStorage.getItem('ftb_install_dismissed')) {
-      setTimeout(showInstallBanner, 30000);
+      setTimeout(showInstallBanner, 6000);
     }
   });
 
