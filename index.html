@@ -756,8 +756,10 @@
         <h2>🍽️ Discover Nearby</h2>
         <button id="nearby-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
-      <p style="font-size:.83rem;color:var(--text-dim);margin:0 0 12px">Real restaurants nearby — powered by OpenStreetMap. One tap to add any to your list!</p>
-      <div id="nearby-results" class="nearby-results"></div>
+      <div style="padding:16px 20px 20px">
+        <p style="font-size:.83rem;color:var(--text-dim);margin:0 0 12px">Real restaurants nearby — powered by OpenStreetMap. One tap to add any to your list!</p>
+        <div id="nearby-results" class="nearby-results"></div>
+      </div>
     </div>
   </div>
 
@@ -1029,19 +1031,21 @@
         <h2 id="discover-title">🗺️ Smart Discovery</h2>
         <button id="discover-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
-      <p class="discover-subtitle">Nearby restaurants you <strong>haven't saved yet</strong>, ranked by your taste profile.</p>
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <select id="discover-radius" class="form-select" style="flex:1">
-          <option value="402">Within 0.25 mi</option>
-          <option value="805">Within 0.5 mi</option>
-          <option value="1609" selected>Within 1 mi</option>
-          <option value="3219">Within 2 mi</option>
-          <option value="8047">Within 5 mi</option>
-        </select>
-        <button id="discover-search-btn" class="btn-sm btn-orange">🔍 Search</button>
-      </div>
-      <div id="discover-results" class="discover-results">
-        <div class="discover-empty">Enable location and tap Search to find places nearby.</div>
+      <div style="padding:16px 20px 20px">
+        <p class="discover-subtitle">Nearby restaurants you <strong>haven't saved yet</strong>, ranked by your taste profile.</p>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <select id="discover-radius" class="form-select" style="flex:1">
+            <option value="402">Within 0.25 mi</option>
+            <option value="805">Within 0.5 mi</option>
+            <option value="1609" selected>Within 1 mi</option>
+            <option value="3219">Within 2 mi</option>
+            <option value="8047">Within 5 mi</option>
+          </select>
+          <button id="discover-search-btn" class="btn-sm btn-orange">🔍 Search</button>
+        </div>
+        <div id="discover-results" class="discover-results">
+          <div class="discover-empty">Enable location and tap Search to find places nearby.</div>
+        </div>
       </div>
     </div>
   </div>

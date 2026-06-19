@@ -4874,8 +4874,11 @@ async function runDiscover () {
   const overpassUrl = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(overpassQuery);
 
   try {
-    const resp = await fetch(overpassUrl, { signal: AbortSignal.timeout(12000) });
-    if (!resp.ok) throw new Error('Overpass error');
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 12000);
+    const resp = await fetch(overpassUrl, { signal: ctrl.signal });
+    clearTimeout(t);
+    if (!resp.ok) throw new Error(`Overpass error ${resp.status}`);
     const json = await resp.json();
     const elements = (json.elements || []).filter(el => el.tags?.name);
 
@@ -6325,9 +6328,12 @@ async function runOpenNowSearch () {
   const query = `[out:json][timeout:20];(node["amenity"~"restaurant|cafe|fast_food|bar"]["opening_hours"](around:${radius},${lat},${lng}););out body 40;`;
 
   try {
+    const ctrl2 = new AbortController();
+    const t2 = setTimeout(() => ctrl2.abort(), 18000);
     const resp = await fetch('https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query), {
-      signal: AbortSignal.timeout(18000)
+      signal: ctrl2.signal
     });
+    clearTimeout(t2);
     const json = await resp.json();
     const elements = (json.elements || []).filter(el => el.tags?.name);
 
