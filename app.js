@@ -245,6 +245,8 @@ function enableLocation () {
       state.userLat = pos.coords.latitude;
       state.userLng = pos.coords.longitude;
       state.locationEnabled = true;
+      state.settings.locationEnabled = true;
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
       updateLocationBtn();
       hideBanner('location-banner');
       renderCards();
@@ -278,6 +280,8 @@ async function ensureLocationForDiscovery () {
     state.userLng = pos.coords.longitude;
     if (!state.locationEnabled) {
       state.locationEnabled = true;
+      state.settings.locationEnabled = true;
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
       updateLocationBtn();
       hideBanner('location-banner');
       startWatching();
@@ -310,6 +314,8 @@ function disableLocation () {
     state.watchId = null;
   }
   state.locationEnabled = false;
+  state.settings.locationEnabled = false;
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
   state.userLat = null;
   state.userLng = null;
   updateLocationBtn();
@@ -2887,6 +2893,26 @@ document.addEventListener('DOMContentLoaded', () => {
   checkAchievements();
   // Restore travel mode state on load
   (function () { const t = getTravelMode(); if (t) { state._travelLat = t.lat; state._travelLng = t.lng; } })();
+  // Silently restore location if it was on last session
+  if (state.settings.locationEnabled && navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        state.userLat = pos.coords.latitude;
+        state.userLng = pos.coords.longitude;
+        state.locationEnabled = true;
+        updateLocationBtn();
+        hideBanner('location-banner');
+        startWatching();
+        renderCards();
+      },
+      () => {
+        // Permission revoked or unavailable — clear persisted flag so banner shows again
+        state.settings.locationEnabled = false;
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+    );
+  }
   updateTagSuggestions();
   updateAppBadge();
   renderAll();
