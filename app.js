@@ -175,6 +175,8 @@ function saveData () {
   updateTagSuggestions();
   setTimeout(checkAchievements, 0);
   setTimeout(renderWeeklyGoal, 0);
+  // Sync to Firestore if user is signed in (debounced)
+  if (typeof fbDebouncedSync === 'function') fbDebouncedSync();
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -361,9 +363,16 @@ function openAccountModal () {
   const btn = id => document.getElementById(id);
   const gotoAndClose = fn => { closeAccountModal(); setTimeout(fn, 150); };
   if (btn('account-profile-link-btn'))  btn('account-profile-link-btn').onclick  = () => gotoAndClose(openFoodieProfile);
-  if (btn('account-review-link-btn'))   btn('account-review-link-btn').onclick   = () => gotoAndClose(openYearReview);
-  if (btn('account-ach-link-btn'))      btn('account-ach-link-btn').onclick      = () => gotoAndClose(openAchievements);
+  if (btn('account-review-link-btn'))   btn('account-review-link-btn').onclick   = () => gotoAndClose(() => (typeof requiresPremium === 'function' ? requiresPremium('Year in Review 📅', openYearReview) : openYearReview()));
+  if (btn('account-ach-link-btn'))      btn('account-ach-link-btn').onclick      = () => gotoAndClose(() => (typeof requiresPremium === 'function' ? requiresPremium('Achievements 🏆', openAchievements) : openAchievements()));
   if (btn('account-export-link-btn'))   btn('account-export-link-btn').onclick   = () => gotoAndClose(openExport2);
+
+  // Hide lock icons on premium features if user is Grizzly
+  const prem = typeof isPremium === 'function' && isPremium();
+  overlay.querySelectorAll('.prem-lock').forEach(el => { el.textContent = prem ? '›' : '🔒'; });
+
+  // Refresh auth UI badges
+  if (typeof updateAuthUI === 'function') updateAuthUI(typeof _auth !== 'undefined' ? _auth.currentUser : null);
 
   overlay.classList.remove('hidden');
   document.body.classList.add('overlay-open');
@@ -1096,6 +1105,13 @@ function handleFormSubmit (e) {
 
   const status = document.querySelector('input[name="form-status"]:checked')?.value || 'want-to-try';
   const isNew  = !state.editingId;
+
+  // Free plan: cap at 15 restaurants
+  if (isNew && typeof isPremium === 'function' && !isPremium() && state.restaurants.length >= FREE_RESTAURANT_LIMIT) {
+    showToast('🐾 Den is full!', `Free Cub accounts hold up to ${FREE_RESTAURANT_LIMIT} spots. Upgrade to Grizzly for unlimited.`, 'info');
+    if (typeof openUpgradeModal === 'function') openUpgradeModal('Unlimited restaurants');
+    return;
+  }
 
   // Try to geocode address for proximity detection (best-effort via nominatim)
   const address = document.getElementById('form-address').value.trim();

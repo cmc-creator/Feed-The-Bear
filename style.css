@@ -4243,3 +4243,224 @@ body.light-mode #profile-btn {
 .setup-sub { text-wrap: balance; }
 .pwa-banner-text { text-wrap: balance; }
 .quick-add-desc, .discover-item-meta, .nearby-home-card-meta { text-wrap: balance; }
+
+/* ════════════════════════════════════════════════════════════
+   AUTH MODAL
+   ════════════════════════════════════════════════════════════ */
+.auth-card { max-width: 400px; padding: 0; }
+.auth-body { padding: 0 24px 28px; }
+.auth-title { font-size: 1.15rem; }
+.auth-sub {
+  font-size: .85rem;
+  color: var(--text-dim);
+  margin-bottom: 20px;
+  text-wrap: balance;
+  line-height: 1.5;
+}
+.auth-google-btn {
+  width: 100%;
+  padding: 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: .92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .12s;
+  margin-bottom: 4px;
+}
+.auth-google-btn:hover { background: var(--surface3); }
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+  color: var(--text-dim);
+  font-size: .78rem;
+}
+.auth-divider::before,
+.auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.auth-toggle-text {
+  text-align: center;
+  font-size: .82rem;
+  color: var(--text-dim);
+  margin-top: 14px;
+}
+.auth-link-btn {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-family: var(--font);
+  font-size: .82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+/* ════════════════════════════════════════════════════════════
+   UPGRADE MODAL
+   ════════════════════════════════════════════════════════════ */
+.upgrade-card { max-width: 520px; padding: 0; }
+.upgrade-body { padding: 0 24px 28px; }
+.upgrade-highlight {
+  background: rgba(255,107,53,.12);
+  border: 1px solid rgba(255,107,53,.3);
+  border-radius: var(--radius);
+  color: var(--primary);
+  font-size: .82rem;
+  font-weight: 600;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.upgrade-plans-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.upgrade-plan {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 14px;
+  position: relative;
+}
+.upgrade-plan-paid {
+  border-color: var(--primary);
+  background: rgba(255,107,53,.05);
+}
+.upgrade-plan-badge {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--primary);
+  color: #fff;
+  font-size: .65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: 3px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.upgrade-plan-name {
+  font-size: .9rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  margin-top: 4px;
+}
+.upgrade-plan-price {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+.upgrade-price-row { margin-bottom: 10px; }
+.upgrade-price-main {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+.upgrade-price-sub {
+  font-size: .75rem;
+  color: var(--text-dim);
+  display: block;
+  margin-top: 2px;
+}
+.upgrade-plan-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: .78rem;
+  color: var(--text-muted);
+}
+.upgrade-plan-features li.dim { color: var(--text-dim); opacity: .55; }
+.upgrade-period-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.upgrade-period-btn {
+  flex: 1;
+  padding: 9px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-dim);
+  font-family: var(--font);
+  font-size: .82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .12s;
+}
+.upgrade-period-btn.active {
+  border-color: var(--primary);
+  background: rgba(255,107,53,.12);
+  color: var(--primary);
+}
+.upgrade-cta-btn { width: 100%; padding: 14px; font-size: 1rem; }
+.upgrade-footer {
+  text-align: center;
+  font-size: .73rem;
+  color: var(--text-dim);
+  margin-top: 10px;
+}
+
+/* ════════════════════════════════════════════════════════════
+   ACCOUNT PORTAL — AUTH BADGES + EXTRA ROWS
+   ════════════════════════════════════════════════════════════ */
+.account-badges-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.account-plan-badge,
+.account-sync-badge {
+  font-size: .7rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-dim);
+}
+.account-plan-badge.badge-grizzly {
+  background: rgba(255,107,53,.15);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.account-plan-badge.badge-cub { color: var(--text-dim); }
+.account-sync-badge.badge-synced {
+  background: rgba(46,204,113,.1);
+  border-color: #2ecc71;
+  color: #2ecc71;
+}
+.account-signin-row { color: var(--primary) !important; }
+.account-upgrade-row {
+  background: rgba(255,107,53,.06) !important;
+  color: var(--primary) !important;
+  border-top: 1px solid rgba(255,107,53,.18) !important;
+  font-weight: 600;
+}
+.account-upgrade-row:hover { background: rgba(255,107,53,.12) !important; }
+.account-signout-row { color: var(--text-dim) !important; }
+.prem-lock { font-size: .85rem; }
+
+/* Premium lock icon in Year Review / Achievements (hidden for Grizzly) */
+.prem-lock { opacity: .6; }
+
+@media (max-width: 480px) {
+  .upgrade-plans-row { grid-template-columns: 1fr; }
+  .upgrade-card { max-width: 100%; }
+  .auth-card { max-width: 100%; }
+}

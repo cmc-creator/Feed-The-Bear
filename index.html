@@ -64,9 +64,17 @@
         <div id="account-avatar-display" class="account-avatar-display">🐻</div>
         <h2 id="account-name-display" class="account-name-display">Foodie</h2>
         <div id="account-since-display" class="account-since-display">Foodie since today</div>
+        <div class="account-badges-row">
+          <span id="account-plan-badge" class="account-plan-badge badge-cub">🐾 Cub — Free</span>
+          <span id="account-sync-badge" class="account-sync-badge">📱 Device only</span>
+        </div>
       </div>
       <div id="account-stats-row" class="account-stats-row"></div>
       <div class="account-portal-actions">
+        <!-- Sign in row — hidden when logged in -->
+        <button class="account-action-row account-signin-row" id="account-signin-row">
+          <span class="aar-icon">🔑</span><span class="aar-label">Sign in / Create account</span><span class="aar-chevron">›</span>
+        </button>
         <button class="account-action-row" id="account-edit-btn">
           <span class="aar-icon">✏️</span><span class="aar-label">Edit Profile</span><span class="aar-chevron">›</span>
         </button>
@@ -74,13 +82,21 @@
           <span class="aar-icon">👤</span><span class="aar-label">My Foodie Profile</span><span class="aar-chevron">›</span>
         </button>
         <button class="account-action-row" id="account-review-link-btn">
-          <span class="aar-icon">📅</span><span class="aar-label">Year in Review</span><span class="aar-chevron">›</span>
+          <span class="aar-icon">📅</span><span class="aar-label">Year in Review</span><span class="aar-chevron prem-lock">🔒</span>
         </button>
         <button class="account-action-row" id="account-ach-link-btn">
-          <span class="aar-icon">🏆</span><span class="aar-label">Achievements &amp; XP</span><span class="aar-chevron">›</span>
+          <span class="aar-icon">🏆</span><span class="aar-label">Achievements &amp; XP</span><span class="aar-chevron prem-lock">🔒</span>
         </button>
         <button class="account-action-row" id="account-export-link-btn">
           <span class="aar-icon">📤</span><span class="aar-label">Export My Data</span><span class="aar-chevron">›</span>
+        </button>
+        <!-- Upgrade row — hidden for Grizzly members -->
+        <button class="account-action-row account-upgrade-row" id="account-upgrade-row">
+          <span class="aar-icon">🐻</span><span class="aar-label"><strong>Upgrade to Grizzly</strong> — unlock everything</span><span class="aar-chevron">›</span>
+        </button>
+        <!-- Sign out row — hidden when not logged in -->
+        <button class="account-action-row account-signout-row hidden" id="account-signout-row">
+          <span class="aar-icon">🚪</span><span class="aar-label">Sign Out</span><span class="aar-chevron">›</span>
         </button>
       </div>
     </div>
@@ -117,6 +133,76 @@
     <span class="pwa-banner-text">🐻 Install Feed The Bear for faster launch, offline access, and a true app feel.</span>
     <button id="pwa-install-btn" class="btn-sm btn-orange">Install App</button>
     <button id="pwa-dismiss-btn" class="icon-btn" aria-label="Dismiss">✕</button>
+  </div>
+
+  <!-- ── Auth Modal (Sign In / Sign Up) ──────────────────── -->
+  <div id="auth-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="auth-title" data-mode="signin">
+    <div class="modal-card auth-card">
+      <div class="modal-header">
+        <h2 id="auth-title" class="auth-title">Welcome back, bear 🐾</h2>
+        <button id="auth-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="auth-body">
+        <p class="auth-sub">Sign in to sync your den across devices and unlock Grizzly features.</p>
+        <button id="auth-google-btn" class="auth-google-btn">🟠 Continue with Google</button>
+        <div class="auth-divider"><span>or</span></div>
+        <label class="form-label" for="auth-email">Email</label>
+        <input id="auth-email" class="form-input" type="email" placeholder="bear@example.com" autocomplete="email" />
+        <label class="form-label" for="auth-password" style="margin-top:12px">Password</label>
+        <input id="auth-password" class="form-input" type="password" placeholder="At least 6 characters" autocomplete="current-password" />
+        <button id="auth-submit-btn" class="btn-primary" style="width:100%;margin-top:16px">Sign In</button>
+        <p id="auth-toggle-text" class="auth-toggle-text">New to the den? <button class="auth-link-btn" id="auth-mode-toggle">Sign up — it's free</button></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Upgrade Modal (Free → Grizzly) ────────────────────── -->
+  <div id="upgrade-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="upgrade-title">
+    <div class="modal-card upgrade-card">
+      <div class="modal-header">
+        <h2 id="upgrade-title">Become a Grizzly 🐻</h2>
+        <button id="upgrade-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="upgrade-body">
+        <p id="upgrade-feature-highlight" class="upgrade-highlight hidden"></p>
+        <div class="upgrade-plans-row">
+          <div class="upgrade-plan upgrade-plan-free">
+            <div class="upgrade-plan-name">🐾 Cub</div>
+            <div class="upgrade-plan-price">Free</div>
+            <ul class="upgrade-plan-features">
+              <li>✓ Up to 15 restaurants</li>
+              <li>✓ Map &amp; discovery</li>
+              <li>✓ Basic lists</li>
+              <li class="dim">✗ AI recommendations</li>
+              <li class="dim">✗ Year in Review</li>
+              <li class="dim">✗ Achievements</li>
+              <li class="dim">✗ Cross-device sync</li>
+            </ul>
+          </div>
+          <div class="upgrade-plan upgrade-plan-paid">
+            <div class="upgrade-plan-badge">Most popular</div>
+            <div class="upgrade-plan-name">🐻 Grizzly</div>
+            <div class="upgrade-price-row">
+              <span id="upgrade-price-main" class="upgrade-price-main">$19.99</span>
+              <span id="upgrade-price-sub" class="upgrade-price-sub">/ year — save 44%!</span>
+            </div>
+            <ul class="upgrade-plan-features">
+              <li>✓ Unlimited restaurants</li>
+              <li>✓ AI recs &amp; Smart Fill</li>
+              <li>✓ Year in Review</li>
+              <li>✓ All Achievements</li>
+              <li>✓ Cloud sync (all devices)</li>
+            </ul>
+          </div>
+        </div>
+        <div class="upgrade-period-toggle">
+          <button id="upgrade-monthly-btn" class="upgrade-period-btn">Monthly</button>
+          <button id="upgrade-yearly-btn"  class="upgrade-period-btn active">Yearly</button>
+        </div>
+        <button id="upgrade-cta-btn" class="btn-primary upgrade-cta-btn" data-period="yearly">Upgrade to Grizzly 🐻</button>
+        <p class="upgrade-footer">Cancel anytime. Billed securely by Stripe. No hidden fees.</p>
+      </div>
+    </div>
   </div>
 
   <!-- ── Toast Notifications ──────────────────────────────── -->
@@ -1799,6 +1885,11 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="ai.js"></script>
   <script src="app.js"></script>
+  <!-- Firebase SDK (compat layer — no build step required) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="firebase.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
