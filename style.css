@@ -1327,22 +1327,210 @@ body.bulk-mode .card-checkbox { display: flex; }
 .card-checkbox.checked::after { content: '✓'; color: #fff; font-size: .72rem; font-weight: 700; }
 #bulk-select-btn.active { color: var(--primary); border-color: var(--primary); }
 
-/* ── Nearby Discovery ────────────────────────────────────── */
-.nearby-card { max-width: 460px; width: 100%; }
-.nearby-results { padding: 4px 0 8px; max-height: 420px; overflow-y: auto; }
-.nearby-loading, .nearby-empty { padding: 32px; text-align: center; color: var(--text-dim); font-size: .9rem; }
-.nearby-item {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 0; border-bottom: 1px solid var(--border); gap: 12px;
+/* ══ Full-Screen Discovery (Grubhub-style) ════════════════ */
+.disc-fullscreen {
+  position: fixed; inset: 0; z-index: 9100;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  overflow: hidden;
 }
-.nearby-item:last-child { border-bottom: none; }
-.nearby-item-info { flex: 1; min-width: 0; }
-.nearby-item-name { font-size: .9rem; font-weight: 600; color: var(--text); }
-.nearby-item-meta { font-size: .77rem; color: var(--text-dim); margin-top: 2px; }
-.nearby-saved-badge {
-  font-size: .73rem; font-weight: 700; color: var(--green);
-  padding: 4px 10px; background: rgba(46,204,113,.1); border-radius: 20px; white-space: nowrap;
+.disc-fullscreen.hidden { display: none; }
+
+/* Header */
+.disc-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 16px; height: 60px; flex-shrink: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
+.disc-back-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--surface2); color: var(--text);
+  border: 1px solid var(--border);
+  flex-shrink: 0; cursor: pointer; transition: background .15s;
+}
+.disc-back-btn:hover { background: var(--surface3); }
+.disc-header-center { flex: 1; min-width: 0; }
+.disc-title { font-size: 1rem; font-weight: 700; line-height: 1.2; }
+.disc-location-label { font-size: .75rem; color: var(--text-muted); margin-top: 1px; }
+.disc-radius-select {
+  font-size: .8rem; font-weight: 600; color: var(--text);
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 6px 8px;
+  flex-shrink: 0; cursor: pointer; outline: none;
+}
+
+/* Search row */
+.disc-search-row {
+  display: flex; gap: 8px; align-items: center;
+  padding: 10px 16px; flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.disc-search-wrap {
+  flex: 1; position: relative;
+}
+.disc-search-icon {
+  position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  color: var(--text-dim); pointer-events: none;
+}
+.disc-search-input {
+  width: 100%; padding: 9px 12px 9px 34px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text); font-size: .88rem;
+  outline: none; font-family: var(--font);
+  transition: border-color .15s;
+}
+.disc-search-input:focus { border-color: var(--primary); }
+.disc-search-input::placeholder { color: var(--text-dim); }
+.disc-refresh-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: var(--radius);
+  background: var(--surface2); color: var(--text-muted);
+  border: 1px solid var(--border); flex-shrink: 0;
+  cursor: pointer; transition: background .15s, color .15s;
+}
+.disc-refresh-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* Cuisine chips + sort row */
+.disc-controls-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.disc-chips {
+  display: flex; gap: 6px; overflow-x: auto;
+  flex: 1; min-width: 0; padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.disc-chips::-webkit-scrollbar { display: none; }
+.disc-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 12px; border-radius: 100px; white-space: nowrap;
+  font-size: .78rem; font-weight: 600;
+  background: var(--surface2); color: var(--text-muted);
+  border: 1px solid var(--border); cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+  flex-shrink: 0;
+}
+.disc-chip:hover { background: var(--surface3); color: var(--text); }
+.disc-chip.active {
+  background: var(--primary); color: #fff; border-color: var(--primary);
+}
+.disc-chip-count {
+  background: rgba(255,255,255,.15); border-radius: 100px;
+  padding: 1px 6px; font-size: .7rem; font-weight: 700;
+}
+.disc-chip.active .disc-chip-count { background: rgba(255,255,255,.2); }
+.disc-sort-select {
+  font-size: .8rem; font-weight: 600; color: var(--text);
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 6px 8px;
+  flex-shrink: 0; cursor: pointer; outline: none;
+}
+
+/* Result count */
+.disc-result-meta {
+  padding: 8px 16px 0; font-size: .78rem;
+  color: var(--text-dim); flex-shrink: 0;
+}
+
+/* Results list — scrollable */
+.disc-results-list {
+  flex: 1; overflow-y: auto; padding: 8px 12px 24px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+/* Individual restaurant card */
+.disc-card {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 14px 14px 16px;
+  transition: border-color .15s, transform .15s;
+}
+.disc-card:hover { border-color: rgba(255,107,53,.3); transform: translateY(-1px); }
+.disc-card-saved { opacity: .7; }
+
+.disc-card-thumb {
+  font-size: 2.2rem; flex-shrink: 0;
+  width: 52px; height: 52px;
+  background: var(--surface2);
+  border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
+}
+.disc-card-body { flex: 1; min-width: 0; }
+.disc-card-name {
+  font-size: .95rem; font-weight: 700;
+  color: var(--text); margin-bottom: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.disc-card-meta {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  font-size: .78rem; color: var(--text-muted); margin-bottom: 4px;
+}
+.disc-meta-dot { color: var(--text-dim); }
+.disc-card-dist { color: var(--text-muted); }
+.disc-card-addr {
+  font-size: .74rem; color: var(--text-dim); margin-bottom: 5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.disc-card-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+.disc-tag {
+  font-size: .68rem; font-weight: 700; padding: 2px 8px;
+  border-radius: 100px; white-space: nowrap;
+}
+.disc-tag-open   { background: rgba(46,204,113,.15); color: var(--green); }
+.disc-tag-closed { background: rgba(231,76,60,.10);  color: #c0575a; }
+.disc-tag-match  { background: rgba(255,107,53,.12); color: var(--primary); }
+.disc-tag-saved  { background: rgba(46,204,113,.12); color: var(--green); }
+
+.disc-card-action { flex-shrink: 0; }
+.disc-save-btn {
+  padding: 8px 14px; border-radius: 100px;
+  background: var(--primary); color: #fff;
+  font-size: .82rem; font-weight: 700;
+  border: none; cursor: pointer;
+  transition: background .15s, transform .15s;
+  white-space: nowrap;
+}
+.disc-save-btn:hover { background: var(--primary-dk); transform: scale(1.04); }
+.disc-saved-mark {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: rgba(46,204,113,.15);
+  color: var(--green); font-size: 1rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Loading state */
+.disc-loading {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 60px 24px;
+  color: var(--text-muted); font-size: .9rem; gap: 14px;
+  text-align: center;
+}
+.disc-spinner {
+  width: 28px; height: 28px;
+  border: 3px solid var(--surface3);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: discSpin .75s linear infinite;
+  display: block;
+}
+@keyframes discSpin { to { transform: rotate(360deg); } }
+
+/* Empty / error state */
+.disc-empty {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 60px 24px; text-align: center; gap: 8px;
+}
+.disc-empty-icon { font-size: 2.8rem; }
+.disc-empty-title { font-size: 1rem; font-weight: 700; }
+.disc-empty-sub { font-size: .85rem; color: var(--text-muted); }
 
 /* ── Onboarding Overlay ──────────────────────────────────── */
 .onboarding-overlay {

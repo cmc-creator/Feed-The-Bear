@@ -945,17 +945,54 @@
   </nav>
 
   <!-- ── Nearby Discovery Modal ─────────────────────────── -->
-  <div id="nearby-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Discover Nearby Restaurants">
-    <div class="modal-card nearby-card">
-      <div class="modal-header">
-        <h2>🍽️ Discover Nearby</h2>
-        <button id="nearby-close-btn" class="icon-btn" aria-label="Close">✕</button>
+  <!-- ── Full-Screen Nearby Discovery (Grubhub-style) ─────── -->
+  <div id="nearby-overlay" class="disc-fullscreen hidden" role="dialog" aria-modal="true" aria-label="Discover Nearby Restaurants">
+
+    <!-- Header -->
+    <div class="disc-header">
+      <button id="nearby-close-btn" class="disc-back-btn" aria-label="Close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div class="disc-header-center">
+        <div class="disc-title">Restaurants Near You</div>
+        <div class="disc-location-label" id="disc-location-label">📍 Locating you…</div>
       </div>
-      <div style="padding:16px 20px 20px">
-        <p style="font-size:.83rem;color:var(--text-dim);margin:0 0 12px">Real restaurants nearby — powered by OpenStreetMap. One tap to add any to your list!</p>
-        <div id="nearby-results" class="nearby-results"></div>
-      </div>
+      <select id="disc-radius" class="disc-radius-select" aria-label="Search radius">
+        <option value="1609">1 mi</option>
+        <option value="3219" selected>2 mi</option>
+        <option value="8047">5 mi</option>
+        <option value="16093">10 mi</option>
+      </select>
     </div>
+
+    <!-- Search bar -->
+    <div class="disc-search-row">
+      <div class="disc-search-wrap">
+        <svg class="disc-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="disc-search" class="disc-search-input" type="search" placeholder="Search restaurants…" autocomplete="off" />
+      </div>
+      <button id="disc-refresh-btn" class="disc-refresh-btn" title="Refresh results" aria-label="Refresh">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      </button>
+    </div>
+
+    <!-- Cuisine filter chips + sort -->
+    <div class="disc-controls-row">
+      <div class="disc-chips" id="disc-cuisine-chips">
+        <button class="disc-chip active" data-cuisine="all">All</button>
+      </div>
+      <select id="disc-sort" class="disc-sort-select" aria-label="Sort by">
+        <option value="distance">Nearest</option>
+        <option value="match">Best match</option>
+        <option value="type">Type</option>
+      </select>
+    </div>
+
+    <!-- Result count -->
+    <div class="disc-result-meta" id="disc-result-meta"></div>
+
+    <!-- Results -->
+    <div id="nearby-results" class="disc-results-list"></div>
   </div>
 
   <!-- ── Onboarding Overlay ──────────────────────────────── -->
@@ -1018,7 +1055,7 @@
     <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true">
       <button id="lightbox-close" class="lightbox-close" aria-label="Close">✕</button>
       <button id="lightbox-prev" class="lightbox-nav lightbox-prev" aria-label="Previous">‹</button>
-      <img id="lightbox-img" class="lightbox-img" src="" alt="Restaurant photo" />
+      <img id="lightbox-img" class="lightbox-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Restaurant photo" />
       <div id="lightbox-caption" class="lightbox-caption"></div>
       <button id="lightbox-ai-caption-btn" class="btn-sm btn-ai lightbox-ai-btn">✨ AI Caption</button>
       <button id="lightbox-next" class="lightbox-nav lightbox-next" aria-label="Next">›</button>

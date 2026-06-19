@@ -1986,50 +1986,286 @@ function parseMapsUrl (raw) {
 }
 
 /* ════════════════════════════════════════════════════════════
-   NEARBY DISCOVERY — Overpass API
+   NEARBY DISCOVERY — Full-screen Grubhub-style restaurant list
    ════════════════════════════════════════════════════════════ */
+
+let _discAllResults  = [];   // full result set for client-side filtering
+let _discActiveCuisine = 'all';
+let _discSort = 'distance';
+
 async function discoverNearby () {
   if (!(await ensureLocationForDiscovery())) return;
+
   const overlay = document.getElementById('nearby-overlay');
   overlay.classList.remove('hidden');
-  document.getElementById('ui-overlay').classList.remove('hidden');
-  document.getElementById('nearby-results').innerHTML = '<div class="nearby-loading">🐻 Sniffing out restaurants near you…</div>';
+  document.body.classList.add('overlay-open');
+
+  // Update location label
+  const locLabel = document.getElementById('disc-location-label');
+  if (locLabel) locLabel.textContent = '📍 Near your current location';
+
+  // Wire controls once
+  _discWireControls();
+
+  // Run initial fetch
+  await _discFetch();
+}
+
+function _discWireControls () {
+  // Only attach listeners once (guard with a flag on the element)
+  const overlay = document.getElementById('nearby-overlay');
+  if (overlay._wired) return;
+  overlay._wired = true;
+
+  document.getElementById('disc-search')?.addEventListener('input', _discApplyFilters);
+  document.getElementById('disc-sort')?.addEventListener('change', e => {
+    _discSort = e.target.value;
+    _discApplyFilters();
+  });
+  document.getElementById('disc-radius')?.addEventListener('change', () => _discFetch());
+  document.getElementById('disc-refresh-btn')?.addEventListener('click', () => _discFetch());
+
+  // Chip clicks (delegate since chips are dynamic)
+  document.getElementById('disc-cuisine-chips')?.addEventListener('click', e => {
+    const chip = e.target.closest('.disc-chip');
+    if (!chip) return;
+    _discActiveCuisine = chip.dataset.cuisine;
+    document.querySelectorAll('#disc-cuisine-chips .disc-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    _discApplyFilters();
+  });
+}
+
+async function _discFetch () {
+  const resultsEl = document.getElementById('nearby-results');
+  const metaEl    = document.getElementById('disc-result-meta');
+  const chipWrap  = document.getElementById('disc-cuisine-chips');
+  if (!resultsEl) return;
+
+  resultsEl.innerHTML = '<div class="disc-loading"><span class="disc-spinner"></span>Sniffing out restaurants near you…</div>';
+  if (metaEl) metaEl.textContent = '';
+
+  const { userLat: lat, userLng: lng } = state;
+  const radius = parseInt(document.getElementById('disc-radius')?.value) || 3219;
+
   try {
-    const { userLat: lat, userLng: lng } = state;
-    const query = `[out:json][timeout:15];(node["amenity"="restaurant"](around:1609,${lat},${lng});way["amenity"="restaurant"](around:1609,${lat},${lng}););out center 20;`;
-    const res  = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:query });
-    const data = await res.json();
-    const els  = (data.elements || []).slice(0, 20);
-    if (!els.length) { document.getElementById('nearby-results').innerHTML = '<div class="nearby-empty">🐻 No spots sniffed out within 1 mile — try a different area!</div>'; return; }
-    const html = els.map(el => {
-      const tags = el.tags || {};
-      const elLat = el.lat ?? el.center?.lat, elLon = el.lon ?? el.center?.lon;
-      const name = tags.name || 'Unknown Restaurant';
-      const cuisine = (tags.cuisine || '').split(';')[0];
-      const dist = (elLat && elLon) ? haversine(lat, lng, elLat, elLon) : null;
-      const saved = state.restaurants.some(r => r.name.toLowerCase() === name.toLowerCase());
-      return `<div class="nearby-item">
-        <div class="nearby-item-info">
-          <div class="nearby-item-name">${escHtml(name)}</div>
-          <div class="nearby-item-meta">${cuisine ? `${cuisineEmoji(cuisine)} ${escHtml(cuisine)} · ` : ''}${dist ? fmtDist(dist)+' away' : ''}</div>
-        </div>
-        ${saved ? '<span class="nearby-saved-badge">✓ Saved</span>' :
-          `<button class="btn-sm btn-orange nearby-add-btn" data-name="${escHtml(name)}" data-cuisine="${escHtml(cuisine)}" data-lat="${elLat||''}" data-lng="${elLon||''}">+ Add</button>`}
-      </div>`;
-    }).join('');
-    document.getElementById('nearby-results').innerHTML = html;
-    document.querySelectorAll('.nearby-add-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        overlay.classList.add('hidden'); maybeHideOverlay();
-        openAddModal();
-        document.getElementById('form-name').value    = btn.dataset.name;
-        document.getElementById('form-cuisine').value = btn.dataset.cuisine;
-        showToast('Pre-filled!', 'Review the details and save.', 'info');
-      });
+    const q = `[out:json][timeout:20];(node["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${radius},${lat},${lng});way["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${radius},${lat},${lng}););out center 60;`;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 18000);
+    const resp  = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: q, signal: ctrl.signal });
+    clearTimeout(timer);
+    const json  = await resp.json();
+
+    const savedNames = new Set(state.restaurants.map(r => normalizeName(r.name)));
+    const myCuisines = {};
+    state.restaurants.filter(r => r.myRating >= 4 && r.cuisine).forEach(r => {
+      const c = (r.cuisine || '').toLowerCase();
+      myCuisines[c] = (myCuisines[c] || 0) + (r.myRating || 3);
     });
-  } catch {
-    document.getElementById('nearby-results').innerHTML = '<div class="nearby-empty">Could not fetch — check your connection.</div>';
+
+    _discAllResults = (json.elements || [])
+      .filter(el => el.tags?.name)
+      .map(el => {
+        const tags   = el.tags || {};
+        const elLat  = el.lat ?? el.center?.lat;
+        const elLon  = el.lon ?? el.center?.lon;
+        const dist   = (elLat != null && elLon != null) ? haversine(lat, lng, elLat, elLon) : Infinity;
+        const rawCuisines = (tags.cuisine || '').split(';').map(s => s.trim().replace(/_/g, ' ')).filter(Boolean);
+        const cuisine = rawCuisines[0] || '';
+        const amenity = tags.amenity || 'restaurant';
+
+        // Taste-match score
+        let matchScore = 0;
+        Object.entries(myCuisines).forEach(([c, w]) => {
+          if (cuisine.toLowerCase().includes(c) || c.includes(cuisine.toLowerCase())) matchScore += w;
+        });
+        if (amenity === 'restaurant') matchScore += 5;
+        if (tags.opening_hours)       matchScore += 3;
+        if (tags.website)             matchScore += 2;
+        if (tags['addr:street'])      matchScore += 1;
+
+        // Check if open now (simple heuristic — mark unknown if no hours)
+        const openNow = _discIsOpenNow(tags.opening_hours);
+
+        const street = [tags['addr:housenumber'], tags['addr:street']].filter(Boolean).join(' ');
+        const city   = tags['addr:city'] || '';
+
+        return {
+          name: tags.name,
+          cuisine,
+          rawCuisines,
+          amenity,
+          dist,
+          matchScore,
+          openNow,
+          street,
+          city,
+          website: tags.website || '',
+          phone:   tags.phone || '',
+          saved:   savedNames.has(normalizeName(tags.name)),
+        };
+      })
+      .sort((a, b) => a.dist - b.dist);   // default: nearest first
+
+    if (!_discAllResults.length) {
+      resultsEl.innerHTML = `<div class="disc-empty">
+        <div class="disc-empty-icon">🐻</div>
+        <div class="disc-empty-title">No spots found nearby</div>
+        <div class="disc-empty-sub">Try increasing the radius above.</div>
+      </div>`;
+      return;
+    }
+
+    // Build cuisine chip list from results
+    _discBuildChips(_discAllResults, chipWrap);
+
+    _discActiveCuisine = 'all';
+    _discSort = document.getElementById('disc-sort')?.value || 'distance';
+    _discApplyFilters();
+
+  } catch (err) {
+    resultsEl.innerHTML = `<div class="disc-empty">
+      <div class="disc-empty-icon">📡</div>
+      <div class="disc-empty-title">${err?.name === 'AbortError' ? 'Took too long' : 'Connection error'}</div>
+      <div class="disc-empty-sub">Check your connection and tap the refresh button.</div>
+    </div>`;
   }
+}
+
+function _discBuildChips (results, wrap) {
+  if (!wrap) return;
+  const counts = {};
+  results.forEach(r => {
+    const c = r.cuisine || r.amenity;
+    if (c) counts[c] = (counts[c] || 0) + 1;
+  });
+  const topCuisines = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([c]) => c);
+
+  const amenityEmoji = { restaurant:'🍽️', cafe:'☕', fast_food:'🍟', bar:'🍺', pub:'🍺', food_court:'🏪', ice_cream:'🍦' };
+
+  wrap.innerHTML = `<button class="disc-chip active" data-cuisine="all">All <span class="disc-chip-count">${results.length}</span></button>` +
+    topCuisines.map(c => {
+      const emoji = cuisineEmoji(c) || amenityEmoji[c] || '🍽️';
+      const label = c.charAt(0).toUpperCase() + c.slice(1);
+      return `<button class="disc-chip" data-cuisine="${escHtml(c)}">${emoji} ${escHtml(label)} <span class="disc-chip-count">${counts[c]}</span></button>`;
+    }).join('');
+}
+
+function _discApplyFilters () {
+  const query   = (document.getElementById('disc-search')?.value || '').trim().toLowerCase();
+  const cuisine = _discActiveCuisine;
+  const sort    = document.getElementById('disc-sort')?.value || 'distance';
+  const metaEl  = document.getElementById('disc-result-meta');
+
+  let results = _discAllResults.filter(r => {
+    if (cuisine !== 'all' && r.cuisine !== cuisine && r.amenity !== cuisine) return false;
+    if (query && !r.name.toLowerCase().includes(query) && !r.cuisine.toLowerCase().includes(query)) return false;
+    return true;
+  });
+
+  if (sort === 'distance') {
+    results = results.slice().sort((a, b) => a.dist - b.dist);
+  } else if (sort === 'match') {
+    results = results.slice().sort((a, b) => b.matchScore - a.matchScore);
+  } else if (sort === 'type') {
+    results = results.slice().sort((a, b) => a.amenity.localeCompare(b.amenity) || a.dist - b.dist);
+  }
+
+  if (metaEl) {
+    metaEl.textContent = results.length
+      ? `${results.length} spot${results.length !== 1 ? 's' : ''} found`
+      : '';
+  }
+
+  const resultsEl = document.getElementById('nearby-results');
+  if (!results.length) {
+    resultsEl.innerHTML = `<div class="disc-empty">
+      <div class="disc-empty-icon">🔍</div>
+      <div class="disc-empty-title">No matches</div>
+      <div class="disc-empty-sub">Try a different filter or search term.</div>
+    </div>`;
+    return;
+  }
+
+  const myCuisines = new Set(
+    state.restaurants.filter(r => r.myRating >= 4 && r.cuisine).map(r => r.cuisine.toLowerCase())
+  );
+  const amenityLabel = { restaurant:'Restaurant', cafe:'Café', fast_food:'Fast Food', bar:'Bar', pub:'Pub', food_court:'Food Court', ice_cream:'Ice Cream' };
+  const amenityEmoji = { restaurant:'🍽️', cafe:'☕', fast_food:'🍟', bar:'🍺', pub:'🍺', food_court:'🏪', ice_cream:'🍦' };
+
+  resultsEl.innerHTML = results.map(r => {
+    const emoji    = cuisineEmoji(r.cuisine) || amenityEmoji[r.amenity] || '🍽️';
+    const typeLabel = r.cuisine
+      ? (r.cuisine.charAt(0).toUpperCase() + r.cuisine.slice(1))
+      : (amenityLabel[r.amenity] || 'Restaurant');
+    const distStr  = r.dist < Infinity ? fmtDist(r.dist) : '';
+    const isMatch  = r.cuisine && myCuisines.has(r.cuisine.toLowerCase());
+
+    const safeName    = escHtml(r.name).replace(/'/g, "\\'");
+    const safeCuisine = escHtml(r.cuisine).replace(/'/g, "\\'");
+
+    return `<div class="disc-card${r.saved ? ' disc-card-saved' : ''}">
+      <div class="disc-card-thumb" aria-hidden="true">${emoji}</div>
+      <div class="disc-card-body">
+        <div class="disc-card-name">${escHtml(r.name)}</div>
+        <div class="disc-card-meta">
+          <span>${escHtml(typeLabel)}</span>
+          ${distStr ? `<span class="disc-meta-dot">·</span><span class="disc-card-dist">📍 ${distStr} away</span>` : ''}
+        </div>
+        ${r.street ? `<div class="disc-card-addr">${escHtml(r.street)}${r.city ? ', ' + escHtml(r.city) : ''}</div>` : ''}
+        <div class="disc-card-tags">
+          ${r.openNow === true  ? '<span class="disc-tag disc-tag-open">Open Now</span>'   : ''}
+          ${r.openNow === false ? '<span class="disc-tag disc-tag-closed">Closed</span>'   : ''}
+          ${isMatch             ? '<span class="disc-tag disc-tag-match">🎯 Matches your taste</span>' : ''}
+          ${r.saved             ? '<span class="disc-tag disc-tag-saved">✓ In your list</span>'        : ''}
+        </div>
+      </div>
+      <div class="disc-card-action">
+        ${r.saved
+          ? `<div class="disc-saved-mark">✓</div>`
+          : `<button class="disc-save-btn" onclick="openAddModalPreFilled('${safeName}','${safeCuisine}');document.getElementById('nearby-overlay').classList.add('hidden');maybeHideOverlay();" aria-label="Save ${escHtml(r.name)}">+ Save</button>`
+        }
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Simple open-now check using OpenStreetMap opening_hours string
+function _discIsOpenNow (ohStr) {
+  if (!ohStr) return null;   // unknown
+  if (/^24\/7$/i.test(ohStr.trim())) return true;
+  try {
+    const now   = new Date();
+    const day   = ['Su','Mo','Tu','We','Th','Fr','Sa'][now.getDay()];
+    const hhmm  = now.getHours() * 60 + now.getMinutes();
+    // Match patterns like "Mo-Fr 11:00-22:00" or "Mo-Su 09:00-23:00"
+    const segs  = ohStr.split(';').map(s => s.trim());
+    for (const seg of segs) {
+      const m = seg.match(/([A-Za-z,\-]+)\s+(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})/);
+      if (!m) continue;
+      const dayPart  = m[1];
+      const openMin  = _ohToMin(m[2]);
+      const closeMin = _ohToMin(m[3]);
+      if (_dayInRange(day, dayPart) && hhmm >= openMin && hhmm < closeMin) return true;
+    }
+    return false;
+  } catch { return null; }
+}
+const _ohToMin = s => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
+function _dayInRange (day, part) {
+  const DAYS = ['Mo','Tu','We','Th','Fr','Sa','Su'];
+  const segments = part.split(',');
+  return segments.some(seg => {
+    if (seg.includes('-')) {
+      const [s, e] = seg.split('-');
+      const si = DAYS.indexOf(s.trim()), ei = DAYS.indexOf(e.trim()), di = DAYS.indexOf(day);
+      return si !== -1 && ei !== -1 && di >= si && di <= ei;
+    }
+    return seg.trim() === day;
+  });
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -2453,12 +2689,8 @@ function setupEvents () {
 
   // Nearby overlay close
   document.getElementById('nearby-close-btn').addEventListener('click', () => {
-    document.getElementById('nearby-overlay').classList.add('hidden'); maybeHideOverlay();
-  });
-  document.getElementById('nearby-overlay').addEventListener('click', e => {
-    if (e.target === document.getElementById('nearby-overlay')) {
-      document.getElementById('nearby-overlay').classList.add('hidden'); maybeHideOverlay();
-    }
+    document.getElementById('nearby-overlay').classList.add('hidden');
+    document.body.classList.remove('overlay-open');
   });
 
   // Onboarding
