@@ -29,8 +29,8 @@ if (typeof AI === 'undefined') {
 /* ── Constants ───────────────────────────────────────────── */
 const STORAGE_KEY   = 'ftb_restaurants_v2';
 const SETTINGS_KEY  = 'ftb_settings_v1';
-const ALERT_RADIUS  = 500;   // metres — show proximity alert
-const NOTIFY_RADIUS = 800;   // metres — browser notification
+const ALERT_RADIUS  = 805;   // ~0.5 miles — show proximity alert
+const NOTIFY_RADIUS = 1609;  // ~1 mile — browser notification
 const NOTIFY_COOLDOWN = 10 * 60 * 1000; // 10 min between alerts for same place
 
 /* ── Cuisine → emoji map ──────────────────────────────────── */
@@ -345,9 +345,12 @@ function haversine (lat1, lng1, lat2, lng2) {
 }
 const toRad = d => d * Math.PI / 180;
 
+// Returns imperial distance string (ft under 0.2 mi, otherwise mi)
 function fmtDist (m) {
-  if (m < 1000) return `${Math.round(m)} m`;
-  return `${(m/1609.344).toFixed(1)} mi`;
+  const miles = m / 1609.344;
+  if (miles < 0.2) return `${Math.round(m * 3.28084)} ft`;
+  if (miles < 10)  return `${miles.toFixed(1)} mi`;
+  return `${Math.round(miles)} mi`;
 }
 
 function checkProximity () {
@@ -1393,7 +1396,7 @@ function nearbyResponse () {
     .sort((a,b) => a.dist - b.dist)
     .slice(0, 5);
 
-  if (!nearby.length) return `No saved restaurants within 5km of your current location. Try adding some nearby spots! 🗺️`;
+  if (!nearby.length) return `No saved restaurants within 3 miles of your current location. Try adding some nearby spots! 🗺️`;
   const list = nearby.map(r =>
     `<span class="chip-link" data-id="${r.id}">${cuisineEmoji(r.cuisine)} ${r.name} (${fmtDist(r.dist)})</span>`
   ).join('');
@@ -1813,11 +1816,11 @@ async function discoverNearby () {
   document.getElementById('nearby-results').innerHTML = '<div class="nearby-loading">🐻 Sniffing out restaurants near you…</div>';
   try {
     const { userLat: lat, userLng: lng } = state;
-    const query = `[out:json][timeout:15];(node["amenity"="restaurant"](around:1000,${lat},${lng});way["amenity"="restaurant"](around:1000,${lat},${lng}););out center 20;`;
+    const query = `[out:json][timeout:15];(node["amenity"="restaurant"](around:1609,${lat},${lng});way["amenity"="restaurant"](around:1609,${lat},${lng}););out center 20;`;
     const res  = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:query });
     const data = await res.json();
     const els  = (data.elements || []).slice(0, 20);
-    if (!els.length) { document.getElementById('nearby-results').innerHTML = '<div class="nearby-empty">No restaurants found within 1 km. Try a different area!</div>'; return; }
+    if (!els.length) { document.getElementById('nearby-results').innerHTML = '<div class="nearby-empty">No restaurants found within 1 mile. Try a different area!</div>'; return; }
     const html = els.map(el => {
       const tags = el.tags || {};
       const elLat = el.lat ?? el.center?.lat, elLon = el.lon ?? el.center?.lon;

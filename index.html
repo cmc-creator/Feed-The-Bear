@@ -756,7 +756,7 @@
         <h2>🍽️ Discover Nearby</h2>
         <button id="nearby-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
-      <p style="font-size:.83rem;color:var(--text-dim);margin:0 0 12px">Real restaurants within 1 km — powered by OpenStreetMap. One tap to add any to your list!</p>
+      <p style="font-size:.83rem;color:var(--text-dim);margin:0 0 12px">Real restaurants nearby — powered by OpenStreetMap. One tap to add any to your list!</p>
       <div id="nearby-results" class="nearby-results"></div>
     </div>
   </div>
@@ -1032,10 +1032,11 @@
       <p class="discover-subtitle">Nearby restaurants you <strong>haven't saved yet</strong>, ranked by your taste profile.</p>
       <div style="display:flex;gap:8px;margin-bottom:12px">
         <select id="discover-radius" class="form-select" style="flex:1">
-          <option value="500">Within 500m</option>
-          <option value="1000" selected>Within 1km</option>
-          <option value="2000">Within 2km</option>
-          <option value="5000">Within 5km</option>
+          <option value="402">Within 0.25 mi</option>
+          <option value="805">Within 0.5 mi</option>
+          <option value="1609" selected>Within 1 mi</option>
+          <option value="3219">Within 2 mi</option>
+          <option value="8047">Within 5 mi</option>
         </select>
         <button id="discover-search-btn" class="btn-sm btn-orange">🔍 Search</button>
       </div>
@@ -1371,10 +1372,11 @@
         <div class="open-now-time-row">
           <span id="open-now-time" style="font-size:.82rem;color:var(--text-dim)"></span>
           <select id="open-now-radius" class="form-input" style="width:auto;padding:4px 8px">
-            <option value="500">500 m</option>
-            <option value="1000" selected>1 km</option>
-            <option value="2000">2 km</option>
-            <option value="5000">5 km</option>
+            <option value="402">0.25 mi</option>
+            <option value="805">0.5 mi</option>
+            <option value="1609" selected>1 mi</option>
+            <option value="3219">2 mi</option>
+            <option value="8047">5 mi</option>
           </select>
           <button id="open-now-search-btn" class="btn-primary">Search</button>
         </div>
