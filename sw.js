@@ -3,7 +3,7 @@
    Offline-first cache strategy
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-const CACHE  = 'ftb-v28';
+const CACHE  = 'ftb-v29';
 const ASSETS = [
   './',
   './index.html',
@@ -33,11 +33,38 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Network-first for Nominatim geocoding; cache-first for everything else
-  if (e.request.url.includes('nominatim.openstreetmap.org')) {
-    e.respondWith(fetch(e.request).catch(() => new Response('[]', { headers: { 'Content-Type': 'application/json' } })));
+  const url = e.request.url;
+
+  // Always bypass SW for API routes and external APIs
+  if (url.includes('/api/') ||
+      url.includes('overpass-api.de') ||
+      url.includes('nominatim.openstreetmap.org') ||
+      url.includes('firestore.googleapis.com') ||
+      url.includes('identitytoolkit.googleapis.com') ||
+      url.includes('securetoken.googleapis.com')) {
+    e.respondWith(fetch(e.request).catch(() => new Response('', { status: 503 })));
     return;
   }
+
+  // Network-first for our own app files (JS, HTML, CSS) so updates always land
+  const isAppFile = url.includes(self.location.origin) &&
+    (url.endsWith('.js') || url.endsWith('.html') || url.endsWith('.css') ||
+     url.endsWith('.json') || url.endsWith('.svg') || url === self.location.origin + '/');
+
+  if (isAppFile) {
+    e.respondWith(
+      fetch(e.request).then(resp => {
+        if (resp.ok) {
+          const clone = resp.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return resp;
+      }).catch(() => caches.match(e.request).then(cached => cached || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // Cache-first for third-party assets (fonts, Leaflet, etc.)
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request).then(resp => {
       if (resp.ok && e.request.method === 'GET') {
@@ -45,14 +72,7 @@ self.addEventListener('fetch', e => {
         caches.open(CACHE).then(c => c.put(e.request, clone));
       }
       return resp;
-    }).catch(() => {
-      // Only return the app shell for page navigations, not for JS/CSS/image assets.
-      // Returning HTML for a .js request causes a parse error and breaks the app.
-      if (e.request.mode === 'navigate') {
-        return caches.match('./index.html');
-      }
-      return new Response('/* offline */', { status: 503, headers: { 'Content-Type': 'application/javascript' } });
-    }))
+    }).catch(() => new Response('', { status: 503 })))
   );
 });
 
