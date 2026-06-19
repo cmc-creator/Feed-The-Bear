@@ -248,16 +248,12 @@ function saveUserProfile (profile) {
 function initUserProfile () {
   const profile = loadUserProfile();
   if (!profile) {
-    // Wait for onboarding to finish before showing profile setup
-    const tryShow = () => {
-      const ob = document.getElementById('onboarding-overlay');
-      if (ob && !ob.classList.contains('hidden')) {
-        setTimeout(tryShow, 1200);
-      } else {
-        openProfileSetup();
-      }
-    };
-    setTimeout(tryShow, 1000);
+    // Show full-screen signup immediately — suppress onboarding for new users
+    const ob = document.getElementById('onboarding-overlay');
+    if (ob) ob.classList.add('hidden');
+    state.settings.onboardingDone = true;
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+    openProfileSetup();
   } else {
     updateHeaderAvatar(profile.avatar);
   }
@@ -289,45 +285,86 @@ function openProfileSetup () {
   const overlay = document.getElementById('profile-setup-overlay');
   if (!overlay) return;
   overlay.classList.remove('hidden');
-  document.body.classList.add('overlay-open');
   let chosenAvatar = '🐻';
-  document.getElementById('setup-avatar-display').textContent = chosenAvatar;
+  const avatarDisplay = document.getElementById('setup-avatar-display');
+  if (avatarDisplay) avatarDisplay.textContent = chosenAvatar;
   buildAvatarGrid('avatar-emoji-grid', chosenAvatar, emoji => {
     chosenAvatar = emoji;
-    document.getElementById('setup-avatar-display').textContent = emoji;
+    const d = document.getElementById('setup-avatar-display');
+    if (d) d.textContent = emoji;
   });
-  document.getElementById('setup-name').focus();
-  document.getElementById('setup-save-btn').onclick = () => {
-    const name = document.getElementById('setup-name').value.trim() || 'Foodie';
+  const nameInput = document.getElementById('setup-name');
+  if (nameInput) nameInput.focus();
+
+  const doSave = () => {
+    const name = (document.getElementById('setup-name')?.value || '').trim() || 'Foodie';
     const profile = { name, avatar: chosenAvatar, joinDate: new Date().toISOString() };
     saveUserProfile(profile);
     updateHeaderAvatar(profile.avatar);
     overlay.classList.add('hidden');
-    maybeHideOverlay();
-    showToast(`Welcome, ${name}! 🐻`, 'Your profile is set. Now let\'s find some food!', 'success');
+    showToast(`Welcome, ${name}! 🐻`, 'Your account is set. Now let\'s find some food!', 'success');
+    // Show onboarding tour after signup
+    setTimeout(() => {
+      state.settings.onboardingDone = false;
+      showOnboarding();
+      state.settings.onboardingDone = false;
+    }, 600);
   };
+
+  const doSkip = () => {
+    const profile = { name: 'Foodie', avatar: '🐻', joinDate: new Date().toISOString() };
+    saveUserProfile(profile);
+    updateHeaderAvatar(profile.avatar);
+    overlay.classList.add('hidden');
+    showToast('Welcome! 🐻', 'You can set up your profile anytime via the account button.', 'info');
+  };
+
+  document.getElementById('setup-save-btn').onclick = doSave;
+  const skipBtn = document.getElementById('setup-skip-btn');
+  if (skipBtn) skipBtn.onclick = doSkip;
 }
 
 function openAccountModal () {
   const overlay = document.getElementById('account-overlay');
   if (!overlay) return;
   const profile = loadUserProfile() || { name: 'Foodie', avatar: '🐻', joinDate: new Date().toISOString() };
-  document.getElementById('account-avatar-display').textContent = profile.avatar || '🐻';
-  document.getElementById('account-name-display').textContent  = profile.name  || 'Foodie';
-  const joined = profile.joinDate ? new Date(profile.joinDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'recently';
-  document.getElementById('account-since-display').textContent = `Foodie since ${joined}`;
 
-  const all = state.restaurants;
-  const visited = all.filter(r => r.status === 'visited').length;
-  const wtt     = all.filter(r => r.status === 'want-to-try').length;
-  const avgRating = all.filter(r => r.myRating > 0).length
-    ? (all.reduce((s, r) => s + (r.myRating || 0), 0) / all.filter(r => r.myRating > 0).length).toFixed(1)
-    : '—';
-  document.getElementById('account-stats-row').innerHTML = `
-    <div class="account-stat"><span class="account-stat-val">${all.length}</span><span class="account-stat-label">Saved</span></div>
-    <div class="account-stat"><span class="account-stat-val">${visited}</span><span class="account-stat-label">Visited</span></div>
-    <div class="account-stat"><span class="account-stat-val">${avgRating}</span><span class="account-stat-label">Avg Rating</span></div>
-  `;
+  const avatarEl = document.getElementById('account-avatar-display');
+  const nameEl   = document.getElementById('account-name-display');
+  const sinceEl  = document.getElementById('account-since-display');
+  const statsEl  = document.getElementById('account-stats-row');
+
+  if (avatarEl) avatarEl.textContent = profile.avatar || '🐻';
+  if (nameEl)   nameEl.textContent   = profile.name   || 'Foodie';
+  if (sinceEl) {
+    const joined = profile.joinDate
+      ? new Date(profile.joinDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      : 'recently';
+    sinceEl.textContent = `Foodie since ${joined}`;
+  }
+
+  if (statsEl) {
+    const all       = state.restaurants;
+    const visited   = all.filter(r => r.status === 'visited').length;
+    const rated     = all.filter(r => r.myRating > 0);
+    const avgRating = rated.length
+      ? (rated.reduce((s, r) => s + (r.myRating || 0), 0) / rated.length).toFixed(1)
+      : '—';
+    const cuisines  = new Set(all.filter(r => r.cuisine).map(r => r.cuisine.toLowerCase())).size;
+    statsEl.innerHTML = `
+      <div class="account-stat"><span class="account-stat-val">${all.length}</span><span class="account-stat-label">Saved</span></div>
+      <div class="account-stat"><span class="account-stat-val">${visited}</span><span class="account-stat-label">Visited</span></div>
+      <div class="account-stat"><span class="account-stat-val">${avgRating}${avgRating !== '—' ? ' ★' : ''}</span><span class="account-stat-label">Avg Rating</span></div>
+    `;
+  }
+
+  // Wire portal action buttons (safe: use onclick to avoid stacking listeners)
+  const btn = id => document.getElementById(id);
+  const gotoAndClose = fn => { closeAccountModal(); setTimeout(fn, 150); };
+  if (btn('account-profile-link-btn'))  btn('account-profile-link-btn').onclick  = () => gotoAndClose(openFoodieProfile);
+  if (btn('account-review-link-btn'))   btn('account-review-link-btn').onclick   = () => gotoAndClose(openYearReview);
+  if (btn('account-ach-link-btn'))      btn('account-ach-link-btn').onclick      = () => gotoAndClose(openAchievements);
+  if (btn('account-export-link-btn'))   btn('account-export-link-btn').onclick   = () => gotoAndClose(openExport2);
 
   overlay.classList.remove('hidden');
   document.body.classList.add('overlay-open');
@@ -1881,11 +1918,11 @@ function initTheme () {
    ONBOARDING TOUR
    ════════════════════════════════════════════════════════════ */
 const ONBOARDING_STEPS = [
-  { icon: '🐻', title: 'Welcome to Feed The Bear', desc: 'Build your personal restaurant HQ: save spots, track visits, and keep every great find in one place.' },
-  { icon: '➕', title: 'Capture Places Instantly', desc: 'Add restaurants in seconds, or paste a Google Maps URL to auto-fill details and move faster.' },
+  { icon: '🐻', title: 'Welcome to Feed The Bear', desc: 'Build your personal restaurant HQ — save spots, track visits, and keep every great find in one place.' },
+  { icon: '➕', title: 'Capture Places Instantly', desc: 'Add restaurants in seconds, or paste a Google Maps URL to auto-fill details and save time.' },
   { icon: '🗺️', title: 'Discover Around You', desc: 'Use Map view and Nearby Discovery to find what\'s close now, then save your favorites with one tap.' },
   { icon: '📊', title: 'See Your Food Story', desc: 'Stats turns your history into insights: top cuisines, ratings, trends, and your best-performing picks.' },
-  { icon: '🐻', title: 'Let Byte Cub Curate', desc: 'Ask for smart recommendations, random picks, tag-based suggestions, and ready-to-share cards.' },
+  { icon: '🐻', title: 'Let Byte Cub Curate', desc: 'Ask for smart recommendations, random picks, tag-based suggestions, and beautiful shareable cards.' },
 ];
 let _onboardingStep = 0;
 function showOnboarding () {
@@ -3073,7 +3110,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Wire account/profile buttons
   document.getElementById('account-btn')?.addEventListener('click', openAccountModal);
   document.getElementById('account-close-btn')?.addEventListener('click', closeAccountModal);
-  document.getElementById('account-overlay')?.addEventListener('click', e => { if (e.target === document.getElementById('account-overlay')) closeAccountModal(); });
+  document.getElementById('account-overlay')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('account-overlay')) closeAccountModal();
+  });
   document.getElementById('account-edit-btn')?.addEventListener('click', openEditProfile);
   document.getElementById('edit-profile-close-btn')?.addEventListener('click', () => {
     document.getElementById('edit-profile-overlay').classList.add('hidden'); maybeHideOverlay();

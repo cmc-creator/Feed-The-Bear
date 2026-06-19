@@ -4040,3 +4040,172 @@ body.light-mode #profile-btn {
 .nearby-home-teaser-title { font-size: .88rem; font-weight: 700; color: var(--text); }
 .nearby-home-teaser-sub { font-size: .76rem; color: var(--text-dim); margin-top: 2px; }
 .nearby-home-teaser-btn { flex-shrink: 0; }
+
+/* ════════════════════════════════════════════════════════════
+   SIGNUP FULL-SCREEN PAGE (first-run account creation)
+   ════════════════════════════════════════════════════════════ */
+.signup-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 24px 20px;
+}
+.signup-fullscreen.hidden { display: none !important; }
+.signup-inner {
+  width: 100%;
+  max-width: 440px;
+  text-align: center;
+  animation: modal-in .3s ease;
+}
+.signup-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+.signup-brand-bear { font-size: 2.2rem; line-height: 1; }
+.signup-brand-name {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--primary);
+  letter-spacing: -.01em;
+}
+.signup-headline {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 10px;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+.signup-subline {
+  font-size: .9rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+  margin-bottom: 24px;
+  text-wrap: balance;
+}
+.signup-avatar-wrap {
+  margin-bottom: 20px;
+}
+.signup-avatar-big {
+  display: inline-block;
+  font-size: 5rem;
+  line-height: 1;
+  cursor: pointer;
+  filter: drop-shadow(0 4px 12px rgba(255,107,53,.4));
+  transition: transform .2s;
+}
+.signup-avatar-big:hover { transform: scale(1.08); }
+.signup-field {
+  text-align: left;
+  margin-bottom: 16px;
+}
+.signup-cta-btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 1rem;
+  margin-top: 20px;
+}
+.signup-skip-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: .82rem;
+  cursor: pointer;
+  padding: 10px;
+  font-family: var(--font);
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  transition: color .15s;
+}
+.signup-skip-btn:hover { color: var(--text); }
+.signup-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 24px;
+}
+.signup-feature-pill {
+  font-size: .75rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 12px;
+  color: var(--text-dim);
+}
+
+/* ════════════════════════════════════════════════════════════
+   ACCOUNT PORTAL (full dashboard modal)
+   ════════════════════════════════════════════════════════════ */
+.account-portal-card {
+  max-width: 420px;
+  padding: 0;
+  overflow: hidden;
+}
+.account-portal-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.account-portal-topbar-title {
+  font-size: .85rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.account-portal-hero {
+  text-align: center;
+  padding: 24px 20px 20px;
+  background: linear-gradient(180deg, rgba(255,107,53,.08) 0%, transparent 100%);
+  border-bottom: 1px solid var(--border);
+}
+.account-portal-actions {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0 16px;
+}
+.account-action-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 20px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: .92rem;
+  cursor: pointer;
+  transition: background .12s;
+  text-align: left;
+  width: 100%;
+}
+.account-action-row:hover { background: var(--surface2); }
+.aar-icon { font-size: 1.2rem; width: 28px; text-align: center; flex-shrink: 0; }
+.aar-label { flex: 1; font-weight: 500; }
+.aar-chevron {
+  color: var(--text-dim);
+  font-size: 1.1rem;
+  font-weight: 300;
+  margin-left: auto;
+}
+
+/* ════════════════════════════════════════════════════════════
+   TEXT ORPHAN PREVENTION
+   ════════════════════════════════════════════════════════════ */
+.onboarding-card p { text-wrap: balance; }
+.onboarding-card h2 { text-wrap: balance; }
+.setup-sub { text-wrap: balance; }
+.pwa-banner-text { text-wrap: balance; }
+.quick-add-desc, .discover-item-meta, .nearby-home-card-meta { text-wrap: balance; }

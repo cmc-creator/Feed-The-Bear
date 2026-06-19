@@ -24,36 +24,64 @@
 </head>
 <body>
 
-  <!-- ── Profile Setup (first run) ──────────────────────────── -->
-  <div id="profile-setup-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="setup-title">
-    <div class="modal-card profile-setup-card">
-      <div class="setup-top">
-        <span id="setup-avatar-display" class="setup-avatar-display">🐻</span>
-        <h2 id="setup-title">Welcome to Feed The Bear!</h2>
-        <p class="setup-sub">Set up your foodie profile to get started.</p>
+  <!-- ── Signup / Create Account (first-run full-screen page) ── -->
+  <div id="profile-setup-overlay" class="signup-fullscreen hidden" role="dialog" aria-modal="true" aria-label="Create your account">
+    <div class="signup-inner">
+      <div class="signup-brand-row">
+        <span class="signup-brand-bear">🐻</span>
+        <span class="signup-brand-name">Feed The Bear</span>
       </div>
-      <div style="padding:0 20px 24px">
+      <h1 class="signup-headline">Create your account</h1>
+      <p class="signup-subline">Your personal restaurant HQ — save spots, discover gems, track every great meal.</p>
+      <div class="signup-avatar-wrap">
+        <span id="setup-avatar-display" class="signup-avatar-big">🐻</span>
+      </div>
+      <div class="signup-field">
         <label class="form-label">Your name</label>
         <input id="setup-name" class="form-input" type="text" placeholder="e.g. Alex" maxlength="30" autocomplete="name" />
-        <label class="form-label" style="margin-top:16px;margin-bottom:8px;display:block">Pick your avatar</label>
-        <div class="avatar-emoji-grid" id="avatar-emoji-grid"></div>
-        <button id="setup-save-btn" class="btn-primary" style="width:100%;margin-top:20px">Let's Eat! 🐻</button>
+      </div>
+      <label class="form-label" style="margin-bottom:8px;display:block">Choose your avatar</label>
+      <div class="avatar-emoji-grid" id="avatar-emoji-grid"></div>
+      <button id="setup-save-btn" class="btn-primary signup-cta-btn">Create Account 🐻</button>
+      <button id="setup-skip-btn" class="signup-skip-btn">Skip for now →</button>
+      <div class="signup-features">
+        <span class="signup-feature-pill">📍 Nearby discovery</span>
+        <span class="signup-feature-pill">🗺️ Map view</span>
+        <span class="signup-feature-pill">🐻 Byte Cub AI</span>
+        <span class="signup-feature-pill">📊 Food stats</span>
       </div>
     </div>
   </div>
 
-  <!-- ── Account Panel ─────────────────────────────────────── -->
+  <!-- ── Account Portal ─────────────────────────────────────── -->
   <div id="account-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="account-title">
-    <div class="modal-card account-card">
-      <div class="account-hero">
+    <div class="modal-card account-portal-card">
+      <div class="account-portal-topbar">
+        <span class="account-portal-topbar-title">My Account</span>
+        <button id="account-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="account-portal-hero">
         <div id="account-avatar-display" class="account-avatar-display">🐻</div>
         <h2 id="account-name-display" class="account-name-display">Foodie</h2>
-        <div id="account-since-display" class="account-since-display">Member since today</div>
+        <div id="account-since-display" class="account-since-display">Foodie since today</div>
       </div>
       <div id="account-stats-row" class="account-stats-row"></div>
-      <div style="padding:0 20px 24px;display:flex;flex-direction:column;gap:10px">
-        <button id="account-edit-btn" class="btn-secondary">✏️ Edit Profile</button>
-        <button id="account-close-btn" class="btn-ghost">Close</button>
+      <div class="account-portal-actions">
+        <button class="account-action-row" id="account-edit-btn">
+          <span class="aar-icon">✏️</span><span class="aar-label">Edit Profile</span><span class="aar-chevron">›</span>
+        </button>
+        <button class="account-action-row" id="account-profile-link-btn">
+          <span class="aar-icon">👤</span><span class="aar-label">My Foodie Profile</span><span class="aar-chevron">›</span>
+        </button>
+        <button class="account-action-row" id="account-review-link-btn">
+          <span class="aar-icon">📅</span><span class="aar-label">Year in Review</span><span class="aar-chevron">›</span>
+        </button>
+        <button class="account-action-row" id="account-ach-link-btn">
+          <span class="aar-icon">🏆</span><span class="aar-label">Achievements &amp; XP</span><span class="aar-chevron">›</span>
+        </button>
+        <button class="account-action-row" id="account-export-link-btn">
+          <span class="aar-icon">📤</span><span class="aar-label">Export My Data</span><span class="aar-chevron">›</span>
+        </button>
       </div>
     </div>
   </div>
