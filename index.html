@@ -352,6 +352,27 @@
       </div>
     </div>
 
+    <!-- ── Home Discovery: Near You + AI Rec ─────────── -->
+    <section id="home-discovery" class="home-discovery hidden" aria-label="Restaurants near you">
+      <!-- AI Recommendation Banner -->
+      <div id="ai-rec-banner" class="ai-rec-banner hidden">
+        <div class="ai-rec-icon">✨</div>
+        <div class="ai-rec-body">
+          <div class="ai-rec-label">Byte Cub's Pick For You</div>
+          <div id="ai-rec-text" class="ai-rec-text">Thinking…</div>
+        </div>
+        <button id="ai-rec-refresh-btn" class="ai-rec-refresh" title="Refresh recommendation">↻</button>
+      </div>
+      <!-- Nearby strip -->
+      <div class="nearby-home-header">
+        <span class="nearby-home-title">📍 Near You Now</span>
+        <button id="nearby-home-more-btn" class="btn-ghost btn-sm">See all →</button>
+      </div>
+      <div id="nearby-home-list" class="nearby-home-list">
+        <div class="nearby-home-loading">🐻 Sniffing out restaurants near you…</div>
+      </div>
+    </section>
+
     <!-- Restaurant grid -->
     <div id="restaurant-grid" class="restaurant-grid"></div>
 

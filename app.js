@@ -256,8 +256,10 @@ function enableLocation () {
         Notification.requestPermission();
       }
       startWatching();
+      // Load home discovery strip + AI rec
+      loadHomeDiscovery();
       // Auto-open nearby discovery so the user sees restaurants right away
-      setTimeout(() => discoverNearby(), 250);
+      setTimeout(() => discoverNearby(), 300);
     },
     err => {
       showToast('Location Error', err.message || 'Unable to get location.', 'error');
@@ -2907,6 +2909,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hideBanner('location-banner');
         startWatching();
         renderCards();
+        loadHomeDiscovery();
       },
       () => {
         // Permission revoked or unavailable — clear persisted flag so banner shows again
@@ -2928,6 +2931,15 @@ document.addEventListener('DOMContentLoaded', () => {
   handleWebShareTarget();
   // Post-render: add compare checkboxes if mode was active
   if (_compareMode) addCompareCheckboxes();
+  // Wire home discovery buttons
+  document.getElementById('nearby-home-more-btn')?.addEventListener('click', openDiscover);
+  document.getElementById('ai-rec-refresh-btn')?.addEventListener('click', () => {
+    const cacheKey = 'ftb_airec_' + new Date().toDateString();
+    sessionStorage.removeItem(cacheKey);
+    const textEl = document.getElementById('ai-rec-text');
+    if (textEl) textEl.textContent = 'Thinking…';
+    if (_homeDiscCache) loadAiRec(_homeDiscCache);
+  });
 });
 /* ------------------------------------------------------------
    PHASE 5 • STREAK TRACKER
@@ -4847,6 +4859,122 @@ function openAddModalPreFilled (name, cuisine) {
     document.getElementById('form-name').value = name;
     if (cuisine) document.getElementById('form-cuisine').value = cuisine;
   }, 100);
+}
+
+/* ------------------------------------------------------------
+   HOME DISCOVERY — Near You Now strip + AI Rec banner
+   ------------------------------------------------------------ */
+let _homeDiscCache = null;
+let _homeDiscCacheTime = 0;
+const HOME_DISC_TTL = 15 * 60 * 1000; // 15 min
+
+async function loadHomeDiscovery () {
+  if (!state.userLat || !state.userLng) return;
+  const section = document.getElementById('home-discovery');
+  const list    = document.getElementById('nearby-home-list');
+  if (!section || !list) return;
+  section.classList.remove('hidden');
+
+  // Serve from cache if fresh
+  if (_homeDiscCache && Date.now() - _homeDiscCacheTime < HOME_DISC_TTL) {
+    renderHomeDiscovery(_homeDiscCache);
+    loadAiRec(_homeDiscCache);
+    return;
+  }
+
+  list.innerHTML = '<div class="nearby-home-loading">🐻 Sniffing out restaurants near you…</div>';
+  try {
+    const { userLat: lat, userLng: lng } = state;
+    const q = `[out:json][timeout:15];(node["amenity"~"restaurant|cafe|fast_food|bar"](around:1609,${lat},${lng}););out body 30;`;
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 12000);
+    const resp = await fetch('https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(q), { signal: ctrl.signal });
+    clearTimeout(t);
+    const json = await resp.json();
+    const raw = (json.elements || []).filter(el => el.tags?.name);
+    const withDist = raw.map(el => {
+      const elLat = el.lat ?? el.center?.lat;
+      const elLon = el.lon ?? el.center?.lon;
+      const d = (elLat != null && elLon != null) ? haversine(lat, lng, elLat, elLon) : Infinity;
+      return { ...el, _dist: d };
+    }).sort((a, b) => a._dist - b._dist).slice(0, 12);
+
+    _homeDiscCache = { elements: withDist, lat, lng };
+    _homeDiscCacheTime = Date.now();
+    renderHomeDiscovery(_homeDiscCache);
+    loadAiRec(_homeDiscCache);
+  } catch {
+    list.innerHTML = '<div class="nearby-home-loading">Could not load nearby restaurants — check your connection.</div>';
+  }
+}
+
+function renderHomeDiscovery ({ elements }) {
+  const list = document.getElementById('nearby-home-list');
+  if (!list || !elements.length) {
+    if (list) list.innerHTML = '<div class="nearby-home-loading">No restaurants found within 1 mile.</div>';
+    return;
+  }
+  const savedNames = new Set(state.restaurants.map(r => normalizeName(r.name)));
+  list.innerHTML = elements.map(el => {
+    const tags    = el.tags || {};
+    const name    = tags.name || 'Unknown';
+    const isSaved = savedNames.has(normalizeName(name));
+    const cuisine = (tags.cuisine || '').split(';')[0];
+    const amenity = tags.amenity || 'restaurant';
+    const emoji   = cuisineEmoji(cuisine) || ({ restaurant:'🍽', cafe:'☕', fast_food:'🍟', bar:'🍺' }[amenity] || '🍽');
+    const dist    = el._dist < Infinity ? fmtDist(el._dist) : '';
+    const safe    = escHtml(name).replace(/'/g, "\\'");
+    const safeCu  = escHtml(cuisine).replace(/'/g, "\\'");
+    return `<div class="nearby-home-card${isSaved ? ' saved' : ''}">
+      <div class="nearby-home-card-emoji">${emoji}</div>
+      <div class="nearby-home-card-name" title="${escHtml(name)}">${escHtml(name)}</div>
+      ${cuisine ? `<div class="nearby-home-card-meta">${escHtml(cuisine)}</div>` : ''}
+      ${dist    ? `<div class="nearby-home-card-dist">📍 ${dist}</div>` : ''}
+      ${isSaved
+        ? '<div class="nearby-home-card-saved">✓ In your list</div>'
+        : `<button class="btn-sm btn-orange nearby-home-card-add" onclick="openAddModalPreFilled('${safe}','${safeCu}')">+ Save</button>`}
+    </div>`;
+  }).join('');
+}
+
+async function loadAiRec (discData) {
+  if (!window.AI || !AI.hasKey()) return;
+  const banner = document.getElementById('ai-rec-banner');
+  const textEl = document.getElementById('ai-rec-text');
+  if (!banner || !textEl) return;
+
+  // Cache per calendar day
+  const cacheKey = 'ftb_airec_' + new Date().toDateString();
+  const cached   = sessionStorage.getItem(cacheKey);
+  if (cached) { textEl.textContent = cached; banner.classList.remove('hidden'); return; }
+
+  banner.classList.remove('hidden');
+  textEl.textContent = 'Thinking…';
+  try {
+    const topSaved = state.restaurants
+      .filter(r => r.myRating >= 4)
+      .sort((a, b) => (b.myRating || 0) - (a.myRating || 0))
+      .slice(0, 5)
+      .map(r => `${r.name} (${r.cuisine || 'various'})`).join(', ');
+    const nearby = (discData.elements || []).slice(0, 5)
+      .map(el => `${el.tags?.name} (${(el.tags?.cuisine || el.tags?.amenity || 'restaurant').split(';')[0]})`).join(', ');
+    const cuisineCounts = {};
+    state.restaurants.filter(r => r.myRating >= 4 && r.cuisine).forEach(r => {
+      const c = r.cuisine.toLowerCase(); cuisineCounts[c] = (cuisineCounts[c] || 0) + 1;
+    });
+    const topCuisines = Object.entries(cuisineCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([c]) => c).join(', ');
+
+    const prompt = `You are Byte Cub, a fun foodie AI assistant. Give ONE enthusiastic sentence (max 25 words) recommending what to eat tonight. Use this info:
+- User's favourite cuisines: ${topCuisines || 'various'}
+- Their top saved restaurants: ${topSaved || 'none yet'}
+- Restaurants near them right now: ${nearby || 'various places'}
+Mention a specific place or cuisine name. Be warm and exciting.`;
+
+    const rec = await AI.call(prompt);
+    const clean = (rec || '').trim().split('\n')[0].replace(/^["']|["']$/g, '');
+    if (clean) { sessionStorage.setItem(cacheKey, clean); textEl.textContent = clean; }
+    else { banner.classList.add('hidden'); }
+  } catch { banner.classList.add('hidden'); }
 }
 
 /* ------------------------------------------------------------
