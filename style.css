@@ -4104,6 +4104,28 @@ body.light-mode #profile-btn {
   margin-bottom: 10px;
   line-height: 1;
 }
+.profile-photo-preview {
+  display: block;
+  width: 112px;
+  height: 112px;
+  margin: 0 auto 10px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid rgba(255,107,53,.35);
+}
+.profile-photo-row {
+  display: flex;
+  gap: 8px;
+}
+.profile-photo-row .btn-secondary,
+.profile-photo-row .btn-ghost {
+  flex: 1;
+}
+.profile-photo-hint {
+  margin-top: 6px;
+  font-size: .72rem;
+  color: var(--text-dim);
+}
 .setup-sub {
   font-size: .84rem;
   color: var(--text-dim);
@@ -4149,6 +4171,41 @@ body.light-mode #profile-btn {
   line-height: 1;
   margin-bottom: 10px;
   display: block;
+}
+.account-avatar-photo {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+.account-avatar-photo-lg {
+  width: 92px;
+  height: 92px;
+  margin: 0 auto;
+  border: 3px solid rgba(255,107,53,.35);
+}
+
+/* Theme accents */
+body[data-theme-accent='forest'] {
+  --primary: #27ae60;
+  --primary-dk: #1f8d4e;
+  --primary-lt: #48c97d;
+}
+body[data-theme-accent='ocean'] {
+  --primary: #2d8fd5;
+  --primary-dk: #246fa7;
+  --primary-lt: #59a8e0;
+}
+body[data-theme-accent='sunset'] {
+  --primary: #ef5b4f;
+  --primary-dk: #ce463c;
+  --primary-lt: #f27e74;
+}
+body[data-theme-accent='midnight'] {
+  --primary: #cfa93a;
+  --primary-dk: #a9872f;
+  --primary-lt: #dfbf63;
 }
 .account-name-display {
   font-size: 1.3rem;

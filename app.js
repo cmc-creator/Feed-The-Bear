@@ -239,6 +239,15 @@ function iso (offsetDays = 0) {
    USER PROFILE
    ════════════════════════════════════════════════════════════ */
 const AVATAR_OPTIONS = ['🐻','🍕','🌮','🍣','🍔','🥗','🍜','🍝','🥩','🦞','🍰','☕','🍖','🥐','🎯','⭐','🔥','🏆','🌟','🍦','🥞','🍟','🥑','🍱'];
+const PROFILE_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
+const THEME_PRESETS = {
+  dark:     { mode: 'dark',  accent: 'orange' },
+  light:    { mode: 'light', accent: 'orange' },
+  forest:   { mode: 'dark',  accent: 'forest' },
+  ocean:    { mode: 'dark',  accent: 'ocean' },
+  sunset:   { mode: 'light', accent: 'sunset' },
+  midnight: { mode: 'dark',  accent: 'midnight' },
+};
 
 function loadUserProfile () {
   try { return JSON.parse(localStorage.getItem(USER_KEY)) || null; } catch { return null; }
@@ -257,13 +266,59 @@ function initUserProfile () {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
     openProfileSetup();
   } else {
-    updateHeaderAvatar(profile.avatar);
+    updateProfileVisuals(profile);
   }
 }
 
 function updateHeaderAvatar (emoji) {
   const el = document.getElementById('header-avatar');
-  if (el) el.textContent = emoji || '🐻';
+  if (!el) return;
+  const profile = loadUserProfile() || {};
+  if (profile.photo) {
+    el.innerHTML = `<img src="${profile.photo}" alt="Profile" class="account-avatar-photo" />`;
+  } else {
+    el.textContent = emoji || profile.avatar || '🐻';
+  }
+}
+
+function updateProfileVisuals (profile = null) {
+  const p = profile || loadUserProfile() || { avatar: '🐻' };
+
+  const accountAvatar = document.getElementById('account-avatar-display');
+  if (accountAvatar) {
+    if (p.photo) {
+      accountAvatar.innerHTML = `<img src="${p.photo}" alt="Profile" class="account-avatar-photo account-avatar-photo-lg" />`;
+    } else {
+      accountAvatar.textContent = p.avatar || '🐻';
+    }
+  }
+
+  const editAvatar = document.getElementById('edit-avatar-display');
+  const editPreview = document.getElementById('edit-photo-preview');
+  if (editAvatar && editPreview) {
+    if (p.photo) {
+      editAvatar.classList.add('hidden');
+      editPreview.src = p.photo;
+      editPreview.classList.remove('hidden');
+    } else {
+      editPreview.classList.add('hidden');
+      editPreview.removeAttribute('src');
+      editAvatar.classList.remove('hidden');
+      editAvatar.textContent = p.avatar || '🐻';
+    }
+  }
+
+  updateHeaderAvatar(p.avatar || '🐻');
+}
+
+function applyThemeChoice (choice = 'dark') {
+  const preset = THEME_PRESETS[choice] || THEME_PRESETS.dark;
+  document.body.classList.toggle('light-mode', preset.mode === 'light');
+  document.body.dataset.themeAccent = preset.accent;
+  state.settings.theme = preset.mode;
+  state.settings.themeChoice = choice;
+  state.settings.themeManual = true;
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
 }
 
 function buildAvatarGrid (gridId, currentAvatar, onSelect) {
@@ -335,7 +390,13 @@ function openAccountModal () {
   const sinceEl  = document.getElementById('account-since-display');
   const statsEl  = document.getElementById('account-stats-row');
 
-  if (avatarEl) avatarEl.textContent = profile.avatar || '🐻';
+  if (avatarEl) {
+    if (profile.photo) {
+      avatarEl.innerHTML = `<img src="${profile.photo}" alt="Profile" class="account-avatar-photo account-avatar-photo-lg" />`;
+    } else {
+      avatarEl.textContent = profile.avatar || '🐻';
+    }
+  }
   if (nameEl)   nameEl.textContent   = profile.name   || 'Foodie';
   if (sinceEl) {
     const joined = profile.joinDate
@@ -388,19 +449,82 @@ function openEditProfile () {
   if (!overlay) return;
   const profile = loadUserProfile() || { name: 'Foodie', avatar: '🐻' };
   let chosenAvatar = profile.avatar || '🐻';
+  let chosenPhoto = profile.photo || '';
   document.getElementById('edit-name').value = profile.name || '';
-  document.getElementById('edit-avatar-display').textContent = chosenAvatar;
+  const themeSelect = document.getElementById('edit-theme-select');
+  if (themeSelect) {
+    themeSelect.value = state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark');
+  }
+
+  const setEditPhotoState = () => {
+    const avatarEl = document.getElementById('edit-avatar-display');
+    const previewEl = document.getElementById('edit-photo-preview');
+    if (!avatarEl || !previewEl) return;
+    if (chosenPhoto) {
+      avatarEl.classList.add('hidden');
+      previewEl.src = chosenPhoto;
+      previewEl.classList.remove('hidden');
+    } else {
+      previewEl.classList.add('hidden');
+      previewEl.removeAttribute('src');
+      avatarEl.classList.remove('hidden');
+      avatarEl.textContent = chosenAvatar;
+    }
+  };
+
+  setEditPhotoState();
+
   buildAvatarGrid('edit-avatar-grid', chosenAvatar, emoji => {
     chosenAvatar = emoji;
-    document.getElementById('edit-avatar-display').textContent = emoji;
+    if (!chosenPhoto) document.getElementById('edit-avatar-display').textContent = emoji;
   });
+
+  const photoInput = document.getElementById('edit-photo-input');
+  const photoUploadBtn = document.getElementById('edit-photo-upload-btn');
+  const photoRemoveBtn = document.getElementById('edit-photo-remove-btn');
+
+  if (photoUploadBtn && photoInput) {
+    photoUploadBtn.onclick = () => photoInput.click();
+  }
+  if (photoRemoveBtn) {
+    photoRemoveBtn.onclick = () => {
+      chosenPhoto = '';
+      if (photoInput) photoInput.value = '';
+      setEditPhotoState();
+    };
+  }
+  if (photoInput) {
+    photoInput.onchange = async e => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        showToast('Invalid file', 'Please select an image file.', 'error');
+        return;
+      }
+      if (file.size > PROFILE_PHOTO_MAX_BYTES) {
+        showToast('Photo too large', 'Please choose an image under 2 MB.', 'error');
+        return;
+      }
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      chosenPhoto = String(dataUrl);
+      setEditPhotoState();
+    };
+  }
+
   overlay.classList.remove('hidden');
   document.body.classList.add('overlay-open');
   document.getElementById('edit-profile-save-btn').onclick = () => {
     const name = document.getElementById('edit-name').value.trim() || profile.name || 'Foodie';
-    const updated = { ...profile, name, avatar: chosenAvatar };
+    const themeChoice = document.getElementById('edit-theme-select')?.value || (state.settings.themeChoice || 'dark');
+    const updated = { ...profile, name, avatar: chosenAvatar, photo: chosenPhoto || '' };
     saveUserProfile(updated);
-    updateHeaderAvatar(updated.avatar);
+    updateProfileVisuals(updated);
+    applyThemeChoice(themeChoice);
     overlay.classList.add('hidden');
     maybeHideOverlay();
     showToast('Profile updated!', '', 'success');
@@ -1916,12 +2040,11 @@ function initPwa () {
    LIGHT / DARK THEME TOGGLE
    ════════════════════════════════════════════════════════════ */
 function initTheme () {
-  if (state.settings.theme === 'light') document.body.classList.add('light-mode');
+  const initialChoice = state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark');
+  applyThemeChoice(initialChoice);
   document.getElementById('theme-toggle-btn').addEventListener('click', () => {
-    const light = document.body.classList.toggle('light-mode');
-    state.settings.theme = light ? 'light' : 'dark';
-    state.settings.themeManual = true; // user overrode auto-theme
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+    const light = document.body.classList.contains('light-mode');
+    applyThemeChoice(light ? 'dark' : 'light');
   });
 }
 
@@ -2477,6 +2600,9 @@ function updateTagSuggestions () {
    EVENT LISTENERS
    ════════════════════════════════════════════════════════════ */
 function setupEvents () {
+  const safeFn = (name, fallback = () => {}) =>
+    (typeof globalThis[name] === 'function' ? globalThis[name] : fallback);
+
   // Nav buttons
   document.getElementById('main-nav').addEventListener('click', e => {
     const btn = e.target.closest('.nav-btn');
@@ -3195,38 +3321,38 @@ function setupEvents () {
   });
 
   // Phase 12 — Daily Challenge
-  document.getElementById('dailychallenge-close-btn').addEventListener('click', closeDailyChallenge);
-  document.getElementById('dailychallenge-overlay').addEventListener('click', e => { if (e.target === document.getElementById('dailychallenge-overlay')) closeDailyChallenge(); });
-  document.getElementById('dc-complete-btn').addEventListener('click', completeDailyChallenge);
-  document.getElementById('dc-skip-btn').addEventListener('click', skipDailyChallenge);
+  document.getElementById('dailychallenge-close-btn').addEventListener('click', safeFn('closeDailyChallenge'));
+  document.getElementById('dailychallenge-overlay').addEventListener('click', e => { if (e.target === document.getElementById('dailychallenge-overlay')) safeFn('closeDailyChallenge')(); });
+  document.getElementById('dc-complete-btn').addEventListener('click', safeFn('completeDailyChallenge'));
+  document.getElementById('dc-skip-btn').addEventListener('click', safeFn('skipDailyChallenge'));
 
   // Phase 13 — Visit Log
-  document.getElementById('visitlog-close-btn').addEventListener('click', closeVisitLog);
-  document.getElementById('visitlog-overlay').addEventListener('click', e => { if (e.target === document.getElementById('visitlog-overlay')) closeVisitLog(); });
-  document.getElementById('visitlog-load-btn').addEventListener('click', _loadVisitLogEntries);
-  document.getElementById('vl-save-btn').addEventListener('click', _saveVisitLogEntry);
+  document.getElementById('visitlog-close-btn').addEventListener('click', safeFn('closeVisitLog'));
+  document.getElementById('visitlog-overlay').addEventListener('click', e => { if (e.target === document.getElementById('visitlog-overlay')) safeFn('closeVisitLog')(); });
+  document.getElementById('visitlog-load-btn').addEventListener('click', safeFn('_loadVisitLogEntries'));
+  document.getElementById('vl-save-btn').addEventListener('click', safeFn('_saveVisitLogEntry'));
   document.getElementById('vl-star-row').addEventListener('click', e => {
     const btn = e.target.closest('.vl-star');
-    if (btn) _setVlStars(parseInt(btn.dataset.val));
+    if (btn) safeFn('_setVlStars')(parseInt(btn.dataset.val));
   });
 
   // Phase 13 — Spend Tracker
-  document.getElementById('spend-close-btn').addEventListener('click', closeSpendTracker);
-  document.getElementById('spend-overlay').addEventListener('click', e => { if (e.target === document.getElementById('spend-overlay')) closeSpendTracker(); });
+  document.getElementById('spend-close-btn').addEventListener('click', safeFn('closeSpendTracker'));
+  document.getElementById('spend-overlay').addEventListener('click', e => { if (e.target === document.getElementById('spend-overlay')) safeFn('closeSpendTracker')(); });
 
   // Phase 13 — Been a While
-  document.getElementById('beenawhile-close-btn').addEventListener('click', closeBeenaWhile);
-  document.getElementById('beenawhile-overlay').addEventListener('click', e => { if (e.target === document.getElementById('beenawhile-overlay')) closeBeenaWhile(); });
+  document.getElementById('beenawhile-close-btn').addEventListener('click', safeFn('closeBeenaWhile'));
+  document.getElementById('beenawhile-overlay').addEventListener('click', e => { if (e.target === document.getElementById('beenawhile-overlay')) safeFn('closeBeenaWhile')(); });
 
   // Phase 13 — Meal Planner
-  document.getElementById('mealplanner-close-btn').addEventListener('click', closeMealPlanner);
-  document.getElementById('mealplanner-overlay').addEventListener('click', e => { if (e.target === document.getElementById('mealplanner-overlay')) closeMealPlanner(); });
-  document.getElementById('mp-generate-btn').addEventListener('click', generateMealPlan);
+  document.getElementById('mealplanner-close-btn').addEventListener('click', safeFn('closeMealPlanner'));
+  document.getElementById('mealplanner-overlay').addEventListener('click', e => { if (e.target === document.getElementById('mealplanner-overlay')) safeFn('closeMealPlanner')(); });
+  document.getElementById('mp-generate-btn').addEventListener('click', safeFn('generateMealPlan'));
 
   // Phase 13 — Group Vote
-  document.getElementById('groupvote-close-btn').addEventListener('click', closeGroupVote);
-  document.getElementById('groupvote-overlay').addEventListener('click', e => { if (e.target === document.getElementById('groupvote-overlay')) closeGroupVote(); });
-  document.getElementById('groupvote-generate-btn').addEventListener('click', _generateVoteLink);
+  document.getElementById('groupvote-close-btn').addEventListener('click', safeFn('closeGroupVote'));
+  document.getElementById('groupvote-overlay').addEventListener('click', e => { if (e.target === document.getElementById('groupvote-overlay')) safeFn('closeGroupVote')(); });
+  document.getElementById('groupvote-generate-btn').addEventListener('click', safeFn('_generateVoteLink'));
   document.getElementById('groupvote-copy-btn').addEventListener('click', () => {
     const val = document.getElementById('groupvote-link-input').value;
     navigator.clipboard?.writeText(val);
@@ -3239,27 +3365,27 @@ function setupEvents () {
   });
 
   // Phase 13 — World Map
-  document.getElementById('worldmap-close-btn').addEventListener('click', closeWorldMap);
-  document.getElementById('worldmap-overlay').addEventListener('click', e => { if (e.target === document.getElementById('worldmap-overlay')) closeWorldMap(); });
+  document.getElementById('worldmap-close-btn').addEventListener('click', safeFn('closeWorldMap'));
+  document.getElementById('worldmap-overlay').addEventListener('click', e => { if (e.target === document.getElementById('worldmap-overlay')) safeFn('closeWorldMap')(); });
   document.getElementById('worldmap-share-btn').addEventListener('click', () => {
-    const { countries, cuisineVisits } = _getVisitedCountries();
+    const { countries, cuisineVisits } = safeFn('_getVisitedCountries', () => ({ countries: new Set(), cuisineVisits: {} }))();
     const txt = `🌍 I've tasted ${countries.size} countries & ${Object.keys(cuisineVisits).length} cuisines! #FeedTheBear`;
     if (navigator.share) navigator.share({ title: 'My Food World Map', text: txt });
     else { navigator.clipboard?.writeText(txt); showToast('Copied!', 'Map summary copied.', 'success'); }
   });
 
   // Phase 13 — Passport
-  document.getElementById('passport-close-btn').addEventListener('click', closePassport);
-  document.getElementById('passport-overlay').addEventListener('click', e => { if (e.target === document.getElementById('passport-overlay')) closePassport(); });
+  document.getElementById('passport-close-btn').addEventListener('click', safeFn('closePassport'));
+  document.getElementById('passport-overlay').addEventListener('click', e => { if (e.target === document.getElementById('passport-overlay')) safeFn('closePassport')(); });
 
   // Phase 14 — Feed the Bear Game
-  document.getElementById('feedbear-close-btn').addEventListener('click', closeFeedBearGame);
-  document.getElementById('feedbear-overlay').addEventListener('click', e => { if (e.target === document.getElementById('feedbear-overlay')) closeFeedBearGame(); });
-  document.getElementById('feedbear-canvas').addEventListener('click', _ftbHandleCanvasTap);
-  document.getElementById('feedbear-canvas').addEventListener('touchstart', _ftbHandleTouch, { passive: false });
-  document.getElementById('feedbear-canvas').addEventListener('touchmove', _ftbHandleTouch, { passive: false });
-  document.addEventListener('keydown', _ftbHandleKey);
-  document.addEventListener('keyup',   _ftbHandleKey);
+  document.getElementById('feedbear-close-btn').addEventListener('click', safeFn('closeFeedBearGame'));
+  document.getElementById('feedbear-overlay').addEventListener('click', e => { if (e.target === document.getElementById('feedbear-overlay')) safeFn('closeFeedBearGame')(); });
+  document.getElementById('feedbear-canvas').addEventListener('click', safeFn('_ftbHandleCanvasTap'));
+  document.getElementById('feedbear-canvas').addEventListener('touchstart', safeFn('_ftbHandleTouch'), { passive: false });
+  document.getElementById('feedbear-canvas').addEventListener('touchmove', safeFn('_ftbHandleTouch'), { passive: false });
+  document.addEventListener('keydown', safeFn('_ftbHandleKey'));
+  document.addEventListener('keyup',   safeFn('_ftbHandleKey'));
 
   // Phase 11 — Weekly Goal
   const wgBtn = document.getElementById('wg-set-btn');
@@ -3801,6 +3927,7 @@ function initAutoTheme () {
   const apply = (isLight) => {
     if (state.settings.themeManual) return; // user overrode - respect their choice
     document.body.classList.toggle('light-mode', isLight);
+    document.body.dataset.themeAccent = 'orange';
     const btn = document.getElementById('theme-toggle-btn');
     if (btn) {
       btn.querySelector('.icon-moon')?.style && (btn.querySelector('.icon-moon').style.display = isLight ? '' : 'none');
@@ -7636,6 +7763,7 @@ function _renderMoodCal () {
   gridEl2._visitMap = visitMap;
   gridEl2._monthName = monthName;
   document.getElementById('moodcal-detail').classList.add('hidden');
+}
 
 /* ═══════════════════════════════════════════════════════════
    PHASE 12 — Feature: 🔥 DAILY FOODIE CHALLENGE
@@ -8690,7 +8818,5 @@ function _ftbHandleTouch(e) {
     const cx = (t.clientX - rect.left) * (g.canvas.width / rect.width);
     g.touchTargetX = Math.max(g.bear.w / 2, Math.min(g.canvas.width - g.bear.w / 2, cx));
   }
-}
-
 }
 

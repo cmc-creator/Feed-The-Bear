@@ -112,11 +112,28 @@
       <div style="padding:16px 20px 24px">
         <div style="text-align:center;margin-bottom:16px">
           <span id="edit-avatar-display" class="setup-avatar-display">🐻</span>
+          <img id="edit-photo-preview" class="profile-photo-preview hidden" alt="Profile photo preview" />
         </div>
         <label class="form-label">Your name</label>
         <input id="edit-name" class="form-input" type="text" placeholder="Your name" maxlength="30" />
         <label class="form-label" style="margin-top:16px;margin-bottom:8px;display:block">Avatar</label>
         <div class="avatar-emoji-grid" id="edit-avatar-grid"></div>
+        <label class="form-label" style="margin-top:16px;margin-bottom:8px;display:block">Profile photo</label>
+        <div class="profile-photo-row">
+          <input id="edit-photo-input" type="file" accept="image/*" class="hidden" />
+          <button id="edit-photo-upload-btn" type="button" class="btn-secondary">Upload Photo</button>
+          <button id="edit-photo-remove-btn" type="button" class="btn-ghost">Remove Photo</button>
+        </div>
+        <p class="profile-photo-hint">JPG/PNG/WebP up to 2 MB. Stored securely on this device.</p>
+        <label class="form-label" style="margin-top:14px;margin-bottom:8px;display:block">App theme</label>
+        <select id="edit-theme-select" class="form-select">
+          <option value="dark">Dark Ember</option>
+          <option value="light">Light Cream</option>
+          <option value="forest">Forest Mint</option>
+          <option value="ocean">Ocean Blue</option>
+          <option value="sunset">Sunset Coral</option>
+          <option value="midnight">Midnight Gold</option>
+        </select>
         <button id="edit-profile-save-btn" class="btn-primary" style="width:100%;margin-top:20px">Save Changes</button>
       </div>
     </div>
