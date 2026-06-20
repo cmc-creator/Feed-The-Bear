@@ -8692,3 +8692,5 @@ function _ftbHandleTouch(e) {
   }
 }
 
+}
+
