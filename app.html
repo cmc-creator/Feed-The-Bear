@@ -81,6 +81,9 @@
         <button class="account-action-row" id="account-personalize-btn">
           <span class="aar-icon">🎨</span><span class="aar-label">Themes &amp; Personalize</span><span class="aar-chevron">›</span>
         </button>
+        <button class="account-action-row" id="account-dishes-link-btn">
+          <span class="aar-icon">🍽️</span><span class="aar-label">Top Dishes Leaderboard</span><span class="aar-chevron">›</span>
+        </button>
         <button class="account-action-row" id="account-profile-link-btn">
           <span class="aar-icon">👤</span><span class="aar-label">My Foodie Profile</span><span class="aar-chevron">›</span>
         </button>
@@ -600,6 +603,22 @@
         </div>
         <div id="for-you-home-list" class="for-you-home-list"></div>
       </div>
+      <div id="week-recap-home" class="week-recap-home hidden">
+        <div class="week-recap-title">📈 Your Week So Far</div>
+        <div id="week-recap-text" class="week-recap-text"></div>
+      </div>
+      <div id="mood-picks-home" class="mood-picks-home hidden">
+        <div class="mood-picks-home-header">
+          <span class="mood-picks-home-title">🎯 Mood Picks</span>
+        </div>
+        <div id="mood-picks-chips" class="mood-picks-chips">
+          <button class="home-mood-chip active" data-mood="quick" type="button">⚡ Quick</button>
+          <button class="home-mood-chip" data-mood="date" type="button">💫 Date</button>
+          <button class="home-mood-chip" data-mood="comfort" type="button">🛋️ Comfort</button>
+          <button class="home-mood-chip" data-mood="healthy" type="button">🥗 Light</button>
+        </div>
+        <div id="mood-picks-list" class="mood-picks-list"></div>
+      </div>
       <!-- Nearby strip -->
       <div class="nearby-home-header">
         <span class="nearby-home-title">📍 Near You Now</span>
@@ -671,6 +690,18 @@
       </div>
       <button id="challenge-share-btn" class="btn-primary" style="width:100%;margin-top:12px">📤 Share Challenge</button>
       <div class="challenge-footer">Challenge links encode your top 5 rated restaurants — no account needed.</div>
+    </div>
+  </div>
+
+  <!-- ── Top Dishes Leaderboard ───────────────────────────── -->
+  <div id="dish-board-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="dish-board-title">
+    <div class="modal-card dish-board-card">
+      <div class="modal-header">
+        <h2 id="dish-board-title">🍽️ Top Dishes Leaderboard</h2>
+        <button id="dish-board-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="dish-board-subtitle">Your best dishes ranked from ratings + reactions + favorites.</p>
+      <div id="dish-board-list" class="dish-board-list"></div>
     </div>
   </div>
 

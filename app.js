@@ -452,6 +452,7 @@ function openAccountModal () {
   const btn = id => document.getElementById(id);
   const gotoAndClose = fn => { closeAccountModal(); setTimeout(fn, 150); };
   if (btn('account-personalize-btn'))  btn('account-personalize-btn').onclick  = () => gotoAndClose(openPersonalizeSettings);
+  if (btn('account-dishes-link-btn'))  btn('account-dishes-link-btn').onclick  = () => gotoAndClose(openDishLeaderboard);
   if (btn('account-profile-link-btn'))  btn('account-profile-link-btn').onclick  = () => gotoAndClose(openFoodieProfile);
   if (btn('account-review-link-btn'))   btn('account-review-link-btn').onclick   = () => gotoAndClose(() => (typeof requiresPremium === 'function' ? requiresPremium('Year in Review 📅', openYearReview) : openYearReview()));
   if (btn('account-ach-link-btn'))      btn('account-ach-link-btn').onclick      = () => gotoAndClose(() => (typeof requiresPremium === 'function' ? requiresPremium('Achievements 🏆', openAchievements) : openAchievements()));
@@ -1661,6 +1662,8 @@ function renderAll () {
   updateLocationBanner();
   renderWeeklyGoal();
   renderForYouHome();
+  renderWeeklyRecapHome();
+  renderMoodPicksHome();
 }
 
 function updateLocationBanner () {
@@ -3595,6 +3598,13 @@ document.addEventListener('DOMContentLoaded', () => {
     _forYouSeed = Date.now();
     renderForYouHome();
   });
+  document.getElementById('mood-picks-chips')?.addEventListener('click', e => {
+    const chip = e.target.closest('.home-mood-chip[data-mood]');
+    if (!chip) return;
+    document.querySelectorAll('.home-mood-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    renderMoodPicksHome(chip.dataset.mood || 'quick');
+  });
   // Wire account/profile buttons
   document.getElementById('account-btn')?.addEventListener('click', openAccountModal);
   document.getElementById('account-close-btn')?.addEventListener('click', closeAccountModal);
@@ -3619,6 +3629,10 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('personalize-overlay').classList.add('hidden');
       maybeHideOverlay();
     }
+  });
+  document.getElementById('dish-board-close-btn')?.addEventListener('click', closeDishLeaderboard);
+  document.getElementById('dish-board-overlay')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('dish-board-overlay')) closeDishLeaderboard();
   });
   // Init user profile (shows setup on first run)
   initUserProfile();
@@ -5630,6 +5644,186 @@ let _homeDiscCacheTime = 0;
 const HOME_DISC_TTL = 15 * 60 * 1000; // 15 min
 let _forYouSeed = Date.now();
 
+function getWeekStartIso () {
+  const now = new Date();
+  const start = new Date(now);
+  start.setDate(now.getDate() - now.getDay());
+  return start.toISOString().slice(0, 10);
+}
+
+function scoreMoodPick (r, mood) {
+  const cuisine = String(r.cuisine || '').toLowerCase();
+  let s = Math.random() * 0.25;
+  s += (r.myRating || 0) * 1.5;
+  s += r.isFavorite ? 1.6 : 0;
+  s += r.status === 'want-to-try' ? 1.2 : 0.2;
+  if (Number.isFinite(distOf(r))) s += Math.max(0, 1.2 - distOf(r) / 4500);
+
+  if (mood === 'quick') {
+    if ((r.priceRange || 0) <= 2) s += 1.6;
+    if (['cafe', 'pizza', 'american', 'mexican', 'thai'].some(c => cuisine.includes(c))) s += 1.1;
+  } else if (mood === 'date') {
+    if ((r.priceRange || 0) >= 2) s += 1.5;
+    if ((r.googleRating || 0) >= 4.4) s += 1.2;
+    if (['italian', 'french', 'japanese', 'seafood', 'steakhouse'].some(c => cuisine.includes(c))) s += 1.2;
+  } else if (mood === 'comfort') {
+    if (['italian', 'american', 'mexican', 'indian', 'chinese', 'bbq'].some(c => cuisine.includes(c))) s += 1.8;
+    if ((r.priceRange || 0) <= 3) s += 0.8;
+  } else if (mood === 'healthy') {
+    if (['mediterranean', 'greek', 'japanese', 'vietnamese', 'thai', 'vegan'].some(c => cuisine.includes(c))) s += 1.8;
+    if ((r.priceRange || 0) <= 3) s += 0.5;
+  }
+  return s;
+}
+
+function renderMoodPicksHome (selectedMood = null) {
+  const section = document.getElementById('mood-picks-home');
+  const list = document.getElementById('mood-picks-list');
+  const chipsWrap = document.getElementById('mood-picks-chips');
+  if (!section || !list || !chipsWrap) return;
+
+  if (!state.restaurants.length) {
+    section.classList.add('hidden');
+    return;
+  }
+
+  const activeChip = chipsWrap.querySelector('.home-mood-chip.active');
+  const mood = selectedMood || activeChip?.dataset.mood || 'quick';
+  chipsWrap.querySelectorAll('.home-mood-chip').forEach(ch => ch.classList.toggle('active', ch.dataset.mood === mood));
+
+  const picks = [...state.restaurants]
+    .map(r => ({ ...r, _moodScore: scoreMoodPick(r, mood) }))
+    .sort((a, b) => b._moodScore - a._moodScore)
+    .slice(0, 3);
+
+  section.classList.remove('hidden');
+  if (!picks.length) {
+    list.innerHTML = '<div class="for-you-empty">Add more restaurants to unlock mood picks.</div>';
+    return;
+  }
+
+  list.innerHTML = picks.map(r => {
+    const meta = `${escHtml(r.cuisine || 'Restaurant')}${r.myRating ? ` • ${'★'.repeat(r.myRating)}` : ''}`;
+    return `<button class="mood-pick-card" type="button" data-id="${r.id}">
+      <div class="mood-pick-name">${escHtml(r.name)}</div>
+      <div class="mood-pick-meta">${meta}</div>
+    </button>`;
+  }).join('');
+
+  list.querySelectorAll('.mood-pick-card[data-id]').forEach(btn => {
+    btn.addEventListener('click', () => openDetailModal(btn.dataset.id));
+  });
+}
+
+function renderWeeklyRecapHome () {
+  const wrap = document.getElementById('week-recap-home');
+  const text = document.getElementById('week-recap-text');
+  if (!wrap || !text) return;
+
+  if (!state.restaurants.length) {
+    wrap.classList.add('hidden');
+    return;
+  }
+
+  const weekStart = getWeekStartIso();
+  let checkins = 0;
+  const cuisineHits = {};
+
+  state.restaurants.forEach(r => {
+    const visits = r.visits || [];
+    visits.forEach(v => {
+      if ((v.date || '') >= weekStart) {
+        checkins++;
+        const c = r.cuisine || 'Other';
+        cuisineHits[c] = (cuisineHits[c] || 0) + 1;
+      }
+    });
+    if ((r.dateVisited || '') >= weekStart && !visits.length) {
+      checkins++;
+      const c = r.cuisine || 'Other';
+      cuisineHits[c] = (cuisineHits[c] || 0) + 1;
+    }
+  });
+
+  const fav = state.restaurants.filter(r => r.isFavorite).length;
+  const topCuisine = Object.entries(cuisineHits).sort((a, b) => b[1] - a[1])[0]?.[0] || 'No streak yet';
+  text.innerHTML = `🍽️ <strong>${checkins}</strong> check-in${checkins === 1 ? '' : 's'} this week · ⭐ <strong>${fav}</strong> favorite${fav === 1 ? '' : 's'} · ${cuisineEmoji(topCuisine)} <strong>${escHtml(topCuisine)}</strong> leading`;
+  wrap.classList.remove('hidden');
+}
+
+function getDishLeaderboardData () {
+  const map = {};
+  const toItems = (val) => Array.isArray(val) ? val : (val && typeof val === 'object' ? Object.values(val) : []);
+  const notes = getMenuNotes();
+  Object.entries(notes).forEach(([restaurantId, items]) => {
+    toItems(items).forEach(item => {
+      const key = String(item.name || '').trim().toLowerCase();
+      if (!key) return;
+      if (!map[key]) map[key] = { key, name: item.name, score: 0, count: 0, restaurants: new Set(), topRestaurantId: restaurantId };
+      const row = map[key];
+      row.count += 1;
+      row.restaurants.add(restaurantId);
+      row.score += item.reaction === 'liked' ? 3 : item.reaction === 'disliked' ? -2 : 1;
+      if (item.favorite) row.score += 2;
+    });
+  });
+
+  const dishes = getDishes();
+  Object.entries(dishes).forEach(([restaurantId, items]) => {
+    toItems(items).forEach(item => {
+      const key = String(item.name || '').trim().toLowerCase();
+      if (!key) return;
+      if (!map[key]) map[key] = { key, name: item.name, score: 0, count: 0, restaurants: new Set(), topRestaurantId: restaurantId };
+      const row = map[key];
+      row.count += 1;
+      row.restaurants.add(restaurantId);
+      row.score += Math.max(1, item.rating || 0);
+    });
+  });
+
+  return Object.values(map)
+    .map(row => ({ ...row, restaurantCount: row.restaurants.size }))
+    .sort((a, b) => b.score - a.score || b.count - a.count)
+    .slice(0, 12);
+}
+
+function openDishLeaderboard () {
+  const overlay = document.getElementById('dish-board-overlay');
+  const list = document.getElementById('dish-board-list');
+  if (!overlay || !list) return;
+
+  const top = getDishLeaderboardData();
+  if (!top.length) {
+    list.innerHTML = '<div class="dish-empty">No dish data yet. Start adding dish notes and ratings first.</div>';
+  } else {
+    list.innerHTML = top.map((d, i) => {
+      const badge = i < 3 ? ['🥇', '🥈', '🥉'][i] : `#${i + 1}`;
+      return `<button class="dish-board-row" type="button" data-id="${d.topRestaurantId}">
+        <div class="dish-board-rank">${badge}</div>
+        <div class="dish-board-main">
+          <div class="dish-board-name">${escHtml(d.name)}</div>
+          <div class="dish-board-meta">${d.count} note${d.count === 1 ? '' : 's'} • ${d.restaurantCount} place${d.restaurantCount === 1 ? '' : 's'}</div>
+        </div>
+        <div class="dish-board-score">${d.score}</div>
+      </button>`;
+    }).join('');
+    list.querySelectorAll('.dish-board-row[data-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        closeDishLeaderboard();
+        setTimeout(() => openDetailModal(btn.dataset.id), 120);
+      });
+    });
+  }
+
+  overlay.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+
+function closeDishLeaderboard () {
+  document.getElementById('dish-board-overlay')?.classList.add('hidden');
+  maybeHideOverlay();
+}
+
 function miniHash (str) {
   let h = 0;
   for (let i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
@@ -5708,6 +5902,8 @@ function initHomeDiscoverySection () {
   const list = document.getElementById('nearby-home-list');
   if (!list) return;
   renderForYouHome();
+  renderWeeklyRecapHome();
+  renderMoodPicksHome();
   if (state.userLat && state.userLng) {
     loadHomeDiscovery();
   } else {
@@ -5735,6 +5931,8 @@ async function loadHomeDiscovery () {
   if (_homeDiscCache && Date.now() - _homeDiscCacheTime < HOME_DISC_TTL) {
     renderHomeDiscovery(_homeDiscCache);
     renderForYouHome();
+    renderWeeklyRecapHome();
+    renderMoodPicksHome();
     loadAiRec(_homeDiscCache);
     return;
   }
@@ -5760,6 +5958,8 @@ async function loadHomeDiscovery () {
     _homeDiscCacheTime = Date.now();
     renderHomeDiscovery(_homeDiscCache);
     renderForYouHome();
+    renderWeeklyRecapHome();
+    renderMoodPicksHome();
     loadAiRec(_homeDiscCache);
   } catch (err) {
     list.innerHTML = err?.name === 'AbortError'
