@@ -5782,3 +5782,89 @@ body[data-theme-accent='neon'] {
   .upgrade-card { max-width: 100%; }
   .auth-card { max-width: 100%; }
 }
+
+/* ════════════════════════════════════════════════════════════
+   Detail Quick Capture + Delight layer
+   ════════════════════════════════════════════════════════════ */
+.detail-quick {
+  display: flex; flex-direction: column; gap: 14px;
+  background: linear-gradient(160deg, var(--surface2), var(--surface));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.dq-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.dq-label {
+  font-size: .7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--text-muted); min-width: 78px;
+}
+.dq-stars { display: inline-flex; align-items: center; gap: 2px; }
+.dq-star {
+  font-size: 1.75rem; line-height: 1; color: var(--surface3);
+  transition: transform .12s cubic-bezier(.34,1.56,.64,1), color .15s, text-shadow .15s;
+}
+.dq-star.on { color: var(--gold); text-shadow: 0 0 10px rgba(255,210,122,.5); }
+.dq-star:hover { transform: scale(1.18); }
+.dq-star:active { transform: scale(.82); }
+.dq-clear {
+  font-size: .85rem; color: var(--text-dim); margin-left: 6px;
+  width: 26px; height: 26px; border-radius: 50%; transition: all .15s;
+}
+.dq-clear:hover { color: var(--red); background: var(--surface3); }
+.dq-stars.just-set .dq-star.on { animation: starPop .42s ease; }
+@keyframes starPop { 0%{transform:scale(1)} 40%{transform:scale(1.4)} 100%{transform:scale(1)} }
+
+.dq-seg { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.dq-seg-btn {
+  padding: 7px 14px; border-radius: 20px; font-size: .8rem; font-weight: 600;
+  background: var(--surface3); color: var(--text-muted);
+  border: 1px solid transparent; transition: transform .12s ease, background .18s, color .18s, box-shadow .2s;
+}
+.dq-seg-btn:hover { color: var(--text); }
+.dq-seg-btn:active { transform: scale(.92); }
+.dq-seg-btn.active {
+  background: linear-gradient(135deg, var(--primary-lt), var(--primary-dk));
+  color: #211318; border-color: transparent;
+  box-shadow: 0 4px 14px rgba(var(--primary-rgb),.42);
+}
+
+.detail-notes-head { display: flex; align-items: center; justify-content: space-between; }
+.detail-notes-saved { font-size: .72rem; color: var(--green); font-weight: 700; }
+.detail-notes-edit {
+  width: 100%; margin-top: 8px; padding: 12px; border-radius: var(--radius);
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  font-family: inherit; font-size: .9rem; resize: vertical; line-height: 1.5;
+}
+.detail-notes-edit:focus { border-color: var(--primary); }
+
+/* Pull-to-refresh */
+.ptr-indicator {
+  position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface2); border: 1px solid var(--border);
+  box-shadow: var(--shadow); font-size: 1.35rem;
+  opacity: 0; pointer-events: none; z-index: 130; transition: opacity .2s ease;
+}
+.ptr-indicator.visible { opacity: 1; }
+.ptr-indicator.ready { border-color: var(--primary); box-shadow: 0 0 18px rgba(var(--primary-rgb),.55); }
+.ptr-indicator.refreshing .ptr-bear { animation: ptrSpin .7s linear infinite; display: inline-block; }
+@keyframes ptrSpin { to { transform: rotate(360deg); } }
+
+/* Global tactile micro-interactions (only in playful motion) */
+body[data-ui-motion='playful'] .btn-primary,
+body[data-ui-motion='playful'] .btn-secondary,
+body[data-ui-motion='playful'] .btn-orange,
+body[data-ui-motion='playful'] .btn-ghost,
+body[data-ui-motion='playful'] .btn-sm,
+body[data-ui-motion='playful'] .icon-btn {
+  transition: transform .12s cubic-bezier(.34,1.56,.64,1), box-shadow .2s ease, background .2s ease, color .2s ease;
+}
+body[data-ui-motion='playful'] .btn-primary:active,
+body[data-ui-motion='playful'] .btn-secondary:active,
+body[data-ui-motion='playful'] .btn-orange:active,
+body[data-ui-motion='playful'] .btn-ghost:active,
+body[data-ui-motion='playful'] .btn-sm:active,
+body[data-ui-motion='playful'] .icon-btn:active { transform: scale(.94); }
+body[data-ui-motion='playful'] .btn-primary:hover { box-shadow: 0 6px 20px rgba(var(--primary-rgb),.4); }

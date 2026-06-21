@@ -1137,13 +1137,11 @@ function openDetailModal (id) {
   document.getElementById('detail-price').innerHTML =
     `<label>Price Range</label><div style="font-size:1.2rem;color:var(--gold);font-weight:700">${priceDollars(r.priceRange)||'<span style="color:var(--text-dim);font-size:.85rem">Unknown</span>'}</div>`;
 
-  const notesWrap = document.getElementById('detail-notes-wrap');
-  if (r.notes) {
-    document.getElementById('detail-notes').textContent = r.notes;
-    notesWrap.style.display = '';
-  } else {
-    notesWrap.style.display = 'none';
-  }
+  const notesEdit = document.getElementById('detail-notes-edit');
+  if (notesEdit) notesEdit.value = r.notes || '';
+  const notesSaved = document.getElementById('detail-notes-saved');
+  if (notesSaved) notesSaved.textContent = '';
+  renderDetailQuickCapture(r);
 
   const dist = distOf(r);
   const meta = [];
@@ -1206,6 +1204,7 @@ function openDetailModal (id) {
       renderAll();
       openDetailModal(id);
       showToast('✅ Checked In!', `Visit logged for ${state.restaurants[idx].name}`, 'success');
+      celebrateMilestones();
     }
   };
 
@@ -1253,6 +1252,165 @@ function openDetailModal (id) {
 function closeDetailModal () {
   document.getElementById('detail-overlay').classList.add('hidden');
   maybeHideOverlay();
+}
+
+/* ── Detail Quick Capture: set rating / status / price inline ── */
+function renderDetailQuickCapture (r) {
+  const stars = document.querySelectorAll('#dq-stars .dq-star');
+  stars.forEach(b => b.classList.toggle('on', parseInt(b.dataset.val) <= (r.myRating || 0)));
+  document.querySelectorAll('#dq-status .dq-seg-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.status === r.status));
+  document.querySelectorAll('#dq-price .dq-seg-btn').forEach(b =>
+    b.classList.toggle('active', parseInt(b.dataset.price) === (r.priceRange || 0)));
+}
+
+/* Patch a restaurant in place, persist, and refresh the open detail + lists
+   without closing the modal. */
+function patchRestaurant (id, patch) {
+  const i = state.restaurants.findIndex(x => x.id === id);
+  if (i === -1) return null;
+  Object.assign(state.restaurants[i], patch);
+  saveData();
+  return state.restaurants[i];
+}
+
+function initDetailQuickCapture () {
+  const stars = document.getElementById('dq-stars');
+  if (stars) {
+    stars.addEventListener('click', e => {
+      const btn = e.target.closest('[data-val]');
+      if (!btn || !state.detailId) return;
+      const val = parseInt(btn.dataset.val);
+      const r = patchRestaurant(state.detailId, { myRating: val });
+      if (!r) return;
+      hapticTap('medium');
+      renderDetailQuickCapture(r);
+      document.getElementById('detail-my-rating').innerHTML = myRatingHtml(r.myRating);
+      stars.classList.remove('just-set'); void stars.offsetWidth; stars.classList.add('just-set');
+      if (val === 5) launchConfetti(1200);
+      renderStats();
+    });
+  }
+
+  const statusSeg = document.getElementById('dq-status');
+  if (statusSeg) {
+    statusSeg.addEventListener('click', e => {
+      const btn = e.target.closest('[data-status]');
+      if (!btn || !state.detailId) return;
+      const status = btn.dataset.status;
+      const patch = { status };
+      if (status === 'visited') {
+        const cur = state.restaurants.find(x => x.id === state.detailId);
+        if (cur && !cur.dateVisited) patch.dateVisited = iso();
+      }
+      const r = patchRestaurant(state.detailId, patch);
+      if (!r) return;
+      hapticTap('medium');
+      renderDetailQuickCapture(r);
+      renderAll();
+      if (status === 'visited') celebrateVisit(r.name);
+    });
+  }
+
+  const priceSeg = document.getElementById('dq-price');
+  if (priceSeg) {
+    priceSeg.addEventListener('click', e => {
+      const btn = e.target.closest('[data-price]');
+      if (!btn || !state.detailId) return;
+      const cur = state.restaurants.find(x => x.id === state.detailId);
+      const price = parseInt(btn.dataset.price);
+      // tapping the active price clears it
+      const next = (cur && cur.priceRange === price) ? 0 : price;
+      const r = patchRestaurant(state.detailId, { priceRange: next });
+      if (!r) return;
+      hapticTap('light');
+      renderDetailQuickCapture(r);
+      document.getElementById('detail-price').innerHTML =
+        `<label>Price Range</label><div style="font-size:1.2rem;color:var(--gold);font-weight:700">${priceDollars(r.priceRange)||'<span style="color:var(--text-dim);font-size:.85rem">Unknown</span>'}</div>`;
+    });
+  }
+
+  // Editable notes — autosave on input (debounced) + on blur
+  const notes = document.getElementById('detail-notes-edit');
+  if (notes) {
+    let t = null;
+    const save = () => {
+      if (!state.detailId) return;
+      patchRestaurant(state.detailId, { notes: notes.value.trim() });
+      const saved = document.getElementById('detail-notes-saved');
+      if (saved) { saved.textContent = 'Saved ✓'; clearTimeout(t); t = setTimeout(() => saved.textContent = '', 1600); }
+    };
+    let dt = null;
+    notes.addEventListener('input', () => { clearTimeout(dt); dt = setTimeout(save, 600); });
+    notes.addEventListener('blur', save);
+  }
+}
+
+/* ── Celebration / milestone helpers (delight) ───────────────── */
+function visitedCount () {
+  return state.restaurants.filter(r => r.status === 'visited').length;
+}
+function celebrateVisit (name) {
+  hapticTap('medium');
+  showToast('✅ Visited!', `"${name}" added to your conquests.`, 'success');
+  celebrateMilestones();
+}
+const VISIT_MILESTONES = [1, 5, 10, 25, 50, 100, 150, 200, 300, 500];
+function celebrateMilestones () {
+  const count = visitedCount();
+  const last = state.settings.lastMilestone || 0;
+  const hit = VISIT_MILESTONES.filter(m => m > last && m <= count).pop();
+  if (!hit) return;
+  state.settings.lastMilestone = hit;
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+  launchConfetti(3200);
+  const msg = hit === 1 ? 'Your first visit logged — the adventure begins! 🐻'
+    : `${hit} restaurants visited! You're a certified foodie explorer. 🌟`;
+  setTimeout(() => showToast(`🏆 ${hit} Visited!`, msg, 'success'), 250);
+}
+
+/* ── Pull-to-refresh (mobile) ────────────────────────────────── */
+function initPullToRefresh () {
+  const indicator = document.getElementById('ptr-indicator');
+  if (!indicator) return;
+  let startY = 0, pulling = false, dist = 0;
+  const THRESHOLD = 70, MAX = 120;
+  const canPull = () =>
+    window.scrollY <= 0 &&
+    !document.body.classList.contains('overlay-open') &&
+    state.currentView !== 'map' &&
+    state.settings.uiMotion !== 'reduced';
+
+  window.addEventListener('touchstart', e => {
+    pulling = canPull();
+    if (pulling) { startY = e.touches[0].clientY; dist = 0; }
+  }, { passive: true });
+
+  window.addEventListener('touchmove', e => {
+    if (!pulling) return;
+    dist = e.touches[0].clientY - startY;
+    if (dist <= 0) { indicator.classList.remove('visible', 'ready'); indicator.style.transform = ''; return; }
+    const pull = Math.min(dist * 0.5, MAX);
+    indicator.classList.add('visible');
+    indicator.style.transform = `translateX(-50%) translateY(${pull}px) rotate(${pull * 3}deg)`;
+    indicator.classList.toggle('ready', pull >= THRESHOLD);
+  }, { passive: true });
+
+  const reset = () => { indicator.classList.remove('visible', 'ready', 'refreshing'); indicator.style.transform = ''; };
+  window.addEventListener('touchend', () => {
+    if (!pulling) return;
+    pulling = false;
+    if (Math.min(dist * 0.5, MAX) < THRESHOLD) { reset(); return; }
+    indicator.classList.add('refreshing');
+    hapticTap('medium');
+    setTimeout(() => {
+      _forYouSeed = (state._ptrTick = (state._ptrTick || 0) + 1); // reroll For You picks
+      renderAll();
+      if (typeof loadHomeDiscovery === 'function') { try { loadHomeDiscovery(); } catch (_) {} }
+      reset();
+      showToast('🐻 Refreshed', 'Fresh picks served up.', 'success');
+    }, 520);
+  });
 }
 
 /* ── Add / Edit Modal ────────────────────────────────────── */
@@ -1334,7 +1492,7 @@ function markVisited (id) {
   state.restaurants[idx].dateVisited = state.restaurants[idx].dateVisited || iso();
   saveData();
   renderAll();
-  showToast('✅ Visited!', `"${state.restaurants[idx].name}" marked as visited.`, 'success');
+  celebrateVisit(state.restaurants[idx].name);
 }
 
 function setFormStars (n) {
@@ -4194,6 +4352,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initCollections();
   initOfflineIndicator();
   initSwipeGestures();
+  initPullToRefresh();
+  initDetailQuickCapture();
   initReminders();
   initInstallPrompt();
   checkAndNudge();
@@ -4797,8 +4957,7 @@ function initSwipeGestures () {
         r.dateVisited = r.dateVisited || iso();
         saveData();
         renderAll();
-        showToast('? Visited!', '"' + r.name + '" marked as visited.', 'success');
-        launchConfetti(1500);
+        celebrateVisit(r.name);
       }
     } else if (dx < -THRESHOLD && id) {
       // Swipe left ? show detail

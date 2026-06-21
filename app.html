@@ -564,6 +564,9 @@
   <!-- ── Map View ─────────────────────────────────────────────── -->
   <div id="map-container" class="map-container hidden"></div>
 
+  <!-- ── Pull-to-refresh indicator ───────────────────────────── -->
+  <div id="ptr-indicator" class="ptr-indicator" aria-hidden="true"><span class="ptr-bear">🐻</span></div>
+
   <!-- ── Main Content ─────────────────────────────────────────── -->
   <main class="main-content" id="main-content">
 
@@ -992,11 +995,46 @@
           </div>
         </div>
 
+        <!-- Quick Capture: set rating / status / price inline -->
+        <div class="detail-quick" id="detail-quick">
+          <div class="dq-group">
+            <span class="dq-label">Your rating</span>
+            <div class="dq-stars" id="dq-stars" role="radiogroup" aria-label="Set your rating">
+              <button class="dq-star" type="button" data-val="1" aria-label="1 star">★</button>
+              <button class="dq-star" type="button" data-val="2" aria-label="2 stars">★</button>
+              <button class="dq-star" type="button" data-val="3" aria-label="3 stars">★</button>
+              <button class="dq-star" type="button" data-val="4" aria-label="4 stars">★</button>
+              <button class="dq-star" type="button" data-val="5" aria-label="5 stars">★</button>
+              <button class="dq-clear" type="button" data-val="0" title="Clear rating" aria-label="Clear rating">✕</button>
+            </div>
+          </div>
+          <div class="dq-group">
+            <span class="dq-label">Status</span>
+            <div class="dq-seg" id="dq-status">
+              <button class="dq-seg-btn" type="button" data-status="want-to-try">🔖 Want to Try</button>
+              <button class="dq-seg-btn" type="button" data-status="visited">✅ Visited</button>
+            </div>
+          </div>
+          <div class="dq-group">
+            <span class="dq-label">Price</span>
+            <div class="dq-seg" id="dq-price">
+              <button class="dq-seg-btn" type="button" data-price="1">$</button>
+              <button class="dq-seg-btn" type="button" data-price="2">$$</button>
+              <button class="dq-seg-btn" type="button" data-price="3">$$$</button>
+              <button class="dq-seg-btn" type="button" data-price="4">$$$$</button>
+            </div>
+          </div>
+        </div>
+
         <div class="detail-tags-wrap" id="detail-tags-wrap"></div>
 
         <div class="detail-notes" id="detail-notes-wrap">
-          <h4>📝 My Notes</h4>
-          <p id="detail-notes"></p>
+          <div class="detail-notes-head">
+            <h4>📝 My Notes</h4>
+            <span class="detail-notes-saved" id="detail-notes-saved" aria-live="polite"></span>
+          </div>
+          <textarea id="detail-notes-edit" class="detail-notes-edit" rows="3"
+            placeholder="Jot the vibe, what to order, who you went with…" maxlength="2000"></textarea>
         </div>
 
         <div class="detail-menu-notes" id="detail-menu-notes-wrap">
