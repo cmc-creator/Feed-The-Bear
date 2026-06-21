@@ -4345,6 +4345,65 @@ body.light-mode #profile-btn {
   letter-spacing: .01em;
 }
 
+.today-vibe-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: linear-gradient(140deg, rgba(74,144,217,.16), rgba(26,188,156,.1));
+}
+
+.today-vibe-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 5px 10px;
+  border: 1px solid rgba(255,255,255,.24);
+  background: rgba(8,14,26,.28);
+  color: #f3f7ff;
+  font-size: .74rem;
+  font-weight: 700;
+}
+
+.home-discovery.staged .home-module {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: home-module-rise .35s ease forwards;
+}
+
+.home-discovery.staged .home-module:nth-child(1) { animation-delay: .02s; }
+.home-discovery.staged .home-module:nth-child(2) { animation-delay: .08s; }
+.home-discovery.staged .home-module:nth-child(3) { animation-delay: .14s; }
+.home-discovery.staged .home-module:nth-child(4) { animation-delay: .2s; }
+.home-discovery.staged .home-module:nth-child(5) { animation-delay: .26s; }
+.home-discovery.staged .home-module:nth-child(6) { animation-delay: .32s; }
+
+@keyframes home-module-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.home-skeleton {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(120deg, rgba(255,255,255,.05) 20%, rgba(255,255,255,.12) 40%, rgba(255,255,255,.05) 60%);
+  background-size: 220% 100%;
+  animation: home-skeleton-shimmer 1.2s linear infinite;
+}
+
+.home-skeleton-title { height: 16px; width: 48%; margin-bottom: 8px; }
+.home-skeleton-row { height: 74px; width: 100%; margin-top: 8px; }
+
+@keyframes home-skeleton-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -20% 0; }
+}
+
 /* For You strip */
 .for-you-home {
   margin-bottom: 14px;

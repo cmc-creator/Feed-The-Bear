@@ -593,7 +593,7 @@
     <!-- ── Home Discovery: Near You + AI Rec ─────────── -->
     <section id="home-discovery" class="home-discovery" aria-label="Restaurants near you">
       <!-- AI Recommendation Banner -->
-      <div id="ai-rec-banner" class="ai-rec-banner hidden">
+      <div id="ai-rec-banner" class="ai-rec-banner home-module hidden">
         <div class="ai-rec-icon">✨</div>
         <div class="ai-rec-body">
           <div class="ai-rec-label">Byte Cub's Pick For You</div>
@@ -601,7 +601,7 @@
         </div>
         <button id="ai-rec-refresh-btn" class="ai-rec-refresh" title="Refresh recommendation">↻</button>
       </div>
-      <div class="home-quick-actions" id="home-quick-actions" aria-label="Quick actions">
+      <div class="home-quick-actions home-module" id="home-quick-actions" aria-label="Quick actions">
         <button class="home-quick-btn" id="home-quick-pick-btn" type="button">
           <span class="home-quick-emoji">🎯</span>
           <span class="home-quick-label">Pick For Me</span>
@@ -619,20 +619,21 @@
           <span class="home-quick-label">Share Recap</span>
         </button>
       </div>
-      <div id="today-status-row" class="today-status-row" aria-label="Today status"></div>
+      <div id="today-status-row" class="today-status-row home-module" aria-label="Today status"></div>
+      <div id="today-vibe-row" class="today-vibe-row home-module" aria-label="Tonight vibe"></div>
       <!-- Personal recommendation strip -->
-      <div id="for-you-home" class="for-you-home hidden">
+      <div id="for-you-home" class="for-you-home home-module hidden">
         <div class="for-you-home-header">
           <span class="for-you-home-title">🐻 For You Tonight</span>
           <button id="for-you-refresh-btn" class="btn-ghost btn-sm">Shuffle ↻</button>
         </div>
         <div id="for-you-home-list" class="for-you-home-list"></div>
       </div>
-      <div id="week-recap-home" class="week-recap-home hidden">
+      <div id="week-recap-home" class="week-recap-home home-module hidden">
         <div class="week-recap-title">📈 Your Week So Far</div>
         <div id="week-recap-text" class="week-recap-text"></div>
       </div>
-      <div id="mood-picks-home" class="mood-picks-home hidden">
+      <div id="mood-picks-home" class="mood-picks-home home-module hidden">
         <div class="mood-picks-home-header">
           <span class="mood-picks-home-title">🎯 Mood Picks</span>
         </div>

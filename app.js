@@ -6431,6 +6431,31 @@ function renderTodayStatusRow () {
   `;
 }
 
+function renderTodayVibeRow () {
+  const row = document.getElementById('today-vibe-row');
+  if (!row) return;
+
+  const hour = new Date().getHours();
+  const vibe = hour < 11 ? 'Brunch Hunt' : hour < 17 ? 'Lunch Mode' : hour < 22 ? 'Dinner Prime' : 'Late Bite';
+  const mood = document.querySelector('.home-mood-chip.active')?.textContent?.trim() || '⚡ Quick';
+  const nearby = state.restaurants.filter(r => Number.isFinite(distOf(r)) && distOf(r) <= 1609).length;
+
+  row.innerHTML = `
+    <span class="today-vibe-pill">🕒 ${vibe}</span>
+    <span class="today-vibe-pill">🎯 ${escHtml(mood)}</span>
+    <span class="today-vibe-pill">📍 ${nearby} near you</span>
+  `;
+}
+
+function stageHomeModules () {
+  const home = document.getElementById('home-discovery');
+  if (!home || state.settings.uiMotion === 'reduced' || state.settings.homeModulesStaged) return;
+  home.classList.add('staged');
+  state.settings.homeModulesStaged = true;
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+  setTimeout(() => home.classList.remove('staged'), 900);
+}
+
 function getDishLeaderboardData () {
   const map = {};
   const toItems = (val) => Array.isArray(val) ? val : (val && typeof val === 'object' ? Object.values(val) : []);
@@ -6585,6 +6610,8 @@ function initHomeDiscoverySection () {
   const list = document.getElementById('nearby-home-list');
   if (!list) return;
   renderTodayStatusRow();
+  renderTodayVibeRow();
+  stageHomeModules();
   renderForYouHome();
   renderWeeklyRecapHome();
   renderMoodPicksHome();
@@ -6614,6 +6641,7 @@ async function loadHomeDiscovery () {
   // Serve from cache if fresh
   if (_homeDiscCache && Date.now() - _homeDiscCacheTime < HOME_DISC_TTL) {
     renderTodayStatusRow();
+    renderTodayVibeRow();
     renderHomeDiscovery(_homeDiscCache);
     renderForYouHome();
     renderWeeklyRecapHome();
@@ -6622,7 +6650,11 @@ async function loadHomeDiscovery () {
     return;
   }
 
-  list.innerHTML = '<div class="nearby-home-loading">🐻 Sniffing out restaurants near you…</div>';
+  list.innerHTML = `
+    <div class="home-skeleton home-skeleton-title"></div>
+    <div class="home-skeleton home-skeleton-row"></div>
+    <div class="home-skeleton home-skeleton-row"></div>
+  `;
   try {
     const { userLat: lat, userLng: lng } = state;
     const q = `[out:json][timeout:15];(node["amenity"~"restaurant|cafe|fast_food|bar"](around:1609,${lat},${lng}););out body 30;`;
@@ -6642,6 +6674,7 @@ async function loadHomeDiscovery () {
     _homeDiscCache = { elements: withDist, lat, lng };
     _homeDiscCacheTime = Date.now();
     renderTodayStatusRow();
+    renderTodayVibeRow();
     renderHomeDiscovery(_homeDiscCache);
     renderForYouHome();
     renderWeeklyRecapHome();
