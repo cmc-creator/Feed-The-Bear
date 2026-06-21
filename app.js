@@ -63,7 +63,7 @@ const CUISINE_GRAD = {
   vegan:     ['#27AE60','#1ABC9C'],
   cafe:      ['#7F8C8D','#5D4E37'],
   desserts:  ['#E91E63','#9C27B0'],
-  default:   ['#FF6B35','#C0392B']
+  default:   ['#E8B15A','#C0392B']
 };
 const cuisineGrad = c => CUISINE_GRAD[(c||'').toLowerCase()] || CUISINE_GRAD.default;
 
@@ -1525,7 +1525,7 @@ function renderMap () {
     const emoji = cuisineEmoji(r.cuisine);
     const isVisited = r.status === 'visited';
     const bg  = isVisited ? 'rgba(46,204,113,.9)' : 'rgba(74,144,217,.9)';
-    const bdr = isVisited ? '#2ECC71' : '#4A90D9';
+    const bdr = isVisited ? '#2ECC71' : '#9B7BE0';
     const icon = L.divIcon({
       className: '',
       html: `<div style="width:38px;height:38px;background:${bg};border:3px solid ${bdr};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;box-shadow:0 3px 12px rgba(0,0,0,.6);cursor:pointer">${emoji}</div>`,
@@ -1538,8 +1538,8 @@ function renderMap () {
       <div style="font-size:.77rem;color:#aaa;margin-bottom:6px">${r.cuisine ? escHtml(r.cuisine)+'&nbsp;&middot;&nbsp;' : ''}${priceDollars(r.priceRange)||''}</div>
       ${r.googleRating ? `<div style="font-size:.8rem;margin-bottom:6px">⭐ ${r.googleRating}/5</div>` : ''}
       <div style="display:flex;gap:6px;margin-top:8px">
-        <button onclick="window.__ftbOpenDetail('${r.id}')" style="flex:1;padding:5px 8px;background:#FF6B35;color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:600;cursor:pointer">Details</button>
-        ${r.address ? `<button onclick="window.__ftbDirections('${r.id}')" style="flex:1;padding:5px 8px;background:#4A90D9;color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:600;cursor:pointer">Directions</button>` : ''}
+        <button onclick="window.__ftbOpenDetail('${r.id}')" style="flex:1;padding:5px 8px;background:#E8B15A;color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:600;cursor:pointer">Details</button>
+        ${r.address ? `<button onclick="window.__ftbDirections('${r.id}')" style="flex:1;padding:5px 8px;background:#9B7BE0;color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:600;cursor:pointer">Directions</button>` : ''}
       </div>
     </div>`;
     const marker = L.marker([r.lat, r.lng], { icon })
@@ -1706,10 +1706,10 @@ function renderAll () {
     renderCards();
   }
   updateLocationBanner();
-  renderWeeklyGoal();
-  renderForYouHome();
-  renderWeeklyRecapHome();
-  renderMoodPicksHome();
+  // Home sections are isolated: a failure in one must never cascade and
+  // abort renderAll (which would leave later init wiring unattached).
+  [renderWeeklyGoal, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
+    .forEach(fn => { try { fn(); } catch (err) { console.error(`${fn.name} failed:`, err); } });
 }
 
 function updateLocationBanner () {
@@ -2544,7 +2544,7 @@ function shareCard (r) {
   canvas.width = W; canvas.height = H;
   const [c1, c2] = cuisineGrad(r.cuisine);
   const bg = ctx.createLinearGradient(0,0,W,H);
-  bg.addColorStop(0,'#0D0D1A'); bg.addColorStop(1,'#1A1A2E');
+  bg.addColorStop(0,'#15111C'); bg.addColorStop(1,'#281F34');
   ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
   const acc = ctx.createLinearGradient(0,0,0,H);
   acc.addColorStop(0,c1); acc.addColorStop(1,c2);
@@ -2569,11 +2569,11 @@ function shareCard (r) {
   if (r.address) { ctx.fillStyle = '#AAA'; ctx.font = '17px system-ui,sans-serif'; ctx.fillText(`📍 ${r.address.length>55?r.address.slice(0,55)+'…':r.address}`, 50, 318); }
   if (r.notes) { ctx.fillStyle = '#777'; ctx.font = 'italic 15px system-ui,sans-serif'; ctx.fillText(`"${r.notes.length>72?r.notes.slice(0,72)+'…':r.notes}"`, 50, 356); }
   if (r.priceRange) { ctx.fillStyle = '#F4C430'; ctx.font = 'bold 20px monospace'; ctx.fillText(priceDollars(r.priceRange), 50, 408); }
-  const bc = r.status==='visited' ? '#2ECC71' : '#4A90D9';
+  const bc = r.status==='visited' ? '#2ECC71' : '#9B7BE0';
   ctx.fillStyle = bc+'33'; ftbRoundRect(ctx, r.priceRange?110:50, 390, 130, 28, 8); ctx.fill();
   ctx.fillStyle = bc; ctx.font = 'bold 13px system-ui,sans-serif';
   ctx.fillText(r.status==='visited'?'✅ Visited':'🔖 Want to Try', r.priceRange?122:62, 409);
-  ctx.fillStyle = '#FF6B35'; ctx.font = 'bold 15px system-ui,sans-serif';
+  ctx.fillStyle = '#E8B15A'; ctx.font = 'bold 15px system-ui,sans-serif';
   ctx.fillText('🐻 Feed The Bear', W-195, H-18);
   canvas.toBlob(blob => {
     const file = new File([blob], `${r.name.replace(/[^a-z0-9]/gi,'_')}-ftb.png`, {type:'image/png'});
@@ -2650,7 +2650,7 @@ function bulkMoveToCollection () {
 /* ════════════════════════════════════════════════════════════
    CUSTOM LISTS / COLLECTIONS
    ════════════════════════════════════════════════════════════ */
-const COLLECTION_COLORS = ['#FF6B35','#E74C3C','#9B59B6','#3498DB','#2ECC71','#F39C12','#1ABC9C','#E91E63'];
+const COLLECTION_COLORS = ['#E8B15A','#E74C3C','#9B59B6','#3498DB','#2ECC71','#F39C12','#1ABC9C','#E91E63'];
 let _newCollectionColor = COLLECTION_COLORS[0];
 let _sharedManageCollectionId = null;
 const _sharedRealtimeUnsubs = {};
@@ -3197,8 +3197,8 @@ function exportHighlightCard (kind = 'weekly') {
   ctx.fillRect(0, 0, W, H);
 
   const glowA = ctx.createRadialGradient(220, 170, 20, 220, 170, 320);
-  glowA.addColorStop(0, 'rgba(255,107,53,.38)');
-  glowA.addColorStop(1, 'rgba(255,107,53,0)');
+  glowA.addColorStop(0, 'rgba(232,177,90,.38)');
+  glowA.addColorStop(1, 'rgba(232,177,90,0)');
   ctx.fillStyle = glowA;
   ctx.fillRect(0, 0, W, H);
 
@@ -3466,16 +3466,29 @@ function setupEvents () {
 
   // Mobile bottom nav
   document.getElementById('mobile-bottom-nav').addEventListener('click', e => {
-    const btn = e.target.closest('.mobile-nav-btn');
+    const btn = e.target.closest('.mobile-nav-btn, .mobile-nav-fab');
     if (!btn) return;
-    if (btn.id === 'mobile-add-btn') { openAddModal(); return; }
-    document.querySelectorAll('.nav-btn, .mobile-nav-btn[data-view]').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.querySelector(`.nav-btn[data-view="${btn.dataset.view}"]`)?.classList.add('active');
-    state.currentView = btn.dataset.view;
-    if (state.currentView === 'map') { showMapView(); }
-    else if (state.currentView === 'stats') { showStatsView(); }
-    else { hideMapView(); hideStatsView(); renderCards(); }
+    if (btn.id === 'mobile-add-btn')  { hapticTap('medium'); openAddModal(); return; }
+    if (btn.id === 'mobile-play-btn') { openMobileHub(); return; }
+    if (!btn.dataset.view) return;
+    hapticTap('light');
+    setView(btn.dataset.view);
+  });
+
+  // Tappable top stat counters → jump to that list (keeps Want/Visited one tap away on mobile)
+  document.getElementById('stats-bar')?.addEventListener('click', e => {
+    const item = e.target.closest('.stat-item[data-view-filter]');
+    if (!item) return;
+    hapticTap('light');
+    setView(item.dataset.viewFilter);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  document.getElementById('stats-bar')?.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const item = e.target.closest('.stat-item[data-view-filter]');
+    if (!item) return;
+    e.preventDefault();
+    setView(item.dataset.viewFilter);
   });
 
   // Group-by toggle
@@ -3545,6 +3558,7 @@ function setupEvents () {
   // Keyboard: Escape
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
+      closeMobileHub();
       closeModal();
       closeDetailModal();
       closeChat();
@@ -3699,6 +3713,7 @@ function setupEvents () {
 
   // Phase 8 — ⋯ More Menu
   initMoreMenu();
+  initMobileHub();
 
   // Phase 8 — Craving Engine
   document.getElementById('craving-btn').addEventListener('click', openCravingEngine);
@@ -4655,7 +4670,7 @@ function checkDuplicate () {
    PHASE 6 • ANIMATED CONFETTI
    ------------------------------------------------------------ */
 
-const CONFETTI_COLORS = ['#FF6B35','#FFD700','#2ED573','#3498DB','#9B59B6','#FF69B4','#00CEC9'];
+const CONFETTI_COLORS = ['#E8B15A','#FFD27A','#2ED573','#3498DB','#9B59B6','#FF69B4','#00CEC9'];
 let _confettiAnim = null;
 
 function launchConfetti (durationMs) {
@@ -5649,7 +5664,7 @@ function openFoodieProfile () {
     try {
       // qrcodejs uses a div; we'll render to a temp div then extract img
       const tmp = document.createElement('div');
-      new QRCode(tmp, { text: url, width:180, height:180, colorDark:'#FF6B35', colorLight:'#1A1A2E' });
+      new QRCode(tmp, { text: url, width:180, height:180, colorDark:'#E8B15A', colorLight:'#281F34' });
       setTimeout(() => {
         const img = tmp.querySelector('img');
         if (img) {
@@ -5782,18 +5797,12 @@ function initMoreMenu () {
   const menu = document.getElementById('more-menu');
   if (!btn || !menu) return;
 
+  // The header button now opens the full Discover & Play hub (same as the
+  // mobile bottom-nav "Play"). The legacy dropdown markup stays as a no-JS
+  // fallback but is no longer toggled.
   btn.addEventListener('click', e => {
     e.stopPropagation();
-    const open = menu.classList.toggle('open');
-    btn.setAttribute('aria-expanded', open);
-  });
-
-  // Close on outside click
-  document.addEventListener('click', e => {
-    if (!menu.contains(e.target) && e.target !== btn) {
-      menu.classList.remove('open');
-      btn.setAttribute('aria-expanded', 'false');
-    }
+    openMobileHub();
   });
 
   // Dispatch to existing handlers via data-more attribute
@@ -5802,53 +5811,160 @@ function initMoreMenu () {
     if (!item) return;
     menu.classList.remove('open');
     btn.setAttribute('aria-expanded', 'false');
-    const action = item.dataset.more;
-    const map = {
-      'tonight':          () => document.getElementById('tonight-btn').click(),
-      'craving':          openCravingEngine,
-      'discover':         openDiscover,
-      'challenge':        openChallenges,
-      'gallery':          openGallery,
-      'compare':          toggleCompareMode,
-      'budget':           openBudget,
-      'dishes':           () => { if (state.detailId) openDishTracker(state.detailId); else showToast('Open a restaurant first', 'View a restaurant then tap Dishes.', 'error'); },
-      'review':           openYearReview,
-      'profile':          openFoodieProfile,
-      'friends':          openFoodieFriends,
-      'stats2':           openStats2,
-      'ai-panel':         openAiPanel,
-      'route':            openRoutePlanner,
-      'export2':          openExport2,
-      'push':             requestPushPermission,
-      'open-now':         openOpenNow,
-      'travel':           openTravelMode,
-      'swipe':            openSwipeDeck,
-      'spin':             openSpinWheel,
-      'achievements':     openAchievements,
-      'digest':           openMonthlyDigest,
-      'duel':             openDuel,
-      'bingo':            openBingo,
-      'fortune':          openFortune,
-      'moodcal':          openMoodCal,
-      'feedbear':         openFeedBearGame,
-      'dailychallenge':   openDailyChallenge,
-      'passport':         openPassport,
-      'worldmap':         openWorldMap,
-      'visitlog':         openVisitLog,
-      'spend':            openSpendTracker,
-      'beenawhile':       openBeenaWhile,
-      'mealplanner':      openMealPlanner,
-      'groupvote':        openGroupVote,
-      'wrap':             () => document.getElementById('wrap-btn').click(),
-      'export':           () => document.getElementById('export-btn').click(),
-      'import-bookmarks': () => document.getElementById('import-bookmarks-btn').click(),
-      'pdf':              () => document.getElementById('pdf-export-btn').click(),
-      'bulk':             () => document.getElementById('bulk-select-btn').click(),
-      'collections':      () => document.getElementById('collections-btn').click(),
-      'location':         () => document.getElementById('location-toggle-btn').click(),
-    };
-    if (map[action]) map[action]();
+    runToolAction(item.dataset.more);
   });
+}
+
+/* Single source of truth for every secondary tool / game.
+   Shared by the desktop ⋯ menu and the mobile Discover & Play hub. */
+const TOOL_ACTIONS = {
+  'tonight':          () => document.getElementById('tonight-btn').click(),
+  'craving':          openCravingEngine,
+  'discover':         openDiscover,
+  'challenge':        openChallenges,
+  'gallery':          openGallery,
+  'compare':          toggleCompareMode,
+  'budget':           openBudget,
+  'dishes':           () => { if (state.detailId) openDishTracker(state.detailId); else showToast('Open a restaurant first', 'View a restaurant then tap Dishes.', 'error'); },
+  'review':           openYearReview,
+  'profile':          openFoodieProfile,
+  'friends':          openFoodieFriends,
+  'stats2':           openStats2,
+  'ai-panel':         openAiPanel,
+  'route':            openRoutePlanner,
+  'export2':          openExport2,
+  'push':             requestPushPermission,
+  'open-now':         openOpenNow,
+  'travel':           openTravelMode,
+  'swipe':            openSwipeDeck,
+  'spin':             openSpinWheel,
+  'achievements':     openAchievements,
+  'digest':           openMonthlyDigest,
+  'duel':             openDuel,
+  'bingo':            openBingo,
+  'fortune':          openFortune,
+  'moodcal':          openMoodCal,
+  'feedbear':         openFeedBearGame,
+  'dailychallenge':   openDailyChallenge,
+  'passport':         openPassport,
+  'worldmap':         openWorldMap,
+  'visitlog':         openVisitLog,
+  'spend':            openSpendTracker,
+  'beenawhile':       openBeenaWhile,
+  'mealplanner':      openMealPlanner,
+  'groupvote':        openGroupVote,
+  'wrap':             () => document.getElementById('wrap-btn').click(),
+  'export':           () => document.getElementById('export-btn').click(),
+  'import':           () => document.getElementById('import-file-input').click(),
+  'import-bookmarks': () => document.getElementById('import-bookmarks-btn').click(),
+  'pdf':              () => document.getElementById('pdf-export-btn').click(),
+  'bulk':             () => document.getElementById('bulk-select-btn').click(),
+  'collections':      () => document.getElementById('collections-btn').click(),
+  'location':         () => document.getElementById('location-toggle-btn').click(),
+};
+
+function runToolAction (action) {
+  const fn = TOOL_ACTIONS[action];
+  if (fn) { hapticTap('light'); fn(); }
+}
+
+/* ── Mobile Discover & Play hub ─────────────────────────────
+   Replaces the unscrollable 40-item ⋯ menu on phones with a
+   thumb-friendly, searchable grid of tiles, grouped by intent. */
+const HUB_SECTIONS = [
+  { title: '🍽️ Decide tonight', items: [
+    ['tonight','🎯',"Tonight's Pick"], ['craving','🔥','Craving Engine'],
+    ['spin','🎡','Spin the Wheel'], ['swipe','🃏','Swipe to Decide'],
+    ['duel','🥊','Restaurant Duel'], ['fortune','🥠','Fortune Cookie'],
+  ]},
+  { title: '🧭 Discover', items: [
+    ['discover','🗺️','Smart Discovery'], ['open-now','🟢','Open Now'],
+    ['travel','✈️','Travel Mode'], ['route','🛣️','Route Planner'],
+    ['mealplanner','📆','Meal Planner'], ['worldmap','🌍','Cuisine Map'],
+  ]},
+  { title: '🏆 Play & earn', items: [
+    ['challenge','🏆','Challenges'], ['achievements','🏅','Achievements'],
+    ['bingo','🎲','Cuisine Bingo'], ['dailychallenge','🔥','Daily Challenge'],
+    ['feedbear','🐻','Feed the Bear'], ['passport','🛂','Passport'],
+    ['moodcal','📅','Mood Calendar'],
+  ]},
+  { title: '📒 Track', items: [
+    ['gallery','🖼️','Photo Gallery'], ['dishes','🍴','Dish Tracker'],
+    ['visitlog','📋','Visit Log'], ['budget','💰','Budget'],
+    ['spend','💸','Spend Tracker'], ['compare','⚖️','Compare'],
+    ['beenawhile','⏰','Been a While'],
+  ]},
+  { title: '👥 Social & stats', items: [
+    ['profile','🌐','My Profile'], ['friends','👥','Friends'],
+    ['groupvote','🗳️','Group Vote'], ['stats2','📊','Deep Stats'],
+    ['ai-panel','🐻','Byte Cub'], ['review','🎞️','Year in Review'],
+    ['wrap','🎁','Monthly Wrap'], ['digest','📨','Monthly Digest'],
+  ]},
+  { title: '🗂️ Data & tools', items: [
+    ['collections','📁','My Lists'], ['bulk','☑️','Bulk Select'],
+    ['location','📍','Location'], ['export2','📦','Export Passport'],
+    ['export','📥','Export JSON'], ['import','📤','Import JSON'],
+    ['import-bookmarks','🔖','Import Bookmarks'], ['pdf','📄','Export PDF'],
+  ]},
+];
+
+function renderMobileHub (filter = '') {
+  const body = document.getElementById('mobile-hub-body');
+  if (!body) return;
+  const q = filter.trim().toLowerCase();
+  const html = HUB_SECTIONS.map(sec => {
+    const items = sec.items.filter(([, , label]) => !q || label.toLowerCase().includes(q));
+    if (!items.length) return '';
+    return `<div class="hub-section">
+      <div class="hub-section-title">${sec.title}</div>
+      <div class="hub-grid">
+        ${items.map(([action, emoji, label]) => `<button class="hub-tile" data-tool="${action}">
+          <span class="hub-tile-emoji">${emoji}</span>
+          <span class="hub-tile-label">${label}</span>
+        </button>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  body.innerHTML = html || '<p class="hub-empty">No tools match “' + filter + '”.</p>';
+}
+
+function openMobileHub () {
+  hapticTap('medium');
+  const ov = document.getElementById('mobile-hub-overlay');
+  if (!ov) return;
+  const search = document.getElementById('mobile-hub-search');
+  if (search) search.value = '';
+  renderMobileHub();
+  ov.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+
+function closeMobileHub () {
+  document.getElementById('mobile-hub-overlay')?.classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function initMobileHub () {
+  document.getElementById('mobile-hub-close')?.addEventListener('click', closeMobileHub);
+  document.getElementById('mobile-hub-search')?.addEventListener('input', e => renderMobileHub(e.target.value));
+  document.getElementById('mobile-hub-body')?.addEventListener('click', e => {
+    const tile = e.target.closest('.hub-tile');
+    if (!tile) return;
+    const action = tile.dataset.tool;
+    closeMobileHub();
+    runToolAction(action);
+  });
+}
+
+/* Switch the main list/map/stats view from any control (nav, stat chips). */
+function setView (view) {
+  document.querySelectorAll('.nav-btn, .mobile-nav-btn[data-view]').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.nav-btn[data-view="${view}"]`)?.classList.add('active');
+  document.querySelector(`.mobile-nav-btn[data-view="${view}"]`)?.classList.add('active');
+  state.currentView = view;
+  if (view === 'map') { showMapView(); }
+  else if (view === 'stats') { showStatsView(); }
+  else { hideMapView(); hideStatsView(); renderCards(); }
 }
 
 /* ------------------------------------------------------------
@@ -6562,19 +6678,14 @@ function renderForYouHome () {
     return;
   }
 
-  const notesByRestaurant = getMenuNotes().reduce((map, n) => {
-    const key = String(n.restaurantId || '');
-    if (!key) return map;
-    if (!map[key]) map[key] = [];
-    map[key].push(n);
-    return map;
-  }, {});
+  // getMenuNotes() is already a map keyed by restaurant id ({ id: [notes] })
+  const notesByRestaurant = getMenuNotes() || {};
 
   const scored = all.map(r => {
     const notes = notesByRestaurant[String(r.id)] || [];
     const likedCount = notes.filter(n => n.reaction === 'liked').length;
     const dislikedCount = notes.filter(n => n.reaction === 'disliked').length;
-    const favDishCount = notes.filter(n => n.favoriteDish).length;
+    const favDishCount = notes.filter(n => n.favorite).length;
     const dist = distOf(r);
     const nearbyBonus = Number.isFinite(dist) ? Math.max(0, 7 - dist / 850) : 0;
     const ratingScore = (r.myRating || 0) * 7 + (r.googleRating || 0) * 2;
@@ -7228,7 +7339,7 @@ function renderScatterPlot (visited) {
     const isGem = r.myRating >= 4 && r.priceRange <= 2;
     ctx.beginPath();
     ctx.arc(x + (Math.random()-.5)*14, y + (Math.random()-.5)*10, 5, 0, Math.PI*2);
-    ctx.fillStyle = isGem ? '#ffd166' : 'rgba(255,107,53,.75)';
+    ctx.fillStyle = isGem ? '#ffd166' : 'rgba(232,177,90,.75)';
     ctx.fill();
   });
 
@@ -7236,7 +7347,7 @@ function renderScatterPlot (visited) {
   ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(pad.l+6, pad.t+8, 4, 0, Math.PI*2); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.font = '9px Poppins, sans-serif'; ctx.textAlign = 'left';
   ctx.fillText('Hidden gem', pad.l+14, pad.t+12);
-  ctx.fillStyle = 'rgba(255,107,53,.75)'; ctx.beginPath(); ctx.arc(pad.l+76, pad.t+8, 4, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'rgba(232,177,90,.75)'; ctx.beginPath(); ctx.arc(pad.l+76, pad.t+8, 4, 0, Math.PI*2); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.fillText('Other', pad.l+84, pad.t+12);
 
   if (!withBoth.length) {
@@ -7987,7 +8098,7 @@ let _spinAngle    = 0;
 let _spinAnimId   = null;
 let _spinning     = false;
 
-const WHEEL_COLORS = ['#FF6B35','#FF8C42','#FFA62B','#FFD166','#06D6A0','#118AB2','#7C83FD','#EF476F','#F78C6B','#C77DFF'];
+const WHEEL_COLORS = ['#E8B15A','#FF8C42','#FFA62B','#FFD166','#06D6A0','#118AB2','#7C83FD','#EF476F','#F78C6B','#C77DFF'];
 
 function openSpinWheel () {
   _spinItems = state.restaurants.filter(r => r.status === 'wishlist' || r.status === 'visited');
@@ -8050,12 +8161,12 @@ function _drawWheel (highlightIdx = -1) {
   // Centre circle
   ctx.beginPath();
   ctx.arc(cx, cy, 22, 0, Math.PI * 2);
-  ctx.fillStyle = '#0D0D1A';
+  ctx.fillStyle = '#15111C';
   ctx.fill();
   ctx.strokeStyle = 'var(--border)';
   ctx.lineWidth = 2;
   ctx.stroke();
-  ctx.fillStyle = '#FF6B35';
+  ctx.fillStyle = '#E8B15A';
   ctx.font = 'bold 14px Poppins';
   ctx.textAlign = 'center';
   ctx.fillText('🎲', cx, cy + 5);
@@ -8393,7 +8504,7 @@ function renderTasteDna () {
     : 'Comfort Loyalist 🏠';
 
   const signature = top5[0];
-  const dnaColors = ['#FF6B35', '#3498DB', '#2ECC71', '#F39C12', '#9B59B6'];
+  const dnaColors = ['#E8B15A', '#3498DB', '#2ECC71', '#F39C12', '#9B59B6'];
 
   el.innerHTML = `
     <div class="dna-personality">${adventureLabel} · ${priceLabel}</div>
@@ -8431,11 +8542,11 @@ function shareTasteDna () {
   canvas.width = W; canvas.height = H;
 
   const bg = ctx.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, '#0D0D1A'); bg.addColorStop(1, '#1A1A2E');
+  bg.addColorStop(0, '#15111C'); bg.addColorStop(1, '#281F34');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
   const acc = ctx.createLinearGradient(0, 0, 0, H);
-  acc.addColorStop(0, '#FF6B35'); acc.addColorStop(1, '#C0392B');
+  acc.addColorStop(0, '#E8B15A'); acc.addColorStop(1, '#C0392B');
   ctx.fillStyle = acc; ctx.fillRect(0, 0, 8, H);
 
   ctx.globalAlpha = .06; ctx.font = '200px serif'; ctx.fillStyle = '#FFF';
@@ -8446,7 +8557,7 @@ function shareTasteDna () {
   ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.font = '16px system-ui,sans-serif';
   ctx.fillText('Based on ' + total + ' restaurant' + (total !== 1 ? 's' : '') + ' visited', 50, 104);
 
-  const dnaColors = ['#FF6B35', '#3498DB', '#2ECC71'];
+  const dnaColors = ['#E8B15A', '#3498DB', '#2ECC71'];
   const maxVal = Math.max(...top3.map(([, v]) => v), 1);
   top3.forEach(([c, n], i) => {
     const y = 155 + i * 82;
@@ -8459,7 +8570,7 @@ function shareTasteDna () {
     ctx.fillText(cuisineEmoji(c) + ' ' + c + '  ' + Math.round(n / total * 100) + '%', 62, y);
   });
 
-  ctx.fillStyle = '#FF6B35'; ctx.font = 'bold 15px system-ui,sans-serif';
+  ctx.fillStyle = '#E8B15A'; ctx.font = 'bold 15px system-ui,sans-serif';
   ctx.fillText('🐻 Feed The Bear', W - 195, H - 18);
 
   canvas.toBlob(blob => {
@@ -9838,7 +9949,7 @@ function _ftbBg() {
   }
 
   /* ground line */
-  ctx.strokeStyle = 'rgba(255,107,53,0.25)';
+  ctx.strokeStyle = 'rgba(232,177,90,0.25)';
   ctx.lineWidth = 1;
   ctx.setLineDash([4, 6]);
   ctx.beginPath();
