@@ -832,6 +832,31 @@
           <p id="detail-notes"></p>
         </div>
 
+        <div class="detail-menu-notes" id="detail-menu-notes-wrap">
+          <div class="detail-menu-head">
+            <h4>🍽️ Menu Notes</h4>
+            <button id="detail-menu-add-btn" class="btn-sm btn-orange" type="button">+ Add Item</button>
+          </div>
+          <div class="detail-menu-form hidden" id="detail-menu-form">
+            <input id="detail-menu-item-input" class="form-input" type="text" placeholder="Menu item (e.g. Truffle Pasta)" />
+            <div class="detail-menu-reaction-row" id="detail-menu-reaction-row">
+              <button class="detail-menu-react-btn" data-reaction="liked" type="button">👍 Liked</button>
+              <button class="detail-menu-react-btn" data-reaction="disliked" type="button">👎 Didn’t Like</button>
+              <button class="detail-menu-react-btn active" data-reaction="neutral" type="button">🤔 Neutral</button>
+            </div>
+            <input id="detail-menu-note-input" class="form-input" type="text" placeholder="Quick note (optional)" />
+            <label class="detail-menu-fav-check">
+              <input id="detail-menu-fav-input" type="checkbox" />
+              Mark as favorite dish ⭐
+            </label>
+            <div class="detail-menu-form-actions">
+              <button id="detail-menu-save-btn" class="btn-primary" type="button">Save Item</button>
+              <button id="detail-menu-cancel-btn" class="btn-ghost" type="button">Cancel</button>
+            </div>
+          </div>
+          <div id="detail-menu-list" class="detail-menu-list"></div>
+        </div>
+
         <div class="detail-visit-log" id="detail-visit-log-wrap">
           <div class="visit-log-header">
             <h4>📅 Visit Log</h4>
@@ -888,6 +913,9 @@
           </button>
           <button id="detail-dishes-ai-btn" class="btn-secondary">
             🍽️ AI Dish Picks
+          </button>
+          <button id="detail-favorite-btn" class="btn-secondary">
+            ☆ Favorite
           </button>
           <button id="detail-route-btn" class="btn-secondary">
             🗺️ Route

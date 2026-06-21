@@ -354,6 +354,12 @@ img { display: block; }
   gap: 20px;
 }
 
+.restaurant-grid-single {
+  grid-template-columns: 1fr;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
 /* ── Restaurant Card ─────────────────────────────────────── */
 .restaurant-card {
   background: var(--surface);
@@ -419,6 +425,26 @@ img { display: block; }
   color: #fff;
 }
 
+.card-favorite-btn {
+  position: absolute;
+  top: 46px;
+  left: 12px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: .7rem;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0,0,0,.55);
+  border: 1px solid rgba(255,255,255,.24);
+  z-index: 2;
+}
+
+.card-favorite-btn.active {
+  background: rgba(255,215,0,.18);
+  border-color: rgba(255,215,0,.55);
+  color: #ffd75a;
+}
+
 .card-price-badge {
   position: absolute;
   top: 12px;
@@ -452,6 +478,22 @@ img { display: block; }
 
 .card-body { padding: 14px 16px 16px; }
 
+.restaurant-grid-single .restaurant-card {
+  border-radius: 22px;
+}
+
+.restaurant-grid-single .card-photo {
+  height: 230px;
+}
+
+.restaurant-grid-single .card-name {
+  font-size: 1.2rem;
+}
+
+.restaurant-grid-single .card-body {
+  padding: 16px 18px 18px;
+}
+
 .card-cuisine {
   font-size: .65rem;
   font-weight: 700;
@@ -468,6 +510,7 @@ img { display: block; }
   margin-bottom: 5px;
   line-height: 1.3;
   display: -webkit-box;
+  line-clamp: 1;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -541,6 +584,7 @@ img { display: block; }
   color: var(--text-muted);
   margin-bottom: 12px;
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -777,6 +821,108 @@ img { display: block; }
 .detail-notes { background: var(--surface2); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; }
 .detail-notes h4 { font-size: .82rem; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
 .detail-notes p { font-size: .88rem; color: var(--text); line-height: 1.6; font-style: italic; }
+
+.detail-menu-notes {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.detail-menu-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.detail-menu-head h4 {
+  font-size: .88rem;
+  font-weight: 700;
+}
+
+.detail-menu-form {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.detail-menu-react-btn {
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  font-size: .78rem;
+  color: var(--text-muted);
+  background: var(--surface3);
+}
+
+.detail-menu-reaction-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.detail-menu-react-btn.active {
+  color: #fff;
+  border-color: var(--primary);
+  background: linear-gradient(135deg, var(--primary), var(--primary-dk));
+}
+
+.detail-menu-fav-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: .8rem;
+  color: var(--text-muted);
+}
+
+.detail-menu-form-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.detail-menu-list {
+  display: grid;
+  gap: 8px;
+}
+
+.detail-menu-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,.02);
+}
+
+.detail-menu-item.liked {
+  border-color: rgba(46,204,113,.4);
+  background: rgba(46,204,113,.08);
+}
+
+.detail-menu-item.disliked {
+  border-color: rgba(231,76,60,.45);
+  background: rgba(231,76,60,.09);
+}
+
+.detail-menu-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.detail-menu-item-name {
+  font-size: .85rem;
+  font-weight: 700;
+}
+
+.detail-menu-item-note {
+  margin-top: 4px;
+  font-size: .78rem;
+  color: var(--text-muted);
+}
 
 .detail-meta { font-size: .78rem; color: var(--text-dim); margin-bottom: 20px; display: flex; gap: 16px; flex-wrap: wrap; }
 
@@ -2932,7 +3078,6 @@ body.light-mode #profile-btn {
   height: 14px;
   border-radius: 3px;
   background: var(--surface3);
-  title: '';
 }
 .heatmap-cell.h1 { background: #ff6b3533; }
 .heatmap-cell.h2 { background: #ff6b3566; }

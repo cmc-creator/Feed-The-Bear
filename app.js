@@ -809,6 +809,7 @@ function renderCards () {
   const list   = getFiltered();
 
   grid.innerHTML = '';
+  grid.classList.add('restaurant-grid-single');
   empty.classList.add('hidden');
   noRes.classList.add('hidden');
 
@@ -865,6 +866,9 @@ function buildCard (r) {
       <span class="card-status-badge ${r.status === 'want-to-try' ? 'want' : 'visited'}">
         ${r.status === 'want-to-try' ? 'Want to Try' : 'Visited'}
       </span>
+      <button class="card-favorite-btn ${r.isFavorite ? 'active' : ''}" data-action="toggle-favorite" aria-label="Toggle favorite restaurant">
+        ${r.isFavorite ? '★ Favorite' : '☆ Favorite'}
+      </button>
       ${r.priceRange ? `<span class="card-price-badge">${priceDollars(r.priceRange)}</span>` : ''}
       ${distStr ? `<span class="card-distance-badge">📍 ${distStr}</span>` : ''}
     </div>
@@ -919,6 +923,16 @@ function buildCard (r) {
   card.addEventListener('click', e => {
     if (state.bulkMode) return; // checkboxes handle it
     const action = e.target.closest('[data-action]')?.dataset.action;
+    if (action === 'toggle-favorite') {
+      e.stopPropagation();
+      const i = state.restaurants.findIndex(x => x.id === r.id);
+      if (i !== -1) {
+        state.restaurants[i].isFavorite = !state.restaurants[i].isFavorite;
+        saveData();
+        renderCards();
+      }
+      return;
+    }
     if (action === 'directions')   { e.stopPropagation(); openDirections(r);      return; }
     if (action === 'website')       { e.stopPropagation(); openWebsite(r);         return; }
     if (action === 'edit')          { e.stopPropagation(); openEditModal(r.id);    return; }
@@ -1105,6 +1119,11 @@ function openDetailModal (id) {
   document.getElementById('detail-share-btn').onclick = () => shareCard(r);
   document.getElementById('detail-directions-btn').onclick = () => openDirections(r);
   document.getElementById('detail-sms-btn').onclick = () => shareViaSMS(r);
+  const detailFavBtn = document.getElementById('detail-favorite-btn');
+  if (detailFavBtn) {
+    detailFavBtn.classList.toggle('active', !!r.isFavorite);
+    detailFavBtn.textContent = r.isFavorite ? '★ Favorite' : '☆ Favorite';
+  }
   document.getElementById('detail-website-btn').style.display = r.website ? '' : 'none';
   document.getElementById('detail-website-btn').onclick = () => openWebsite(r);
   document.getElementById('detail-maps-search-btn').onclick = () => openMapsSearch(r);
@@ -1118,6 +1137,9 @@ function openDetailModal (id) {
       showToast('Deleted', `"${r.name}" removed from your list.`, 'info');
     }
   };
+
+  resetDetailMenuForm();
+  renderDetailMenuList(id);
 
   document.getElementById('detail-overlay').classList.remove('hidden');
   document.getElementById('ui-overlay').classList.remove('hidden');
@@ -3009,6 +3031,42 @@ function setupEvents () {
     _renderDishRatingPicker(parseInt(star.dataset.v));
   });
   document.getElementById('detail-dishes-btn').addEventListener('click', () => { if (state.detailId) openDishTracker(state.detailId); });
+
+  // Phase 8 — Detail favorites + menu notes
+  document.getElementById('detail-favorite-btn').addEventListener('click', () => {
+    if (!state.detailId) return;
+    const i = state.restaurants.findIndex(x => x.id === state.detailId);
+    if (i === -1) return;
+    state.restaurants[i].isFavorite = !state.restaurants[i].isFavorite;
+    saveData();
+    renderCards();
+    openDetailModal(state.detailId);
+  });
+  document.getElementById('detail-menu-add-btn').addEventListener('click', () => {
+    const formEl = document.getElementById('detail-menu-form');
+    if (!formEl) return;
+    formEl.classList.remove('hidden');
+    document.getElementById('detail-menu-item-input')?.focus();
+  });
+  document.getElementById('detail-menu-cancel-btn').addEventListener('click', resetDetailMenuForm);
+  document.getElementById('detail-menu-save-btn').addEventListener('click', saveDetailMenuItem);
+  document.getElementById('detail-menu-item-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveDetailMenuItem();
+    }
+  });
+  document.getElementById('detail-menu-note-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveDetailMenuItem();
+    }
+  });
+  document.getElementById('detail-menu-reaction-row').addEventListener('click', e => {
+    const btn = e.target.closest('.detail-menu-react-btn');
+    if (!btn) return;
+    setDetailMenuReaction(btn.dataset.reaction || 'neutral');
+  });
 
   // Phase 8 — Visit Debrief
   document.getElementById('detail-debrief-btn').addEventListener('click', () => { if (state.detailId) openVisitDebrief(state.detailId); });
@@ -5156,11 +5214,86 @@ function runCravingEngine () {
 
 let _dishRating = 0;
 const DISHES_KEY = 'ftb_dishes_v1';
+const MENU_NOTES_KEY = 'ftb_menu_notes_v1';
+let _detailMenuReaction = 'neutral';
 
 function getDishes () {
   try { return JSON.parse(localStorage.getItem(DISHES_KEY)) || {}; } catch(_) { return {}; }
 }
 function saveDishes (data) { localStorage.setItem(DISHES_KEY, JSON.stringify(data)); }
+
+function getMenuNotes () {
+  try { return JSON.parse(localStorage.getItem(MENU_NOTES_KEY)) || {}; } catch (_) { return {}; }
+}
+function saveMenuNotes (data) { localStorage.setItem(MENU_NOTES_KEY, JSON.stringify(data)); }
+
+function setDetailMenuReaction (reaction = 'neutral') {
+  _detailMenuReaction = reaction;
+  document.querySelectorAll('.detail-menu-react-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.reaction === reaction);
+  });
+}
+
+function resetDetailMenuForm () {
+  const formEl = document.getElementById('detail-menu-form');
+  if (formEl) formEl.classList.add('hidden');
+  const itemEl = document.getElementById('detail-menu-item-input');
+  const noteEl = document.getElementById('detail-menu-note-input');
+  const favEl = document.getElementById('detail-menu-fav-input');
+  if (itemEl) itemEl.value = '';
+  if (noteEl) noteEl.value = '';
+  if (favEl) favEl.checked = false;
+  setDetailMenuReaction('neutral');
+}
+
+function saveDetailMenuItem () {
+  if (!state.detailId) return;
+  const name = (document.getElementById('detail-menu-item-input')?.value || '').trim();
+  if (!name) {
+    showToast('Item name required', 'Add a menu item name first.', 'error');
+    return;
+  }
+  const note = (document.getElementById('detail-menu-note-input')?.value || '').trim();
+  const favorite = !!document.getElementById('detail-menu-fav-input')?.checked;
+  const notes = getMenuNotes();
+  if (!Array.isArray(notes[state.detailId])) notes[state.detailId] = [];
+  notes[state.detailId].push({
+    id: uid(),
+    name,
+    note,
+    reaction: _detailMenuReaction,
+    favorite,
+    date: iso(),
+  });
+  saveMenuNotes(notes);
+  resetDetailMenuForm();
+  renderDetailMenuList(state.detailId);
+  showToast('Saved', `${name} added to menu notes.`, 'success');
+}
+
+function renderDetailMenuList (restaurantId) {
+  const listEl = document.getElementById('detail-menu-list');
+  if (!listEl) return;
+  const notes = getMenuNotes();
+  const list = (notes[restaurantId] || []).slice().reverse();
+  if (!list.length) {
+    listEl.innerHTML = '<div class="dish-empty">No menu notes yet. Add your first dish above.</div>';
+    return;
+  }
+  listEl.innerHTML = list.map(item => {
+    const reaction = item.reaction === 'liked' ? '👍' : item.reaction === 'disliked' ? '👎' : '🤔';
+    const fav = item.favorite ? '⭐ ' : '';
+    const note = item.note ? `<div class="detail-menu-item-note">${escHtml(item.note)}</div>` : '';
+    const cls = item.reaction === 'liked' ? 'liked' : item.reaction === 'disliked' ? 'disliked' : 'neutral';
+    return `<div class="detail-menu-item ${cls}">
+      <div class="detail-menu-item-top">
+        <div class="detail-menu-item-name">${fav}${escHtml(item.name)}</div>
+        <div class="detail-menu-item-reaction">${reaction}</div>
+      </div>
+      ${note}
+    </div>`;
+  }).join('');
+}
 
 function openDishTracker (restaurantId) {
   const r = state.restaurants.find(x => x.id === restaurantId);
