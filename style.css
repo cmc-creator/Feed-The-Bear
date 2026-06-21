@@ -12,6 +12,7 @@
   --border:      rgba(255,255,255,.08);
 
   --primary:     #FF6B35;
+  --primary-rgb: 255,107,53;
   --primary-dk:  #E5541E;
   --primary-lt:  #FF8C5A;
 
@@ -35,7 +36,7 @@
 
   --shadow:      0 4px 24px rgba(0,0,0,.5);
   --shadow-lg:   0 8px 40px rgba(0,0,0,.7);
-  --shadow-glow: 0 0 20px rgba(255,107,53,.25);
+  --shadow-glow: 0 0 20px rgba(var(--primary-rgb), .25);
 
   --transition:  .2s ease;
   --font:        'Poppins', system-ui, sans-serif;
@@ -1188,6 +1189,7 @@ img { display: block; }
   .modal-card { border-radius: var(--radius-lg); }
   .detail-ratings-row { gap: 10px; }
   .detail-rating-block { min-width: 80px; padding: 10px 12px; }
+  .for-you-home-list { grid-template-columns: 1fr; }
 
   .mobile-bottom-nav {
     display: flex;
@@ -1321,6 +1323,26 @@ img { display: block; }
   white-space: nowrap; border: 0;
 }
 
+/* ── Personalization knobs ──────────────────────────────── */
+body[data-ui-density='compact'] .filter-bar { padding-top: 8px; padding-bottom: 8px; gap: 8px; }
+body[data-ui-density='compact'] .restaurant-card .card-content { padding: 10px 12px; }
+body[data-ui-density='compact'] .for-you-card { padding: 8px; }
+body[data-ui-density='compact'] .account-action-row { padding-top: 10px; padding-bottom: 10px; }
+
+body[data-ui-corners='sharp'] {
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+}
+
+body[data-ui-motion='reduced'] * {
+  animation-duration: .01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: .01ms !important;
+  scroll-behavior: auto !important;
+}
+
 /* ════════════════════════════════════════════════════════════
    ✦  NEW FEATURES  v3
    ════════════════════════════════════════════════════════════ */
@@ -1330,6 +1352,7 @@ body.light-mode {
   --bg:        #F2EDE8; --surface:   #FFFFFF; --surface2:  #F5F0EB;
   --surface3:  #EDE8E2; --border:    rgba(0,0,0,.1); --text:      #1A1117;
   --text-dim:  #6B7280; --text-muted:#9CA3AF;
+  --primary-rgb: 255,107,53;
   --shadow:    rgba(0,0,0,.06); --shadow-lg: rgba(0,0,0,.12);
 }
 body.light-mode .app-header { background: rgba(255,255,255,.96); box-shadow: 0 1px 0 rgba(0,0,0,.08); }
@@ -1352,7 +1375,7 @@ body.light-mode #theme-toggle-btn .icon-moon { display: none; }
 .pwa-banner {
   display: flex; align-items: center; gap: 12px;
   padding: 10px 20px;
-  background: linear-gradient(90deg, #FF6B35, #C0392B);
+  background: linear-gradient(90deg, var(--primary), var(--primary-dk));
   color: #fff; font-size: .87rem; font-weight: 500;
   position: relative; z-index: 200; flex-shrink: 0;
 }
@@ -4153,6 +4176,105 @@ body.light-mode #profile-btn {
 }
 .ai-rec-refresh:hover { background: rgba(255,107,53,.12); }
 
+/* For You strip */
+.for-you-home {
+  margin-bottom: 14px;
+}
+
+.for-you-home-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.for-you-home-title {
+  font-size: .9rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.for-you-home-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.for-you-card {
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: linear-gradient(145deg, var(--surface2), rgba(var(--primary-rgb), .05));
+  padding: 10px;
+  width: 100%;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  cursor: pointer;
+  opacity: 0;
+  animation: for-you-rise .45s ease forwards;
+  transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+
+.for-you-card:nth-child(1) { animation-delay: .03s; }
+.for-you-card:nth-child(2) { animation-delay: .1s; }
+.for-you-card:nth-child(3) { animation-delay: .17s; }
+
+.for-you-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(var(--primary-rgb), .45);
+  box-shadow: 0 6px 20px rgba(0,0,0,.25);
+}
+
+.for-you-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.for-you-card-name {
+  font-size: .8rem;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.for-you-chip {
+  font-size: .63rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(var(--primary-rgb), .14);
+  color: var(--primary);
+  border: 1px solid rgba(var(--primary-rgb), .28);
+}
+
+.for-you-card-meta {
+  font-size: .72rem;
+  color: var(--text-dim);
+}
+
+.for-you-empty {
+  grid-column: 1 / -1;
+  color: var(--text-dim);
+  font-size: .82rem;
+  padding: 8px 2px;
+}
+
+@keyframes for-you-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+body[data-ui-motion='reduced'] .for-you-card {
+  opacity: 1;
+  animation: none;
+}
+
 /* Nearby Strip */
 .nearby-home-header {
   display: flex;
@@ -4220,7 +4342,7 @@ body.light-mode #profile-btn {
   height: 36px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--primary), var(--primary-dk));
-  border: 2px solid rgba(255,107,53,.4);
+  border: 2px solid rgba(var(--primary-rgb), .4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4228,11 +4350,11 @@ body.light-mode #profile-btn {
   cursor: pointer;
   transition: transform .15s, box-shadow .15s;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(255,107,53,.3);
+  box-shadow: 0 2px 8px rgba(var(--primary-rgb), .3);
 }
 .account-header-btn:hover {
   transform: scale(1.08);
-  box-shadow: 0 3px 14px rgba(255,107,53,.5);
+  box-shadow: 0 3px 14px rgba(var(--primary-rgb), .5);
 }
 
 /* Profile setup card */
@@ -4256,7 +4378,7 @@ body.light-mode #profile-btn {
   margin: 0 auto 10px;
   border-radius: 50%;
   object-fit: cover;
-  border: 3px solid rgba(255,107,53,.35);
+  border: 3px solid rgba(var(--primary-rgb), .35);
 }
 .profile-photo-row {
   display: flex;
@@ -4271,6 +4393,10 @@ body.light-mode #profile-btn {
   font-size: .72rem;
   color: var(--text-dim);
 }
+.personalize-card { max-width: 460px; }
+.personalize-body { padding: 16px 20px 24px; }
+.personalize-label { margin-top: 14px; margin-bottom: 8px; display: block; }
+.personalize-save-btn { width: 100%; margin-top: 20px; }
 .setup-sub {
   font-size: .84rem;
   color: var(--text-dim);
@@ -4299,7 +4425,7 @@ body.light-mode #profile-btn {
 .avatar-option:hover { background: var(--surface3); transform: scale(1.1); }
 .avatar-option.selected {
   border-color: var(--primary);
-  background: rgba(255,107,53,.15);
+  background: rgba(var(--primary-rgb), .15);
   transform: scale(1.08);
 }
 
@@ -4308,7 +4434,7 @@ body.light-mode #profile-btn {
 .account-hero {
   text-align: center;
   padding: 28px 20px 20px;
-  background: linear-gradient(180deg, rgba(255,107,53,.1) 0%, transparent 100%);
+  background: linear-gradient(180deg, rgba(var(--primary-rgb), .1) 0%, transparent 100%);
   border-bottom: 1px solid var(--border);
 }
 .account-avatar-display {
@@ -4328,29 +4454,51 @@ body.light-mode #profile-btn {
   width: 92px;
   height: 92px;
   margin: 0 auto;
-  border: 3px solid rgba(255,107,53,.35);
+  border: 3px solid rgba(var(--primary-rgb), .35);
 }
 
 /* Theme accents */
 body[data-theme-accent='forest'] {
   --primary: #27ae60;
+  --primary-rgb: 39,174,96;
   --primary-dk: #1f8d4e;
   --primary-lt: #48c97d;
 }
 body[data-theme-accent='ocean'] {
   --primary: #2d8fd5;
+  --primary-rgb: 45,143,213;
   --primary-dk: #246fa7;
   --primary-lt: #59a8e0;
 }
 body[data-theme-accent='sunset'] {
   --primary: #ef5b4f;
+  --primary-rgb: 239,91,79;
   --primary-dk: #ce463c;
   --primary-lt: #f27e74;
 }
 body[data-theme-accent='midnight'] {
   --primary: #cfa93a;
+  --primary-rgb: 207,169,58;
   --primary-dk: #a9872f;
   --primary-lt: #dfbf63;
+}
+body[data-theme-accent='berry'] {
+  --primary: #d6457a;
+  --primary-rgb: 214,69,122;
+  --primary-dk: #b53062;
+  --primary-lt: #e26c99;
+}
+body[data-theme-accent='mint'] {
+  --primary: #22b894;
+  --primary-rgb: 34,184,148;
+  --primary-dk: #169975;
+  --primary-lt: #4dcba9;
+}
+body[data-theme-accent='neon'] {
+  --primary: #7a5cff;
+  --primary-rgb: 122,92,255;
+  --primary-dk: #5f46d6;
+  --primary-lt: #9a86ff;
 }
 .account-name-display {
   font-size: 1.3rem;
@@ -4592,7 +4740,7 @@ body[data-theme-accent='midnight'] {
 .account-portal-hero {
   text-align: center;
   padding: 24px 20px 20px;
-  background: linear-gradient(180deg, rgba(255,107,53,.08) 0%, transparent 100%);
+  background: linear-gradient(180deg, rgba(var(--primary-rgb), .08) 0%, transparent 100%);
   border-bottom: 1px solid var(--border);
 }
 .account-portal-actions {

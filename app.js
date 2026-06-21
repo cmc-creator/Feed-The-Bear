@@ -247,7 +247,13 @@ const THEME_PRESETS = {
   ocean:    { mode: 'dark',  accent: 'ocean' },
   sunset:   { mode: 'light', accent: 'sunset' },
   midnight: { mode: 'dark',  accent: 'midnight' },
+  berry:    { mode: 'dark',  accent: 'berry' },
+  mint:     { mode: 'light', accent: 'mint' },
+  neon:     { mode: 'dark',  accent: 'neon' },
 };
+const UI_DENSITY = new Set(['cozy', 'compact']);
+const UI_CORNERS = new Set(['rounded', 'sharp']);
+const UI_MOTION = new Set(['playful', 'reduced']);
 
 function loadUserProfile () {
   try { return JSON.parse(localStorage.getItem(USER_KEY)) || null; } catch { return null; }
@@ -319,6 +325,28 @@ function applyThemeChoice (choice = 'dark') {
   state.settings.themeChoice = choice;
   state.settings.themeManual = true;
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+  syncThemeMetaColor();
+}
+
+function syncThemeMetaColor () {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) return;
+  const primary = getComputedStyle(document.body).getPropertyValue('--primary').trim();
+  if (primary) meta.setAttribute('content', primary);
+}
+
+function applyPersonalizationSettings () {
+  const density = UI_DENSITY.has(state.settings.uiDensity) ? state.settings.uiDensity : 'cozy';
+  const corners = UI_CORNERS.has(state.settings.uiCorners) ? state.settings.uiCorners : 'rounded';
+  const motion = UI_MOTION.has(state.settings.uiMotion) ? state.settings.uiMotion : 'playful';
+
+  state.settings.uiDensity = density;
+  state.settings.uiCorners = corners;
+  state.settings.uiMotion = motion;
+
+  document.body.dataset.uiDensity = density;
+  document.body.dataset.uiCorners = corners;
+  document.body.dataset.uiMotion = motion;
 }
 
 function buildAvatarGrid (gridId, currentAvatar, onSelect) {
@@ -423,6 +451,7 @@ function openAccountModal () {
   // Wire portal action buttons (safe: use onclick to avoid stacking listeners)
   const btn = id => document.getElementById(id);
   const gotoAndClose = fn => { closeAccountModal(); setTimeout(fn, 150); };
+  if (btn('account-personalize-btn'))  btn('account-personalize-btn').onclick  = () => gotoAndClose(openPersonalizeSettings);
   if (btn('account-profile-link-btn'))  btn('account-profile-link-btn').onclick  = () => gotoAndClose(openFoodieProfile);
   if (btn('account-review-link-btn'))   btn('account-review-link-btn').onclick   = () => gotoAndClose(() => (typeof requiresPremium === 'function' ? requiresPremium('Year in Review 📅', openYearReview) : openYearReview()));
   if (btn('account-ach-link-btn'))      btn('account-ach-link-btn').onclick      = () => gotoAndClose(() => (typeof requiresPremium === 'function' ? requiresPremium('Achievements 🏆', openAchievements) : openAchievements()));
@@ -451,10 +480,6 @@ function openEditProfile () {
   let chosenAvatar = profile.avatar || '🐻';
   let chosenPhoto = profile.photo || '';
   document.getElementById('edit-name').value = profile.name || '';
-  const themeSelect = document.getElementById('edit-theme-select');
-  if (themeSelect) {
-    themeSelect.value = state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark');
-  }
 
   const setEditPhotoState = () => {
     const avatarEl = document.getElementById('edit-avatar-display');
@@ -520,15 +545,44 @@ function openEditProfile () {
   document.body.classList.add('overlay-open');
   document.getElementById('edit-profile-save-btn').onclick = () => {
     const name = document.getElementById('edit-name').value.trim() || profile.name || 'Foodie';
-    const themeChoice = document.getElementById('edit-theme-select')?.value || (state.settings.themeChoice || 'dark');
     const updated = { ...profile, name, avatar: chosenAvatar, photo: chosenPhoto || '' };
     saveUserProfile(updated);
     updateProfileVisuals(updated);
-    applyThemeChoice(themeChoice);
     overlay.classList.add('hidden');
     maybeHideOverlay();
     showToast('Profile updated!', '', 'success');
   };
+}
+
+function openPersonalizeSettings () {
+  const overlay = document.getElementById('personalize-overlay');
+  if (!overlay) return;
+
+  const themeSel = document.getElementById('personalize-theme-select');
+  const densitySel = document.getElementById('personalize-density-select');
+  const cornersSel = document.getElementById('personalize-corners-select');
+  const motionSel = document.getElementById('personalize-motion-select');
+
+  if (themeSel) themeSel.value = state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark');
+  if (densitySel) densitySel.value = UI_DENSITY.has(state.settings.uiDensity) ? state.settings.uiDensity : 'cozy';
+  if (cornersSel) cornersSel.value = UI_CORNERS.has(state.settings.uiCorners) ? state.settings.uiCorners : 'rounded';
+  if (motionSel) motionSel.value = UI_MOTION.has(state.settings.uiMotion) ? state.settings.uiMotion : 'playful';
+
+  document.getElementById('personalize-save-btn').onclick = () => {
+    const choice = themeSel?.value || 'dark';
+    state.settings.uiDensity = densitySel?.value || 'cozy';
+    state.settings.uiCorners = cornersSel?.value || 'rounded';
+    state.settings.uiMotion = motionSel?.value || 'playful';
+    applyThemeChoice(choice);
+    applyPersonalizationSettings();
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+    overlay.classList.add('hidden');
+    maybeHideOverlay();
+    showToast('Personalization saved! 🎨', '', 'success');
+  };
+
+  overlay.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -1606,6 +1660,7 @@ function renderAll () {
   }
   updateLocationBanner();
   renderWeeklyGoal();
+  renderForYouHome();
 }
 
 function updateLocationBanner () {
@@ -2064,6 +2119,8 @@ function initPwa () {
 function initTheme () {
   const initialChoice = state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark');
   applyThemeChoice(initialChoice);
+  applyPersonalizationSettings();
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
   document.getElementById('theme-toggle-btn').addEventListener('click', () => {
     const light = document.body.classList.contains('light-mode');
     applyThemeChoice(light ? 'dark' : 'light');
@@ -3534,6 +3591,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (textEl) textEl.textContent = 'Thinking…';
     if (_homeDiscCache) loadAiRec(_homeDiscCache);
   });
+  document.getElementById('for-you-refresh-btn')?.addEventListener('click', () => {
+    _forYouSeed = Date.now();
+    renderForYouHome();
+  });
   // Wire account/profile buttons
   document.getElementById('account-btn')?.addEventListener('click', openAccountModal);
   document.getElementById('account-close-btn')?.addEventListener('click', closeAccountModal);
@@ -3547,6 +3608,16 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('edit-profile-overlay')?.addEventListener('click', e => {
     if (e.target === document.getElementById('edit-profile-overlay')) {
       document.getElementById('edit-profile-overlay').classList.add('hidden'); maybeHideOverlay();
+    }
+  });
+  document.getElementById('personalize-close-btn')?.addEventListener('click', () => {
+    document.getElementById('personalize-overlay').classList.add('hidden');
+    maybeHideOverlay();
+  });
+  document.getElementById('personalize-overlay')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('personalize-overlay')) {
+      document.getElementById('personalize-overlay').classList.add('hidden');
+      maybeHideOverlay();
     }
   });
   // Init user profile (shows setup on first run)
@@ -3986,6 +4057,7 @@ function initAutoTheme () {
     if (state.settings.themeManual) return; // user overrode - respect their choice
     document.body.classList.toggle('light-mode', isLight);
     document.body.dataset.themeAccent = 'orange';
+    syncThemeMetaColor();
     const btn = document.getElementById('theme-toggle-btn');
     if (btn) {
       btn.querySelector('.icon-moon')?.style && (btn.querySelector('.icon-moon').style.display = isLight ? '' : 'none');
@@ -5556,10 +5628,86 @@ function openAddModalPreFilled (name, cuisine) {
 let _homeDiscCache = null;
 let _homeDiscCacheTime = 0;
 const HOME_DISC_TTL = 15 * 60 * 1000; // 15 min
+let _forYouSeed = Date.now();
+
+function miniHash (str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+function forYouReason (item) {
+  if (item.isFavorite) return 'Favorite';
+  if (item._distMeters < 1300) return 'Near you';
+  if ((item.myRating || 0) >= 4) return 'Highly rated';
+  if (item.status === 'want-to-try') return 'Try next';
+  return 'Good match';
+}
+
+function renderForYouHome () {
+  const section = document.getElementById('for-you-home');
+  const list = document.getElementById('for-you-home-list');
+  if (!section || !list) return;
+
+  const all = state.restaurants || [];
+  if (!all.length) {
+    section.classList.add('hidden');
+    return;
+  }
+
+  const notesByRestaurant = getMenuNotes().reduce((map, n) => {
+    const key = String(n.restaurantId || '');
+    if (!key) return map;
+    if (!map[key]) map[key] = [];
+    map[key].push(n);
+    return map;
+  }, {});
+
+  const scored = all.map(r => {
+    const notes = notesByRestaurant[String(r.id)] || [];
+    const likedCount = notes.filter(n => n.reaction === 'liked').length;
+    const dislikedCount = notes.filter(n => n.reaction === 'disliked').length;
+    const favDishCount = notes.filter(n => n.favoriteDish).length;
+    const dist = distOf(r);
+    const nearbyBonus = Number.isFinite(dist) ? Math.max(0, 7 - dist / 850) : 0;
+    const ratingScore = (r.myRating || 0) * 7 + (r.googleRating || 0) * 2;
+    const statusScore = r.status === 'want-to-try' ? 8 : 3;
+    const favoriteScore = r.isFavorite ? 14 : 0;
+    const noteScore = likedCount * 5 + favDishCount * 3 - dislikedCount * 5;
+    const varietyJitter = (miniHash(`${r.id}|${_forYouSeed}`) % 100) / 100;
+    const score = ratingScore + statusScore + favoriteScore + noteScore + nearbyBonus + varietyJitter;
+    return { ...r, _score: score, _distMeters: dist };
+  }).sort((a, b) => b._score - a._score).slice(0, 3);
+
+  section.classList.remove('hidden');
+  if (!scored.length) {
+    list.innerHTML = '<div class="for-you-empty">Add a few restaurants and ratings to unlock your personalized picks.</div>';
+    return;
+  }
+
+  list.innerHTML = scored.map(r => {
+    const reason = forYouReason(r);
+    const dist = Number.isFinite(r._distMeters) ? fmtDist(r._distMeters) : '';
+    const rating = r.myRating ? ` • You ${'★'.repeat(r.myRating)}` : (r.googleRating ? ` • ⭐${r.googleRating}` : '');
+    return `<button class="for-you-card" data-id="${r.id}" type="button" title="Open ${escHtml(r.name)}">
+      <div class="for-you-card-top">
+        <span class="for-you-card-name">${escHtml(r.name)}</span>
+        <span class="for-you-chip">${escHtml(reason)}</span>
+      </div>
+      <div class="for-you-card-meta">${escHtml(r.cuisine || 'Restaurant')}${rating}</div>
+      <div class="for-you-card-meta">${dist ? `📍 ${dist}` : (r.status === 'want-to-try' ? 'Ready when you are' : 'Saved in your den')}</div>
+    </button>`;
+  }).join('');
+
+  list.querySelectorAll('.for-you-card[data-id]').forEach(el => {
+    el.addEventListener('click', () => openDetailModal(el.dataset.id));
+  });
+}
 
 function initHomeDiscoverySection () {
   const list = document.getElementById('nearby-home-list');
   if (!list) return;
+  renderForYouHome();
   if (state.userLat && state.userLng) {
     loadHomeDiscovery();
   } else {
@@ -5586,6 +5734,7 @@ async function loadHomeDiscovery () {
   // Serve from cache if fresh
   if (_homeDiscCache && Date.now() - _homeDiscCacheTime < HOME_DISC_TTL) {
     renderHomeDiscovery(_homeDiscCache);
+    renderForYouHome();
     loadAiRec(_homeDiscCache);
     return;
   }
@@ -5610,6 +5759,7 @@ async function loadHomeDiscovery () {
     _homeDiscCache = { elements: withDist, lat, lng };
     _homeDiscCacheTime = Date.now();
     renderHomeDiscovery(_homeDiscCache);
+    renderForYouHome();
     loadAiRec(_homeDiscCache);
   } catch (err) {
     list.innerHTML = err?.name === 'AbortError'

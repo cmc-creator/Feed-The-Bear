@@ -78,6 +78,9 @@
         <button class="account-action-row" id="account-edit-btn">
           <span class="aar-icon">✏️</span><span class="aar-label">Edit Profile</span><span class="aar-chevron">›</span>
         </button>
+        <button class="account-action-row" id="account-personalize-btn">
+          <span class="aar-icon">🎨</span><span class="aar-label">Themes &amp; Personalize</span><span class="aar-chevron">›</span>
+        </button>
         <button class="account-action-row" id="account-profile-link-btn">
           <span class="aar-icon">👤</span><span class="aar-label">My Foodie Profile</span><span class="aar-chevron">›</span>
         </button>
@@ -125,16 +128,51 @@
           <button id="edit-photo-remove-btn" type="button" class="btn-ghost">Remove Photo</button>
         </div>
         <p class="profile-photo-hint">JPG/PNG/WebP up to 2 MB. Stored securely on this device.</p>
-        <label class="form-label" style="margin-top:14px;margin-bottom:8px;display:block">App theme</label>
-        <select id="edit-theme-select" class="form-select">
+        <button id="edit-profile-save-btn" class="btn-primary" style="width:100%;margin-top:20px">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Themes & Personalization ─────────────────────────── -->
+  <div id="personalize-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="personalize-title">
+    <div class="modal-card personalize-card">
+      <div class="modal-header">
+        <h2 id="personalize-title">🎨 Themes &amp; Personalize</h2>
+        <button id="personalize-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="personalize-body">
+        <label class="form-label" for="personalize-theme-select">Theme</label>
+        <select id="personalize-theme-select" class="form-select">
           <option value="dark">Dark Ember</option>
           <option value="light">Light Cream</option>
           <option value="forest">Forest Mint</option>
           <option value="ocean">Ocean Blue</option>
           <option value="sunset">Sunset Coral</option>
           <option value="midnight">Midnight Gold</option>
+          <option value="berry">Berry Jam</option>
+          <option value="mint">Mint Pop</option>
+          <option value="neon">Neon Night</option>
         </select>
-        <button id="edit-profile-save-btn" class="btn-primary" style="width:100%;margin-top:20px">Save Changes</button>
+
+        <label class="form-label personalize-label" for="personalize-density-select">Card density</label>
+        <select id="personalize-density-select" class="form-select">
+          <option value="cozy">Cozy</option>
+          <option value="compact">Compact</option>
+        </select>
+
+        <label class="form-label personalize-label" for="personalize-corners-select">Corner style</label>
+        <select id="personalize-corners-select" class="form-select">
+          <option value="rounded">Rounded</option>
+          <option value="sharp">Sharp</option>
+        </select>
+
+        <label class="form-label personalize-label" for="personalize-motion-select">Animation style</label>
+        <select id="personalize-motion-select" class="form-select">
+          <option value="playful">Playful</option>
+          <option value="reduced">Reduced</option>
+        </select>
+
+        <button id="personalize-save-btn" class="btn-primary personalize-save-btn">Save Personalization</button>
       </div>
     </div>
   </div>
@@ -553,6 +591,14 @@
           <div id="ai-rec-text" class="ai-rec-text">Thinking…</div>
         </div>
         <button id="ai-rec-refresh-btn" class="ai-rec-refresh" title="Refresh recommendation">↻</button>
+      </div>
+      <!-- Personal recommendation strip -->
+      <div id="for-you-home" class="for-you-home hidden">
+        <div class="for-you-home-header">
+          <span class="for-you-home-title">🐻 For You Tonight</span>
+          <button id="for-you-refresh-btn" class="btn-ghost btn-sm">Shuffle ↻</button>
+        </div>
+        <div id="for-you-home-list" class="for-you-home-list"></div>
       </div>
       <!-- Nearby strip -->
       <div class="nearby-home-header">
