@@ -884,6 +884,14 @@ function renderCards () {
 
   grid.innerHTML = '';
   grid.classList.add('restaurant-grid-single');
+  const shouldAnimateCards = state.settings.uiMotion !== 'reduced' && !state.settings.homeEntranceSeen;
+  if (shouldAnimateCards) {
+    grid.classList.add('card-enter-run');
+    state.settings.homeEntranceSeen = true;
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+  } else {
+    grid.classList.remove('card-enter-run');
+  }
   empty.classList.add('hidden');
   noRes.classList.add('hidden');
 
@@ -6403,6 +6411,26 @@ function renderWeeklyRecapHome () {
   wrap.classList.remove('hidden');
 }
 
+function renderTodayStatusRow () {
+  const row = document.getElementById('today-status-row');
+  if (!row) return;
+
+  const all = state.restaurants || [];
+  const favorites = all.filter(r => r.isFavorite).length;
+  const visited = all.filter(r => r.status === 'visited').length;
+  const nearby = all.filter(r => Number.isFinite(distOf(r)) && distOf(r) <= 1609).length;
+  const avgMine = all.filter(r => (r.myRating || 0) > 0);
+  const avg = avgMine.length ? (avgMine.reduce((s, r) => s + (r.myRating || 0), 0) / avgMine.length).toFixed(1) : null;
+
+  row.innerHTML = `
+    <span class="today-status-pill">🐻 Saved <strong>${all.length}</strong></span>
+    <span class="today-status-pill">✅ Visited <strong>${visited}</strong></span>
+    <span class="today-status-pill">⭐ Favorites <strong>${favorites}</strong></span>
+    <span class="today-status-pill">📍 Nearby <strong>${nearby}</strong></span>
+    <span class="today-status-pill">💯 Avg <strong>${avg ? `${avg}★` : '—'}</strong></span>
+  `;
+}
+
 function getDishLeaderboardData () {
   const map = {};
   const toItems = (val) => Array.isArray(val) ? val : (val && typeof val === 'object' ? Object.values(val) : []);
@@ -6556,6 +6584,7 @@ function renderForYouHome () {
 function initHomeDiscoverySection () {
   const list = document.getElementById('nearby-home-list');
   if (!list) return;
+  renderTodayStatusRow();
   renderForYouHome();
   renderWeeklyRecapHome();
   renderMoodPicksHome();
@@ -6584,6 +6613,7 @@ async function loadHomeDiscovery () {
 
   // Serve from cache if fresh
   if (_homeDiscCache && Date.now() - _homeDiscCacheTime < HOME_DISC_TTL) {
+    renderTodayStatusRow();
     renderHomeDiscovery(_homeDiscCache);
     renderForYouHome();
     renderWeeklyRecapHome();
@@ -6611,6 +6641,7 @@ async function loadHomeDiscovery () {
 
     _homeDiscCache = { elements: withDist, lat, lng };
     _homeDiscCacheTime = Date.now();
+    renderTodayStatusRow();
     renderHomeDiscovery(_homeDiscCache);
     renderForYouHome();
     renderWeeklyRecapHome();
