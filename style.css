@@ -683,6 +683,15 @@ img { display: block; }
   border: 1px solid rgba(255,255,255,.2);
 }
 .card-action-btn.edit-card:hover { color: #fff; border-color: rgba(255,255,255,.45); }
+.card-action-btn.primary-action {
+  background: linear-gradient(145deg, rgba(255,107,53,.26), rgba(255,107,53,.12));
+  color: #fff;
+  border: 1px solid rgba(255,107,53,.46);
+}
+.card-action-btn.primary-action:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+}
 .card-action-btn.mark-visited {
   background: rgba(46,204,113,.15);
   color: var(--green);
@@ -4278,6 +4287,38 @@ body.light-mode #profile-btn {
 }
 .ai-rec-refresh:hover { background: rgba(255,107,53,.12); }
 
+.home-quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.home-quick-btn {
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(255,107,53,.2), rgba(74,144,217,.12));
+  color: #fff;
+  padding: 12px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  font-weight: 700;
+  letter-spacing: .01em;
+  box-shadow: 0 8px 20px rgba(0,0,0,.28);
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+}
+
+.home-quick-btn:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,.4);
+  box-shadow: 0 14px 30px rgba(0,0,0,.38);
+}
+
+.home-quick-emoji { font-size: 1rem; }
+.home-quick-label { font-size: .8rem; }
+
 /* For You strip */
 .for-you-home {
   margin-bottom: 14px;
@@ -4647,6 +4688,7 @@ body[data-ui-motion='reduced'] .for-you-card {
   .mood-picks-list,
   .for-you-home-list { grid-template-columns: 1fr; }
   .smart-planner-grid { grid-template-columns: 1fr; }
+  .home-quick-actions { grid-template-columns: 1fr; }
 }
 
 /* Nearby Strip */
@@ -4659,20 +4701,18 @@ body[data-ui-motion='reduced'] .for-you-card {
 .nearby-home-title { font-size: .9rem; font-weight: 700; color: var(--text); }
 
 .nearby-home-list {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 10px;
-  overflow-x: auto;
+  overflow-x: hidden;
   padding-bottom: 4px;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
 }
 .nearby-home-list::-webkit-scrollbar { display: none; }
 
 .nearby-home-loading { color: var(--text-dim); font-size: .85rem; padding: 6px 0; }
 
 .nearby-home-card {
-  flex-shrink: 0;
-  width: 148px;
+  width: 100%;
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: 14px;

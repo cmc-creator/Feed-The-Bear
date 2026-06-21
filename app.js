@@ -260,6 +260,21 @@ function loadUserProfile () {
 }
 function saveUserProfile (profile) {
   localStorage.setItem(USER_KEY, JSON.stringify(profile));
+  if (window._ftbUid && typeof fbSaveProfileCloud === 'function') {
+    fbSaveProfileCloud(window._ftbUid, profile);
+  }
+}
+
+function persistAppearanceProfile () {
+  const base = loadUserProfile() || { name: 'Foodie', avatar: '🐻', joinDate: iso() };
+  const appearance = {
+    themeChoice: state.settings.themeChoice || 'dark',
+    themeMode: state.settings.theme || 'dark',
+    uiDensity: UI_DENSITY.has(state.settings.uiDensity) ? state.settings.uiDensity : 'cozy',
+    uiCorners: UI_CORNERS.has(state.settings.uiCorners) ? state.settings.uiCorners : 'rounded',
+    uiMotion: UI_MOTION.has(state.settings.uiMotion) ? state.settings.uiMotion : 'playful',
+  };
+  saveUserProfile({ ...base, appearance });
 }
 
 function initUserProfile () {
@@ -325,6 +340,7 @@ function applyThemeChoice (choice = 'dark') {
   state.settings.themeChoice = choice;
   state.settings.themeManual = true;
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+  persistAppearanceProfile();
   syncThemeMetaColor();
 }
 
@@ -579,6 +595,7 @@ function openPersonalizeSettings () {
     applyThemeChoice(choice);
     applyPersonalizationSettings();
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+    persistAppearanceProfile();
     overlay.classList.add('hidden');
     maybeHideOverlay();
     showToast('Personalization saved! 🎨', '', 'success');
@@ -953,6 +970,9 @@ function buildCard (r) {
       ${priorityBadgeHtml(r)}
       ${r.notes ? `<div class="card-notes">"${escHtml(r.notes)}"</div>` : ''}
       <div class="card-actions">
+        <button class="card-action-btn primary-action" data-action="open" aria-label="Open ${escHtml(r.name)}">
+          ${r.status === 'want-to-try' ? 'Plan This' : 'Open'}
+        </button>
         ${r.address ? `<button class="card-action-btn directions" data-action="directions" aria-label="Get directions to ${escHtml(r.name)}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
             Directions
@@ -1000,6 +1020,7 @@ function buildCard (r) {
     if (action === 'directions')   { e.stopPropagation(); openDirections(r);      return; }
     if (action === 'website')       { e.stopPropagation(); openWebsite(r);         return; }
     if (action === 'edit')          { e.stopPropagation(); openEditModal(r.id);    return; }
+    if (action === 'open')          { e.stopPropagation(); openDetailModal(r.id);  return; }
     if (action === 'mark-visited')  { e.stopPropagation(); markVisited(r.id);      return; }
     openDetailModal(r.id);
   });
@@ -2129,6 +2150,13 @@ function initPwa () {
    LIGHT / DARK THEME TOGGLE
    ════════════════════════════════════════════════════════════ */
 function initTheme () {
+  const appearance = loadUserProfile()?.appearance || {};
+  if (!state.settings.themeChoice && appearance.themeChoice) state.settings.themeChoice = appearance.themeChoice;
+  if (!state.settings.theme && appearance.themeMode) state.settings.theme = appearance.themeMode;
+  if (!state.settings.uiDensity && appearance.uiDensity) state.settings.uiDensity = appearance.uiDensity;
+  if (!state.settings.uiCorners && appearance.uiCorners) state.settings.uiCorners = appearance.uiCorners;
+  if (!state.settings.uiMotion && appearance.uiMotion) state.settings.uiMotion = appearance.uiMotion;
+
   const initialChoice = state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark');
   applyThemeChoice(initialChoice);
   applyPersonalizationSettings();
@@ -4176,6 +4204,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (_compareMode) addCompareCheckboxes();
   // Wire home discovery buttons
   document.getElementById('nearby-home-more-btn')?.addEventListener('click', openDiscover);
+  document.getElementById('home-quick-pick-btn')?.addEventListener('click', showTonightsPick);
+  document.getElementById('home-quick-nearby-btn')?.addEventListener('click', openDiscover);
+  document.getElementById('home-quick-plan-btn')?.addEventListener('click', openSmartPlanner);
+  document.getElementById('home-quick-share-btn')?.addEventListener('click', openShareHighlights);
   document.getElementById('ai-rec-refresh-btn')?.addEventListener('click', () => {
     const cacheKey = 'ftb_airec_' + new Date().toDateString();
     sessionStorage.removeItem(cacheKey);

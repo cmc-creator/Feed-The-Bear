@@ -180,6 +180,20 @@ function initFirebaseAuth () {
         const localProf = loadUserProfile() || {};
         saveUserProfile({ ...localProf, ...cloudProfile });
         updateHeaderAvatar(cloudProfile.avatar || localProf.avatar || '🐻');
+
+        const appearance = cloudProfile.appearance || null;
+        if (appearance && typeof applyThemeChoice === 'function') {
+          if (appearance.themeChoice) state.settings.themeChoice = appearance.themeChoice;
+          if (appearance.themeMode) state.settings.theme = appearance.themeMode;
+          if (appearance.uiDensity) state.settings.uiDensity = appearance.uiDensity;
+          if (appearance.uiCorners) state.settings.uiCorners = appearance.uiCorners;
+          if (appearance.uiMotion) state.settings.uiMotion = appearance.uiMotion;
+
+          const settingsKey = (typeof SETTINGS_KEY !== 'undefined') ? SETTINGS_KEY : 'ftb_settings_v1';
+          localStorage.setItem(settingsKey, JSON.stringify(state.settings));
+          applyThemeChoice(state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark'));
+          if (typeof applyPersonalizationSettings === 'function') applyPersonalizationSettings();
+        }
       } else {
         const localProf = loadUserProfile();
         if (localProf) fbSaveProfileCloud(user.uid, localProf);
