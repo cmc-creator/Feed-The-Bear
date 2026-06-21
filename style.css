@@ -352,7 +352,7 @@ img { display: block; }
 .restaurant-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
+  gap: 22px;
 }
 
 .restaurant-grid-single {
@@ -363,23 +363,38 @@ img { display: block; }
 
 /* ── Restaurant Card ─────────────────────────────────────── */
 .restaurant-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: linear-gradient(170deg, rgba(22,29,45,.98), rgba(12,16,30,.96));
+  border: 1px solid rgba(255,255,255,.14);
   border-radius: var(--radius-lg);
   overflow: hidden;
   transition: all .25s ease;
   cursor: pointer;
   position: relative;
+  box-shadow: 0 10px 34px rgba(0,0,0,.42);
+}
+.restaurant-card::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(130deg, rgba(255,107,53,.34), rgba(74,144,217,.2), rgba(255,255,255,0));
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+  padding: 1px;
+  opacity: .7;
 }
 .restaurant-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 40px rgba(0,0,0,.6);
-  border-color: rgba(255,255,255,.12);
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 16px 40px rgba(0,0,0,.58);
+  border-color: rgba(255,255,255,.26);
 }
 .restaurant-card:hover .card-img-overlay { opacity: 1; }
 
 .card-photo {
-  height: 200px;
+  height: 220px;
   position: relative;
   overflow: hidden;
 }
@@ -479,6 +494,10 @@ img { display: block; }
 
 .card-body { padding: 14px 16px 16px; }
 
+.restaurant-grid-single .card-body {
+  background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+}
+
 .restaurant-grid-single .restaurant-card {
   border-radius: 22px;
 }
@@ -496,19 +515,18 @@ img { display: block; }
 }
 
 .card-cuisine {
-  font-size: .65rem;
+  font-size: .72rem;
   font-weight: 700;
-  color: var(--primary-lt);
-  text-transform: uppercase;
-  letter-spacing: .1em;
-  margin-bottom: 4px;
+  color: #ffd7a7;
+  letter-spacing: .03em;
+  margin-bottom: 6px;
 }
 
 .card-name {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text);
-  margin-bottom: 5px;
+  font-size: 1.07rem;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 7px;
   line-height: 1.3;
   display: -webkit-box;
   line-clamp: 1;
@@ -522,8 +540,44 @@ img { display: block; }
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   flex-wrap: wrap;
+}
+
+.card-highlights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 9px;
+}
+
+.card-highlight {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  border: 1px solid transparent;
+}
+
+.card-highlight.good {
+  background: rgba(46,204,113,.14);
+  border-color: rgba(46,204,113,.4);
+  color: #9af3bf;
+}
+
+.card-highlight.mood {
+  background: rgba(255,107,53,.16);
+  border-color: rgba(255,107,53,.4);
+  color: #ffd4bf;
+}
+
+.card-highlight.neutral {
+  background: rgba(255,255,255,.09);
+  border-color: rgba(255,255,255,.2);
+  color: #f3f6ff;
 }
 .g-rating {
   display: flex;
@@ -568,8 +622,8 @@ img { display: block; }
 .my-stars { color: var(--primary); font-size: .8rem; }
 
 .card-address {
-  font-size: .78rem;
-  color: var(--text-dim);
+  font-size: .79rem;
+  color: #c9d2e8;
   margin-bottom: 10px;
   display: flex;
   align-items: flex-start;
@@ -582,7 +636,7 @@ img { display: block; }
 
 .card-notes {
   font-size: .78rem;
-  color: var(--text-muted);
+  color: #d4deee;
   margin-bottom: 12px;
   display: -webkit-box;
   line-clamp: 2;
@@ -595,15 +649,15 @@ img { display: block; }
 
 .card-actions {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 .card-action-btn {
   flex: 1;
-  padding: 7px 10px;
+  padding: 8px 11px;
   border-radius: var(--radius-sm);
-  font-size: .75rem;
-  font-weight: 600;
+  font-size: .76rem;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -612,23 +666,23 @@ img { display: block; }
   min-width: 70px;
 }
 .card-action-btn.directions {
-  background: rgba(255,107,53,.15);
-  color: var(--primary);
-  border: 1px solid rgba(255,107,53,.25);
+  background: linear-gradient(145deg, rgba(255,107,53,.2), rgba(255,107,53,.09));
+  color: #ffc4ad;
+  border: 1px solid rgba(255,107,53,.4);
 }
-.card-action-btn.directions:hover { background: var(--primary); color: #fff; }
+.card-action-btn.directions:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
 .card-action-btn.website {
-  background: rgba(74,144,217,.15);
-  color: var(--blue);
-  border: 1px solid rgba(74,144,217,.25);
+  background: linear-gradient(145deg, rgba(74,144,217,.22), rgba(74,144,217,.1));
+  color: #cde5ff;
+  border: 1px solid rgba(74,144,217,.4);
 }
-.card-action-btn.website:hover { background: var(--blue); color: #fff; }
+.card-action-btn.website:hover { background: var(--blue); color: #fff; border-color: var(--blue); }
 .card-action-btn.edit-card {
-  background: var(--surface3);
-  color: var(--text-muted);
-  border: 1px solid var(--border);
+  background: rgba(255,255,255,.09);
+  color: #e6ecf8;
+  border: 1px solid rgba(255,255,255,.2);
 }
-.card-action-btn.edit-card:hover { color: var(--text); border-color: rgba(255,255,255,.2); }
+.card-action-btn.edit-card:hover { color: #fff; border-color: rgba(255,255,255,.45); }
 .card-action-btn.mark-visited {
   background: rgba(46,204,113,.15);
   color: var(--green);
@@ -4245,18 +4299,18 @@ body.light-mode #profile-btn {
 .for-you-home-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .for-you-card {
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: linear-gradient(145deg, var(--surface2), rgba(var(--primary-rgb), .05));
-  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: linear-gradient(145deg, rgba(255,107,53,.2), rgba(74,144,217,.1) 52%, rgba(12,20,34,.95));
+  padding: 12px;
   width: 100%;
   text-align: left;
   display: grid;
-  gap: 4px;
+  gap: 6px;
   cursor: pointer;
   opacity: 0;
   animation: for-you-rise .45s ease forwards;
@@ -4268,9 +4322,9 @@ body.light-mode #profile-btn {
 .for-you-card:nth-child(3) { animation-delay: .17s; }
 
 .for-you-card:hover {
-  transform: translateY(-1px);
-  border-color: rgba(var(--primary-rgb), .45);
-  box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,.34);
+  box-shadow: 0 12px 28px rgba(0,0,0,.35);
 }
 
 .for-you-card-top {
@@ -4281,29 +4335,50 @@ body.light-mode #profile-btn {
 }
 
 .for-you-card-name {
-  font-size: .8rem;
-  font-weight: 700;
-  color: var(--text);
+  font-size: .95rem;
+  font-weight: 800;
+  color: #fff;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .for-you-chip {
-  font-size: .63rem;
+  font-size: .62rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .04em;
-  padding: 2px 8px;
+  padding: 3px 9px;
   border-radius: 999px;
-  background: rgba(var(--primary-rgb), .14);
-  color: var(--primary);
-  border: 1px solid rgba(var(--primary-rgb), .28);
+  background: rgba(255,255,255,.12);
+  color: #f8fbff;
+  border: 1px solid rgba(255,255,255,.25);
+}
+
+.for-you-chip.alt {
+  background: rgba(46,204,113,.17);
+  border-color: rgba(46,204,113,.35);
+  color: #9ef2bf;
 }
 
 .for-you-card-meta {
-  font-size: .72rem;
-  color: var(--text-dim);
+  font-size: .76rem;
+  color: rgba(234,241,255,.86);
+}
+
+.for-you-meter {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.16);
+  overflow: hidden;
+}
+
+.for-you-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2ecc71, #8fe4b0);
 }
 
 .for-you-empty {
@@ -4374,36 +4449,69 @@ body.light-mode #profile-btn {
 .mood-picks-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 
 .mood-pick-card {
   width: 100%;
   text-align: left;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface2);
-  padding: 8px 10px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 14px;
+  background: linear-gradient(150deg, rgba(12,20,34,.98), rgba(74,144,217,.12));
+  padding: 10px 11px;
 }
 
 .mood-pick-card:hover {
-  border-color: rgba(var(--primary-rgb), .5);
-  transform: translateY(-1px);
+  border-color: rgba(255,255,255,.32);
+  transform: translateY(-2px);
+}
+
+.mood-pick-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .mood-pick-name {
-  font-size: .8rem;
-  font-weight: 700;
-  color: var(--text);
+  font-size: .84rem;
+  font-weight: 800;
+  color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.mood-pick-fit {
+  font-size: .66rem;
+  font-weight: 800;
+  color: #9ef2bf;
+  border: 1px solid rgba(46,204,113,.38);
+  background: rgba(46,204,113,.14);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
 .mood-pick-meta {
-  font-size: .72rem;
-  color: var(--text-dim);
-  margin-top: 2px;
+  font-size: .74rem;
+  color: rgba(235,241,255,.8);
+  margin-top: 4px;
+}
+
+.mood-pick-meter {
+  margin-top: 8px;
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.16);
+  overflow: hidden;
+}
+
+.mood-pick-meter span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #ff9a66, #ffd166);
+  border-radius: inherit;
 }
 
 .dish-board-card { max-width: 520px; }
@@ -4519,6 +4627,21 @@ body[data-ui-motion='reduced'] .for-you-card {
 }
 
 @media (max-width: 768px) {
+  .restaurant-card {
+    border-radius: 20px;
+  }
+  .card-photo {
+    height: 208px;
+  }
+  .card-body {
+    padding: 14px;
+  }
+  .card-name {
+    font-size: 1.02rem;
+  }
+  .card-action-btn {
+    min-height: 34px;
+  }
   .mood-picks-list,
   .for-you-home-list { grid-template-columns: 1fr; }
   .smart-planner-grid { grid-template-columns: 1fr; }

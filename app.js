@@ -914,6 +914,8 @@ function buildCard (r) {
   const collBadge = col
     ? `<span class="collection-badge" style="background:${col.color}22;color:${col.color};border-color:${col.color}44"><span class="collection-dot" style="background:${col.color}"></span>${escHtml(col.name)}</span>`
     : '';
+  const matchScore = Math.max(42, Math.min(99, Math.round(((r.myRating || r.googleRating || 3) * 18) + (r.isFavorite ? 10 : 0) + (r.status === 'want-to-try' ? 6 : 0))));
+  const moodLabel = r.status === 'want-to-try' ? 'Up next' : 'Trusted pick';
 
   card.innerHTML = `
     <div class="card-checkbox${state.selectedIds.has(r.id) ? ' checked' : ''}" title="Select"></div>
@@ -930,11 +932,16 @@ function buildCard (r) {
       ${distStr ? `<span class="card-distance-badge">📍 ${distStr}</span>` : ''}
     </div>
     <div class="card-body">
-      ${r.cuisine ? `<div class="card-cuisine">${escHtml(r.cuisine.toUpperCase())}</div>` : ''}
+      ${r.cuisine ? `<div class="card-cuisine">${escHtml(`${cuisineEmoji(r.cuisine)} ${r.cuisine}`.trim())}</div>` : ''}
       <div class="card-name">${escHtml(r.name)}</div>
       <div class="card-rating-row">
         ${r.googleRating ? googleStarsHtml(r.googleRating, r.googleReviews) : ''}
         ${r.myRating ? `<span class="my-rating-row"><span class="my-stars">${'★'.repeat(r.myRating)}${'☆'.repeat(5-r.myRating)}</span> My Rating</span>` : ''}
+      </div>
+      <div class="card-highlights">
+        <span class="card-highlight good">${matchScore}% match</span>
+        <span class="card-highlight mood">${escHtml(moodLabel)}</span>
+        ${distStr ? `<span class="card-highlight neutral">📍 ${distStr}</span>` : ''}
       </div>
       ${r.address ? `
         <div class="card-address">
@@ -3128,22 +3135,52 @@ function exportHighlightCard (kind = 'weekly') {
   const W = canvas.width = 1080;
   const H = canvas.height = 1080;
 
-  ctx.fillStyle = '#111525';
+  const roundRect = (x, y, w, h, r) => {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  };
+
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#101a2c');
+  bg.addColorStop(0.5, '#13253b');
+  bg.addColorStop(1, '#0e1422');
+  ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
-  const grad = ctx.createLinearGradient(0, 0, W, H);
-  grad.addColorStop(0, '#FF6B35');
-  grad.addColorStop(1, '#1abc9c');
-  ctx.fillStyle = grad;
-  ctx.globalAlpha = 0.12;
-  ctx.fillRect(40, 40, W - 80, H - 80);
-  ctx.globalAlpha = 1;
+
+  const glowA = ctx.createRadialGradient(220, 170, 20, 220, 170, 320);
+  glowA.addColorStop(0, 'rgba(255,107,53,.38)');
+  glowA.addColorStop(1, 'rgba(255,107,53,0)');
+  ctx.fillStyle = glowA;
+  ctx.fillRect(0, 0, W, H);
+
+  const glowB = ctx.createRadialGradient(860, 760, 20, 860, 760, 350);
+  glowB.addColorStop(0, 'rgba(26,188,156,.35)');
+  glowB.addColorStop(1, 'rgba(26,188,156,0)');
+  ctx.fillStyle = glowB;
+  ctx.fillRect(0, 0, W, H);
+
+  roundRect(58, 58, W - 116, H - 116, 42);
+  ctx.fillStyle = 'rgba(255,255,255,.05)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.18)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
 
   ctx.fillStyle = '#fff';
-  ctx.font = '700 54px Poppins, system-ui';
+  ctx.font = '700 56px Poppins, system-ui';
   const title = kind === 'weekly' ? 'Weekly Recap' : kind === 'mood' ? 'Mood Picks' : 'Top Dishes';
-  ctx.fillText(`🐻 ${title}`, 72, 120);
+  ctx.fillText(`🐻 ${title}`, 92, 154);
 
-  ctx.font = '500 34px Poppins, system-ui';
+  ctx.fillStyle = '#ffd18a';
+  ctx.font = '600 26px Poppins, system-ui';
+  ctx.fillText('Feed The Bear Spotlight', 94, 198);
+
+  ctx.font = '600 36px Poppins, system-ui';
   let lines = [];
   if (kind === 'weekly') {
     const weekStart = getWeekStartIso();
@@ -3169,12 +3206,25 @@ function exportHighlightCard (kind = 'weekly') {
     lines = top.length ? top.map((d, i) => `${i + 1}. ${d.name} (${d.score})`) : ['No dish data yet'];
   }
 
-  ctx.fillStyle = '#eaf0ff';
-  lines.forEach((line, i) => ctx.fillText(line, 72, 220 + (i * 64)));
+  const chips = lines.slice(0, 5);
+  chips.forEach((line, i) => {
+    const y = 280 + (i * 126);
+    roundRect(92, y - 52, W - 184, 92, 26);
+    ctx.fillStyle = 'rgba(255,255,255,.08)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.14)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = '#f0f6ff';
+    ctx.fillText(line, 126, y + 8);
+  });
 
   ctx.fillStyle = '#FFD166';
-  ctx.font = '600 28px Poppins, system-ui';
-  ctx.fillText('feed the bear', 72, H - 90);
+  ctx.font = '600 30px Poppins, system-ui';
+  ctx.fillText('feed the bear', 92, H - 128);
+  ctx.fillStyle = 'rgba(255,255,255,.72)';
+  ctx.font = '500 24px Poppins, system-ui';
+  ctx.fillText(new Date().toLocaleDateString(), 92, H - 88);
 
   canvas.toBlob(blob => {
     if (!blob) {
@@ -6267,9 +6317,16 @@ function renderMoodPicksHome (selectedMood = null) {
 
   list.innerHTML = picks.map(r => {
     const meta = `${escHtml(r.cuisine || 'Restaurant')}${r.myRating ? ` • ${'★'.repeat(r.myRating)}` : ''}`;
+    const dist = distOf(r);
+    const distMeta = Number.isFinite(dist) ? ` • 📍 ${fmtDist(dist)}` : '';
+    const moodFit = Math.max(40, Math.min(98, Math.round(r._moodScore * 9.5)));
     return `<button class="mood-pick-card" type="button" data-id="${r.id}">
-      <div class="mood-pick-name">${escHtml(r.name)}</div>
-      <div class="mood-pick-meta">${meta}</div>
+      <div class="mood-pick-top">
+        <div class="mood-pick-name">${escHtml(r.name)}</div>
+        <div class="mood-pick-fit">${moodFit}%</div>
+      </div>
+      <div class="mood-pick-meta">${meta}${distMeta}</div>
+      <div class="mood-pick-meter"><span style="width:${moodFit}%"></span></div>
     </button>`;
   }).join('');
 
@@ -6446,13 +6503,16 @@ function renderForYouHome () {
     const reason = forYouReason(r);
     const dist = Number.isFinite(r._distMeters) ? fmtDist(r._distMeters) : '';
     const rating = r.myRating ? ` • You ${'★'.repeat(r.myRating)}` : (r.googleRating ? ` • ⭐${r.googleRating}` : '');
+    const match = Math.max(45, Math.min(99, Math.round(r._score * 1.7)));
     return `<button class="for-you-card" data-id="${r.id}" type="button" title="Open ${escHtml(r.name)}">
       <div class="for-you-card-top">
-        <span class="for-you-card-name">${escHtml(r.name)}</span>
         <span class="for-you-chip">${escHtml(reason)}</span>
+        <span class="for-you-chip alt">${match}% match</span>
       </div>
+      <div class="for-you-card-name">${escHtml(r.name)}</div>
       <div class="for-you-card-meta">${escHtml(r.cuisine || 'Restaurant')}${rating}</div>
       <div class="for-you-card-meta">${dist ? `📍 ${dist}` : (r.status === 'want-to-try' ? 'Ready when you are' : 'Saved in your den')}</div>
+      <div class="for-you-meter"><span style="width:${match}%"></span></div>
     </button>`;
   }).join('');
 
