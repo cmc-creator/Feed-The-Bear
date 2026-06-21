@@ -84,6 +84,12 @@
         <button class="account-action-row" id="account-dishes-link-btn">
           <span class="aar-icon">🍽️</span><span class="aar-label">Top Dishes Leaderboard</span><span class="aar-chevron">›</span>
         </button>
+        <button class="account-action-row" id="account-smartplanner-btn">
+          <span class="aar-icon">🗓️</span><span class="aar-label">Smart Planner</span><span class="aar-chevron">›</span>
+        </button>
+        <button class="account-action-row" id="account-sharehighlights-btn">
+          <span class="aar-icon">📣</span><span class="aar-label">Share Highlights</span><span class="aar-chevron">›</span>
+        </button>
         <button class="account-action-row" id="account-profile-link-btn">
           <span class="aar-icon">👤</span><span class="aar-label">My Foodie Profile</span><span class="aar-chevron">›</span>
         </button>
@@ -702,6 +708,70 @@
       </div>
       <p class="dish-board-subtitle">Your best dishes ranked from ratings + reactions + favorites.</p>
       <div id="dish-board-list" class="dish-board-list"></div>
+    </div>
+  </div>
+
+  <!-- ── Shared List Manager ──────────────────────────────── -->
+  <div id="shared-manage-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="shared-manage-title">
+    <div class="modal-card shared-manage-card">
+      <div class="modal-header">
+        <h2 id="shared-manage-title">👥 Shared List Manager</h2>
+        <button id="shared-manage-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p id="shared-manage-subtitle" class="dish-board-subtitle">Manage collaborators and track activity.</p>
+      <div id="shared-manage-collab-list" class="shared-collab-list"></div>
+      <div class="shared-manage-divider">Recent Activity</div>
+      <div id="shared-manage-activity-list" class="shared-activity-list"></div>
+    </div>
+  </div>
+
+  <!-- ── Smart Planner ───────────────────────────────────── -->
+  <div id="smart-planner-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="smart-planner-title">
+    <div class="modal-card smart-planner-card">
+      <div class="modal-header">
+        <h2 id="smart-planner-title">🗓️ Smart Planner</h2>
+        <button id="smart-planner-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="smart-planner-grid">
+        <label class="form-label" for="smart-date">Date</label>
+        <input id="smart-date" class="form-input" type="date" />
+        <label class="form-label" for="smart-budget">Budget</label>
+        <select id="smart-budget" class="form-select">
+          <option value="">Any</option>
+          <option value="1">$ Budget</option>
+          <option value="2">$$ Casual</option>
+          <option value="3">$$$ Upscale</option>
+          <option value="4">$$$$ Fine Dining</option>
+        </select>
+        <label class="form-label" for="smart-distance">Max distance (mi)</label>
+        <input id="smart-distance" class="form-input" type="number" min="1" max="25" value="8" />
+        <label class="form-label" for="smart-vibe">Vibe</label>
+        <select id="smart-vibe" class="form-select">
+          <option value="quick">⚡ Quick</option>
+          <option value="date">💫 Date</option>
+          <option value="comfort">🛋️ Comfort</option>
+          <option value="healthy">🥗 Light</option>
+          <option value="surprise">🎲 Surprise</option>
+        </select>
+      </div>
+      <button id="smart-plan-run-btn" class="btn-primary smart-plan-run-btn">Build Plan</button>
+      <div id="smart-plan-results" class="smart-plan-results"></div>
+    </div>
+  </div>
+
+  <!-- ── Share Highlights ────────────────────────────────── -->
+  <div id="share-highlights-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="share-highlights-title">
+    <div class="modal-card share-highlights-card">
+      <div class="modal-header">
+        <h2 id="share-highlights-title">📣 Share Highlights</h2>
+        <button id="share-highlights-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="dish-board-subtitle">Generate beautiful cards for your foodie wins.</p>
+      <div class="share-highlights-actions">
+        <button id="share-weekly-card-btn" class="btn-secondary">📈 Weekly Recap Card</button>
+        <button id="share-mood-card-btn" class="btn-secondary">🎯 Mood Picks Card</button>
+        <button id="share-dishes-card-btn" class="btn-secondary">🍽️ Top Dishes Card</button>
+      </div>
     </div>
   </div>
 

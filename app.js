@@ -453,6 +453,8 @@ function openAccountModal () {
   const gotoAndClose = fn => { closeAccountModal(); setTimeout(fn, 150); };
   if (btn('account-personalize-btn'))  btn('account-personalize-btn').onclick  = () => gotoAndClose(openPersonalizeSettings);
   if (btn('account-dishes-link-btn'))  btn('account-dishes-link-btn').onclick  = () => gotoAndClose(openDishLeaderboard);
+  if (btn('account-smartplanner-btn')) btn('account-smartplanner-btn').onclick = () => gotoAndClose(openSmartPlanner);
+  if (btn('account-sharehighlights-btn')) btn('account-sharehighlights-btn').onclick = () => gotoAndClose(openShareHighlights);
   if (btn('account-profile-link-btn'))  btn('account-profile-link-btn').onclick  = () => gotoAndClose(openFoodieProfile);
   if (btn('account-review-link-btn'))   btn('account-review-link-btn').onclick   = () => gotoAndClose(() => (typeof requiresPremium === 'function' ? requiresPremium('Year in Review 📅', openYearReview) : openYearReview()));
   if (btn('account-ach-link-btn'))      btn('account-ach-link-btn').onclick      = () => gotoAndClose(() => (typeof requiresPremium === 'function' ? requiresPremium('Achievements 🏆', openAchievements) : openAchievements()));
@@ -2599,6 +2601,8 @@ function bulkMoveToCollection () {
    ════════════════════════════════════════════════════════════ */
 const COLLECTION_COLORS = ['#FF6B35','#E74C3C','#9B59B6','#3498DB','#2ECC71','#F39C12','#1ABC9C','#E91E63'];
 let _newCollectionColor = COLLECTION_COLORS[0];
+let _sharedManageCollectionId = null;
+const _sharedRealtimeUnsubs = {};
 
 function getSharedListsMap () {
   if (!state.settings.sharedLists || typeof state.settings.sharedLists !== 'object') state.settings.sharedLists = {};
@@ -2640,6 +2644,7 @@ function ensureSharedMeta (collectionId) {
   if (!map[collectionId]) {
     map[collectionId] = {
       token: uid(),
+      cloudId: null,
       ownerName: getActorName(),
       collaborators: [],
       activity: [],
@@ -2653,11 +2658,67 @@ function ensureSharedMeta (collectionId) {
   return meta;
 }
 
+function getSharedCloudId (collectionId) {
+  const meta = ensureSharedMeta(collectionId);
+  if (!meta.cloudId) {
+    const base = `${collectionId}-${meta.token || uid()}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+    meta.cloudId = base.slice(0, 120);
+  }
+  return meta.cloudId;
+}
+
+function syncSharedMetaToCloud (collectionId) {
+  const meta = getSharedListsMap()[collectionId];
+  if (!meta || !window._ftbUid || typeof fbSharedListUpsert !== 'function') return;
+  const col = (state.settings.collections || []).find(c => c.id === collectionId);
+  if (!col) return;
+  const cloudId = getSharedCloudId(collectionId);
+  fbSharedListUpsert(cloudId, {
+    localId: collectionId,
+    name: col.name,
+    color: col.color,
+    token: meta.token,
+    ownerName: meta.ownerName,
+    collaborators: meta.collaborators || [],
+    activity: meta.activity || [],
+    updatedAt: Date.now(),
+  });
+}
+
+function applySharedCloudData (collectionId, data) {
+  if (!data) return;
+  const meta = ensureSharedMeta(collectionId);
+  if (data.token) meta.token = data.token;
+  if (data.cloudId) meta.cloudId = data.cloudId;
+  if (data.ownerName) meta.ownerName = data.ownerName;
+  if (Array.isArray(data.collaborators)) meta.collaborators = data.collaborators;
+  if (Array.isArray(data.activity)) meta.activity = data.activity;
+  meta.updatedAt = data.updatedAt || Date.now();
+}
+
+function refreshSharedRealtimeSubscriptions () {
+  Object.values(_sharedRealtimeUnsubs).forEach(unsub => { try { unsub(); } catch {} });
+  Object.keys(_sharedRealtimeUnsubs).forEach(k => delete _sharedRealtimeUnsubs[k]);
+  if (!window._ftbUid || typeof fbSharedListSubscribe !== 'function') return;
+
+  Object.entries(getSharedListsMap()).forEach(([cid, meta]) => {
+    const cloudId = getSharedCloudId(cid);
+    _sharedRealtimeUnsubs[cid] = fbSharedListSubscribe(cloudId, data => {
+      if (!data) return;
+      applySharedCloudData(cid, { ...data, cloudId });
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+      renderCollectionsList();
+      if (_sharedManageCollectionId === cid) renderSharedManageModal();
+    });
+  });
+}
+
 function logSharedActivity (collectionId, text) {
   const meta = ensureSharedMeta(collectionId);
   meta.activity.unshift({ id: uid(), text, ts: Date.now() });
   meta.activity = meta.activity.slice(0, 10);
   meta.updatedAt = Date.now();
+  syncSharedMetaToCloud(collectionId);
 }
 
 function addOrUpdateCollaborator (collectionId, role = 'editor') {
@@ -2673,6 +2734,7 @@ function addOrUpdateCollaborator (collectionId, role = 'editor') {
     meta.collaborators.push({ id: cid, name, role, updatedAt: Date.now() });
   }
   meta.updatedAt = Date.now();
+  syncSharedMetaToCloud(collectionId);
 }
 
 function encodeInvitePayload (obj) {
@@ -2752,6 +2814,7 @@ function joinCollectionFromPayload (payload) {
   map[target.id] = {
     ...(map[target.id] || {}),
     token: payload.t,
+    cloudId: map[target.id]?.cloudId || null,
     ownerName: payload.o || map[target.id]?.ownerName || 'Friend',
     collaborators: Array.isArray(map[target.id]?.collaborators) ? map[target.id].collaborators : [],
     activity: Array.isArray(map[target.id]?.activity) ? map[target.id].activity : [],
@@ -2771,6 +2834,8 @@ function joinCollectionFromPayload (payload) {
   if (sel) sel.value = target.id;
   renderAll();
   showToast('Joined shared list 👥', `You joined ${target.name} as ${role}.`, 'success');
+  syncSharedMetaToCloud(target.id);
+  refreshSharedRealtimeSubscriptions();
   return true;
 }
 
@@ -2860,6 +2925,7 @@ function initCollections () {
   });
 
   processSharedListInviteFromUrl();
+  refreshSharedRealtimeSubscriptions();
   renderCollectionFilter();
 }
 function renderCollectionsList () {
@@ -2886,11 +2952,15 @@ function renderCollectionsList () {
       </div>
       <div class="collection-item-count">${count}</div>
       <button class="collection-item-share" data-share="${c.id}" title="Share list">🔗</button>
+      <button class="collection-item-manage" data-manage="${c.id}" title="Manage collaborators">👥</button>
       <button class="collection-item-del" data-del="${c.id}" title="Delete">✕</button>
     </div>`;
   }).join('');
   list.querySelectorAll('.collection-item-share').forEach(btn => {
     btn.addEventListener('click', e => { e.stopPropagation(); shareCollectionInvite(btn.dataset.share); });
+  });
+  list.querySelectorAll('.collection-item-manage').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); openSharedManageModal(btn.dataset.manage); });
   });
   list.querySelectorAll('.collection-item-del').forEach(btn => {
     btn.addEventListener('click', e => { e.stopPropagation(); deleteCollection(btn.dataset.del); });
@@ -2898,11 +2968,232 @@ function renderCollectionsList () {
 }
 function deleteCollection (id) {
   if (!confirm('Delete this list? Restaurants won\'t be deleted.')) return;
+  const sharedMeta = state.settings.sharedLists?.[id] || null;
   state.settings.collections = (state.settings.collections||[]).filter(c => c.id!==id);
   if (state.settings.sharedLists && state.settings.sharedLists[id]) delete state.settings.sharedLists[id];
   state.restaurants.forEach(r => { if (r.collectionId===id) r.collectionId=null; });
   saveData(); localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
   renderCollectionsList(); renderCollectionFilter(); renderAll();
+  if (typeof fbSharedListDelete === 'function' && window._ftbUid) {
+    const cloudId = sharedMeta?.cloudId || `${id}`;
+    fbSharedListDelete(cloudId);
+  }
+  refreshSharedRealtimeSubscriptions();
+}
+
+function openSharedManageModal (collectionId) {
+  _sharedManageCollectionId = collectionId;
+  renderSharedManageModal();
+  document.getElementById('shared-manage-overlay')?.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+
+function closeSharedManageModal () {
+  document.getElementById('shared-manage-overlay')?.classList.add('hidden');
+  _sharedManageCollectionId = null;
+  maybeHideOverlay();
+}
+
+function renderSharedManageModal () {
+  const cid = _sharedManageCollectionId;
+  if (!cid) return;
+  const meta = ensureSharedMeta(cid);
+  const col = (state.settings.collections || []).find(c => c.id === cid);
+  const title = document.getElementById('shared-manage-title');
+  const subtitle = document.getElementById('shared-manage-subtitle');
+  const collabList = document.getElementById('shared-manage-collab-list');
+  const actList = document.getElementById('shared-manage-activity-list');
+  if (!collabList || !actList) return;
+  if (title) title.textContent = `👥 ${col?.name || 'Shared List'} Manager`;
+  if (subtitle) subtitle.textContent = `Owner: ${meta.ownerName || 'Unknown'} • ${meta.collaborators.length} collaborator(s)`;
+
+  collabList.innerHTML = meta.collaborators.length
+    ? meta.collaborators.map(c => `<div class="shared-collab-row">
+        <div class="shared-collab-name">${escHtml(c.name || 'Foodie')}</div>
+        <select class="shared-collab-role" data-collab="${c.id}">
+          <option value="owner" ${c.role === 'owner' ? 'selected' : ''}>Owner</option>
+          <option value="editor" ${c.role === 'editor' ? 'selected' : ''}>Editor</option>
+          <option value="viewer" ${c.role === 'viewer' ? 'selected' : ''}>Viewer</option>
+        </select>
+        <button class="shared-collab-remove" data-collab="${c.id}" type="button">Remove</button>
+      </div>`).join('')
+    : '<div class="dish-empty">No collaborators yet.</div>';
+
+  actList.innerHTML = meta.activity.length
+    ? meta.activity.map(a => `<div class="shared-activity-row">
+        <div class="shared-activity-text">${escHtml(a.text || '')}</div>
+        <div class="shared-activity-time">${sharedAgo(a.ts)}</div>
+      </div>`).join('')
+    : '<div class="dish-empty">No activity yet.</div>';
+}
+
+function updateCollaboratorRole (collabId, role) {
+  const cid = _sharedManageCollectionId;
+  if (!cid) return;
+  const meta = ensureSharedMeta(cid);
+  const item = meta.collaborators.find(c => c.id === collabId);
+  if (!item) return;
+  item.role = role;
+  item.updatedAt = Date.now();
+  logSharedActivity(cid, `${item.name || 'Foodie'} role changed to ${role}`);
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+  renderCollectionsList();
+  renderSharedManageModal();
+  syncSharedMetaToCloud(cid);
+}
+
+function removeCollaborator (collabId) {
+  const cid = _sharedManageCollectionId;
+  if (!cid) return;
+  const meta = ensureSharedMeta(cid);
+  const who = meta.collaborators.find(c => c.id === collabId);
+  meta.collaborators = meta.collaborators.filter(c => c.id !== collabId);
+  logSharedActivity(cid, `${who?.name || 'Foodie'} removed from list`);
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+  renderCollectionsList();
+  renderSharedManageModal();
+  syncSharedMetaToCloud(cid);
+}
+
+function openSmartPlanner () {
+  const dateEl = document.getElementById('smart-date');
+  if (dateEl && !dateEl.value) dateEl.value = iso();
+  document.getElementById('smart-plan-results').innerHTML = '';
+  document.getElementById('smart-planner-overlay')?.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+
+function closeSmartPlanner () {
+  document.getElementById('smart-planner-overlay')?.classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function runSmartPlanner () {
+  const budget = Number(document.getElementById('smart-budget')?.value || 0);
+  const miles = Math.max(1, Number(document.getElementById('smart-distance')?.value || 8));
+  const vibe = document.getElementById('smart-vibe')?.value || 'quick';
+  const maxMeters = miles * 1609.34;
+  const out = document.getElementById('smart-plan-results');
+  if (!out) return;
+
+  const picks = [...state.restaurants].map(r => {
+    if (budget && (r.priceRange || 0) > budget) return { r, s: -999 };
+    const d = distOf(r);
+    if (Number.isFinite(d) && d > maxMeters) return { r, s: -999 };
+    let s = scoreMoodPick(r, vibe);
+    s += r.isFavorite ? 1 : 0;
+    s += r.status === 'want-to-try' ? 0.8 : 0.2;
+    return { r, s };
+  }).filter(x => x.s > -900).sort((a, b) => b.s - a.s).slice(0, 3);
+
+  if (!picks.length) {
+    out.innerHTML = '<div class="dish-empty">No matches. Try increasing distance or budget.</div>';
+    return;
+  }
+
+  out.innerHTML = picks.map(p => {
+    const d = distOf(p.r);
+    const dist = Number.isFinite(d) ? fmtDist(d) : 'distance n/a';
+    return `<button class="smart-plan-row" data-id="${p.r.id}" type="button">
+      <div>
+        <div class="smart-plan-name">${escHtml(p.r.name)}</div>
+        <div class="smart-plan-meta">${escHtml(p.r.cuisine || 'Restaurant')} • ${dist}</div>
+      </div>
+      <div class="smart-plan-score">${(p.s).toFixed(1)}</div>
+    </button>`;
+  }).join('');
+
+  out.querySelectorAll('.smart-plan-row[data-id]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      closeSmartPlanner();
+      setTimeout(() => openDetailModal(btn.dataset.id), 120);
+    });
+  });
+}
+
+function openShareHighlights () {
+  document.getElementById('share-highlights-overlay')?.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+
+function closeShareHighlights () {
+  document.getElementById('share-highlights-overlay')?.classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function exportHighlightCard (kind = 'weekly') {
+  const canvas = document.getElementById('share-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width = 1080;
+  const H = canvas.height = 1080;
+
+  ctx.fillStyle = '#111525';
+  ctx.fillRect(0, 0, W, H);
+  const grad = ctx.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, '#FF6B35');
+  grad.addColorStop(1, '#1abc9c');
+  ctx.fillStyle = grad;
+  ctx.globalAlpha = 0.12;
+  ctx.fillRect(40, 40, W - 80, H - 80);
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = '#fff';
+  ctx.font = '700 54px Poppins, system-ui';
+  const title = kind === 'weekly' ? 'Weekly Recap' : kind === 'mood' ? 'Mood Picks' : 'Top Dishes';
+  ctx.fillText(`🐻 ${title}`, 72, 120);
+
+  ctx.font = '500 34px Poppins, system-ui';
+  let lines = [];
+  if (kind === 'weekly') {
+    const weekStart = getWeekStartIso();
+    let checkins = 0;
+    state.restaurants.forEach(r => {
+      (r.visits || []).forEach(v => { if ((v.date || '') >= weekStart) checkins++; });
+      if ((r.dateVisited || '') >= weekStart && !(r.visits || []).length) checkins++;
+    });
+    lines = [
+      `${checkins} check-ins this week`,
+      `${state.restaurants.filter(r => r.isFavorite).length} favorites saved`,
+      `${state.restaurants.length} restaurants in your den`,
+    ];
+  } else if (kind === 'mood') {
+    const mood = document.querySelector('.home-mood-chip.active')?.dataset.mood || 'quick';
+    const picks = [...state.restaurants]
+      .map(r => ({ ...r, s: scoreMoodPick(r, mood) }))
+      .sort((a, b) => b.s - a.s)
+      .slice(0, 3);
+    lines = [`Mood: ${mood.toUpperCase()}`, ...picks.map((p, i) => `${i + 1}. ${p.name}`)];
+  } else {
+    const top = getDishLeaderboardData().slice(0, 5);
+    lines = top.length ? top.map((d, i) => `${i + 1}. ${d.name} (${d.score})`) : ['No dish data yet'];
+  }
+
+  ctx.fillStyle = '#eaf0ff';
+  lines.forEach((line, i) => ctx.fillText(line, 72, 220 + (i * 64)));
+
+  ctx.fillStyle = '#FFD166';
+  ctx.font = '600 28px Poppins, system-ui';
+  ctx.fillText('feed the bear', 72, H - 90);
+
+  canvas.toBlob(blob => {
+    if (!blob) {
+      showToast('Export failed', 'Could not generate the highlight card.', 'error');
+      return;
+    }
+    const file = new File([blob], `ftb-${kind}-card.png`, { type: 'image/png' });
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      navigator.share({ title: `Feed The Bear ${title}`, files: [file] }).catch(() => {});
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    showToast('Card ready 📣', `${title} card generated.`, 'success');
+  }, 'image/png');
 }
 function renderCollectionFilter () {
   const sel = document.getElementById('filter-collection'); if (!sel) return;
@@ -3882,6 +4173,30 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('dish-board-overlay')?.addEventListener('click', e => {
     if (e.target === document.getElementById('dish-board-overlay')) closeDishLeaderboard();
   });
+  document.getElementById('shared-manage-close-btn')?.addEventListener('click', closeSharedManageModal);
+  document.getElementById('shared-manage-overlay')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('shared-manage-overlay')) closeSharedManageModal();
+  });
+  document.getElementById('shared-manage-collab-list')?.addEventListener('change', e => {
+    const sel = e.target.closest('.shared-collab-role[data-collab]');
+    if (sel) updateCollaboratorRole(sel.dataset.collab, sel.value);
+  });
+  document.getElementById('shared-manage-collab-list')?.addEventListener('click', e => {
+    const btn = e.target.closest('.shared-collab-remove[data-collab]');
+    if (btn) removeCollaborator(btn.dataset.collab);
+  });
+  document.getElementById('smart-planner-close-btn')?.addEventListener('click', closeSmartPlanner);
+  document.getElementById('smart-planner-overlay')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('smart-planner-overlay')) closeSmartPlanner();
+  });
+  document.getElementById('smart-plan-run-btn')?.addEventListener('click', runSmartPlanner);
+  document.getElementById('share-highlights-close-btn')?.addEventListener('click', closeShareHighlights);
+  document.getElementById('share-highlights-overlay')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('share-highlights-overlay')) closeShareHighlights();
+  });
+  document.getElementById('share-weekly-card-btn')?.addEventListener('click', () => exportHighlightCard('weekly'));
+  document.getElementById('share-mood-card-btn')?.addEventListener('click', () => exportHighlightCard('mood'));
+  document.getElementById('share-dishes-card-btn')?.addEventListener('click', () => exportHighlightCard('dishes'));
   // Init user profile (shows setup on first run)
   initUserProfile();
   // Show home discovery teaser or load if location ready

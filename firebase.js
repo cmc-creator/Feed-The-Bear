@@ -114,6 +114,37 @@ function fbDebouncedSync () {
   _syncTimer = setTimeout(() => fbSaveRestaurants(uid, state.restaurants), 3000);
 }
 
+// ─── SHARED LISTS REALTIME ───────────────────────────────────
+function fbSharedListUpsert (sharedId, payload) {
+  if (!window._ftbUid || !sharedId || !payload) return Promise.resolve();
+  return _db.collection('sharedLists').doc(sharedId).set({
+    ...payload,
+    cloudId: sharedId,
+    updatedBy: window._ftbUid,
+    updatedAt: Date.now(),
+  }, { merge: true }).catch(err => console.warn('[FTB] shared upsert failed:', err));
+}
+
+function fbSharedListDelete (sharedId) {
+  if (!window._ftbUid || !sharedId) return Promise.resolve();
+  return _db.collection('sharedLists').doc(sharedId).delete().catch(err => console.warn('[FTB] shared delete failed:', err));
+}
+
+function fbSharedListSubscribe (sharedId, onData) {
+  if (!sharedId || typeof onData !== 'function') return () => {};
+  return _db.collection('sharedLists').doc(sharedId).onSnapshot(
+    snap => {
+      if (!snap.exists) return;
+      onData({ id: snap.id, ...snap.data() });
+    },
+    err => console.warn('[FTB] shared subscribe failed:', err),
+  );
+}
+
+window.fbSharedListUpsert = fbSharedListUpsert;
+window.fbSharedListDelete = fbSharedListDelete;
+window.fbSharedListSubscribe = fbSharedListSubscribe;
+
 // ─── AUTH STATE OBSERVER ──────────────────────────────────────
 function initFirebaseAuth () {
   _auth.onAuthStateChanged(async user => {
@@ -153,6 +184,7 @@ function initFirebaseAuth () {
       }
 
       updateAuthUI(user);
+      if (typeof refreshSharedRealtimeSubscriptions === 'function') refreshSharedRealtimeSubscriptions();
 
       // Handle ?upgrade=success redirect back from Stripe
       const params = new URLSearchParams(window.location.search);
@@ -168,6 +200,7 @@ function initFirebaseAuth () {
       window._ftbUid  = null;
       window._ftbPlan = localStorage.getItem('ftb_plan_v1') || 'free';
       updateAuthUI(null);
+      if (typeof refreshSharedRealtimeSubscriptions === 'function') refreshSharedRealtimeSubscriptions();
     }
   });
 }
