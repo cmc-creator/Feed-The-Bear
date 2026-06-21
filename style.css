@@ -1746,6 +1746,13 @@ body.bulk-mode .card-checkbox { display: flex; }
 .collections-panel h3 { font-size: 1rem; font-weight: 700; margin-bottom: 4px; color: var(--text); float: left; }
 .collections-panel .panel-close { float: right; margin-top: -4px; }
 .collections-panel::after { content: ''; display: table; clear: both; }
+.collection-share-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+.collection-share-row input { flex: 1; }
 .collections-list { display: flex; flex-direction: column; gap: 2px; margin-top: 12px; }
 .collection-item {
   display: flex; align-items: center; gap: 10px;
@@ -1753,8 +1760,39 @@ body.bulk-mode .card-checkbox { display: flex; }
 }
 .collection-item:hover { background: var(--surface2); }
 .collection-item.active { background: var(--surface2); outline: 1px solid var(--primary); }
+.collection-item-main { flex: 1; min-width: 0; }
+.collection-item-name-row { display: flex; align-items: center; gap: 6px; }
 .collection-item-name { flex: 1; font-size: .88rem; font-weight: 600; color: var(--text); }
+.collection-item-activity {
+  font-size: .69rem;
+  color: var(--text-dim);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .collection-item-count { font-size: .73rem; color: var(--text-dim); }
+.collection-shared-pill {
+  font-size: .58rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--primary-rgb), .35);
+  background: rgba(var(--primary-rgb), .14);
+  color: var(--primary);
+  flex-shrink: 0;
+}
+.collection-item-share {
+  opacity: .72;
+  color: var(--text-muted);
+  font-size: .84rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.collection-item:hover .collection-item-share { opacity: 1; color: var(--primary); }
 .collection-item-del { opacity: 0; color: var(--danger); font-size: .8rem; background: none; border: none; cursor: pointer; padding: 2px 4px; }
 .collection-item:hover .collection-item-del { opacity: 1; }
 .new-collection-row { display: flex; gap: 6px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }

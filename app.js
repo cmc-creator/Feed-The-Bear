@@ -2599,6 +2599,215 @@ function bulkMoveToCollection () {
    ════════════════════════════════════════════════════════════ */
 const COLLECTION_COLORS = ['#FF6B35','#E74C3C','#9B59B6','#3498DB','#2ECC71','#F39C12','#1ABC9C','#E91E63'];
 let _newCollectionColor = COLLECTION_COLORS[0];
+
+function getSharedListsMap () {
+  if (!state.settings.sharedLists || typeof state.settings.sharedLists !== 'object') state.settings.sharedLists = {};
+  return state.settings.sharedLists;
+}
+
+function getCollaboratorId () {
+  const key = 'ftb_collab_id_v1';
+  let id = localStorage.getItem(key);
+  if (!id) {
+    id = uid();
+    localStorage.setItem(key, id);
+  }
+  return id;
+}
+
+function getActorName () {
+  const profile = loadUserProfile?.() || null;
+  if (profile?.name) return profile.name;
+  if (typeof _auth !== 'undefined' && _auth?.currentUser) {
+    return _auth.currentUser.displayName || _auth.currentUser.email || 'Foodie';
+  }
+  return 'Foodie';
+}
+
+function sharedAgo (ts) {
+  const ms = Math.max(0, Date.now() - Number(ts || 0));
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+function ensureSharedMeta (collectionId) {
+  const map = getSharedListsMap();
+  if (!map[collectionId]) {
+    map[collectionId] = {
+      token: uid(),
+      ownerName: getActorName(),
+      collaborators: [],
+      activity: [],
+      updatedAt: Date.now(),
+    };
+  }
+  const meta = map[collectionId];
+  if (!Array.isArray(meta.collaborators)) meta.collaborators = [];
+  if (!Array.isArray(meta.activity)) meta.activity = [];
+  if (!meta.ownerName) meta.ownerName = getActorName();
+  return meta;
+}
+
+function logSharedActivity (collectionId, text) {
+  const meta = ensureSharedMeta(collectionId);
+  meta.activity.unshift({ id: uid(), text, ts: Date.now() });
+  meta.activity = meta.activity.slice(0, 10);
+  meta.updatedAt = Date.now();
+}
+
+function addOrUpdateCollaborator (collectionId, role = 'editor') {
+  const meta = ensureSharedMeta(collectionId);
+  const cid = getCollaboratorId();
+  const name = getActorName();
+  const existing = meta.collaborators.find(c => c.id === cid);
+  if (existing) {
+    existing.name = name;
+    existing.role = role;
+    existing.updatedAt = Date.now();
+  } else {
+    meta.collaborators.push({ id: cid, name, role, updatedAt: Date.now() });
+  }
+  meta.updatedAt = Date.now();
+}
+
+function encodeInvitePayload (obj) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+}
+
+function decodeInvitePayload (encoded) {
+  return JSON.parse(decodeURIComponent(escape(atob(encoded))));
+}
+
+function buildCollectionShareLink (collectionId, role = 'editor') {
+  const col = (state.settings.collections || []).find(c => c.id === collectionId);
+  if (!col) return '';
+  const meta = ensureSharedMeta(collectionId);
+  const payload = {
+    v: 1,
+    id: collectionId,
+    t: meta.token,
+    n: col.name,
+    c: col.color,
+    o: meta.ownerName,
+    r: role,
+  };
+  return `${location.origin}${location.pathname}#join-list=${encodeURIComponent(encodeInvitePayload(payload))}`;
+}
+
+function shareCollectionInvite (collectionId) {
+  const col = (state.settings.collections || []).find(c => c.id === collectionId);
+  if (!col) return;
+  const asked = (prompt('Invite role for this link: owner, editor, or viewer', 'editor') || 'editor').trim().toLowerCase();
+  const role = ['owner', 'editor', 'viewer'].includes(asked) ? asked : 'editor';
+  addOrUpdateCollaborator(collectionId, 'owner');
+  const link = buildCollectionShareLink(collectionId, role);
+  if (!link) return;
+
+  const done = () => {
+    logSharedActivity(collectionId, `${getActorName()} shared link (${role})`);
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+    renderCollectionsList();
+    showToast('Invite ready 🔗', `Share link for ${col.name} copied.`, 'success');
+  };
+
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(link).then(done).catch(() => {
+      prompt('Copy this shared list link:', link);
+      done();
+    });
+  } else {
+    prompt('Copy this shared list link:', link);
+    done();
+  }
+}
+
+function joinCollectionFromPayload (payload) {
+  if (!payload?.id || !payload?.t) return false;
+  if (!state.settings.collections) state.settings.collections = [];
+
+  let target = state.settings.collections.find(c => c.id === payload.id) || null;
+  const map = getSharedListsMap();
+  const existingMeta = map[payload.id];
+
+  if (target && existingMeta?.token && existingMeta.token !== payload.t) {
+    const newId = `${payload.id}-${uid().slice(0, 4)}`;
+    target = null;
+    payload.id = newId;
+  }
+
+  if (!target) {
+    target = {
+      id: payload.id,
+      name: payload.n || 'Shared List',
+      color: payload.c || COLLECTION_COLORS[0],
+    };
+    state.settings.collections.push(target);
+  }
+
+  map[target.id] = {
+    ...(map[target.id] || {}),
+    token: payload.t,
+    ownerName: payload.o || map[target.id]?.ownerName || 'Friend',
+    collaborators: Array.isArray(map[target.id]?.collaborators) ? map[target.id].collaborators : [],
+    activity: Array.isArray(map[target.id]?.activity) ? map[target.id].activity : [],
+    updatedAt: Date.now(),
+  };
+
+  const role = ['owner', 'editor', 'viewer'].includes(payload.r) ? payload.r : 'editor';
+  addOrUpdateCollaborator(target.id, role);
+  logSharedActivity(target.id, `${getActorName()} joined as ${role}`);
+
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+  renderCollectionsList();
+  renderCollectionFilter();
+  populateFormCollections();
+  state.filter.collection = target.id;
+  const sel = document.getElementById('filter-collection');
+  if (sel) sel.value = target.id;
+  renderAll();
+  showToast('Joined shared list 👥', `You joined ${target.name} as ${role}.`, 'success');
+  return true;
+}
+
+function joinCollectionFromInput () {
+  const input = document.getElementById('join-list-input');
+  const raw = (input?.value || '').trim();
+  if (!raw) return;
+  try {
+    const hash = raw.includes('#') ? raw.split('#')[1] : raw;
+    const params = new URLSearchParams(hash.startsWith('join-list=') ? hash : hash.replace(/^.*\?/, ''));
+    const encoded = params.get('join-list') || (hash.startsWith('join-list=') ? hash.slice('join-list='.length) : '');
+    if (!encoded) throw new Error('bad-link');
+    const payload = decodeInvitePayload(decodeURIComponent(encoded));
+    joinCollectionFromPayload(payload);
+    if (input) input.value = '';
+  } catch {
+    showToast('Invalid link', 'That shared list link looks invalid.', 'error');
+  }
+}
+
+function processSharedListInviteFromUrl () {
+  const hash = window.location.hash || '';
+  if (!hash.includes('join-list=')) return;
+  try {
+    const params = new URLSearchParams(hash.slice(1));
+    const encoded = params.get('join-list');
+    if (!encoded) return;
+    const payload = decodeInvitePayload(decodeURIComponent(encoded));
+    const ask = confirm(`Join shared list "${payload.n || 'Shared List'}" as ${payload.r || 'editor'}?`);
+    if (ask) joinCollectionFromPayload(payload);
+  } catch {
+    showToast('Invalid invite', 'Could not parse shared list invite.', 'error');
+  } finally {
+    history.replaceState({}, document.title, window.location.pathname + window.location.search);
+  }
+}
+
 function initCollections () {
   const panel = document.getElementById('collections-panel');
   const swatchRow = document.getElementById('collection-color-swatches');
@@ -2620,6 +2829,13 @@ function initCollections () {
   document.getElementById('collections-panel-close').addEventListener('click', () => {
     panel.classList.remove('open'); maybeHideOverlay();
   });
+  document.getElementById('join-list-btn')?.addEventListener('click', joinCollectionFromInput);
+  document.getElementById('join-list-input')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      joinCollectionFromInput();
+    }
+  });
   document.getElementById('add-collection-btn').addEventListener('click', () => {
     const name = document.getElementById('new-collection-name').value.trim();
     if (!name) return;
@@ -2630,21 +2846,52 @@ function initCollections () {
     renderCollectionsList(); renderCollectionFilter();
     showToast('📁 List Created!', `"${name}" ready.`, 'success');
   });
+
+  window.addEventListener('storage', e => {
+    if (e.key !== SETTINGS_KEY) return;
+    try {
+      const next = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+      state.settings = { ...state.settings, ...next };
+      renderCollectionsList();
+      renderCollectionFilter();
+      populateFormCollections();
+      renderAll();
+    } catch {}
+  });
+
+  processSharedListInviteFromUrl();
   renderCollectionFilter();
 }
 function renderCollectionsList () {
   const list = document.getElementById('collections-list');
+  const me = getCollaboratorId();
   const cols = state.settings.collections || [];
   if (!cols.length) { list.innerHTML = '<div style="color:var(--text-dim);font-size:.82rem;padding:8px 0">No custom lists yet. Create one below!</div>'; return; }
   list.innerHTML = cols.map(c => {
     const count = state.restaurants.filter(r => r.collectionId === c.id).length;
+    const shared = getSharedListsMap()[c.id];
+    const mine = shared?.collaborators?.find(x => x.id === me);
+    const sharedLabel = shared ? `<span class="collection-shared-pill">Shared • ${escHtml((mine?.role || 'editor').toUpperCase())}</span>` : '';
+    const activity = shared?.activity?.[0]
+      ? `<div class="collection-item-activity">${escHtml(shared.activity[0].text)} · ${sharedAgo(shared.activity[0].ts)}</div>`
+      : '';
     return `<div class="collection-item" data-cid="${c.id}">
       <div class="collection-dot" style="background:${c.color}"></div>
-      <div class="collection-item-name">${escHtml(c.name)}</div>
+      <div class="collection-item-main">
+        <div class="collection-item-name-row">
+          <div class="collection-item-name">${escHtml(c.name)}</div>
+          ${sharedLabel}
+        </div>
+        ${activity}
+      </div>
       <div class="collection-item-count">${count}</div>
+      <button class="collection-item-share" data-share="${c.id}" title="Share list">🔗</button>
       <button class="collection-item-del" data-del="${c.id}" title="Delete">✕</button>
     </div>`;
   }).join('');
+  list.querySelectorAll('.collection-item-share').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); shareCollectionInvite(btn.dataset.share); });
+  });
   list.querySelectorAll('.collection-item-del').forEach(btn => {
     btn.addEventListener('click', e => { e.stopPropagation(); deleteCollection(btn.dataset.del); });
   });
@@ -2652,6 +2899,7 @@ function renderCollectionsList () {
 function deleteCollection (id) {
   if (!confirm('Delete this list? Restaurants won\'t be deleted.')) return;
   state.settings.collections = (state.settings.collections||[]).filter(c => c.id!==id);
+  if (state.settings.sharedLists && state.settings.sharedLists[id]) delete state.settings.sharedLists[id];
   state.restaurants.forEach(r => { if (r.collectionId===id) r.collectionId=null; });
   saveData(); localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
   renderCollectionsList(); renderCollectionFilter(); renderAll();
