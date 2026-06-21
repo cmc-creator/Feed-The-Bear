@@ -235,6 +235,13 @@ function iso (offsetDays = 0) {
   return d.toISOString().split('T')[0];
 }
 
+function hapticTap (strength = 'light') {
+  if (!navigator.vibrate) return;
+  if (state?.settings?.uiMotion === 'reduced') return;
+  const ms = strength === 'medium' ? 16 : 8;
+  navigator.vibrate(ms);
+}
+
 /* ════════════════════════════════════════════════════════════
    USER PROFILE
    ════════════════════════════════════════════════════════════ */
@@ -964,8 +971,8 @@ function buildCard (r) {
         ${r.myRating ? `<span class="my-rating-row"><span class="my-stars">${'★'.repeat(r.myRating)}${'☆'.repeat(5-r.myRating)}</span> My Rating</span>` : ''}
       </div>
       <div class="card-highlights">
-        <span class="card-highlight good">${matchScore}% match</span>
-        <span class="card-highlight mood">${escHtml(moodLabel)}</span>
+        <span class="card-highlight good">💯 ${matchScore}% match</span>
+        <span class="card-highlight mood">🎯 ${escHtml(moodLabel)}</span>
         ${distStr ? `<span class="card-highlight neutral">📍 ${distStr}</span>` : ''}
       </div>
       ${r.address ? `
@@ -1030,6 +1037,7 @@ function buildCard (r) {
     if (action === 'edit')          { e.stopPropagation(); openEditModal(r.id);    return; }
     if (action === 'open')          { e.stopPropagation(); openDetailModal(r.id);  return; }
     if (action === 'mark-visited')  { e.stopPropagation(); markVisited(r.id);      return; }
+    hapticTap('light');
     openDetailModal(r.id);
   });
   card.addEventListener('keydown', e => {
@@ -4212,10 +4220,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (_compareMode) addCompareCheckboxes();
   // Wire home discovery buttons
   document.getElementById('nearby-home-more-btn')?.addEventListener('click', openDiscover);
-  document.getElementById('home-quick-pick-btn')?.addEventListener('click', showTonightsPick);
-  document.getElementById('home-quick-nearby-btn')?.addEventListener('click', openDiscover);
-  document.getElementById('home-quick-plan-btn')?.addEventListener('click', openSmartPlanner);
-  document.getElementById('home-quick-share-btn')?.addEventListener('click', openShareHighlights);
+  document.getElementById('home-quick-pick-btn')?.addEventListener('click', () => { hapticTap('medium'); showTonightsPick(); });
+  document.getElementById('home-quick-nearby-btn')?.addEventListener('click', () => { hapticTap('medium'); openDiscover(); });
+  document.getElementById('home-quick-plan-btn')?.addEventListener('click', () => { hapticTap('medium'); openSmartPlanner(); });
+  document.getElementById('home-quick-share-btn')?.addEventListener('click', () => { hapticTap('medium'); openShareHighlights(); });
   document.getElementById('ai-rec-refresh-btn')?.addEventListener('click', () => {
     const cacheKey = 'ftb_airec_' + new Date().toDateString();
     sessionStorage.removeItem(cacheKey);

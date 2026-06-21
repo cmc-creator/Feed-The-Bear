@@ -4376,6 +4376,10 @@ body.light-mode #profile-btn {
   animation: home-module-rise .35s ease forwards;
 }
 
+.home-quick-btn:active {
+  transform: translateY(0) scale(.985);
+  box-shadow: 0 8px 18px rgba(0,0,0,.3);
+}
 .home-discovery.staged .home-module:nth-child(1) { animation-delay: .02s; }
 .home-discovery.staged .home-module:nth-child(2) { animation-delay: .08s; }
 .home-discovery.staged .home-module:nth-child(3) { animation-delay: .14s; }
@@ -4386,6 +4390,9 @@ body.light-mode #profile-btn {
 @keyframes home-module-rise {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+.card-action-btn:active {
+  transform: translateY(1px) scale(.99);
 }
 
 .home-skeleton {
