@@ -4298,8 +4298,9 @@ body.light-mode #profile-btn {
 
 .for-you-home-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
+  overflow-x: hidden;
 }
 
 .for-you-card {
@@ -4448,8 +4449,9 @@ body.light-mode #profile-btn {
 
 .mood-picks-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 10px;
+  overflow-x: hidden;
 }
 
 .mood-pick-card {

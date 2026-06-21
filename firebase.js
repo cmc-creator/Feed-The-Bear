@@ -66,7 +66,9 @@ async function fbSignOut () {
   window._ftbPlan = 'free';
   localStorage.removeItem('ftb_plan_v1');
   localStorage.removeItem('ftb_uid_v1');
-  window.location.href = 'index.html';
+  closeAuthModal?.();
+  closeAccountModal?.();
+  showToast?.('Signed out', 'You are now signed out. Your theme and local settings were kept.', 'info');
 }
 
 // ─── FIRESTORE SYNC ───────────────────────────────────────────
