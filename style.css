@@ -5,56 +5,40 @@
 
 /* ── Custom Properties ──────────────────────────────────── */
 :root {
-  /* ── Velvet & Champagne — luxury-but-fun foodie palette ── */
-  --bg:          #15111C;   /* deep plum-black   */
-
-.home-module {
-  border: 1px solid rgba(255,255,255,.16);
-  border-radius: 16px;
-  background: linear-gradient(145deg, rgba(255,255,255,.07), rgba(255,255,255,.03));
-  box-shadow: 0 10px 26px rgba(0,0,0,.24);
-  backdrop-filter: blur(10px);
-  padding: 10px 12px;
-}
-  --surface:     #1E1828;   /* aubergine         */
-  --surface2:    #281F34;
-  --surface3:    #342843;
+  /* ── Espresso & Brass — calmer, more editorial look ── */
+  --bg:          #101319;
+  --surface:     #171c24;
+  --surface2:    #1d2430;
+  --surface3:    #263142;
   --border:      rgba(255,255,255,.09);
 
-  --primary:     #E8B15A;   /* champagne gold    */
-  --primary-rgb: 232,177,90;
-  --primary-dk:  #CE9740;
-  border: 1px solid rgba(255,255,255,.28);
-  background: rgba(255,255,255,.12);
-  --rose:        #E8628A;   /* soft rose pop     */
-  --rose-rgb:    232,98,138;
-  --rose-dk:     #D44B74;
+  --primary:     #d6a86b;
+  --primary-rgb: 214,168,107;
+  --primary-dk:  #bf8f52;
+  --rose:        #ce6b88;
+  --rose-rgb:    206,107,136;
+  --rose-dk:     #b85673;
 
-  --blue:        #9B7BE0;   /* orchid jewel      */
-  --blue-rgb:    155,123,224;
-  --blue-lt:     #B79BEC;
-  border: 1px solid rgba(255,255,255,.28);
-  background: rgba(8,14,26,.38);
-  --red:         #E85C6A;
-  --gold:        #FFD27A;
-  --gold-dk:     #F0B84E;
-  --purple:      #B07FE8;
+  --blue:        #6f8ec7;
+  --blue-rgb:    111,142,199;
+  --blue-lt:     #8da8db;
+  --red:         #de6670;
+  --gold:        #f0c27e;
+  --gold-dk:     #d9a861;
+  --purple:      #9479c3;
 
-  --text:        #F0EAF2;   /* warm ivory        */
-  --text-muted:  #A99FB5;
-  --text-dim:    #6E6478;
+  --text:        #eaf0f7;
+  --text-muted:  #b1bdce;
+  --text-dim:    #7f8ea6;
 
-  font-size: .72rem;
+  --radius-sm:   10px;
   --radius:      12px;
   --radius-lg:   20px;
   --radius-xl:   28px;
 
-  --shadow:      0 4px 24px rgba(0,0,0,.5);
-  background: rgba(255,255,255,.14);
-  border-color: rgba(255,255,255,.32);
-  color: #ffffff;
+  --shadow:      0 8px 28px rgba(0,0,0,.34);
   --transition:  .2s ease;
-  --font:        'Poppins', system-ui, sans-serif;
+  --font:        'Manrope', system-ui, sans-serif;
 
   --header-h:    64px;
   --stats-h:     64px;
@@ -97,7 +81,7 @@ img { display: block; }
   top: 0;
   z-index: 100;
   height: var(--header-h);
-  background: rgba(13,13,26,.92);
+  background: linear-gradient(180deg, rgba(16,19,25,.96), rgba(16,19,25,.88));
   backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border);
   display: flex;
@@ -114,9 +98,10 @@ img { display: block; }
 }
 .brand-icon { font-size: 1.4rem; opacity: .9; }
 .brand-name {
-  font-size: 1.2rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--primary), var(--rose));
+  font-size: 1.12rem;
+  font-weight: 800;
+  letter-spacing: .01em;
+  background: linear-gradient(135deg, #f2d5a8, #cf9e5f);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -126,7 +111,8 @@ img { display: block; }
 .header-nav {
   display: flex;
   gap: 4px;
-  background: var(--surface2);
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08);
   border-radius: var(--radius-xl);
   padding: 4px;
   flex-shrink: 0;
@@ -134,16 +120,19 @@ img { display: block; }
 .nav-btn {
   padding: 6px 16px;
   border-radius: 20px;
-  font-size: .82rem;
-  font-weight: 500;
+  font-size: .79rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
   color: var(--text-muted);
   transition: all var(--transition);
 }
 .nav-btn:hover { color: var(--text); }
 .nav-btn.active {
-  background: var(--primary);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(var(--primary-rgb),.35);
+  background: linear-gradient(135deg, rgba(var(--primary-rgb),.22), rgba(var(--primary-rgb),.08));
+  color: #fdf8ef;
+  border: 1px solid rgba(var(--primary-rgb),.45);
+  box-shadow: 0 2px 12px rgba(0,0,0,.3);
 }
 
 .header-actions {
@@ -159,17 +148,17 @@ img { display: block; }
   align-items: center;
   gap: 6px;
   padding: 9px 18px;
-  background: linear-gradient(135deg, var(--primary), var(--primary-dk));
-  color: #fff;
+  background: linear-gradient(135deg, #e1b67c, #c99556);
+  color: #1a1310;
   border-radius: var(--radius-xl);
   font-size: .85rem;
   font-weight: 600;
   transition: all var(--transition);
-  box-shadow: 0 2px 10px rgba(var(--primary-rgb),.3);
+  box-shadow: 0 8px 18px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.35);
 }
 .btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(var(--primary-rgb),.5);
+  box-shadow: 0 12px 24px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.42);
 }
 .btn-primary:active { transform: translateY(0); }
 
@@ -4517,6 +4506,15 @@ body.light-mode #profile-btn {
   padding: 4px 16px 12px;
 }
 
+.home-module {
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 16px;
+  background: linear-gradient(155deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+  box-shadow: 0 10px 26px rgba(0,0,0,.24);
+  backdrop-filter: blur(10px);
+  padding: 10px 12px;
+}
+
 /* AI Rec Banner */
 .ai-rec-banner {
   display: flex;
@@ -4555,7 +4553,7 @@ body.light-mode #profile-btn {
 
 .home-quick-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 14px;
 }
@@ -4563,8 +4561,8 @@ body.light-mode #profile-btn {
 .home-quick-btn {
   border: 1px solid rgba(255,255,255,.2);
   border-radius: 14px;
-  background: linear-gradient(145deg, rgba(var(--primary-rgb),.2), rgba(var(--blue-rgb),.12));
-  color: #fff;
+  background: linear-gradient(145deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+  color: #edf3fb;
   padding: 12px 10px;
   display: flex;
   align-items: center;
@@ -4572,13 +4570,13 @@ body.light-mode #profile-btn {
   justify-content: center;
   font-weight: 700;
   letter-spacing: .01em;
-  box-shadow: 0 8px 20px rgba(0,0,0,.28);
+  box-shadow: 0 8px 20px rgba(0,0,0,.24);
   transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
 }
 
 .home-quick-btn:hover {
   transform: translateY(-2px);
-  border-color: rgba(255,255,255,.4);
+  border-color: rgba(var(--primary-rgb),.52);
   box-shadow: 0 14px 30px rgba(0,0,0,.38);
 }
 
@@ -4600,8 +4598,8 @@ body.light-mode #profile-btn {
   padding: 6px 11px;
   font-size: .73rem;
   font-weight: 700;
-  border: 1px solid rgba(255,255,255,.2);
-  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.28);
+  background: rgba(255,255,255,.12);
   color: #f2f6ff;
 }
 
@@ -4628,8 +4626,8 @@ body.light-mode #profile-btn {
   gap: 6px;
   border-radius: 999px;
   padding: 5px 10px;
-  border: 1px solid rgba(255,255,255,.24);
-  background: rgba(8,14,26,.28);
+  border: 1px solid rgba(255,255,255,.28);
+  background: rgba(8,14,26,.38);
   color: #f3f7ff;
   font-size: .74rem;
   font-weight: 700;
@@ -5016,6 +5014,139 @@ body.light-mode #profile-btn {
 .share-highlights-card { max-width: 460px; }
 .share-highlights-actions { display: grid; gap: 10px; }
 
+.smart-itinerary-card { max-width: 620px; }
+.smart-itinerary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+
+.dinner-rooms-card { max-width: 680px; }
+.dinner-rooms-topbar {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.dinner-room-join-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+.dinner-room-shell {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(255,255,255,.03);
+}
+.dinner-room-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.dinner-room-meta {
+  font-size: .82rem;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+.dinner-room-options {
+  display: grid;
+  gap: 8px;
+}
+.dinner-room-option {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--surface2);
+}
+.dinner-room-option-main {
+  display: grid;
+  gap: 2px;
+}
+.dinner-room-option-main strong {
+  font-size: .86rem;
+  color: var(--text);
+}
+.dinner-room-option-main small {
+  font-size: .72rem;
+  color: var(--text-dim);
+}
+.dinner-room-votes {
+  font-size: .72rem;
+  color: var(--primary);
+  font-weight: 700;
+}
+.dinner-room-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.dinner-room-result {
+  margin-top: 10px;
+  font-size: .8rem;
+}
+.dinner-room-locked {
+  border: 1px solid rgba(46,204,113,.35);
+  background: rgba(46,204,113,.12);
+  color: #b9f5cc;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.dinner-room-hint {
+  color: var(--text-dim);
+}
+
+.command-palette-card {
+  max-width: 680px;
+  width: min(680px, calc(100vw - 28px));
+}
+.command-palette-input-row {
+  margin-bottom: 10px;
+}
+.command-palette-results {
+  max-height: 360px;
+  overflow-y: auto;
+  display: grid;
+  gap: 8px;
+}
+.command-row {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px;
+  background: var(--surface2);
+  color: var(--text);
+  padding: 11px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+.command-row-main {
+  font-size: .84rem;
+  font-weight: 700;
+}
+.command-row-hint {
+  font-size: .72rem;
+  color: var(--text-dim);
+}
+.command-row.active,
+.command-row:hover {
+  border-color: rgba(var(--primary-rgb),.5);
+  background: rgba(var(--primary-rgb),.12);
+}
+.command-palette-empty {
+  color: var(--text-dim);
+  font-size: .82rem;
+  padding: 6px 2px;
+}
+
 @keyframes for-you-rise {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
@@ -5063,6 +5194,9 @@ body[data-ui-motion='playful'] .restaurant-grid.card-enter-run .restaurant-card:
   .mood-picks-list,
   .for-you-home-list { grid-template-columns: 1fr; }
   .smart-planner-grid { grid-template-columns: 1fr; }
+  .smart-itinerary-grid { grid-template-columns: 1fr; }
+  .dinner-rooms-topbar { grid-template-columns: 1fr; }
+  .dinner-room-actions { display: grid; grid-template-columns: 1fr 1fr; }
   .home-quick-actions { grid-template-columns: 1fr; }
 }
 

@@ -18,7 +18,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -306,6 +306,7 @@
       </button>
       <button id="voice-btn" class="icon-btn" title="Voice Add">🎙️</button>
       <button id="craving-btn" class="icon-btn" title="Craving Engine — what should I eat?">🔥</button>
+      <button id="command-palette-btn" class="icon-btn" title="Command Palette (Ctrl/Cmd+K)">⌘</button>
       <button id="add-btn" class="btn-primary">
         <span>＋</span> Add Restaurant
       </button>
@@ -621,6 +622,14 @@
           <span class="home-quick-emoji">📣</span>
           <span class="home-quick-label">Share Recap</span>
         </button>
+        <button class="home-quick-btn" id="home-quick-itinerary-btn" type="button">
+          <span class="home-quick-emoji">🛣️</span>
+          <span class="home-quick-label">Build Itinerary</span>
+        </button>
+        <button class="home-quick-btn" id="home-quick-rooms-btn" type="button">
+          <span class="home-quick-emoji">🗳️</span>
+          <span class="home-quick-label">Dinner Rooms</span>
+        </button>
       </div>
       <div id="today-status-row" class="today-status-row home-module" aria-label="Today status"></div>
       <div id="today-vibe-row" class="today-vibe-row home-module" aria-label="Tonight vibe"></div>
@@ -795,6 +804,81 @@
         <button id="share-mood-card-btn" class="btn-secondary">🎯 Mood Picks Card</button>
         <button id="share-dishes-card-btn" class="btn-secondary">🍽️ Top Dishes Card</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ── Smart Itinerary ────────────────────────────────── -->
+  <div id="smart-itinerary-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="smart-itinerary-title">
+    <div class="modal-card smart-itinerary-card">
+      <div class="modal-header">
+        <h2 id="smart-itinerary-title">🛣️ Smart Itinerary</h2>
+        <button id="smart-itinerary-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="dish-board-subtitle">Build a multi-stop dinner route with pacing, vibe, and distance in mind.</p>
+      <div class="smart-itinerary-grid">
+        <label class="form-label" for="itinerary-stops">Stops</label>
+        <select id="itinerary-stops" class="form-select">
+          <option value="2">2 stops</option>
+          <option value="3" selected>3 stops</option>
+          <option value="4">4 stops</option>
+        </select>
+        <label class="form-label" for="itinerary-start">Start time</label>
+        <input id="itinerary-start" class="form-input" type="time" value="18:30" />
+        <label class="form-label" for="itinerary-vibe">Style</label>
+        <select id="itinerary-vibe" class="form-select">
+          <option value="balanced">Balanced</option>
+          <option value="quick">Quick and easy</option>
+          <option value="date">Date night</option>
+          <option value="comfort">Comfort crawl</option>
+          <option value="healthy">Light and clean</option>
+        </select>
+      </div>
+      <button id="itinerary-build-btn" class="btn-primary smart-plan-run-btn">Generate Itinerary</button>
+      <div id="itinerary-results" class="smart-plan-results"></div>
+    </div>
+  </div>
+
+  <!-- ── Dinner Rooms ───────────────────────────────────── -->
+  <div id="dinner-rooms-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="dinner-rooms-title">
+    <div class="modal-card dinner-rooms-card">
+      <div class="modal-header">
+        <h2 id="dinner-rooms-title">🗳️ Dinner Rooms</h2>
+        <button id="dinner-rooms-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="dish-board-subtitle">Create a room, invite people, vote on options, and lock the final pick.</p>
+      <div class="dinner-rooms-topbar">
+        <button id="dinner-room-create-btn" class="btn-secondary">Create Room</button>
+        <div class="dinner-room-join-row">
+          <input id="dinner-room-code-input" class="form-input" type="text" maxlength="8" placeholder="Room code" />
+          <button id="dinner-room-join-btn" class="btn-ghost">Join</button>
+        </div>
+      </div>
+      <div id="dinner-room-shell" class="dinner-room-shell hidden">
+        <div class="dinner-room-meta-row">
+          <div id="dinner-room-meta" class="dinner-room-meta"></div>
+          <button id="dinner-room-share-btn" class="btn-ghost btn-sm">Copy Invite</button>
+        </div>
+        <div id="dinner-room-options" class="dinner-room-options"></div>
+        <div class="dinner-room-actions">
+          <button id="dinner-room-vote-btn" class="btn-secondary">Vote</button>
+          <button id="dinner-room-lock-btn" class="btn-primary">Lock Winner</button>
+        </div>
+        <div id="dinner-room-result" class="dinner-room-result"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Command Palette ────────────────────────────────── -->
+  <div id="command-palette-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="command-palette-title">
+    <div class="modal-card command-palette-card">
+      <div class="modal-header">
+        <h2 id="command-palette-title">Command Palette</h2>
+        <button id="command-palette-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="command-palette-input-row">
+        <input id="command-palette-input" class="form-input" type="text" placeholder="Search actions, views, tools..." autocomplete="off" />
+      </div>
+      <div id="command-palette-results" class="command-palette-results"></div>
     </div>
   </div>
 

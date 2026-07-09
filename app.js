@@ -123,6 +123,9 @@ let state = {
   groupBy: false,
   bulkMode: false,
   selectedIds: new Set(),
+  dinnerRooms: {},
+  activeDinnerRoomCode: '',
+  commandPaletteIndex: 0,
 };
 
 /* ════════════════════════════════════════════════════════════
@@ -143,6 +146,10 @@ function loadData () {
     const s = localStorage.getItem(SETTINGS_KEY);
     state.settings = s ? JSON.parse(s) : {};
   } catch { state.settings = {}; }
+
+  state.dinnerRooms = state.settings.dinnerRooms && typeof state.settings.dinnerRooms === 'object'
+    ? state.settings.dinnerRooms
+    : {};
 }
 
 function pruneLegacyDemoRestaurants (list) {
@@ -3320,6 +3327,240 @@ function runSmartPlanner () {
   });
 }
 
+function openSmartItinerary () {
+  document.getElementById('smart-itinerary-overlay')?.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+
+function closeSmartItinerary () {
+  document.getElementById('smart-itinerary-overlay')?.classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function _minutesToTimeLabel (mins) {
+  const hh = Math.floor(mins / 60) % 24;
+  const mm = mins % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
+function buildSmartItinerary () {
+  const stops = Math.min(4, Math.max(2, Number(document.getElementById('itinerary-stops')?.value || 3)));
+  const style = document.getElementById('itinerary-vibe')?.value || 'balanced';
+  const start = document.getElementById('itinerary-start')?.value || '18:30';
+  const out = document.getElementById('itinerary-results');
+  if (!out) return;
+
+  const [sh, sm] = start.split(':').map(Number);
+  let t = (Number.isFinite(sh) ? sh : 18) * 60 + (Number.isFinite(sm) ? sm : 30);
+  const styleWeights = {
+    balanced: { visited: 0.8, fav: 0.5 },
+    quick: { visited: 0.5, fav: 0.3 },
+    date: { visited: 1.2, fav: 0.9 },
+    comfort: { visited: 1.1, fav: 0.8 },
+    healthy: { visited: 0.6, fav: 0.4 },
+  };
+  const w = styleWeights[style] || styleWeights.balanced;
+
+  const pool = [...state.restaurants]
+    .map(r => {
+      const d = distOf(r);
+      const moodScore = scoreMoodPick(r, style === 'balanced' ? 'quick' : style);
+      const rating = Number(r.myRating || 0);
+      let score = moodScore + rating * 0.8;
+      score += r.status === 'visited' ? w.visited : 0.25;
+      score += r.isFavorite ? w.fav : 0;
+      if (Number.isFinite(d)) score += Math.max(0, 2.8 - d / 2400);
+      return { r, d, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 12);
+
+  if (!pool.length) {
+    out.innerHTML = '<div class="dish-empty">Add restaurants first to generate an itinerary.</div>';
+    return;
+  }
+
+  const selected = [];
+  const used = new Set();
+  for (const item of pool) {
+    if (selected.length >= stops) break;
+    if (used.has(item.r.id)) continue;
+    used.add(item.r.id);
+    selected.push(item);
+  }
+
+  const segments = ['Starter', 'Main', 'Dessert', 'Late Bite'];
+  out.innerHTML = selected.map((item, idx) => {
+    const d = Number.isFinite(item.d) ? fmtDist(item.d) : 'distance n/a';
+    const at = _minutesToTimeLabel(t);
+    t += idx === 0 ? 70 : 85;
+    return `<button class="smart-plan-row" data-id="${item.r.id}" type="button">
+      <div>
+        <div class="smart-plan-name">${idx + 1}. ${escHtml(item.r.name)}</div>
+        <div class="smart-plan-meta">${segments[idx] || 'Stop'} • ${escHtml(item.r.cuisine || 'Restaurant')} • ${d} • ${at}</div>
+      </div>
+      <div class="smart-plan-score">${item.score.toFixed(1)}</div>
+    </button>`;
+  }).join('');
+
+  out.querySelectorAll('.smart-plan-row[data-id]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      closeSmartItinerary();
+      setTimeout(() => openDetailModal(btn.dataset.id), 120);
+    });
+  });
+}
+
+function _persistDinnerRooms () {
+  state.settings.dinnerRooms = state.dinnerRooms;
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+}
+
+function _getDinnerRoomInvite (code) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('room', code);
+  return url.toString();
+}
+
+function _createDinnerRoomCode () {
+  const alpha = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out = '';
+  for (let i = 0; i < 6; i++) out += alpha[Math.floor(Math.random() * alpha.length)];
+  return out;
+}
+
+function openDinnerRooms () {
+  document.getElementById('dinner-rooms-overlay')?.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  renderDinnerRoom();
+}
+
+function closeDinnerRooms () {
+  document.getElementById('dinner-rooms-overlay')?.classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function createDinnerRoom () {
+  if (!state.restaurants.length) {
+    showToast('No restaurants yet', 'Add a few spots before creating a room.', 'info');
+    return;
+  }
+  let code = _createDinnerRoomCode();
+  while (state.dinnerRooms[code]) code = _createDinnerRoomCode();
+  const options = [...state.restaurants]
+    .sort((a, b) => (b.myRating || 0) - (a.myRating || 0))
+    .slice(0, 6)
+    .map(r => r.id);
+  state.dinnerRooms[code] = {
+    code,
+    createdAt: new Date().toISOString(),
+    options,
+    votes: {},
+    lockedChoice: '',
+  };
+  state.activeDinnerRoomCode = code;
+  _persistDinnerRooms();
+  renderDinnerRoom();
+  showToast('Room created', `Code ${code} is ready to share.`, 'success');
+}
+
+function joinDinnerRoom () {
+  const input = document.getElementById('dinner-room-code-input');
+  const code = String(input?.value || '').trim().toUpperCase();
+  if (!code) return;
+  if (!state.dinnerRooms[code]) {
+    showToast('Room not found', 'That room code does not exist on this device yet.', 'error');
+    return;
+  }
+  state.activeDinnerRoomCode = code;
+  renderDinnerRoom();
+}
+
+function renderDinnerRoom () {
+  const shell = document.getElementById('dinner-room-shell');
+  const meta = document.getElementById('dinner-room-meta');
+  const list = document.getElementById('dinner-room-options');
+  const result = document.getElementById('dinner-room-result');
+  if (!shell || !meta || !list || !result) return;
+
+  const code = state.activeDinnerRoomCode;
+  const room = code ? state.dinnerRooms[code] : null;
+  if (!room) {
+    shell.classList.add('hidden');
+    return;
+  }
+  shell.classList.remove('hidden');
+  meta.textContent = `Room ${room.code} • ${room.options.length} options`;
+
+  const votesByOption = {};
+  Object.values(room.votes || {}).forEach(id => { votesByOption[id] = (votesByOption[id] || 0) + 1; });
+
+  list.innerHTML = room.options.map(id => {
+    const r = state.restaurants.find(x => x.id === id);
+    if (!r) return '';
+    const votes = votesByOption[id] || 0;
+    return `<label class="dinner-room-option">
+      <input type="radio" name="dinner-room-vote" value="${id}" ${room.lockedChoice === id ? 'checked' : ''} />
+      <span class="dinner-room-option-main">
+        <strong>${escHtml(r.name)}</strong>
+        <small>${escHtml(r.cuisine || 'Restaurant')} • ${(r.myRating || 0) ? `${r.myRating}★` : 'unrated'}</small>
+      </span>
+      <span class="dinner-room-votes">${votes} vote${votes === 1 ? '' : 's'}</span>
+    </label>`;
+  }).join('');
+
+  if (room.lockedChoice) {
+    const winner = state.restaurants.find(r => r.id === room.lockedChoice);
+    result.innerHTML = winner
+      ? `<div class="dinner-room-locked">Locked winner: <strong>${escHtml(winner.name)}</strong></div>`
+      : '';
+  } else {
+    result.innerHTML = '<div class="dinner-room-hint">Vote first, then lock the winner when everyone agrees.</div>';
+  }
+}
+
+function voteDinnerRoom () {
+  const code = state.activeDinnerRoomCode;
+  const room = code ? state.dinnerRooms[code] : null;
+  if (!room) return;
+  const selected = document.querySelector('input[name="dinner-room-vote"]:checked');
+  if (!selected) {
+    showToast('Pick an option', 'Choose a restaurant before voting.', 'info');
+    return;
+  }
+  const voter = (loadUserProfile()?.name || 'Guest').slice(0, 24);
+  room.votes[voter] = selected.value;
+  _persistDinnerRooms();
+  renderDinnerRoom();
+}
+
+function lockDinnerRoomWinner () {
+  const code = state.activeDinnerRoomCode;
+  const room = code ? state.dinnerRooms[code] : null;
+  if (!room) return;
+
+  const tally = {};
+  Object.values(room.votes || {}).forEach(id => { tally[id] = (tally[id] || 0) + 1; });
+  const winnerId = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (!winnerId) {
+    showToast('No votes yet', 'Collect a few votes before locking.', 'info');
+    return;
+  }
+  room.lockedChoice = winnerId;
+  _persistDinnerRooms();
+  renderDinnerRoom();
+  const winner = state.restaurants.find(r => r.id === winnerId);
+  if (winner) showToast('Winner locked', `${winner.name} wins dinner night.`, 'success');
+}
+
+function shareDinnerRoomInvite () {
+  const code = state.activeDinnerRoomCode;
+  if (!code) return;
+  const url = _getDinnerRoomInvite(code);
+  navigator.clipboard?.writeText(url);
+  showToast('Invite copied', 'Room invite link copied to clipboard.', 'success');
+}
+
 function openShareHighlights () {
   document.getElementById('share-highlights-overlay')?.classList.remove('hidden');
   document.body.classList.add('overlay-open');
@@ -3724,6 +3965,9 @@ function setupEvents () {
       closeChallengeModal();
       closeWrap();
       closeImportBookmarks();
+      closeSmartItinerary();
+      closeDinnerRooms();
+      closeCommandPalette();
       closeGallery();
       closeCompare();
       closeBudget();
@@ -4391,6 +4635,11 @@ document.addEventListener('DOMContentLoaded', () => {
   checkWeeklySuggestion();
   checkGuestProfile();
   handleWebShareTarget();
+  const roomCodeFromUrl = new URLSearchParams(window.location.search).get('room');
+  if (roomCodeFromUrl) {
+    state.activeDinnerRoomCode = String(roomCodeFromUrl).toUpperCase();
+    openDinnerRooms();
+  }
   // Post-render: add compare checkboxes if mode was active
   if (_compareMode) addCompareCheckboxes();
   // Wire home discovery buttons
@@ -4399,6 +4648,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('home-quick-nearby-btn')?.addEventListener('click', () => { hapticTap('medium'); openDiscover(); });
   document.getElementById('home-quick-plan-btn')?.addEventListener('click', () => { hapticTap('medium'); openSmartPlanner(); });
   document.getElementById('home-quick-share-btn')?.addEventListener('click', () => { hapticTap('medium'); openShareHighlights(); });
+  document.getElementById('home-quick-itinerary-btn')?.addEventListener('click', () => { hapticTap('medium'); openSmartItinerary(); });
+  document.getElementById('home-quick-rooms-btn')?.addEventListener('click', () => { hapticTap('medium'); openDinnerRooms(); });
   document.getElementById('ai-rec-refresh-btn')?.addEventListener('click', () => {
     const cacheKey = 'ftb_airec_' + new Date().toDateString();
     sessionStorage.removeItem(cacheKey);
@@ -4470,6 +4721,36 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('share-weekly-card-btn')?.addEventListener('click', () => exportHighlightCard('weekly'));
   document.getElementById('share-mood-card-btn')?.addEventListener('click', () => exportHighlightCard('mood'));
   document.getElementById('share-dishes-card-btn')?.addEventListener('click', () => exportHighlightCard('dishes'));
+  document.getElementById('smart-itinerary-close-btn')?.addEventListener('click', closeSmartItinerary);
+  document.getElementById('smart-itinerary-overlay')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('smart-itinerary-overlay')) closeSmartItinerary();
+  });
+  document.getElementById('itinerary-build-btn')?.addEventListener('click', buildSmartItinerary);
+  document.getElementById('dinner-rooms-close-btn')?.addEventListener('click', closeDinnerRooms);
+  document.getElementById('dinner-rooms-overlay')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('dinner-rooms-overlay')) closeDinnerRooms();
+  });
+  document.getElementById('dinner-room-create-btn')?.addEventListener('click', createDinnerRoom);
+  document.getElementById('dinner-room-join-btn')?.addEventListener('click', joinDinnerRoom);
+  document.getElementById('dinner-room-code-input')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') joinDinnerRoom();
+  });
+  document.getElementById('dinner-room-share-btn')?.addEventListener('click', shareDinnerRoomInvite);
+  document.getElementById('dinner-room-vote-btn')?.addEventListener('click', voteDinnerRoom);
+  document.getElementById('dinner-room-lock-btn')?.addEventListener('click', lockDinnerRoomWinner);
+  document.getElementById('command-palette-btn')?.addEventListener('click', openCommandPalette);
+  document.getElementById('command-palette-close-btn')?.addEventListener('click', closeCommandPalette);
+  document.getElementById('command-palette-overlay')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('command-palette-overlay')) closeCommandPalette();
+  });
+  document.getElementById('command-palette-input')?.addEventListener('input', renderCommandPaletteResults);
+  document.getElementById('command-palette-input')?.addEventListener('keydown', handleCommandPaletteKeydown);
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      openCommandPalette();
+    }
+  });
   // Init user profile (shows setup on first run)
   initUserProfile();
   // Show home discovery teaser or load if location ready
@@ -5951,6 +6232,97 @@ function addCompareCheckboxes () {
    PHASE 8 • ? MORE MENU CONTROLLER
    ------------------------------------------------------------ */
 
+const COMMAND_PALETTE_ACTIONS = [
+  { label: 'View: All Restaurants', hint: 'Switch to all', keys: 'view all restaurants', run: () => setView('all') },
+  { label: 'View: Want to Try', hint: 'Switch to want-to-try', keys: 'view want try wishlist', run: () => setView('want-to-try') },
+  { label: 'View: Visited', hint: 'Switch to visited', keys: 'view visited history', run: () => setView('visited') },
+  { label: 'View: Map', hint: 'Switch to map view', keys: 'view map', run: () => setView('map') },
+  { label: 'View: Stats', hint: 'Switch to stats view', keys: 'view stats analytics', run: () => setView('stats') },
+  { label: 'Action: Add Restaurant', hint: 'Open add modal', keys: 'add new create restaurant', run: openAddModal },
+  { label: 'Action: Smart Planner', hint: 'Build tonight plan', keys: 'planner plan tonight', run: openSmartPlanner },
+  { label: 'Action: Smart Itinerary', hint: 'Generate multi-stop route', keys: 'itinerary route crawl', run: openSmartItinerary },
+  { label: 'Action: Dinner Rooms', hint: 'Create or join voting room', keys: 'room rooms vote social', run: openDinnerRooms },
+  { label: 'Action: Share Highlights', hint: 'Generate social card', keys: 'share highlight recap card', run: openShareHighlights },
+  { label: 'Action: Discover Nearby', hint: 'Find local spots', keys: 'nearby discover find local', run: openDiscover },
+  { label: 'Action: Craving Engine', hint: 'Get recommendation now', keys: 'craving recommend', run: openCravingEngine },
+  { label: 'Action: Theme Toggle', hint: 'Switch dark/light', keys: 'theme dark light', run: () => document.getElementById('theme-toggle-btn')?.click() },
+  { label: 'Action: Collections', hint: 'Manage lists', keys: 'collections lists shared', run: () => runToolAction('collections') },
+];
+
+function _paletteMatches (q, item) {
+  if (!q) return true;
+  const hay = `${item.label} ${item.hint} ${item.keys}`.toLowerCase();
+  return q.split(/\s+/).every(tok => hay.includes(tok));
+}
+
+function openCommandPalette () {
+  const ov = document.getElementById('command-palette-overlay');
+  const input = document.getElementById('command-palette-input');
+  if (!ov || !input) return;
+  ov.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  input.value = '';
+  state.commandPaletteIndex = 0;
+  renderCommandPaletteResults();
+  setTimeout(() => input.focus(), 30);
+}
+
+function closeCommandPalette () {
+  document.getElementById('command-palette-overlay')?.classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function renderCommandPaletteResults () {
+  const input = document.getElementById('command-palette-input');
+  const list = document.getElementById('command-palette-results');
+  if (!list) return;
+  const q = String(input?.value || '').trim().toLowerCase();
+  const results = COMMAND_PALETTE_ACTIONS.filter(item => _paletteMatches(q, item)).slice(0, 14);
+  if (!results.length) {
+    list.innerHTML = '<div class="command-palette-empty">No commands found.</div>';
+    return;
+  }
+  if (state.commandPaletteIndex >= results.length) state.commandPaletteIndex = 0;
+  list.innerHTML = results.map((item, idx) => `
+    <button class="command-row ${idx === state.commandPaletteIndex ? 'active' : ''}" data-cmd="${idx}" type="button">
+      <span class="command-row-main">${escHtml(item.label)}</span>
+      <span class="command-row-hint">${escHtml(item.hint)}</span>
+    </button>
+  `).join('');
+
+  list.querySelectorAll('.command-row[data-cmd]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const sel = results[Number(btn.dataset.cmd)];
+      if (!sel) return;
+      closeCommandPalette();
+      setTimeout(() => sel.run(), 40);
+    });
+  });
+}
+
+function handleCommandPaletteKeydown (e) {
+  const input = document.getElementById('command-palette-input');
+  const q = String(input?.value || '').trim().toLowerCase();
+  const results = COMMAND_PALETTE_ACTIONS.filter(item => _paletteMatches(q, item)).slice(0, 14);
+  if (!results.length) return;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    state.commandPaletteIndex = (state.commandPaletteIndex + 1) % results.length;
+    renderCommandPaletteResults();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    state.commandPaletteIndex = (state.commandPaletteIndex - 1 + results.length) % results.length;
+    renderCommandPaletteResults();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    const sel = results[state.commandPaletteIndex] || results[0];
+    if (!sel) return;
+    closeCommandPalette();
+    setTimeout(() => sel.run(), 40);
+  }
+}
+
 function initMoreMenu () {
   const btn  = document.getElementById('more-menu-btn');
   const menu = document.getElementById('more-menu');
@@ -5978,7 +6350,10 @@ function initMoreMenu () {
    Shared by the desktop ⋯ menu and the mobile Discover & Play hub. */
 const TOOL_ACTIONS = {
   'tonight':          () => document.getElementById('tonight-btn').click(),
+  'command':          openCommandPalette,
   'craving':          openCravingEngine,
+  'itinerary':        openSmartItinerary,
+  'rooms':            openDinnerRooms,
   'discover':         openDiscover,
   'challenge':        openChallenges,
   'gallery':          openGallery,
@@ -6033,6 +6408,8 @@ function runToolAction (action) {
 const HUB_SECTIONS = [
   { title: '🍽️ Decide tonight', items: [
     ['tonight','🎯',"Tonight's Pick"], ['craving','🔥','Craving Engine'],
+    ['command','⌘','Command Palette'], ['itinerary','🛣️','Smart Itinerary'],
+    ['rooms','🗳️','Dinner Rooms'],
     ['spin','🎡','Spin the Wheel'], ['swipe','🃏','Swipe to Decide'],
     ['duel','🥊','Restaurant Duel'], ['fortune','🥠','Fortune Cookie'],
   ]},
