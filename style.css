@@ -2776,7 +2776,6 @@ body.light-mode #profile-btn {
   height: 14px;
   border-radius: 3px;
   background: var(--surface3);
-  title: '';
 }
 .heatmap-cell.h1 { background: #ff6b3533; }
 .heatmap-cell.h2 { background: #ff6b3566; }

@@ -32,12 +32,12 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   // Network-first for Nominatim geocoding — results must always be fresh
-  if (e.request.url.includes('nominatim.openstreetmap.org')) {
+  if (new URL(e.request.url).hostname === 'nominatim.openstreetmap.org') {
     e.respondWith(fetch(e.request).catch(() => new Response('[]', { headers: { 'Content-Type': 'application/json' } })));
     return;
   }
   // Network-first for Overpass API — restaurant results must always be live, never cached
-  if (e.request.url.includes('overpass-api.de')) {
+  if (new URL(e.request.url).hostname === 'overpass-api.de') {
     e.respondWith(fetch(e.request).catch(() => new Response('{"elements":[]}', { headers: { 'Content-Type': 'application/json' } })));
     return;
   }
