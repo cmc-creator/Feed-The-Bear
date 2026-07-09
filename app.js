@@ -224,7 +224,7 @@ function seedData () {
 }
 
 function uid () {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2-3);
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 function iso (offsetDays = 0) {
   const d = new Date();
@@ -433,6 +433,8 @@ function getFiltered () {
       list.sort((a,b) => a.name.localeCompare(b.name)); break;
     case 'name-desc':
       list.sort((a,b) => b.name.localeCompare(a.name)); break;
+    case 'my-rating-desc':
+      list.sort((a,b) => (b.myRating||0) - (a.myRating||0)); break;
     case 'rating-desc':
       list.sort((a,b) => (b.googleRating||0) - (a.googleRating||0)); break;
     case 'distance-asc':
@@ -768,9 +770,20 @@ function openDetailModal (id) {
     : '<div class="visit-log-empty">No visits logged yet.</div>';
 
   document.getElementById('detail-checkin-btn').onclick = () => {
-    const note = prompt('Quick note for this visit (optional):') || '';
-    const ratingStr = prompt('Your rating 1-5 (optional):') || '0';
-    const rating = Math.min(5, Math.max(0, parseInt(ratingStr) || 0));
+    const form = document.getElementById('detail-checkin-form');
+    const isVisible = !form.classList.contains('hidden');
+    form.classList.toggle('hidden', isVisible);
+    if (!isVisible) {
+      form.querySelector('.checkin-note').value = '';
+      setCheckinStars(0);
+      form.querySelector('.checkin-note').focus();
+    }
+  };
+
+  document.getElementById('detail-checkin-submit').onclick = () => {
+    const form = document.getElementById('detail-checkin-form');
+    const note   = form.querySelector('.checkin-note').value.trim();
+    const rating = parseInt(form.dataset.rating || '0') || 0;
     const visitEntry = { date: iso(), note, rating };
     const idx = state.restaurants.findIndex(x => x.id === id);
     if (idx !== -1) {
@@ -784,6 +797,10 @@ function openDetailModal (id) {
       openDetailModal(id);
       showToast('✅ Checked In!', `Visit logged for ${state.restaurants[idx].name}`, 'success');
     }
+  };
+
+  document.getElementById('detail-checkin-cancel').onclick = () => {
+    document.getElementById('detail-checkin-form').classList.add('hidden');
   };
 
   // Reminder
@@ -813,6 +830,15 @@ function openDetailModal (id) {
 
   document.getElementById('detail-overlay').classList.remove('hidden');
   document.getElementById('ui-overlay').classList.remove('hidden');
+  // Reset check-in form so it starts collapsed on each open
+  const checkinForm = document.getElementById('detail-checkin-form');
+  if (checkinForm) {
+    checkinForm.classList.add('hidden');
+    checkinForm.dataset.rating = '0';
+    const note = checkinForm.querySelector('.checkin-note');
+    if (note) note.value = '';
+    setCheckinStars(0);
+  }
   // Phase 9 — load cuisine photo + hide stale AI summary
   loadDetailPhoto(r);
   const aiSumEl = document.getElementById('detail-ai-summary');
@@ -914,6 +940,15 @@ function setFormStars (n) {
   });
 }
 
+function setCheckinStars (n) {
+  const form = document.getElementById('detail-checkin-form');
+  if (!form) return;
+  form.dataset.rating = n;
+  form.querySelectorAll('.checkin-star').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.val) <= n);
+  });
+}
+
 function handleFormSubmit (e) {
   e.preventDefault();
   const name = document.getElementById('form-name').value.trim();
@@ -977,7 +1012,7 @@ function handleFormSubmit (e) {
 async function geocodeAddress (id, address) {
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
-    const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'FeedTheBear/1.0 (github.com/cmc-creator/Feed-The-Bear)' } });
     const data = await res.json();
     if (data && data.length > 0) {
       const idx = state.restaurants.findIndex(r => r.id === id);
@@ -993,7 +1028,9 @@ async function geocodeAddress (id, address) {
 
 /* ── External links ──────────────────────────────────────── */
 function openDirections (r) {
-  if (r.address) {
+  if (r.lat && r.lng) {
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lng}`, '_blank', 'noopener');
+  } else if (r.address) {
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(r.address)}`, '_blank', 'noopener');
   } else {
     showToast('No Address', 'This restaurant has no address saved.', 'error');
@@ -2110,6 +2147,16 @@ function setupEvents () {
     if (!btn) return;
     const val = parseInt(btn.dataset.val);
     setFormStars(state.formRating === val ? 0 : val); // toggle off if same
+  });
+
+  // Check-in inline form star picker
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.checkin-star');
+    if (!btn) return;
+    const val = parseInt(btn.dataset.val);
+    const form = btn.closest('#detail-checkin-form');
+    const current = parseInt(form?.dataset.rating || '0');
+    setCheckinStars(current === val ? 0 : val);
   });
 
   // Filters

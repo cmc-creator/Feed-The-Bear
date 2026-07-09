@@ -190,7 +190,8 @@
       <option value="date-asc">Oldest First</option>
       <option value="name-asc">Name A–Z</option>
       <option value="name-desc">Name Z–A</option>
-      <option value="rating-desc">Highest Rated</option>
+      <option value="rating-desc">Highest Rated (Google)</option>
+      <option value="my-rating-desc">Highest Rated (Mine)</option>
       <option value="distance-asc">Nearest</option>
     </select>
 
@@ -611,6 +612,20 @@
           <div class="visit-log-header">
             <h4>📅 Visit Log</h4>
             <button id="detail-checkin-btn" class="btn-sm btn-orange">+ Check In</button>
+          </div>
+          <div id="detail-checkin-form" class="checkin-form hidden" data-rating="0">
+            <div class="checkin-star-row" role="radiogroup" aria-label="Visit rating">
+              <button type="button" class="checkin-star" data-val="1" aria-label="1 star">★</button>
+              <button type="button" class="checkin-star" data-val="2" aria-label="2 stars">★</button>
+              <button type="button" class="checkin-star" data-val="3" aria-label="3 stars">★</button>
+              <button type="button" class="checkin-star" data-val="4" aria-label="4 stars">★</button>
+              <button type="button" class="checkin-star" data-val="5" aria-label="5 stars">★</button>
+            </div>
+            <textarea class="checkin-note" rows="2" placeholder="Quick note (optional)…" maxlength="500"></textarea>
+            <div class="checkin-actions">
+              <button type="button" id="detail-checkin-submit" class="btn-sm btn-orange">✅ Log Visit</button>
+              <button type="button" id="detail-checkin-cancel" class="btn-ghost btn-sm">Cancel</button>
+            </div>
           </div>
           <div id="detail-visit-log-list"></div>
         </div>
