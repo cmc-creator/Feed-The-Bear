@@ -85,10 +85,10 @@
           <span class="aar-icon">TD</span><span class="aar-label">Top Dishes Leaderboard</span><span class="aar-chevron">›</span>
         </button>
         <button class="account-action-row" id="account-smartplanner-btn">
-          <span class="aar-icon">🗓️</span><span class="aar-label">Smart Planner</span><span class="aar-chevron">›</span>
+          <span class="aar-icon">PL</span><span class="aar-label">Smart Planner</span><span class="aar-chevron">›</span>
         </button>
         <button class="account-action-row" id="account-sharehighlights-btn">
-          <span class="aar-icon">📣</span><span class="aar-label">Share Highlights</span><span class="aar-chevron">›</span>
+          <span class="aar-icon">SH</span><span class="aar-label">Share Highlights</span><span class="aar-chevron">›</span>
         </button>
         <button class="account-action-row" id="account-profile-link-btn">
           <span class="aar-icon">👤</span><span class="aar-label">My Foodie Profile</span><span class="aar-chevron">›</span>
@@ -100,7 +100,7 @@
           <span class="aar-icon">XP</span><span class="aar-label">Achievements &amp; XP</span><span class="aar-chevron prem-lock">LOCK</span>
         </button>
         <button class="account-action-row" id="account-export-link-btn">
-          <span class="aar-icon">📤</span><span class="aar-label">Export My Data</span><span class="aar-chevron">›</span>
+          <span class="aar-icon">EX</span><span class="aar-label">Export My Data</span><span class="aar-chevron">›</span>
         </button>
         <!-- Upgrade row — hidden for Grizzly members -->
         <button class="account-action-row account-upgrade-row" id="account-upgrade-row">
@@ -304,9 +304,15 @@
         <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       </button>
-      <button id="voice-btn" class="icon-btn" title="Voice Add">🎙️</button>
-      <button id="craving-btn" class="icon-btn" title="Craving Engine — what should I eat?">🔥</button>
-      <button id="command-palette-btn" class="icon-btn" title="Command Palette (Ctrl/Cmd+K)">⌘</button>
+      <button id="voice-btn" class="icon-btn" title="Voice Add">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/></svg>
+      </button>
+      <button id="craving-btn" class="icon-btn" title="Craving Engine — what should I eat?">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" aria-hidden="true"><path d="M13 2s3 2 3 6-2 5-2 7 2 4 2 7c0 0-2-1-3-3-1 2-3 3-3 3s1-3 1-6-2-4-2-7 2-5 4-7z"/></svg>
+      </button>
+      <button id="command-palette-btn" class="icon-btn" title="Command Palette (Ctrl/Cmd+K)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M10 19l4-14"/></svg>
+      </button>
       <button id="add-btn" class="btn-primary">
         <span>＋</span> Add Restaurant
       </button>
@@ -319,11 +325,11 @@
 
       <!-- Discover & Play hub launcher (legacy dropdown kept as fallback) -->
       <div class="more-menu-wrap">
-        <button id="more-menu-btn" class="play-hub-btn" title="Discover & Play"><span class="play-hub-spark">✨</span> <span class="play-hub-label">Discover</span></button>
+        <button id="more-menu-btn" class="play-hub-btn" title="Discover & Play"><span class="play-hub-spark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><path d="M12 2l2.6 5.4L20 10l-5.4 2.6L12 18l-2.6-5.4L4 10l5.4-2.6L12 2z"/></svg></span> <span class="play-hub-label">Discover</span></button>
         <div id="more-menu" class="more-menu" role="menu" aria-label="More tools">
           <div class="more-menu-section">Discover</div>
-          <button class="more-menu-item" data-more="tonight">🎯 Tonight's Pick</button>
-          <button class="more-menu-item" data-more="craving">🔥 Craving Engine</button>
+          <button class="more-menu-item" data-more="tonight"><span class="menu-item-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><path d="M12 3v18M3 12h18"/><path d="M12 3l4 4M12 3l-4 4M12 21l4-4M12 21l-4-4"/></svg></span><span>Tonight's Pick</span></button>
+          <button class="more-menu-item" data-more="craving"><span class="menu-item-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><path d="M13 2s3 2 3 6-2 5-2 7 2 4 2 7c0 0-2-1-3-3-1 2-3 3-3 3s1-3 1-6-2-4-2-7 2-5 4-7z"/></svg></span><span>Craving Engine</span></button>
           <button class="more-menu-item" data-more="discover">Smart Discovery</button>
           <button class="more-menu-item" data-more="challenge">Challenges</button>
           <button class="more-menu-item" data-more="open-now">Open Now</button>
@@ -461,18 +467,18 @@
   <!-- ── Compare Selection Bar ──────────────────────────── -->
   <div id="compare-bar" class="compare-bar hidden">
     <span id="compare-count">Select 2–3 restaurants to compare</span>
-    <button id="compare-now-btn" class="btn-sm btn-orange" disabled>⚖️ Compare Now</button>
-    <button id="compare-cancel-btn" class="btn-ghost btn-sm">✕ Cancel</button>
+    <button id="compare-now-btn" class="btn-sm btn-orange" disabled>Compare Now</button>
+    <button id="compare-cancel-btn" class="btn-ghost btn-sm">Cancel</button>
   </div>
 
   <!-- ── Bulk Action Bar ──────────────────────────────────── -->
   <div id="bulk-bar" class="bulk-bar hidden">
     <span id="bulk-count">Select restaurants</span>
-    <button id="bulk-tag-btn" class="btn-sm btn-orange" disabled>🏷️ Tag</button>
-    <button id="bulk-collection-btn" class="btn-sm btn-secondary" disabled>📁 Move to List</button>
-    <button id="bulk-export-btn" class="btn-sm btn-secondary" disabled>📥 Export</button>
-    <button id="bulk-delete-btn" class="btn-sm btn-danger" disabled>🗑️ Delete</button>
-    <button id="bulk-cancel-btn" class="btn-ghost btn-sm">✕ Cancel</button>
+    <button id="bulk-tag-btn" class="btn-sm btn-orange" disabled>Tag</button>
+    <button id="bulk-collection-btn" class="btn-sm btn-secondary" disabled>Move to List</button>
+    <button id="bulk-export-btn" class="btn-sm btn-secondary" disabled>Export</button>
+    <button id="bulk-delete-btn" class="btn-sm btn-danger" disabled>Delete</button>
+    <button id="bulk-cancel-btn" class="btn-ghost btn-sm">Cancel</button>
   </div>
 
   <!-- ── Stats / Analytics View ─────────────────────────────── -->
@@ -486,10 +492,10 @@
         <div class="stats-chart-card" style="flex:1">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
             <div>
-              <h3>🧬 Your Taste DNA</h3>
+              <h3>Your Taste DNA</h3>
               <p class="chart-sub">Your unique flavor fingerprint</p>
             </div>
-            <button id="ai-taste-profile-btn" class="btn-sm btn-ai">✨ AI Personality</button>
+            <button id="ai-taste-profile-btn" class="btn-sm btn-ai">AI Personality</button>
           </div>
           <div id="chart-taste-dna" class="taste-dna-section"></div>
           <div id="ai-taste-profile-result" class="ai-taste-card hidden"></div>
@@ -519,7 +525,7 @@
       <!-- Streak + Heatmap row -->
       <div class="stats-charts-row">
         <div class="stats-chart-card stats-chart-card--narrow">
-          <h3>🔥 Streaks</h3>
+          <h3>Streaks</h3>
           <div id="chart-streaks" class="streak-section"></div>
         </div>
         <div class="stats-chart-card stats-chart-card--wide">
@@ -534,14 +540,14 @@
           <div id="chart-leaderboard" class="leaderboard-list"></div>
         </div>
         <div class="stats-chart-card">
-          <h3>💸 Spending Trend</h3>
+          <h3>Spending Trend</h3>
           <div id="chart-price-trend" class="bar-chart"></div>
         </div>
       </div>
       <!-- Cuisine Passport row -->
       <div class="stats-charts-row">
         <div class="stats-chart-card" style="flex:1">
-          <h3>🌍 Cuisine Passport</h3>
+          <h3>Cuisine Passport</h3>
           <p class="chart-sub">Cuisines you've explored</p>
           <div id="chart-passport" class="passport-grid"></div>
         </div>
@@ -549,7 +555,7 @@
       <!-- Budget + Calendar row -->
       <div class="stats-charts-row">
         <div class="stats-chart-card">
-          <h3>💰 Monthly Budget</h3>
+          <h3>Monthly Budget</h3>
           <p class="chart-sub">Estimated dining spend this month</p>
           <div id="chart-budget" class="budget-chart"></div>
         </div>
@@ -582,7 +588,7 @@
     <!-- Weekly Dining Goal Widget -->
     <div id="weekly-goal-widget" class="weekly-goal-widget hidden">
       <div class="wg-left">
-        <span class="wg-icon">🎯</span>
+        <span class="wg-icon">GO</span>
         <div class="wg-text-col">
           <div class="wg-title">Weekly Dining Goal: <strong id="wg-count">0</strong>/<strong id="wg-goal">3</strong> meals</div>
           <div class="wg-label" id="wg-label">Get out and eat this week!</div>
@@ -598,7 +604,7 @@
     <section id="home-discovery" class="home-discovery" aria-label="Restaurants near you">
       <!-- AI Recommendation Banner -->
       <div id="ai-rec-banner" class="ai-rec-banner home-module hidden">
-        <div class="ai-rec-icon">✨</div>
+        <div class="ai-rec-icon">AI</div>
         <div class="ai-rec-body">
           <div class="ai-rec-label">Byte Cub's Pick For You</div>
           <div id="ai-rec-text" class="ai-rec-text">Thinking…</div>
@@ -607,27 +613,39 @@
       </div>
       <div class="home-quick-actions home-module" id="home-quick-actions" aria-label="Quick actions">
         <button class="home-quick-btn" id="home-quick-pick-btn" type="button">
-          <span class="home-quick-emoji">Pick</span>
+          <span class="home-quick-emoji" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.8 5.7L21 10l-4.5 4.4L17.6 21 12 18l-5.6 3 1.1-6.6L3 10l6.2-.3L12 3z"/></svg>
+          </span>
           <span class="home-quick-label">Pick For Me</span>
         </button>
         <button class="home-quick-btn" id="home-quick-nearby-btn" type="button">
-          <span class="home-quick-emoji">Near</span>
+          <span class="home-quick-emoji" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s5.5-5.2 5.5-10A5.5 5.5 0 1 0 6.5 11c0 4.8 5.5 10 5.5 10z"/><circle cx="12" cy="11" r="1.8"/></svg>
+          </span>
           <span class="home-quick-label">Nearby Now</span>
         </button>
         <button class="home-quick-btn" id="home-quick-plan-btn" type="button">
-          <span class="home-quick-emoji">Plan</span>
+          <span class="home-quick-emoji" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>
+          </span>
           <span class="home-quick-label">Plan Tonight</span>
         </button>
         <button class="home-quick-btn" id="home-quick-share-btn" type="button">
-          <span class="home-quick-emoji">Share</span>
+          <span class="home-quick-emoji" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="2.2"/><circle cx="6" cy="12" r="2.2"/><circle cx="18" cy="19" r="2.2"/><path d="M8 11l8-4M8 13l8 4"/></svg>
+          </span>
           <span class="home-quick-label">Share Recap</span>
         </button>
         <button class="home-quick-btn" id="home-quick-itinerary-btn" type="button">
-          <span class="home-quick-emoji">Route</span>
+          <span class="home-quick-emoji" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 18c3 0 4-12 7-12s4 12 9 12"/><path d="M7 18h10"/><circle cx="8" cy="6" r="1.5"/><circle cx="16" cy="18" r="1.5"/></svg>
+          </span>
           <span class="home-quick-label">Build Itinerary</span>
         </button>
         <button class="home-quick-btn" id="home-quick-rooms-btn" type="button">
-          <span class="home-quick-emoji">Room</span>
+          <span class="home-quick-emoji" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="6" width="7" height="12" rx="1.5"/><rect x="13" y="8" width="7" height="10" rx="1.5"/><path d="M11 12h2"/></svg>
+          </span>
           <span class="home-quick-label">Dinner Rooms</span>
         </button>
       </div>
@@ -642,18 +660,18 @@
         <div id="for-you-home-list" class="for-you-home-list"></div>
       </div>
       <div id="week-recap-home" class="week-recap-home home-module hidden">
-        <div class="week-recap-title">📈 Your Week So Far</div>
+        <div class="week-recap-title">Your Week So Far</div>
         <div id="week-recap-text" class="week-recap-text"></div>
       </div>
       <div id="mood-picks-home" class="mood-picks-home home-module hidden">
         <div class="mood-picks-home-header">
-          <span class="mood-picks-home-title">🎯 Mood Picks</span>
+          <span class="mood-picks-home-title">Mood Picks</span>
         </div>
         <div id="mood-picks-chips" class="mood-picks-chips">
-          <button class="home-mood-chip active" data-mood="quick" type="button">⚡ Quick</button>
-          <button class="home-mood-chip" data-mood="date" type="button">💫 Date</button>
-          <button class="home-mood-chip" data-mood="comfort" type="button">🛋️ Comfort</button>
-          <button class="home-mood-chip" data-mood="healthy" type="button">🥗 Light</button>
+          <button class="home-mood-chip active" data-mood="quick" type="button">Quick</button>
+          <button class="home-mood-chip" data-mood="date" type="button">Date</button>
+          <button class="home-mood-chip" data-mood="comfort" type="button">Comfort</button>
+          <button class="home-mood-chip" data-mood="healthy" type="button">Light</button>
         </div>
         <div id="mood-picks-list" class="mood-picks-list"></div>
       </div>
@@ -692,23 +710,23 @@
   <div id="tonight-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="tonight-title">
     <div class="modal-card tonight-card">
       <div class="modal-header">
-        <h2 id="tonight-title">🎯 Tonight's Pick</h2>
+        <h2 id="tonight-title">Tonight's Pick</h2>
         <button id="tonight-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <p class="tonight-subtitle">Tell me about tonight and I'll find the perfect spot.</p>
       <div class="tonight-moods" id="tonight-moods">
-        <button class="mood-chip" data-mood="quick">⚡ Quick bite</button>
-        <button class="mood-chip" data-mood="date">💫 Date night</button>
-        <button class="mood-chip" data-mood="budget">💰 Budget-friendly</button>
-        <button class="mood-chip" data-mood="fancy">🥂 Treat myself</button>
-        <button class="mood-chip" data-mood="new">🆕 Try something new</button>
-        <button class="mood-chip" data-mood="comfort">🛋️ Comfort food</button>
-        <button class="mood-chip" data-mood="healthy">🥗 Something light</button>
-        <button class="mood-chip" data-mood="surprise">🎲 Surprise me</button>
+        <button class="mood-chip" data-mood="quick">Quick bite</button>
+        <button class="mood-chip" data-mood="date">Date night</button>
+        <button class="mood-chip" data-mood="budget">Budget-friendly</button>
+        <button class="mood-chip" data-mood="fancy">Treat myself</button>
+        <button class="mood-chip" data-mood="new">Try something new</button>
+        <button class="mood-chip" data-mood="comfort">Comfort food</button>
+        <button class="mood-chip" data-mood="healthy">Something light</button>
+        <button class="mood-chip" data-mood="surprise">Surprise me</button>
       </div>
       <div id="tonight-result" class="tonight-result hidden"></div>
       <div class="tonight-actions">
-        <button id="tonight-pick-btn" class="btn-primary" style="width:100%">Find My Pick 🎯</button>
+        <button id="tonight-pick-btn" class="btn-primary" style="width:100%">Find My Pick</button>
       </div>
     </div>
   </div>
@@ -726,7 +744,7 @@
         <input id="challenge-link" class="challenge-link-input" readonly placeholder="Generating link…" />
         <button id="challenge-copy-btn" class="btn-sm btn-orange">Copy</button>
       </div>
-      <button id="challenge-share-btn" class="btn-primary" style="width:100%;margin-top:12px">📤 Share Challenge</button>
+      <button id="challenge-share-btn" class="btn-primary" style="width:100%;margin-top:12px">Share Challenge</button>
       <div class="challenge-footer">Challenge links encode your top 5 rated restaurants — no account needed.</div>
     </div>
   </div>
@@ -761,7 +779,7 @@
   <div id="smart-planner-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="smart-planner-title">
     <div class="modal-card smart-planner-card">
       <div class="modal-header">
-        <h2 id="smart-planner-title">🗓️ Smart Planner</h2>
+        <h2 id="smart-planner-title">Smart Planner</h2>
         <button id="smart-planner-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="smart-planner-grid">
@@ -779,11 +797,11 @@
         <input id="smart-distance" class="form-input" type="number" min="1" max="25" value="8" />
         <label class="form-label" for="smart-vibe">Vibe</label>
         <select id="smart-vibe" class="form-select">
-          <option value="quick">⚡ Quick</option>
-          <option value="date">💫 Date</option>
-          <option value="comfort">🛋️ Comfort</option>
-          <option value="healthy">🥗 Light</option>
-          <option value="surprise">🎲 Surprise</option>
+          <option value="quick">Quick</option>
+          <option value="date">Date</option>
+          <option value="comfort">Comfort</option>
+          <option value="healthy">Light</option>
+          <option value="surprise">Surprise</option>
         </select>
       </div>
       <button id="smart-plan-run-btn" class="btn-primary smart-plan-run-btn">Build Plan</button>
@@ -795,13 +813,13 @@
   <div id="share-highlights-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="share-highlights-title">
     <div class="modal-card share-highlights-card">
       <div class="modal-header">
-        <h2 id="share-highlights-title">📣 Share Highlights</h2>
+        <h2 id="share-highlights-title">Share Highlights</h2>
         <button id="share-highlights-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <p class="dish-board-subtitle">Generate beautiful cards for your foodie wins.</p>
       <div class="share-highlights-actions">
-        <button id="share-weekly-card-btn" class="btn-secondary">📈 Weekly Recap Card</button>
-        <button id="share-mood-card-btn" class="btn-secondary">🎯 Mood Picks Card</button>
+        <button id="share-weekly-card-btn" class="btn-secondary">Weekly Recap Card</button>
+        <button id="share-mood-card-btn" class="btn-secondary">Mood Picks Card</button>
         <button id="share-dishes-card-btn" class="btn-secondary">Top Dishes Card</button>
       </div>
     </div>
@@ -842,7 +860,7 @@
   <div id="dinner-rooms-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="dinner-rooms-title">
     <div class="modal-card dinner-rooms-card">
       <div class="modal-header">
-        <h2 id="dinner-rooms-title">🗳️ Dinner Rooms</h2>
+        <h2 id="dinner-rooms-title">Dinner Rooms</h2>
         <button id="dinner-rooms-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <p class="dish-board-subtitle">Create a room, invite people, vote on options, and lock the final pick.</p>
@@ -975,7 +993,7 @@
               </label>
               <label class="radio-label">
                 <input type="radio" name="form-status" value="visited" />
-                <span class="radio-pill visited">✅ Visited</span>
+                <span class="radio-pill visited">Visited</span>
               </label>
             </div>
           </div>
@@ -1016,7 +1034,7 @@
             <label for="form-priority">Priority</label>
             <select id="form-priority">
               <option value="">Normal</option>
-              <option value="hot">🔥 Hot — Must Go!</option>
+              <option value="hot">Hot — Must Go!</option>
               <option value="next">⭐ Up Next</option>
               <option value="someday">📌 Someday</option>
             </select>
@@ -1040,7 +1058,7 @@
 
           <!-- Notes -->
           <div class="form-group form-full">
-            <label for="form-notes">Notes <button type="button" id="ai-notes-btn" class="btn-sm btn-ai">✨ AI Enrich</button></label>
+            <label for="form-notes">Notes <button type="button" id="ai-notes-btn" class="btn-sm btn-ai">AI Enrich</button></label>
             <textarea id="form-notes" rows="3" placeholder="Must try the truffle pasta! Call ahead for reservations. Great for date night…"></textarea>
             <div id="ai-notes-result" class="ai-inline-result hidden"></div>
           </div>
@@ -1096,7 +1114,7 @@
             <span class="dq-label">Status</span>
             <div class="dq-seg" id="dq-status">
               <button class="dq-seg-btn" type="button" data-status="want-to-try">🔖 Want to Try</button>
-              <button class="dq-seg-btn" type="button" data-status="visited">✅ Visited</button>
+              <button class="dq-seg-btn" type="button" data-status="visited">Visited</button>
             </div>
           </div>
           <div class="dq-group">
@@ -1198,7 +1216,7 @@
             Debrief
           </button>
           <button id="detail-ai-btn" class="btn-secondary">
-            ✨ AI Summary
+            AI Summary
           </button>
           <button id="detail-dishes-ai-btn" class="btn-secondary">
             AI Dish Picks
@@ -1358,7 +1376,7 @@
 
   <!-- ── Collections Panel ──────────────────────────────── -->
   <aside id="collections-panel" class="collections-panel" aria-label="My Lists">
-    <h3>📁 My Lists</h3>
+    <h3>My Lists</h3>
     <button id="collections-panel-close" class="icon-btn panel-close" aria-label="Close">✕</button>
     <div class="collection-share-row">
       <input type="text" id="join-list-input" placeholder="Paste shared list link…" maxlength="500" />
@@ -1384,7 +1402,7 @@
   <!-- ── Voice Add Overlay ─────────────────────────────────── -->
   <div id="voice-overlay" class="voice-overlay hidden" role="status" aria-live="polite">
     <div class="voice-card">
-      <div id="voice-pulse" class="voice-pulse">🎙️</div>
+      <div id="voice-pulse" class="voice-pulse">MIC</div>
       <div id="voice-status" class="voice-status">Listening…</div>
       <div id="voice-transcript" class="voice-transcript"></div>
       <button id="voice-cancel-btn" class="btn-ghost btn-sm">Cancel</button>
@@ -1395,7 +1413,7 @@
   <div id="gallery-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="gallery-title">
     <div class="modal-card gallery-card">
       <div class="modal-header">
-        <h2 id="gallery-title">🖼️ Photo Gallery</h2>
+        <h2 id="gallery-title">Photo Gallery</h2>
         <button id="gallery-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div id="gallery-grid" class="gallery-grid"></div>
@@ -1406,7 +1424,7 @@
       <button id="lightbox-prev" class="lightbox-nav lightbox-prev" aria-label="Previous">‹</button>
       <img id="lightbox-img" class="lightbox-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Restaurant photo" />
       <div id="lightbox-caption" class="lightbox-caption"></div>
-      <button id="lightbox-ai-caption-btn" class="btn-sm btn-ai lightbox-ai-btn">✨ AI Caption</button>
+      <button id="lightbox-ai-caption-btn" class="btn-sm btn-ai lightbox-ai-btn">AI Caption</button>
       <button id="lightbox-next" class="lightbox-nav lightbox-next" aria-label="Next">›</button>
     </div>
   </div>
@@ -1415,7 +1433,7 @@
   <div id="compare-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="compare-title">
     <div class="modal-card compare-card">
       <div class="modal-header">
-        <h2 id="compare-title">⚖️ Compare Restaurants</h2>
+        <h2 id="compare-title">Compare Restaurants</h2>
         <button id="compare-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div id="compare-table" class="compare-table"></div>
@@ -1426,7 +1444,7 @@
   <div id="budget-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="budget-title">
     <div class="modal-card budget-card">
       <div class="modal-header">
-        <h2 id="budget-title">💰 Dining Budget</h2>
+        <h2 id="budget-title">Dining Budget</h2>
         <button id="budget-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <p class="import-subtitle">Set your monthly dining budget to track estimated spending.</p>
@@ -1457,7 +1475,7 @@
         <input id="profile-link" class="challenge-link-input" readonly placeholder="Generating…" />
         <button id="profile-copy-btn" class="btn-sm btn-orange">Copy</button>
       </div>
-      <button id="profile-share-btn" class="btn-primary" style="width:100%;margin-top:10px">📤 Share Profile</button>
+      <button id="profile-share-btn" class="btn-primary" style="width:100%;margin-top:10px">Share Profile</button>
       <div id="profile-preview" class="profile-preview"></div>
     </div>
   </div>
@@ -1480,14 +1498,14 @@
   <div id="wrap-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="wrap-title">
     <div class="modal-card wrap-card">
       <div class="modal-header">
-        <h2 id="wrap-title">🎁 Your Monthly Wrap</h2>
+        <h2 id="wrap-title">Your Monthly Wrap</h2>
         <button id="wrap-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div id="wrap-content" class="wrap-content"></div>
       <div id="wrap-ai-digest" class="ai-digest-block hidden"></div>
       <div style="display:flex;gap:8px;margin-top:16px">
-        <button id="wrap-ai-btn" class="btn-secondary">✨ AI Narrative</button>
-        <button id="wrap-share-btn" class="btn-primary" style="flex:1">📤 Share My Wrap</button>
+        <button id="wrap-ai-btn" class="btn-secondary">AI Narrative</button>
+        <button id="wrap-share-btn" class="btn-primary" style="flex:1">Share My Wrap</button>
         <button id="wrap-prev-btn" class="btn-ghost btn-sm">◀ Prev Month</button>
         <button id="wrap-next-btn" class="btn-ghost btn-sm">Next ▶</button>
       </div>
@@ -1498,7 +1516,7 @@
   <div id="import-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="import-title">
     <div class="modal-card import-card">
       <div class="modal-header">
-        <h2 id="import-title">📋 Import from Yelp / Google Maps</h2>
+        <h2 id="import-title">Import from Yelp / Google Maps</h2>
         <button id="import-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <p class="import-subtitle">Paste exported bookmarks (CSV or JSON) from Google Maps Takeout or Yelp, one place per line, or paste a comma-separated list of names.</p>
@@ -1506,7 +1524,7 @@
       <div id="import-preview" class="import-preview"></div>
       <div style="display:flex;gap:8px;margin-top:12px">
         <button id="import-parse-btn" class="btn-sm btn-orange">Preview Import</button>
-        <button id="import-confirm-btn" class="btn-primary" style="flex:1" disabled>✅ Import All</button>
+        <button id="import-confirm-btn" class="btn-primary" style="flex:1" disabled>Import All</button>
       </div>
     </div>
   </div>
@@ -1515,31 +1533,31 @@
 
   <!-- ══ PHASE 8 MODALS ═══════════════════════════════════════ -->
 
-  <!-- 🔥 Craving Engine -->
+  <!-- Craving Engine -->
   <div id="craving-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="craving-title">
     <div class="modal-card craving-card">
       <div class="modal-header">
-        <h2 id="craving-title">🔥 What Are You Craving?</h2>
+        <h2 id="craving-title">What Are You Craving?</h2>
         <button id="craving-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <p class="craving-subtitle">Describe your mood, budget, or vibe and I'll pick the perfect spot from your list.</p>
       <div class="craving-chips-row" id="craving-mood-chips">
-        <button class="craving-chip" data-mood="comfort">🛋️ Comfort Food</button>
-        <button class="craving-chip" data-mood="adventurous">🌶️ Adventurous</button>
-        <button class="craving-chip" data-mood="date-night">💑 Date Night</button>
-        <button class="craving-chip" data-mood="quick">⚡ Quick &amp; Easy</button>
-        <button class="craving-chip" data-mood="healthy">🥗 Healthy</button>
-        <button class="craving-chip" data-mood="splurge">💎 Splurge</button>
-        <button class="craving-chip" data-mood="cheap">💸 Cheap Eats</button>
-        <button class="craving-chip" data-mood="new">✨ Try Something New</button>
+        <button class="craving-chip" data-mood="comfort">Comfort Food</button>
+        <button class="craving-chip" data-mood="adventurous">Adventurous</button>
+        <button class="craving-chip" data-mood="date-night">Date Night</button>
+        <button class="craving-chip" data-mood="quick">Quick &amp; Easy</button>
+        <button class="craving-chip" data-mood="healthy">Healthy</button>
+        <button class="craving-chip" data-mood="splurge">Splurge</button>
+        <button class="craving-chip" data-mood="cheap">Cheap Eats</button>
+        <button class="craving-chip" data-mood="new">Try Something New</button>
       </div>
       <input id="craving-freetext" class="form-input" placeholder="Or type anything: 'spicy noodles under $20' …" style="margin-top:12px" />
-      <button id="craving-go-btn" class="btn-primary" style="width:100%;margin-top:12px">Find My Match 🎯</button>
+      <button id="craving-go-btn" class="btn-primary" style="width:100%;margin-top:12px">Find My Match</button>
       <div id="craving-result" class="craving-result hidden"></div>
     </div>
   </div>
 
-  <!-- 🍽️ Dish Tracker modal (opens inside detail view as a sheet) -->
+  <!-- Dish Tracker modal (opens inside detail view as a sheet) -->
   <div id="dish-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="dish-title">
     <div class="modal-card dish-card">
       <div class="modal-header">
@@ -1564,7 +1582,7 @@
   <div id="review-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="review-title">
     <div class="modal-card review-card">
       <div class="modal-header">
-        <h2 id="review-title">🎬 Your Foodie Year in Review</h2>
+        <h2 id="review-title">Your Foodie Year in Review</h2>
         <button id="review-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="review-year-picker">
@@ -1575,8 +1593,8 @@
       <div id="review-content" class="review-content"></div>
       <div id="review-ai-digest" class="ai-digest-block hidden"></div>
       <div style="display:flex;gap:8px;margin-top:16px">
-        <button id="review-ai-btn" class="btn-secondary">✨ AI Year Recap</button>
-        <button id="review-share-btn" class="btn-primary" style="flex:1">📤 Share My Wrap</button>
+        <button id="review-ai-btn" class="btn-secondary">AI Year Recap</button>
+        <button id="review-share-btn" class="btn-primary" style="flex:1">Share My Wrap</button>
         <button id="review-close-btn2" class="btn-ghost">Close</button>
       </div>
     </div>
@@ -1713,7 +1731,7 @@
         </div>
         <div class="stats2-section-title">Value vs. Enjoyment</div>
         <canvas id="scatter-canvas" width="340" height="220"></canvas>
-        <div class="stats2-section-title">💎 Hidden Gems</div>
+        <div class="stats2-section-title">Hidden Gems</div>
         <div id="s2-gems-list" class="gems-list"></div>
         <div class="stats2-section-title">Visit Heatmap</div>
         <div id="s2-heatmap" class="visit-heatmap"></div>
@@ -1736,7 +1754,7 @@
         <!-- API Key Setup -->
         <div id="ai-key-setup" class="ai-key-setup">
           <div class="ai-key-setup-inner">
-            <div class="ai-key-icon">✨</div>
+            <div class="ai-key-icon">AI</div>
             <h3>Unlock Real AI</h3>
             <p>Add your free Google Gemini API key to power every AI feature in Feed The Bear.</p>
             <div class="ai-key-input-row">
@@ -1755,11 +1773,11 @@
 
         <div class="ai-quick-btns">
           <button class="ai-quick-btn" data-prompt="summarize">My food story</button>
-          <button class="ai-quick-btn" data-prompt="recommend">🎯 Tonight's pick</button>
-          <button class="ai-quick-btn" data-prompt="rut">🔄 Food rut check</button>
-          <button class="ai-quick-btn" data-prompt="next-cuisine">🌍 New cuisine idea</button>
-          <button class="ai-quick-btn" data-prompt="hidden-gems">💎 Hidden gems</button>
-          <button class="ai-quick-btn" data-prompt="taste-profile">🧬 My taste DNA</button>
+          <button class="ai-quick-btn" data-prompt="recommend">Tonight's pick</button>
+          <button class="ai-quick-btn" data-prompt="rut">Food rut check</button>
+          <button class="ai-quick-btn" data-prompt="next-cuisine">New cuisine idea</button>
+          <button class="ai-quick-btn" data-prompt="hidden-gems">Hidden gems</button>
+          <button class="ai-quick-btn" data-prompt="taste-profile">My taste DNA</button>
         </div>
         <div class="ai-chat-history" id="ai-chat-history"></div>
         <div class="ai-input-row">
@@ -1864,13 +1882,13 @@
   <div id="swipe-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="swipe-title">
     <div class="modal-card swipe-card">
       <div class="modal-header">
-        <h2 id="swipe-title">🃏 Swipe to Decide</h2>
+        <h2 id="swipe-title">Swipe to Decide</h2>
         <button id="swipe-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <p class="swipe-hint">➡️ Swipe right or tap ✔ to pick tonight &nbsp;·&nbsp; ⬅️ Swipe left to skip</p>
       <div id="swipe-deck" class="swipe-deck">
         <div class="swipe-empty hidden" id="swipe-empty">
-          <div style="font-size:3rem">🖤</div>
+          <div style="font-size:3rem">♥</div>
           <div style="font-weight:600;margin-top:8px">All caught up!</div>
           <div style="font-size:.8rem;color:var(--text-dim)">Add more to your wishlist to keep swiping.</div>
         </div>
@@ -1886,7 +1904,7 @@
   <div id="spin-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="spin-title">
     <div class="modal-card spin-card">
       <div class="modal-header">
-        <h2 id="spin-title">🎯 Spin the Wheel</h2>
+        <h2 id="spin-title">Spin the Wheel</h2>
         <button id="spin-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="spin-wrap">
@@ -1894,7 +1912,7 @@
         <canvas id="spin-canvas" width="300" height="300"></canvas>
       </div>
       <div id="spin-result" class="spin-result hidden"></div>
-      <button id="spin-btn" class="btn-primary" style="width:100%;margin-top:12px">🎯 Spin!</button>
+      <button id="spin-btn" class="btn-primary" style="width:100%;margin-top:12px">Spin!</button>
     </div>
   </div>
 
@@ -1902,13 +1920,13 @@
   <div id="travel-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="travel-title">
     <div class="modal-card travel-card">
       <div class="modal-header">
-        <h2 id="travel-title">✈️ Travel Mode</h2>
+        <h2 id="travel-title">Travel Mode</h2>
         <button id="travel-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="travel-body">
         <p class="travel-hint">Set a custom location for Discovery &amp; Map. Great for planning food stops on a trip!</p>
         <div id="travel-active-banner" class="travel-active-banner hidden">
-          ✈️ Travel Mode active: <strong id="travel-active-city"></strong>
+          Travel Mode active: <strong id="travel-active-city"></strong>
           <button id="travel-deactivate-btn" class="btn-sm" style="margin-left:auto">Turn Off</button>
         </div>
         <div class="travel-quick-cities">
@@ -1944,7 +1962,7 @@
         <!-- Dynamically rendered -->
       </div>
       <div style="display:flex;gap:8px;margin-top:12px">
-        <button id="digest-share-btn" class="btn-primary" style="flex:1">📲 Share Digest</button>
+        <button id="digest-share-btn" class="btn-primary" style="flex:1">Share Digest</button>
         <button id="digest-prev-btn" class="btn-secondary">❮</button>
         <button id="digest-next-btn" class="btn-secondary">❯</button>
       </div>
@@ -1955,7 +1973,7 @@
   <div id="open-now-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="open-now-title">
     <div class="modal-card open-now-card">
       <div class="modal-header">
-        <h2 id="open-now-title">🟢 Open Now Nearby</h2>
+        <h2 id="open-now-title">Open Now Nearby</h2>
         <button id="open-now-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="open-now-body">
@@ -1980,7 +1998,7 @@
   <div id="duel-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="duel-title">
     <div class="modal-card duel-card">
       <div class="modal-header">
-        <h2 id="duel-title">🥊 Restaurant Duel</h2>
+        <h2 id="duel-title">Restaurant Duel</h2>
         <button id="duel-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <p class="duel-hint">Pick two restaurants — Byte Cub judges the ultimate showdown.</p>
@@ -1999,10 +2017,10 @@
           </select>
         </div>
       </div>
-      <button id="duel-go-btn" class="btn-primary duel-go-btn">🥊 Fight!</button>
+      <button id="duel-go-btn" class="btn-primary duel-go-btn">Fight!</button>
       <div id="duel-result" class="duel-result hidden"></div>
       <div id="duel-share-row" class="duel-share-row hidden">
-        <button id="duel-share-btn" class="btn-sm">📤 Share Fight Card</button>
+        <button id="duel-share-btn" class="btn-sm">Share Fight Card</button>
       </div>
     </div>
   </div>
@@ -2011,14 +2029,14 @@
   <div id="bingo-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="bingo-title">
     <div class="modal-card bingo-card">
       <div class="modal-header">
-        <h2 id="bingo-title">🎯 Cuisine Bingo</h2>
+        <h2 id="bingo-title">Cuisine Bingo</h2>
         <button id="bingo-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <p class="bingo-sub">Visit a restaurant of each cuisine to fill your card.</p>
       <div id="bingo-progress" class="bingo-progress"></div>
       <div id="bingo-grid" class="bingo-grid"></div>
-      <div id="bingo-winner-banner" class="bingo-winner-banner hidden">🎉 BINGO! You got a full line!</div>
-      <button id="bingo-share-btn" class="btn-sm" style="margin-top:10px">📤 Share Card</button>
+      <div id="bingo-winner-banner" class="bingo-winner-banner hidden">BINGO! You got a full line!</div>
+      <button id="bingo-share-btn" class="btn-sm" style="margin-top:10px">Share Card</button>
     </div>
   </div>
 
@@ -2026,17 +2044,17 @@
   <div id="fortune-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="fortune-title">
     <div class="modal-card fortune-card">
       <div class="modal-header">
-        <h2 id="fortune-title">🥠 Food Fortune</h2>
+        <h2 id="fortune-title">Food Fortune</h2>
         <button id="fortune-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="fortune-cookie-wrap">
-        <div id="fortune-cookie" class="fortune-cookie" role="button" tabindex="0" aria-label="Tap to crack open fortune cookie">🥠</div>
+        <div id="fortune-cookie" class="fortune-cookie" role="button" tabindex="0" aria-label="Tap to crack open fortune cookie">FORTUNE</div>
         <p id="fortune-tap-hint" class="fortune-tap-hint">Tap the cookie for your food fortune…</p>
       </div>
       <div id="fortune-result" class="fortune-result hidden">
         <div id="fortune-text" class="fortune-text"></div>
-        <button id="fortune-again-btn" class="btn-sm" style="margin-top:12px">🥠 Another Fortune</button>
-        <button id="fortune-share-btn" class="btn-sm" style="margin-left:6px">📤 Share</button>
+        <button id="fortune-again-btn" class="btn-sm" style="margin-top:12px">Another Fortune</button>
+        <button id="fortune-share-btn" class="btn-sm" style="margin-left:6px">Share</button>
       </div>
     </div>
   </div>
@@ -2068,12 +2086,12 @@
   <div id="dailychallenge-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="dailychallenge-title">
     <div class="modal-card dailychallenge-card">
       <div class="modal-header">
-        <h2 id="dailychallenge-title">🔥 Daily Challenge</h2>
+        <h2 id="dailychallenge-title">Daily Challenge</h2>
         <button id="dailychallenge-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="dc-streak-row">
         <div class="dc-streak-badge">
-          <span class="dc-streak-flame">🔥</span>
+          <span class="dc-streak-flame">STREAK</span>
           <span id="dc-streak-count" class="dc-streak-count">0</span>
           <span class="dc-streak-label">day streak</span>
         </div>
@@ -2083,16 +2101,16 @@
         </div>
       </div>
       <div id="dc-challenge-card" class="dc-challenge-card">
-        <div class="dc-challenge-emoji" id="dc-emoji">🎯</div>
+        <div class="dc-challenge-emoji" id="dc-emoji">GO</div>
         <div class="dc-challenge-text" id="dc-text">Loading today's challenge…</div>
         <div class="dc-challenge-desc" id="dc-desc"></div>
       </div>
       <div class="dc-actions">
-        <button id="dc-complete-btn" class="btn-primary dc-complete-btn">✅ Mark Complete</button>
+        <button id="dc-complete-btn" class="btn-primary dc-complete-btn">Mark Complete</button>
         <button id="dc-skip-btn" class="btn-sm">Skip today</button>
       </div>
       <div id="dc-completed-banner" class="dc-completed-banner hidden">
-        <span>🎉 Challenge completed! +25 XP</span>
+          <span>Challenge completed! +25 XP</span>
       </div>
       <div id="dc-history" class="dc-history"></div>
     </div>
@@ -2104,7 +2122,7 @@
   <div id="visitlog-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="visitlog-title">
     <div class="modal-card visitlog-card">
       <div class="modal-header">
-        <h2 id="visitlog-title">📋 Visit Log</h2>
+        <h2 id="visitlog-title">Visit Log</h2>
         <button id="visitlog-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <p class="visitlog-sub">Track every visit to a restaurant — what you ordered, how much you spent, your thoughts.</p>
@@ -2138,7 +2156,7 @@
   <div id="spend-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="spend-title">
     <div class="modal-card spend-card">
       <div class="modal-header">
-        <h2 id="spend-title">💸 Spend Tracker</h2>
+        <h2 id="spend-title">Spend Tracker</h2>
         <button id="spend-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="spend-summary-row">
@@ -2157,7 +2175,7 @@
   <div id="beenawhile-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="beenawhile-title">
     <div class="modal-card beenawhile-card">
       <div class="modal-header">
-        <h2 id="beenawhile-title">⏰ It's Been a While…</h2>
+        <h2 id="beenawhile-title">It's Been a While…</h2>
         <button id="beenawhile-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <p class="beenawhile-sub">Your favourite spots you haven't visited in a while. Time to go back!</p>
@@ -2169,7 +2187,7 @@
   <div id="mealplanner-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="mealplanner-title">
     <div class="modal-card mealplanner-card">
       <div class="modal-header">
-        <h2 id="mealplanner-title">📆 AI Meal Planner</h2>
+        <h2 id="mealplanner-title">AI Meal Planner</h2>
         <button id="mealplanner-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <p class="mealplanner-sub">Tell Byte Cub your week and budget — get a personalised dining plan.</p>
@@ -2193,9 +2211,9 @@
           <input type="text" id="mp-vibe" class="form-input" style="flex:1" placeholder="e.g. comfort food, exploring, healthy…" />
         </div>
       </div>
-      <button id="mp-generate-btn" class="btn-primary" style="width:100%;margin-top:12px">✨ Plan My Week</button>
+      <button id="mp-generate-btn" class="btn-primary" style="width:100%;margin-top:12px">Plan My Week</button>
       <div id="mp-result" class="mp-result hidden"></div>
-      <button id="mp-share-btn" class="btn-sm hidden" style="margin-top:10px;width:100%">📤 Share Plan</button>
+      <button id="mp-share-btn" class="btn-sm hidden" style="margin-top:10px;width:100%">Share Plan</button>
     </div>
   </div>
 
@@ -2203,13 +2221,13 @@
   <div id="groupvote-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="groupvote-title">
     <div class="modal-card groupvote-card">
       <div class="modal-header">
-        <h2 id="groupvote-title">🗳 Group Vote</h2>
+        <h2 id="groupvote-title">Group Vote</h2>
         <button id="groupvote-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <p class="groupvote-sub">Can't decide as a group? Pick up to 5 restaurants, share the link — everyone votes.</p>
       <div id="groupvote-picker" class="groupvote-picker"></div>
       <div class="groupvote-btn-row">
-        <button id="groupvote-generate-btn" class="btn-primary" style="flex:1">🔗 Generate Vote Link</button>
+        <button id="groupvote-generate-btn" class="btn-primary" style="flex:1">Generate Vote Link</button>
       </div>
       <div id="groupvote-link-row" class="groupvote-link-row hidden">
         <input id="groupvote-link-input" class="form-input" readonly style="flex:1" />
@@ -2227,14 +2245,14 @@
   <div id="worldmap-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="worldmap-title">
     <div class="modal-card worldmap-card">
       <div class="modal-header">
-        <h2 id="worldmap-title">🌍 Cuisine World Map</h2>
+        <h2 id="worldmap-title">Cuisine World Map</h2>
         <button id="worldmap-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
-      <p class="worldmap-sub">Countries you've tasted lit up 🔥 — how much of the world have you eaten?</p>
+      <p class="worldmap-sub">Countries you've tasted lit up — how much of the world have you eaten?</p>
       <div id="worldmap-stats" class="worldmap-stats"></div>
       <div id="worldmap-svg-container" class="worldmap-svg-container"></div>
       <div id="worldmap-legend" class="worldmap-legend"></div>
-      <button id="worldmap-share-btn" class="btn-primary" style="width:100%;margin-top:12px">📤 Share My Food Map</button>
+      <button id="worldmap-share-btn" class="btn-primary" style="width:100%;margin-top:12px">Share My Food Map</button>
     </div>
   </div>
 
@@ -2242,13 +2260,13 @@
   <div id="passport-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="passport-title">
     <div class="modal-card passport-card">
       <div class="modal-header">
-        <h2 id="passport-title">🛂 Foodie Passport</h2>
+        <h2 id="passport-title">Foodie Passport</h2>
         <button id="passport-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <p class="passport-sub">A rubber-stamp badge for every cuisine you've explored.</p>
       <div id="passport-stats-row" class="passport-stats-row"></div>
       <div id="passport-stamps" class="passport-stamps"></div>
-      <button id="passport-share-btn" class="btn-primary" style="width:100%;margin-top:14px">📤 Share Passport</button>
+      <button id="passport-share-btn" class="btn-primary" style="width:100%;margin-top:14px">Share Passport</button>
     </div>
   </div>
 
