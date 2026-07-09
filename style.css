@@ -96,7 +96,12 @@ img { display: block; }
   gap: 10px;
   flex-shrink: 0;
 }
-.brand-icon { font-size: 1.4rem; opacity: .9; }
+.bear-mark {
+  display: inline-block;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.brand-icon { width: 1.55rem; height: 1.55rem; opacity: .95; }
 .brand-name {
   font-size: 1.12rem;
   font-weight: 800;
@@ -3116,6 +3121,7 @@ body.light-mode #profile-btn {
 .guest-profile-card { max-width:500px; width:100%; }
 .guest-header { text-align:center; margin-bottom:24px; }
 .guest-bear { font-size:3rem; }
+.guest-bear.bear-mark { width: 3rem; height: 3rem; }
 .guest-header h1 { font-size:1.8rem; font-weight:800; margin:8px 0 4px; }
 .guest-sub { color:var(--text-dim); font-size:.84rem; }
 .guest-profile-list { display:flex; flex-direction:column; gap:10px; }
@@ -5531,6 +5537,7 @@ body[data-theme-accent='neon'] {
   margin-bottom: 28px;
 }
 .signup-brand-bear { font-size: 2.2rem; line-height: 1; }
+.signup-brand-bear.bear-mark { width: 2.4rem; height: 2.4rem; }
 .signup-brand-name {
   font-size: 1.4rem;
   font-weight: 800;
