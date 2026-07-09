@@ -33,7 +33,10 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   // Network-first for Nominatim geocoding — results must always be fresh
   if (new URL(e.request.url).hostname === 'nominatim.openstreetmap.org') {
-    e.respondWith(fetch(e.request).catch(() => new Response('[]', { headers: { 'Content-Type': 'application/json' } })));
+    const req = new Request(e.request, {
+      headers: new Headers({ ...Object.fromEntries(e.request.headers), 'User-Agent': 'FeedTheBear/1.0 (github.com/cmc-creator/Feed-The-Bear)' }),
+    });
+    e.respondWith(fetch(req).catch(() => new Response('[]', { headers: { 'Content-Type': 'application/json' } })));
     return;
   }
   // Network-first for Overpass API — restaurant results must always be live, never cached
