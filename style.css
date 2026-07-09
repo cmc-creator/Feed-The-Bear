@@ -4587,14 +4587,17 @@ body.light-mode #profile-btn {
 }
 
 .home-quick-emoji {
-  width: 1.55rem;
+  min-width: 2.4rem;
   height: 1.55rem;
+  padding: 0 .4rem;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: .88rem;
-  font-weight: 700;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .03em;
+  text-transform: uppercase;
   color: var(--primary);
   background: rgba(var(--primary-rgb),.08);
   border: 1px solid rgba(var(--primary-rgb),.18);
