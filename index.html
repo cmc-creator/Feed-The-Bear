@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Feed The Bear — Restaurant List, Done Properly</title>
+  <title>Feed The Bear: Restaurant List, Done Properly</title>
   <meta name="description" content="Save restaurants you care about, compare options cleanly, and use smarter discovery when you want a better dinner decision without the clutter." />
-  <meta property="og:title" content="Feed The Bear — Restaurant List, Done Properly" />
+  <meta property="og:title" content="Feed The Bear: Restaurant List, Done Properly" />
   <meta property="og:description" content="Keep one clean place for every restaurant you care about, with smarter discovery, clean tracking, and AI when you need it." />
   <meta property="og:type" content="website" />
   <meta name="theme-color" content="#FF6B35" />
@@ -133,12 +133,14 @@
       font-weight: 900; line-height: 1.05;
       letter-spacing: -.02em; margin-bottom: 20px;
       max-width: 800px;
+      text-wrap: balance;
     }
     .hero-title span { color: var(--primary); }
     .hero-sub {
       font-size: clamp(1rem, 2.5vw, 1.25rem);
       color: var(--text-muted); max-width: 560px;
       line-height: 1.6; margin-bottom: 40px;
+      text-wrap: pretty;
     }
     .hero-ctas { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-bottom: 60px; }
     .btn-hero-primary {
@@ -232,11 +234,13 @@
     .section-title {
       text-align: center; font-size: clamp(1.8rem, 4vw, 2.8rem);
       font-weight: 800; margin-bottom: 14px; line-height: 1.2;
+      text-wrap: balance;
     }
     .section-sub {
       text-align: center; color: var(--text-muted);
       font-size: 1rem; max-width: 520px; margin: 0 auto 56px;
       line-height: 1.6;
+      text-wrap: pretty;
     }
     .features-grid {
       display: grid;
@@ -367,8 +371,8 @@
       padding: 56px 40px;
     }
     .cta-bear { width: 5rem; height: 5rem; margin: 0 auto 16px; display: block; }
-    .cta-title { font-size: clamp(1.8rem, 4vw, 2.4rem); font-weight: 900; margin-bottom: 14px; }
-    .cta-sub { color: var(--text-muted); font-size: 1rem; max-width: 440px; margin: 0 auto 32px; line-height: 1.6; }
+    .cta-title { font-size: clamp(1.8rem, 4vw, 2.4rem); font-weight: 900; margin-bottom: 14px; text-wrap: balance; }
+    .cta-sub { color: var(--text-muted); font-size: 1rem; max-width: 440px; margin: 0 auto 32px; line-height: 1.6; text-wrap: pretty; }
     .cta-disclaimer { color: var(--text-dim); font-size: .8rem; margin-top: 14px; }
 
     /* ── FOOTER ── */
@@ -415,17 +419,17 @@
   <!-- ── HERO ── -->
   <section class="hero">
     <div class="hero-glow"></div>
-    <div class="hero-badge">Your personal restaurant shortlist</div>
+    <div class="hero-badge">Curated dining, bear approved</div>
     <img class="hero-bear bear-mark" src="feedbear.png" alt="Hungry bear mascot" />
-    <h1 class="hero-title">Your personal hit list for where to eat next</h1>
-    <p class="hero-sub">Save promising spots, rate what is worth a repeat, and let Byte Cub AI break ties when you need a great pick fast.</p>
+    <h1 class="hero-title">Your private little black book for exceptional bites</h1>
+    <p class="hero-sub">Save standouts, rate every table worth a return, and let Byte Cub AI settle the what should we eat question with style.</p>
     <div class="hero-ctas">
       <a href="auth.html?mode=signup" class="btn-hero-primary">Start for free</a>
       <a href="auth.html?mode=signin" class="btn-hero-secondary">Sign In</a>
     </div>
     <div class="hero-social-proof">
-      <div class="hero-proof-kicker">Shortlist. Rate. Pick.</div>
-      <span>Dinner decisions in seconds, not 30 minutes of scrolling.</span>
+      <div class="hero-proof-kicker">Curate. Compare. Crave.</div>
+      <span>Less tab hopping, more table hopping.</span>
     </div>
   </section>
 
@@ -479,13 +483,13 @@
   <!-- ── FEATURES ── -->
   <section class="section" id="features">
     <p class="section-label">Everything in one place</p>
-    <h2 class="section-title">Built for people who keep a serious food list</h2>
-    <p class="section-sub">Track restaurants, compare options, and keep your list usable instead of letting it turn into a pile of screenshots and half-remembered recommendations.</p>
+    <h2 class="section-title">For diners with expensive taste and excellent memory</h2>
+    <p class="section-sub">Track restaurants, compare options, and keep every recommendation in one polished place that feels more concierge and less chaos.</p>
     <div class="features-grid">
       <div class="feature-card fade-in">
         <span class="feature-icon">◎</span>
         <h3 class="feature-title">Save Any Restaurant</h3>
-        <p class="feature-desc">Add restaurants from anywhere — search by name, paste a link, or let the app auto-fill details. Tag them, rate them, and add personal notes.</p>
+        <p class="feature-desc">Add restaurants from anywhere, search by name, paste a link, or let the app fill in details. Tag them, rate them, and keep private tasting notes.</p>
       </div>
       <div class="feature-card fade-in">
         <span class="feature-icon">◌</span>
@@ -501,12 +505,12 @@
       <div class="feature-card fade-in">
         <span class="feature-icon">▦</span>
         <h3 class="feature-title">Foodie Stats & Insights</h3>
-        <p class="feature-desc">See your dining patterns — top cuisines, spending habits, most-visited spots, and your personal food personality score.</p>
+        <p class="feature-desc">See your dining patterns, top cuisines, spending habits, most visited spots, and your personal flavor profile score.</p>
       </div>
       <div class="feature-card fade-in">
         <span class="feature-icon">⟡</span>
         <h3 class="feature-title">Works on Any Device</h3>
-        <p class="feature-desc">Install as an app on your phone or use it in any browser. Works offline too — your restaurant list is always available.</p>
+        <p class="feature-desc">Install on your phone or use any browser. It works offline too, so your list is always ready when cravings strike.</p>
       </div>
       <div class="feature-card fade-in">
         <span class="feature-icon">◐</span>
@@ -522,7 +526,7 @@
       <div class="feature-card fade-in">
         <span class="feature-icon">▧</span>
         <h3 class="feature-title">Year in Review</h3>
-        <p class="feature-desc">Get a beautiful annual recap of your dining adventures — your top cuisines, most-visited spots, and favorite dishes of the year.</p>
+        <p class="feature-desc">Get an elegant annual recap of your dining adventures, your top cuisines, most visited spots, and favorite dishes of the year.</p>
         <span class="feature-badge">🔒 Grizzly</span>
       </div>
       <div class="feature-card fade-in">
@@ -551,7 +555,7 @@
           <div class="step-num">2</div>
           <span class="step-icon">02</span>
           <h3 class="step-title">Add your first restaurant</h3>
-          <p class="step-desc">Search for a spot, paste a link, or scan nearby — your first save takes under 10 seconds.</p>
+          <p class="step-desc">Search for a spot, paste a link, or scan nearby. Your first save takes under 10 seconds.</p>
         </div>
         <div class="step">
           <div class="step-num">3</div>
@@ -568,14 +572,14 @@
   <!-- ── PRICING ── -->
   <section class="section" id="pricing">
     <p class="section-label">Simple pricing</p>
-      <h2 class="section-title">Free to start, Grizzly when your food list gets serious</h2>
-    <p class="section-sub">Start with the essentials, then unlock sync, AI, and unlimited storage when your saved places stop fitting on one screen.</p>
+      <h2 class="section-title">Start free, go Grizzly when your appetite gets ambitious</h2>
+    <p class="section-sub">Start with the essentials, then unlock sync, AI, and unlimited saves when your list graduates from casual cravings to curated cuisine.</p>
     <div class="pricing-grid">
       <!-- Cub (Free) -->
       <div class="pricing-card fade-in">
         <img class="pricing-plan-bear bear-mark" src="feedbear.png" alt="" aria-hidden="true" />
         <div class="pricing-plan-name">Cub</div>
-        <div class="pricing-plan-desc">For people who want to start organizing their list without turning dinner into admin.</div>
+        <div class="pricing-plan-desc">For people who want better dinner picks without turning every meal into admin.</div>
         <div class="pricing-price">
           <div class="pricing-amount">Free</div>
           <div class="pricing-period">forever</div>
@@ -597,7 +601,7 @@
         <div class="pricing-popular">Most Popular</div>
         <img class="pricing-plan-bear bear-mark" src="feedbear.png" alt="" aria-hidden="true" />
         <div class="pricing-plan-name">Grizzly</div>
-        <div class="pricing-plan-desc">For people who want every device, insight, and recommendation in sync, with less dinner indecision.</div>
+        <div class="pricing-plan-desc">For people who want synced devices, smarter recommendations, and fewer where do we eat debates.</div>
         <div class="pricing-price">
           <div class="pricing-amount">$4<span style="font-size:1.4rem;font-weight:600">.99</span></div>
           <div class="pricing-period">per month · cancel anytime</div>
@@ -613,10 +617,10 @@
           <li><span class="pricing-check">✓</span> Foodie profile page</li>
           <li><span class="pricing-check">✓</span> Priority support</li>
         </ul>
-        <a href="auth.html?mode=signup" class="btn-plan-paid">Start Grizzly — $4.99/mo</a>
+        <a href="auth.html?mode=signup" class="btn-plan-paid">Start Grizzly - $4.99/mo</a>
       </div>
     </div>
-    <p class="pricing-note">Secure payments via Stripe · Cancel anytime · No hidden fees</p>
+    <p class="pricing-note">Secure payments via Stripe. Cancel anytime. No hidden fees.</p>
   </section>
 
   <hr class="divider" />
@@ -624,8 +628,8 @@
   <!-- ── TESTIMONIALS ── -->
   <section class="section" id="reviews">
     <p class="section-label">What customers say</p>
-    <h2 class="section-title">Useful enough to keep, friendly enough to enjoy</h2>
-    <p class="section-sub">People use Feed The Bear to replace messy notes, stale screenshots, and forgotten favorites with one system that actually behaves.</p>
+    <h2 class="section-title">Smart enough for food nerds, smooth enough for everyone else</h2>
+    <p class="section-sub">People use Feed The Bear to replace messy notes, stale screenshots, and forgotten favorites with one polished home for every great bite.</p>
     <div class="testimonials-grid">
       <div class="testimonial-card fade-in">
         <div class="testimonial-stars">★★★★★</div>
@@ -668,9 +672,9 @@
     <div class="cta-card fade-in">
       <img class="cta-bear bear-mark" src="feedbear.png" alt="" aria-hidden="true" />
       <h2 class="cta-title">Ready to make your restaurant list useful?</h2>
-      <p class="cta-sub">Feed The Bear turns saved places into a system you can actually use. Start free, get organized fast, and upgrade when the list outgrows the basics and starts acting like a project.</p>
+      <p class="cta-sub">Feed The Bear turns saved places into a refined system you will actually enjoy using. Start free, get organized fast, and upgrade when your list grows into a full tasting archive.</p>
       <a href="auth.html?mode=signup" class="btn-hero-primary">Create your free account</a>
-      <p class="cta-disclaimer">No credit card required · Free plan available</p>
+      <p class="cta-disclaimer">No credit card required. Free plan available.</p>
     </div>
   </section>
 
@@ -687,7 +691,7 @@
         <a href="auth.html?mode=signin">Sign In</a>
         <a href="app.html">Open App</a>
       </div>
-      <p class="footer-copy">© 2025 Feed The Bear. Built for people who want a cleaner restaurant workflow.</p>
+      <p class="footer-copy">© 2026 NyxCollective LLC. Feed The Bear is a trademark of NyxCollective LLC. All rights reserved.</p>
     </div>
   </footer>
 

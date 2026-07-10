@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sign In — Feed The Bear 🐻</title>
+  <title>Sign In - Feed The Bear 🐻</title>
   <meta name="description" content="Sign in or create your free Feed The Bear account to track restaurants, sync across devices, and unlock Grizzly features." />
   <meta name="theme-color" content="#FF6B35" />
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
@@ -336,7 +336,7 @@
       document.getElementById('tabSignup').classList.toggle('active', !isSignin);
       document.getElementById('footerSignin').style.display = isSignin ? '' : 'none';
       document.getElementById('footerSignup').style.display = isSignin ? 'none' : '';
-      document.title = isSignin ? 'Sign In — Feed The Bear 🐻' : 'Sign Up — Feed The Bear 🐻';
+      document.title = isSignin ? 'Sign In - Feed The Bear 🐻' : 'Sign Up - Feed The Bear 🐻';
     }
 
     // ── Message helpers ──
@@ -425,7 +425,7 @@
       setLoading('resetSubmitBtn', 'resetSpinner', true);
       try {
         await auth.sendPasswordResetEmail(email);
-        showMsg('Check your inbox — reset email sent!', 'success', 'resetMsg');
+        showMsg('Check your inbox - reset email sent!', 'success', 'resetMsg');
       } catch (err) {
         showMsg(friendlyError(err.code), 'error', 'resetMsg');
       }
@@ -439,9 +439,9 @@
         'auth/wrong-password':      'Incorrect password. Try again or reset it.',
         'auth/invalid-email':       'That doesn\'t look like a valid email address.',
         'auth/email-already-in-use':'An account already exists with that email. Sign in instead?',
-        'auth/weak-password':       'Password is too weak — use at least 8 characters.',
+        'auth/weak-password':       'Password is too weak - use at least 8 characters.',
         'auth/too-many-requests':   'Too many attempts. Try again in a few minutes.',
-        'auth/network-request-failed': 'Network error — check your connection and try again.',
+        'auth/network-request-failed': 'Network error - check your connection and try again.',
         'auth/invalid-credential':  'Email or password is incorrect. Try again.',
         'auth/popup-blocked':       'Popup was blocked. Please allow popups and try again.',
       };
