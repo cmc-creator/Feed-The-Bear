@@ -1375,12 +1375,37 @@ function initDetailQuickCapture () {
 }
 
 /* ── Celebration / milestone helpers (delight) ───────────────── */
+let _celebrationTimer = null;
+
+function showCelebrationMoment (title, subtitle = '', opts = {}) {
+  const banner = document.getElementById('celebration-banner');
+  const titleEl = document.getElementById('celebration-title');
+  const subEl = document.getElementById('celebration-sub');
+  if (!banner || !titleEl || !subEl) return;
+
+  const duration = Math.max(900, Number(opts.durationMs || 1800));
+  titleEl.textContent = title;
+  subEl.textContent = subtitle || '';
+  banner.classList.remove('hidden');
+
+  if (opts.glow !== false) {
+    document.body.classList.add('celebrate-glow');
+    setTimeout(() => document.body.classList.remove('celebrate-glow'), Math.min(duration, 900));
+  }
+  if (opts.confetti) launchConfetti(Number(opts.confettiMs || 2000));
+  if (opts.haptic) hapticTap(opts.haptic);
+
+  clearTimeout(_celebrationTimer);
+  _celebrationTimer = setTimeout(() => banner.classList.add('hidden'), duration);
+}
+
 function visitedCount () {
   return state.restaurants.filter(r => r.status === 'visited').length;
 }
 function celebrateVisit (name) {
   hapticTap('medium');
   showToast('✅ Visited!', `"${name}" added to your conquests.`, 'success');
+  showCelebrationMoment('Visit Logged', name, { durationMs: 1500, glow: true, confetti: false });
   celebrateMilestones();
 }
 const VISIT_MILESTONES = [1, 5, 10, 25, 50, 100, 150, 200, 300, 500];
@@ -1394,6 +1419,7 @@ function celebrateMilestones () {
   launchConfetti(3200);
   const msg = hit === 1 ? 'Your first visit logged - the adventure begins!'
     : `${hit} restaurants visited! You're a certified foodie explorer. `;
+  showCelebrationMoment(`${hit} Visited`, msg, { durationMs: 2200, glow: true, confetti: true, confettiMs: 2500, haptic: 'medium' });
   setTimeout(() => showToast(` ${hit} Visited!`, msg, 'success'), 250);
 }
 
@@ -7362,6 +7388,7 @@ function claimDailyQuestReward (quest) {
   quest.claimedAt = Date.now();
   saveDailyQuest(quest);
   awardXp(20, 'Daily Quest');
+  showCelebrationMoment('Daily Quest Complete', 'Reward claimed: +20 XP', { durationMs: 2100, glow: true, confetti: true, confettiMs: 2000, haptic: 'medium' });
   showToast('Quest Complete', 'Daily quest reward claimed: +20 XP.', 'success');
 }
 
@@ -8661,6 +8688,7 @@ function awardXp (amount, reason) {
 
   // Level up
   if (before.name !== after.name) {
+    showCelebrationMoment('Level Up', `Now: ${after.name}`, { durationMs: 2300, glow: true, confetti: true, confettiMs: 2400, haptic: 'medium' });
     setTimeout(() => showToast('⭐ Level Up!', 'You are now: ' + after.name, 'success'), 400);
   }
 }
@@ -8681,6 +8709,7 @@ function checkAchievements () {
     saveXpData(data);
     newUnlocks.forEach((def, i) => {
       setTimeout(() => {
+        showCelebrationMoment('Badge Unlocked', def.name, { durationMs: 1800, glow: true, confetti: true, confettiMs: 1800, haptic: 'light' });
         showToast(' Badge Unlocked!', def.icon + ' ' + def.name, 'success');
         awardXp(def.xp, def.name);
       }, i * 600);
@@ -9473,6 +9502,7 @@ function openCheckinWithPhoto (id) {
   renderAll();
   openDetailModal(id);
   showToast('✅ Checked In!', 'Visit logged for ' + r.name, 'success');
+  showCelebrationMoment('Visit Logged', r.name, { durationMs: 1500, glow: true, confetti: false });
   checkConfettiMilestones(state.restaurants, state.restaurants);
 }
 

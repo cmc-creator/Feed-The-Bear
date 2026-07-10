@@ -1089,6 +1089,66 @@ button:focus-visible,
   gap: 10px;
   max-width: 320px;
 }
+
+.celebration-banner {
+  position: fixed;
+  top: 86px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  width: min(520px, calc(100% - 28px));
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(var(--primary-rgb), .42);
+  background: linear-gradient(140deg, rgba(var(--primary-rgb), .26), rgba(var(--blue-rgb), .18));
+  box-shadow: 0 12px 36px rgba(0, 0, 0, .34);
+  backdrop-filter: blur(8px);
+  animation: celebration-in .24s ease;
+}
+
+.celebration-title {
+  font-size: .86rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: .01em;
+}
+
+.celebration-sub {
+  font-size: .76rem;
+  color: rgba(246, 251, 255, .92);
+  margin-top: 1px;
+}
+
+body.celebrate-glow::before {
+  content: '';
+  position: fixed;
+  inset: -20%;
+  pointer-events: none;
+  z-index: 120;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(var(--primary-rgb), .2), transparent 52%),
+    radial-gradient(circle at 50% 100%, rgba(var(--blue-rgb), .14), transparent 50%);
+  animation: celebration-glow 850ms ease;
+}
+
+@keyframes celebration-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@keyframes celebration-glow {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .celebration-banner,
+  body.celebrate-glow::before {
+    animation: none;
+  }
+}
+
 .toast {
   background: var(--surface2);
   border: 1px solid var(--border);
