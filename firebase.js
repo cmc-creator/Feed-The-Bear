@@ -179,7 +179,7 @@ function initFirebaseAuth () {
       if (cloudProfile) {
         const localProf = loadUserProfile() || {};
         saveUserProfile({ ...localProf, ...cloudProfile });
-        updateHeaderAvatar(cloudProfile.avatar || localProf.avatar || '🐻');
+        updateHeaderAvatar(cloudProfile.avatar || localProf.avatar || 'FTB');
 
         const appearance = cloudProfile.appearance || null;
         if (appearance && typeof applyThemeChoice === 'function') {
@@ -209,7 +209,7 @@ function initFirebaseAuth () {
         if (sessionId) await _verifyAndActivatePlan(sessionId, user.uid);
         history.replaceState({}, '', window.location.pathname);
         if (isPremium()) {
-          showToast('🐻 Welcome to Grizzly!', 'Unlimited restaurants, AI recs, and more. You\'re a true bear now!', 'success');
+          showToast('Welcome to Grizzly!', 'Unlimited restaurants, AI recs, and more are now unlocked.', 'success');
         }
       }
     } else {

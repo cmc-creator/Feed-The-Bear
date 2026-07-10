@@ -427,7 +427,7 @@ function openProfileSetup () {
     saveUserProfile(profile);
     updateHeaderAvatar(profile.avatar);
     overlay.classList.add('hidden');
-    showToast(`Welcome, ${name}! 🐻`, 'Your account is set. Now let\'s find some food!', 'success');
+    showToast(`Welcome, ${name}!`, 'Your account is set. Now let\'s find some food!', 'success');
     // Show onboarding tour after signup
     setTimeout(() => {
       state.settings.onboardingDone = false;
@@ -440,7 +440,7 @@ function openProfileSetup () {
     saveUserProfile(profile);
     updateHeaderAvatar(profile.avatar);
     overlay.classList.add('hidden');
-    showToast('Welcome! 🐻', 'You can set up your profile anytime via the account button.', 'info');
+    showToast('Welcome!', 'You can set up your profile anytime via the account button.', 'info');
   };
 
   document.getElementById('setup-save-btn').onclick = doSave;
@@ -648,7 +648,7 @@ function enableLocation () {
       updateLocationBtn();
       hideBanner('location-banner');
       renderCards();
-      showToast('📍 Bearings locked! 🐻', 'You\'ll get a nudge when you\'re near spots on your list!', 'success');
+      showToast('📍 Location enabled', 'You\'ll get a nudge when you\'re near spots on your list!', 'success');
       // Request notification permission
       if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
@@ -1382,7 +1382,7 @@ function celebrateMilestones () {
   state.settings.lastMilestone = hit;
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
   launchConfetti(3200);
-  const msg = hit === 1 ? 'Your first visit logged - the adventure begins! 🐻'
+  const msg = hit === 1 ? 'Your first visit logged - the adventure begins!'
     : `${hit} restaurants visited! You're a certified foodie explorer. 🌟`;
   setTimeout(() => showToast(`🏆 ${hit} Visited!`, msg, 'success'), 250);
 }
@@ -1426,7 +1426,7 @@ function initPullToRefresh () {
       renderAll();
       if (typeof loadHomeDiscovery === 'function') { try { loadHomeDiscovery(); } catch (_) {} }
       reset();
-      showToast('🐻 Refreshed', 'Fresh picks served up.', 'success');
+      showToast('Refreshed', 'Fresh picks served up.', 'success');
     }, 520);
   });
 }
@@ -1643,14 +1643,14 @@ async function scheduleReminder (r) {
   if (swReg) {
     swReg.active.postMessage({
       type: 'SCHEDULE_REMINDER',
-      title: `🐻 Time to visit ${r.name}!`,
+      title: `Time to visit ${r.name}!`,
       body: `${r.cuisine ? cuisineEmoji(r.cuisine)+' '+r.cuisine+' · ' : ''}${r.address || ''}`,
       delay,
     });
   } else {
     setTimeout(() => {
       if (Notification.permission === 'granted') {
-        new Notification(`🐻 Time to visit ${r.name}!`, { body: r.address || r.cuisine || '' });
+        new Notification(`Time to visit ${r.name}!`, { body: r.address || r.cuisine || '' });
       }
     }, delay);
   }
@@ -1663,7 +1663,7 @@ async function scheduleReminder (r) {
 
 /* ── Share via SMS ─────────────────────────────────────── */
 function shareViaSMS (r) {
-  const lines = [`🐻 ${r.name}`];
+  const lines = [r.name];
   if (r.cuisine) lines.push(`${cuisineEmoji(r.cuisine)} ${r.cuisine}`);
   if (r.address) lines.push(`📍 ${r.address}`);
   if (r.googleRating) lines.push(`⭐ ${r.googleRating}/5`);
@@ -1925,9 +1925,9 @@ function showToast (title, msg, type = 'default') {
    CHAT BUDDY - BYTE CUB
    ════════════════════════════════════════════════════════════ */
 const GREETINGS = [
-  'Hey foodie! 🐻 I\'m Byte Cub, your personal restaurant strategist. What should we plan first?',
-  'Welcome back, hungry adventurer. 🐻 Want a recommendation, a surprise pick, or your next list idea?',
-  'Roar and ready. 🐻 I can help you discover, organize, and decide where to eat next.',
+  'Hey foodie. I\'m Byte Cub, your personal restaurant strategist. What should we plan first?',
+  'Welcome back, hungry adventurer. Want a recommendation, a surprise pick, or your next list idea?',
+  'Ready when you are. I can help you discover, organize, and decide where to eat next.',
 ];
 
 const FOOD_TIPS = [
@@ -1942,11 +1942,11 @@ const FOOD_TIPS = [
 
 const GENERAL_RESPONSES = [
   (q) => q.match(/\b(hi|hello|hey|yo|sup)\b/i) && randomFrom([
-    'Hey! 🐻 What foodie adventure shall we plan today?',
+    'Hey! What foodie adventure shall we plan today?',
     'Hello, fellow food lover! 🍽️ What can I help you find?',
     'Hi there! Ready to discover something delicious? 😋',
   ]),
-  (q) => q.match(/\b(help|how|what can)\b/i) && `Here's how I can help:\n\n• **Find** restaurants by cuisine, rating, tags, or status\n• **Recommend** high-rated spots you still need to try\n• **Nearby** discovery based on your live location\n• **Surprise me** for instant decision relief\n• **Top cuisine** insights from your visit history\n• **Collections** to organize date nights, lunch spots, and more\n• **Share cards** so your picks look great on social\n\nSay what you're craving and I'll do the rest. 🐻`,
+  (q) => q.match(/\b(help|how|what can)\b/i) && `Here's how I can help:\n\n• **Find** restaurants by cuisine, rating, tags, or status\n• **Recommend** high-rated spots you still need to try\n• **Nearby** discovery based on your live location\n• **Surprise me** for instant decision relief\n• **Top cuisine** insights from your visit history\n• **Collections** to organize date nights, lunch spots, and more\n• **Share cards** so your picks look great on social\n\nSay what you're craving and I'll do the rest.`,
   (q) => q.match(/\b(nearby|close|near me|around me|area)\b/i) && nearbyResponse(),
   (q) => q.match(/\b(surprise|random|anything|don.?t care|pick for me|choose for me)\b/i) && surpriseMeResponse(),
   (q) => q.match(/\b(recommend|suggest|best|top|favorite|favourite)\b/i) && recommendResponse(),
@@ -1987,9 +1987,9 @@ function chatResponse (userText) {
 
   // Generic fallback
   return randomFrom([
-    `Try asking "surprise me", "what's nearby", or "top cuisine breakdown" and I'll pull your best options. 🐻`,
+    `Try asking "surprise me", "what's nearby", or "top cuisine breakdown" and I'll pull your best options.`,
     `Ask me for "date night ideas", "best rated", or "my collections" and I'll curate from your list. 🍽️`,
-    `Tell me a cuisine like "Thai" or "Sushi", and I'll instantly surface your top choices. 🐻`,
+    `Tell me a cuisine like "Thai" or "Sushi", and I'll instantly surface your top choices.`,
   ]);
 }
 
@@ -2015,7 +2015,7 @@ function recommendResponse () {
   const unvisited = state.restaurants.filter(r => r.status === 'want-to-try' && r.googleRating > 0);
   if (!unvisited.length) {
     const top = [...state.restaurants].sort((a,b) => (b.googleRating||0) - (a.googleRating||0)).slice(0,3);
-    if (!top.length) return `Your list is empty! Click **＋ Add Restaurant** to start building your foodie bucket list 🐻`;
+    if (!top.length) return `Your list is empty! Click **＋ Add Restaurant** to start building your foodie bucket list.`;
     const list = top.map(r => `<span class="chip-link" data-id="${r.id}">${cuisineEmoji(r.cuisine)} ${r.name} ⭐${r.googleRating}</span>`).join('');
     return `Your top-rated spots:\n${list}`;
   }
@@ -2023,7 +2023,7 @@ function recommendResponse () {
   const list = top.map(r =>
     `<span class="chip-link" data-id="${r.id}">${cuisineEmoji(r.cuisine)} ${r.name} - ⭐${r.googleRating}</span>`
   ).join('');
-  return `Here are your highest-rated spots you haven't tried yet! 🌟\n${list}\n\nGet out there and eat! 🐻`;
+  return `Here are your highest-rated spots you haven't tried yet! 🌟\n${list}\n\nGet out there and eat!`;
 }
 
 function wantToTryResponse () {
@@ -2101,7 +2101,7 @@ function restaurantDetailResponse (r) {
 function surpriseMeResponse () {
   const unvisited = state.restaurants.filter(r => r.status === 'want-to-try');
   const pool = unvisited.length ? unvisited : state.restaurants;
-  if (!pool.length) return `Your list is empty! Add some restaurants first 🐻`;
+  if (!pool.length) return `Your list is empty! Add some restaurants first.`;
   const r = randomFrom(pool);
   return `🎲 How about… **${r.name}**? ${r.cuisine ? `${cuisineEmoji(r.cuisine)} ${r.cuisine} vibes.` : ''} ${r.googleRating ? `Rated ⭐${r.googleRating}.` : ''} ${r.address ? `📍 ${r.address}` : ''}\n\n<span class="chip-link" data-id="${r.id}">View details</span>`;
 }
@@ -2114,7 +2114,7 @@ function topCuisineResponse () {
   const sorted = Object.entries(counts).sort(([,a],[,b]) => b-a).slice(0,5);
   const total = visited.length;
   const lines = sorted.map(([c,n]) => `${cuisineEmoji(c)} **${c}** - ${n} visit${n>1?'s':''} (${Math.round(n/total*100)}%)`).join('\n');
-  return `Your foodie habits revealed! 🔍\n\n${lines}\n\n*Total: ${total} restaurants visited* 🐻`;
+  return `Your foodie habits revealed! 🔍\n\n${lines}\n\n*Total: ${total} restaurants visited*`;
 }
 
 function collectionsResponse () {
@@ -2161,7 +2161,7 @@ function addChatMsg (text, role = 'bot') {
 
   const avatar = document.createElement('div');
   avatar.className = 'chat-msg-avatar';
-  avatar.textContent = role === 'bot' ? '🐻' : '😋';
+  avatar.textContent = role === 'bot' ? 'BC' : 'YOU';
 
   const bubble = document.createElement('div');
   bubble.className = 'chat-bubble';
@@ -2197,7 +2197,7 @@ function showTyping () {
 
   const avatar = document.createElement('div');
   avatar.className = 'chat-msg-avatar';
-  avatar.textContent = '🐻';
+  avatar.textContent = 'BC';
 
   const bubble = document.createElement('div');
   bubble.className = 'chat-typing';
@@ -2542,7 +2542,7 @@ async function _discFetch () {
 
     if (!_discAllResults.length) {
       resultsEl.innerHTML = `<div class="disc-empty">
-        <div class="disc-empty-icon">🐻</div>
+        <div class="disc-empty-icon">FTB</div>
         <div class="disc-empty-title">No spots found nearby</div>
         <div class="disc-empty-sub">Try increasing the radius above.</div>
       </div>`;
@@ -2749,11 +2749,11 @@ function shareCard (r) {
   ctx.fillStyle = bc; ctx.font = 'bold 13px system-ui,sans-serif';
   ctx.fillText(r.status==='visited'?'✅ Visited':'🔖 Want to Try', r.priceRange?122:62, 409);
   ctx.fillStyle = '#E8B15A'; ctx.font = 'bold 15px system-ui,sans-serif';
-  ctx.fillText('🐻 Feed The Bear', W-195, H-18);
+  ctx.fillText('Feed The Bear', W-195, H-18);
   canvas.toBlob(blob => {
     const file = new File([blob], `${r.name.replace(/[^a-z0-9]/gi,'_')}-ftb.png`, {type:'image/png'});
     if (navigator.share && navigator.canShare?.({files:[file]})) {
-      navigator.share({title:r.name, text:`Check out ${r.name} on Feed The Bear 🐻`, files:[file]}).catch(()=>{});
+      navigator.share({title:r.name, text:`Check out ${r.name} on Feed The Bear`, files:[file]}).catch(()=>{});
     } else {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href=url; a.download=file.name; a.click(); URL.revokeObjectURL(url);
@@ -3627,7 +3627,7 @@ function exportHighlightCard (kind = 'weekly') {
   ctx.fillStyle = '#fff';
   ctx.font = '700 56px Poppins, system-ui';
   const title = kind === 'weekly' ? 'Weekly Recap' : kind === 'mood' ? 'Mood Picks' : 'Top Dishes';
-  ctx.fillText(`🐻 ${title}`, 92, 154);
+  ctx.fillText(`${title}`, 92, 154);
 
   ctx.fillStyle = '#ffd18a';
   ctx.font = '600 26px Poppins, system-ui';
@@ -5467,7 +5467,7 @@ function shareWrap () {
   const all = state.restaurants;
   const monthKey = new Date(d.getFullYear(), d.getMonth()+_wrapOffset, 1).toISOString().slice(0,7);
   const total = all.flatMap(r=>(r.visits||[]).filter(v=>(v.date||'').slice(0,7)===monthKey)).length;
-  const text = 'My ' + month + ' foodie wrap: ' + total + ' meals out! Track yours with Feed The Bear 🐻';
+  const text = 'My ' + month + ' foodie wrap: ' + total + ' meals out! Track yours with Feed The Bear.';
   if (navigator.share) { navigator.share({ title: 'My Foodie Wrap', text }).catch(()=>{}); }
   else { navigator.clipboard?.writeText(text); showToast('Copied!','Wrap text copied to clipboard','success'); }
 }
@@ -5486,7 +5486,7 @@ function addToGoogleCalendar (restaurantId) {
   const fmt = d => d.toISOString().replace(/[-:]/g,'').slice(0,15) + 'Z';
   const title  = encodeURIComponent('Dinner at ' + r.name);
   const loc    = encodeURIComponent(r.address || r.name);
-  const detail = encodeURIComponent((r.cuisine ? r.cuisine + ' · ' : '') + (r.website || '') + '\n\nAdded via Feed The Bear 🐻');
+  const detail = encodeURIComponent((r.cuisine ? r.cuisine + ' · ' : '') + (r.website || '') + '\n\nAdded via Feed The Bear');
   const url = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
     + '&text=' + title
     + '&dates=' + fmt(start) + '/' + fmt(end)
@@ -5795,7 +5795,7 @@ function initReminders () {
 }
 function fireReminder (r) {
   if (Notification.permission === 'granted') {
-    new Notification('🐻 Feed The Bear Reminder', {
+    new Notification('Feed The Bear Reminder', {
       body: 'Time for your visit to ' + r.name + '!',
       icon: './icon-192.png',
     });
@@ -6431,7 +6431,7 @@ const HUB_SECTIONS = [
   { title: '🏆 Play & earn', items: [
     ['challenge','🏆','Challenges'], ['achievements','🏅','Achievements'],
     ['bingo','🎲','Cuisine Bingo'], ['dailychallenge','🔥','Daily Challenge'],
-    ['feedbear','🐻','Feed the Bear'], ['passport','🛂','Passport'],
+    ['feedbear','🎮','Feed the Bear'], ['passport','🛂','Passport'],
     ['moodcal','📅','Mood Calendar'],
   ]},
   { title: '📒 Track', items: [
@@ -6443,7 +6443,7 @@ const HUB_SECTIONS = [
   { title: '👥 Social & stats', items: [
     ['profile','🌐','My Profile'], ['friends','👥','Friends'],
     ['groupvote','🗳️','Group Vote'], ['stats2','📊','Deep Stats'],
-    ['ai-panel','🐻','Byte Cub'], ['review','🎞️','Year in Review'],
+    ['ai-panel','🧠','Byte Cub'], ['review','🎞️','Year in Review'],
     ['wrap','🎁','Monthly Wrap'], ['digest','📨','Monthly Digest'],
   ]},
   { title: '🗂️ Data & tools', items: [
@@ -7093,7 +7093,7 @@ function renderTodayStatusRow () {
   const avg = avgMine.length ? (avgMine.reduce((s, r) => s + (r.myRating || 0), 0) / avgMine.length).toFixed(1) : null;
 
   row.innerHTML = `
-    <span class="today-status-pill">🐻 Saved <strong>${all.length}</strong></span>
+    <span class="today-status-pill">📚 Saved <strong>${all.length}</strong></span>
     <span class="today-status-pill">✅ Visited <strong>${visited}</strong></span>
     <span class="today-status-pill">⭐ Favorites <strong>${favorites}</strong></span>
     <span class="today-status-pill">📍 Nearby <strong>${nearby}</strong></span>
@@ -8375,7 +8375,7 @@ function schedulePushNudge () {
   const daysSince = Math.floor((Date.now() - new Date(last)) / 86400000);
   if (daysSince >= 14) {
     // Fire a nudge now (in a real app this would use Push API via server)
-    new Notification('🐻 Feed The Bear misses you!', {
+    new Notification('Feed The Bear misses you!', {
       body: `It's been ${daysSince} days since your last visit. Time to try somewhere new!`,
       icon: './icon-192.png',
       badge: './icon-192.png',
@@ -9117,12 +9117,12 @@ function shareTasteDna () {
   });
 
   ctx.fillStyle = '#E8B15A'; ctx.font = 'bold 15px system-ui,sans-serif';
-  ctx.fillText('🐻 Feed The Bear', W - 195, H - 18);
+  ctx.fillText('Feed The Bear', W - 195, H - 18);
 
   canvas.toBlob(blob => {
     const file = new File([blob], 'taste-dna-ftb.png', { type: 'image/png' });
     if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      navigator.share({ title: 'My Taste DNA', text: 'My foodie personality on Feed The Bear 🐻🧬', files: [file] }).catch(() => {});
+      navigator.share({ title: 'My Taste DNA', text: 'My foodie personality on Feed The Bear.', files: [file] }).catch(() => {});
     } else {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = file.name; a.click(); URL.revokeObjectURL(url);
@@ -9333,7 +9333,7 @@ function timeBasedResponse (q) {
       return `For dinner tonight 🌙, how about:\n<span class="chip-link" data-id="${pick.id}">${cuisineEmoji(pick.cuisine)} ${pick.name}${pick.googleRating ? ' ⭐' + pick.googleRating : ''}</span>\n\nOr ask for "Tonight\'s Pick" to get a mood-matched recommendation! 🎯`;
     }
   }
-  return `Tell me more about your mood or craving and I\'ll find the perfect match! 🐻`;
+  return `Tell me more about your mood or craving and I\'ll find the perfect match.`;
 }
 
 function myStatsResponse () {
@@ -9841,7 +9841,7 @@ function _saveVisitLogEntry () {
   document.getElementById('vl-notes').value = '';
   document.getElementById('vl-spend').value = '';
   _setVlStars(0);
-  showToast('🐻 Grizzly good visit!', `Logged your trip to ${escHtml(r.name)}.`, 'success');
+  showToast('Visit logged', `Logged your trip to ${escHtml(r.name)}.`, 'success');
 }
 function _invalidateSpendCache () { _spendCacheValid = false; }
 
