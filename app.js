@@ -252,7 +252,8 @@ function hapticTap (strength = 'light') {
 /* ════════════════════════════════════════════════════════════
    USER PROFILE
    ════════════════════════════════════════════════════════════ */
-const AVATAR_OPTIONS = ['🐻','🍕','🌮','🍣','🍔','🥗','🍜','🍝','🥩','🦞','🍰','☕','🍖','🥐','🎯','⭐','🔥','🏆','🌟','🍦','🥞','🍟','🥑','🍱'];
+const AVATAR_OPTIONS = ['🍕','🌮','🍣','🍔','🥗','🍜','🍝','🥩','🦞','🍰','☕','🍖','🥐','🎯','⭐','🔥','🏆','🌟','🍦','🥞','🍟','🥑','🍱'];
+const DEFAULT_AVATAR = 'FTB';
 const PROFILE_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 const THEME_PRESETS = {
   dark:     { mode: 'dark',  accent: 'orange' },
@@ -270,7 +271,14 @@ const UI_CORNERS = new Set(['rounded', 'sharp']);
 const UI_MOTION = new Set(['playful', 'reduced']);
 
 function loadUserProfile () {
-  try { return JSON.parse(localStorage.getItem(USER_KEY)) || null; } catch { return null; }
+  try {
+    const profile = JSON.parse(localStorage.getItem(USER_KEY)) || null;
+    if (!profile) return null;
+    if (profile.avatar === '🐻') profile.avatar = DEFAULT_AVATAR;
+    return profile;
+  } catch {
+    return null;
+  }
 }
 function saveUserProfile (profile) {
   localStorage.setItem(USER_KEY, JSON.stringify(profile));
@@ -280,7 +288,7 @@ function saveUserProfile (profile) {
 }
 
 function persistAppearanceProfile () {
-  const base = loadUserProfile() || { name: 'Foodie', avatar: '🐻', joinDate: iso() };
+  const base = loadUserProfile() || { name: 'Foodie', avatar: DEFAULT_AVATAR, joinDate: iso() };
   const appearance = {
     themeChoice: state.settings.themeChoice || 'dark',
     themeMode: state.settings.theme || 'dark',
@@ -312,19 +320,21 @@ function updateHeaderAvatar (emoji) {
   if (profile.photo) {
     el.innerHTML = `<img src="${profile.photo}" alt="Profile" class="account-avatar-photo" />`;
   } else {
-    el.textContent = emoji || profile.avatar || '🐻';
+    const avatar = (emoji === '🐻' ? DEFAULT_AVATAR : emoji) || (profile.avatar === '🐻' ? DEFAULT_AVATAR : profile.avatar) || DEFAULT_AVATAR;
+    el.textContent = avatar;
   }
 }
 
 function updateProfileVisuals (profile = null) {
-  const p = profile || loadUserProfile() || { avatar: '🐻' };
+  const p = profile || loadUserProfile() || { avatar: DEFAULT_AVATAR };
+  const normalizedAvatar = p.avatar === '🐻' ? DEFAULT_AVATAR : (p.avatar || DEFAULT_AVATAR);
 
   const accountAvatar = document.getElementById('account-avatar-display');
   if (accountAvatar) {
     if (p.photo) {
       accountAvatar.innerHTML = `<img src="${p.photo}" alt="Profile" class="account-avatar-photo account-avatar-photo-lg" />`;
     } else {
-      accountAvatar.textContent = p.avatar || '🐻';
+      accountAvatar.textContent = normalizedAvatar;
     }
   }
 
@@ -339,11 +349,11 @@ function updateProfileVisuals (profile = null) {
       editPreview.classList.add('hidden');
       editPreview.removeAttribute('src');
       editAvatar.classList.remove('hidden');
-      editAvatar.textContent = p.avatar || '🐻';
+      editAvatar.textContent = normalizedAvatar;
     }
   }
 
-  updateHeaderAvatar(p.avatar || '🐻');
+  updateHeaderAvatar(normalizedAvatar);
 }
 
 function applyThemeChoice (choice = 'dark') {
@@ -400,7 +410,7 @@ function openProfileSetup () {
   const overlay = document.getElementById('profile-setup-overlay');
   if (!overlay) return;
   overlay.classList.remove('hidden');
-  let chosenAvatar = '🐻';
+  let chosenAvatar = DEFAULT_AVATAR;
   const avatarDisplay = document.getElementById('setup-avatar-display');
   if (avatarDisplay) avatarDisplay.textContent = chosenAvatar;
   buildAvatarGrid('avatar-emoji-grid', chosenAvatar, emoji => {
@@ -426,7 +436,7 @@ function openProfileSetup () {
   };
 
   const doSkip = () => {
-    const profile = { name: 'Foodie', avatar: '🐻', joinDate: new Date().toISOString() };
+    const profile = { name: 'Foodie', avatar: DEFAULT_AVATAR, joinDate: new Date().toISOString() };
     saveUserProfile(profile);
     updateHeaderAvatar(profile.avatar);
     overlay.classList.add('hidden');
@@ -441,7 +451,8 @@ function openProfileSetup () {
 function openAccountModal () {
   const overlay = document.getElementById('account-overlay');
   if (!overlay) return;
-  const profile = loadUserProfile() || { name: 'Foodie', avatar: '🐻', joinDate: new Date().toISOString() };
+  const profile = loadUserProfile() || { name: 'Foodie', avatar: DEFAULT_AVATAR, joinDate: new Date().toISOString() };
+  const normalizedAvatar = profile.avatar === '🐻' ? DEFAULT_AVATAR : (profile.avatar || DEFAULT_AVATAR);
 
   const avatarEl = document.getElementById('account-avatar-display');
   const nameEl   = document.getElementById('account-name-display');
@@ -452,7 +463,7 @@ function openAccountModal () {
     if (profile.photo) {
       avatarEl.innerHTML = `<img src="${profile.photo}" alt="Profile" class="account-avatar-photo account-avatar-photo-lg" />`;
     } else {
-      avatarEl.textContent = profile.avatar || '🐻';
+      avatarEl.textContent = normalizedAvatar;
     }
   }
   if (nameEl)   nameEl.textContent   = profile.name   || 'Foodie';
@@ -460,7 +471,7 @@ function openAccountModal () {
     const joined = profile.joinDate
       ? new Date(profile.joinDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
       : 'recently';
-    sinceEl.textContent = `Part of the pack since ${joined} 🐾`;
+    sinceEl.textContent = `Member since ${joined}`;
   }
 
   if (statsEl) {
@@ -509,8 +520,8 @@ function openEditProfile () {
   closeAccountModal();
   const overlay = document.getElementById('edit-profile-overlay');
   if (!overlay) return;
-  const profile = loadUserProfile() || { name: 'Foodie', avatar: '🐻' };
-  let chosenAvatar = profile.avatar || '🐻';
+  const profile = loadUserProfile() || { name: 'Foodie', avatar: DEFAULT_AVATAR };
+  let chosenAvatar = (profile.avatar === '🐻' ? DEFAULT_AVATAR : profile.avatar) || DEFAULT_AVATAR;
   let chosenPhoto = profile.photo || '';
   document.getElementById('edit-name').value = profile.name || '';
 
@@ -2352,11 +2363,11 @@ function initTheme () {
    ONBOARDING TOUR
    ════════════════════════════════════════════════════════════ */
 const ONBOARDING_STEPS = [
-  { icon: '🐻', title: 'Welcome to Feed The Bear', desc: 'Build your private dining archive: save standout spots, track visits, and keep every great find in one polished home.' },
-  { icon: '➕', title: 'Capture Places Instantly', desc: 'Add restaurants in seconds, or paste a Google Maps URL to auto-fill details and save time.' },
-  { icon: '🗺️', title: 'Discover Around You', desc: 'Use Map view and Nearby Discovery to find what is close now, then save your favorites with one tap.' },
-  { icon: '📊', title: 'See Your Food Story', desc: 'Stats turns your history into insight: top cuisines, ratings, trends, and your strongest picks.' },
-  { icon: '🐻', title: 'Let Byte Cub Curate', desc: 'Ask for smart recommendations, tie breakers, and refined shareable cards.' },
+  { title: 'Welcome to Feed The Bear', desc: 'Build your private dining archive: save standout spots, track visits, and keep every great find in one polished home.' },
+  { title: 'Capture Places Instantly', desc: 'Add restaurants in seconds, or paste a Google Maps URL to auto-fill details and save time.' },
+  { title: 'Discover Around You', desc: 'Use Map view and Nearby Discovery to find what is close now, then save your favorites with one tap.' },
+  { title: 'See Your Food Story', desc: 'Stats turns your history into insight: top cuisines, ratings, trends, and your strongest picks.' },
+  { title: 'Let Byte Cub Curate', desc: 'Ask for smart recommendations, tie breakers, and refined shareable cards.' },
 ];
 let _onboardingStep = 0;
 function showOnboarding () {
@@ -2367,11 +2378,10 @@ function showOnboarding () {
 }
 function renderOnboardingStep () {
   const step = ONBOARDING_STEPS[_onboardingStep];
-  document.getElementById('onboarding-icon').textContent = step.icon;
   document.getElementById('onboarding-title').textContent = step.title;
   document.getElementById('onboarding-desc').textContent = step.desc;
   const isLast = _onboardingStep === ONBOARDING_STEPS.length - 1;
-  document.getElementById('onboarding-next-btn').textContent = isLast ? 'Get Started! 🐻' : 'Next →';
+  document.getElementById('onboarding-next-btn').textContent = isLast ? 'Get Started' : 'Next >';
   document.getElementById('onboarding-dots').innerHTML = ONBOARDING_STEPS.map((_,i) =>
     `<div class="onboarding-dot ${i === _onboardingStep ? 'active' : ''}"></div>`
   ).join('');
