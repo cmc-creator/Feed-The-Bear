@@ -1,9 +1,9 @@
 /* ════════════════════════════════════════════════════════════
-   Feed The Bear — Vercel Serverless: Create Stripe Checkout
+   Feed The Bear - Vercel Serverless: Create Stripe Checkout
    ════════════════════════════════════════════════════════════
    Environment variables required (set in Vercel dashboard):
-     STRIPE_SECRET_KEY      — Stripe secret key (sk_live_… or sk_test_…)
-     APP_URL                — Your Vercel URL, e.g. https://feed-the-bear.vercel.app
+     STRIPE_SECRET_KEY      - Stripe secret key (sk_live_… or sk_test_…)
+     APP_URL                - Your Vercel URL, e.g. https://feed-the-bear.vercel.app
    ════════════════════════════════════════════════════════════ */
 
 const Stripe = require('stripe');

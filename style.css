@@ -1,11 +1,11 @@
 /* ════════════════════════════════════════════════════════════
-   Feed The Bear — Style Sheet
+   Feed The Bear - Style Sheet
    Dark, food-themed UI with warm accent colours
    ════════════════════════════════════════════════════════════ */
 
 /* ── Custom Properties ──────────────────────────────────── */
 :root {
-  /* ── Espresso & Brass — calmer, more editorial look ── */
+  /* ── Espresso & Brass - calmer, more editorial look ── */
   --bg:          #101319;
   --surface:     #171c24;
   --surface2:    #1d2430;
@@ -1682,7 +1682,7 @@ body[data-ui-motion='reduced'] * {
 
 /* ── Light Mode ──────────────────────────────────────────── */
 body.light-mode {
-  /* Velvet & Champagne — light */
+  /* Velvet & Champagne - light */
   --bg:        #F6F1EA; --surface:   #FFFFFF; --surface2:  #FBF6EF;
   --surface3:  #EFE7DC; --border:    rgba(42,20,46,.12); --text:      #2A1F2E;
   --text-dim:  #8A7C90; --text-muted:#A99CB0;
@@ -1942,7 +1942,7 @@ body.bulk-mode .card-checkbox { display: flex; }
   color: var(--text-dim); flex-shrink: 0;
 }
 
-/* Results list — scrollable */
+/* Results list - scrollable */
 .disc-results-list {
   flex: 1; overflow-y: auto; padding: 8px 12px 24px;
   display: flex; flex-direction: column; gap: 10px;
@@ -3898,7 +3898,7 @@ body.light-mode #profile-btn {
 .open-now-loading { text-align: center; color: var(--text-dim); font-size: .85rem; padding: 24px; }
 
 /* ============================================================
-   AI FEATURE STYLES — Gemini / Byte Cub upgrade
+   AI FEATURE STYLES - Gemini / Byte Cub upgrade
    ============================================================ */
 
 /* Provider badge */
@@ -4489,7 +4489,7 @@ body.light-mode #profile-btn {
 .passport-stamp-count { font-size: .65rem; color: var(--primary); font-weight: 700; }
 
 /* ═══════════════════════════════════════════════════════════
-   PHASE 14 — 🐻 FEED THE BEAR GAME
+   PHASE 14 - 🐻 FEED THE BEAR GAME
    ═══════════════════════════════════════════════════════════ */
 .feedbear-card {
   padding: 14px 14px 10px;
@@ -4519,7 +4519,7 @@ body.light-mode #profile-btn {
   letter-spacing: .02em;
 }
 /* ════════════════════════════════════════════════════════════
-   HOME DISCOVERY — Near You Now + AI Rec Banner
+   HOME DISCOVERY - Near You Now + AI Rec Banner
    ════════════════════════════════════════════════════════════ */
 .home-discovery {
   padding: 4px 16px 12px;
@@ -5290,7 +5290,7 @@ body[data-ui-motion='playful'] .restaurant-grid.card-enter-run .restaurant-card:
 .nearby-home-card-add { margin-top: 6px; width: 100%; }
 
 /* ════════════════════════════════════════════════════════════
-   USER PROFILE — Account Button, Setup, Account Panel
+   USER PROFILE - Account Button, Setup, Account Panel
    ════════════════════════════════════════════════════════════ */
 
 /* Header account button */
@@ -5910,7 +5910,7 @@ body[data-theme-accent='neon'] {
 }
 
 /* ════════════════════════════════════════════════════════════
-   ACCOUNT PORTAL — AUTH BADGES + EXTRA ROWS
+   ACCOUNT PORTAL - AUTH BADGES + EXTRA ROWS
    ════════════════════════════════════════════════════════════ */
 .account-badges-row {
   display: flex;

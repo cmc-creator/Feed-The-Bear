@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════
-   Feed The Bear — Firebase Auth + Firestore Sync + Monetization
+   Feed The Bear - Firebase Auth + Firestore Sync + Monetization
    ════════════════════════════════════════════════════════════ */
 
 'use strict';
@@ -108,7 +108,7 @@ async function fbSaveProfileCloud (uid, profile) {
   try { await _db.doc(`users/${uid}/meta/profile`).set(profile, { merge: true }); } catch {}
 }
 
-// Called after every saveData() in app.js — debounced to avoid write storms
+// Called after every saveData() in app.js - debounced to avoid write storms
 function fbDebouncedSync () {
   const uid = window._ftbUid;
   if (!uid) return;
@@ -163,7 +163,7 @@ function initFirebaseAuth () {
         localStorage.setItem('ftb_uid_v1',  user.uid);
       } catch { window._ftbPlan = 'free'; }
 
-      // Sync restaurants — cloud wins if it has more data
+      // Sync restaurants - cloud wins if it has more data
       const { restaurants, cloudProfile } = await fbLoadUserData(user.uid);
       const local = state.restaurants || [];
       if (restaurants.length > local.length) {
@@ -221,7 +221,7 @@ function initFirebaseAuth () {
   });
 }
 
-// Called after returning from Stripe — fetches plan from Vercel API
+// Called after returning from Stripe - fetches plan from Vercel API
 async function _verifyAndActivatePlan (sessionId, uid) {
   try {
     const resp = await fetch(`/api/verify-session?sessionId=${encodeURIComponent(sessionId)}&uid=${encodeURIComponent(uid)}`);
@@ -252,11 +252,11 @@ function closeAuthModal () {
 function _setAuthMode (mode) {
   const isSignup = mode === 'signup';
   const el = id => document.getElementById(id);
-  if (el('auth-title'))      el('auth-title').textContent      = isSignup ? 'Join the pack 🐻' : 'Welcome back, bear 🐾';
-  if (el('auth-submit-btn')) el('auth-submit-btn').textContent  = isSignup ? 'Create Account'   : 'Sign In';
+  if (el('auth-title'))      el('auth-title').textContent      = isSignup ? 'Create your profile' : 'Welcome back';
+  if (el('auth-submit-btn')) el('auth-submit-btn').textContent  = isSignup ? 'Create Profile'   : 'Sign In';
   if (el('auth-toggle-text')) el('auth-toggle-text').innerHTML  = isSignup
-    ? 'Already in the den? <button class="auth-link-btn" id="auth-mode-toggle">Sign in</button>'
-    : 'New to the den? <button class="auth-link-btn" id="auth-mode-toggle">Sign up — it\'s free</button>';
+    ? 'Already have an account? <button class="auth-link-btn" id="auth-mode-toggle">Sign in</button>'
+    : 'New here? <button class="auth-link-btn" id="auth-mode-toggle">Sign up, it\'s free</button>';
   document.getElementById('auth-overlay').dataset.mode = mode;
   document.getElementById('auth-mode-toggle')?.addEventListener('click', () => _setAuthMode(isSignup ? 'signin' : 'signup'));
 }
@@ -267,10 +267,10 @@ async function _handleAuthSubmit () {
   const email    = document.getElementById('auth-email')?.value.trim();
   const password = document.getElementById('auth-password')?.value;
   const btn      = document.getElementById('auth-submit-btn');
-  if (!email || !password) { showToast('Missing info', 'Enter your email and password, bear.', 'error'); return; }
+  if (!email || !password) { showToast('Missing info', 'Enter your email and password.', 'error'); return; }
 
   btn.disabled    = true;
-  btn.textContent = 'Bear with us…';
+  btn.textContent = 'Signing you in...';
   try {
     if (mode === 'signup') {
       await fbSignUpEmail(email, password);
@@ -278,15 +278,15 @@ async function _handleAuthSubmit () {
       await fbSignInEmail(email, password);
     }
     closeAuthModal();
-    showToast('🐻 You\'re in!', 'Your den is now synced across all your devices.', 'success');
+    showToast('You are in', 'Your account is now synced across your devices.', 'success');
   } catch (err) {
     const msg =
-      err.code === 'auth/wrong-password'        ? 'Wrong password — try again, bear.'    :
+      err.code === 'auth/wrong-password'        ? 'Wrong password. Please try again.'    :
       err.code === 'auth/user-not-found'        ? 'No account found with that email.'    :
-      err.code === 'auth/email-already-in-use'  ? 'That email is already in the den!'   :
+      err.code === 'auth/email-already-in-use'  ? 'That email is already in use.'   :
       err.code === 'auth/weak-password'         ? 'Password needs at least 6 characters.' :
       err.message;
-    showToast('Auth error 🐾', msg, 'error');
+    showToast('Auth error', msg, 'error');
   } finally {
     btn.disabled = false;
     _setAuthMode(mode);
@@ -295,11 +295,11 @@ async function _handleAuthSubmit () {
 
 async function _handleGoogleAuth () {
   const btn = document.getElementById('auth-google-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '🐻 Sniffing out your Google…'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Connecting Google...'; }
   try {
     await fbSignInGoogle();
     closeAuthModal();
-    showToast('🐻 You\'re in!', 'Synced with Google. Your den is ready!', 'success');
+    showToast('You are in', 'Synced with Google. Your account is ready.', 'success');
   } catch (err) {
     if (err.code !== 'auth/popup-closed-by-user') showToast('Google Sign-In failed', err.message, 'error');
   } finally {
@@ -332,7 +332,7 @@ function _setUpgradePlan (period) {
   el('upgrade-monthly-btn')?.classList.toggle('active', !isYearly);
   el('upgrade-yearly-btn')?.classList.toggle('active',  isYearly);
   if (el('upgrade-price-main')) el('upgrade-price-main').textContent = isYearly ? '$19.99' : '$2.99';
-  if (el('upgrade-price-sub'))  el('upgrade-price-sub').textContent  = isYearly ? '/ year — save 44%!' : '/ month';
+  if (el('upgrade-price-sub'))  el('upgrade-price-sub').textContent  = isYearly ? '/ year, save 44%' : '/ month';
   if (el('upgrade-cta-btn'))    el('upgrade-cta-btn').dataset.period = period;
 }
 
@@ -341,13 +341,13 @@ async function _handleUpgradeClick () {
   if (!user) {
     closeUpgradeModal();
     setTimeout(openAuthModal, 200);
-    showToast('Sign in first 🐾', 'Create a free account, then upgrade to Grizzly.', 'info');
+    showToast('Sign in first', 'Create a free account, then upgrade to Grizzly.', 'info');
     return;
   }
   const btn    = document.getElementById('upgrade-cta-btn');
   const period = btn?.dataset.period || 'yearly';
   const priceId = period === 'yearly' ? _PRICES.yearly : _PRICES.monthly;
-  if (btn) { btn.disabled = true; btn.textContent = '🐻 Heading to checkout…'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Opening secure checkout...'; }
   try {
     const resp = await fetch('/api/create-checkout', {
       method: 'POST',
@@ -358,8 +358,8 @@ async function _handleUpgradeClick () {
     if (error) throw new Error(error);
     window.location.href = url;
   } catch (err) {
-    showToast('Checkout failed 🐾', err.message || 'Please try again.', 'error');
-    if (btn) { btn.disabled = false; btn.textContent = 'Upgrade to Grizzly 🐻'; }
+    showToast('Checkout failed', err.message || 'Please try again.', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Upgrade to Grizzly'; }
   }
 }
 
@@ -375,7 +375,7 @@ function updateAuthUI (user) {
   }
   if (el('account-plan-badge')) {
     const plan = window._ftbPlan || 'free';
-    el('account-plan-badge').textContent = plan === 'grizzly' ? '🐻 Grizzly' : '🐾 Cub — Free';
+    el('account-plan-badge').textContent = plan === 'grizzly' ? 'Grizzly' : 'Cub - Complimentary';
     el('account-plan-badge').className   = 'account-plan-badge' + (plan === 'grizzly' ? ' badge-grizzly' : ' badge-cub');
   }
 }

@@ -1,12 +1,12 @@
 /* ════════════════════════════════════════════════════════════
-   Feed The Bear — Vercel Serverless: Verify Stripe Session
+   Feed The Bear - Vercel Serverless: Verify Stripe Session
    ════════════════════════════════════════════════════════════
    Called after Stripe redirects back to the app with ?session_id=xxx
    Verifies payment was successful and writes plan to Firestore.
 
    Environment variables required (set in Vercel dashboard):
-     STRIPE_SECRET_KEY        — Stripe secret key
-     FIREBASE_SERVICE_ACCOUNT — Stringified JSON of Firebase service account key
+     STRIPE_SECRET_KEY        - Stripe secret key
+     FIREBASE_SERVICE_ACCOUNT - Stringified JSON of Firebase service account key
                                  (Firebase Console → Project Settings → Service accounts
                                   → Generate new private key → copy contents as one-line JSON)
    ════════════════════════════════════════════════════════════ */

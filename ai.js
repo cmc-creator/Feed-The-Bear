@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════
-   Feed The Bear — AI Engine  (Gemini 2.0 Flash)
+   Feed The Bear - AI Engine  (Gemini 2.0 Flash)
    ════════════════════════════════════════════════════════════
    All AI logic lives here. app.js calls these helpers.
    API key is stored in localStorage under ftb_settings_v1
@@ -162,7 +162,7 @@ const AI = {
     const systemMsg = `You are Byte Cub 🐻, a warm, witty, expert food guide for the Feed The Bear app.
 You know the user's personal restaurant list intimately. Be concise (2-4 sentences usually), enthusiastic, and personal.
 Use food emoji naturally. Format lists with bullet points or line breaks when helpful.
-Never say you're an AI — you're Byte Cub.
+Never say you're an AI - you're Byte Cub.
 User's restaurant data: ${context}`;
 
     // Build message history (last 10 turns)
@@ -205,7 +205,7 @@ Respond with ONLY valid JSON, no markdown, no explanation.`;
 
 Restaurant: ${name} (${cuisine || 'cuisine unknown'}, ${price}, ${stars})
 Address: ${address || 'unknown'}
-Raw note: "${rawNote || 'No notes provided – write something charming based on the restaurant details.'}"
+Raw note: "${rawNote || 'No notes provided - write something charming based on the restaurant details.'}"
 
 Write ONLY the enriched note, no quotes, no explanation.`;
 
@@ -293,7 +293,7 @@ Write ONLY the summary, no quotes.`;
   async cravingMatch (userInput, restaurants) {
     if (!restaurants.length) throw new Error('NO_DATA');
     const list = restaurants.map(r =>
-      `[${r.id}] ${r.name} – ${r.cuisine || '?'}, ${['', '$', '$$', '$$$', '$$$$'][r.priceRange || 0] || '?'}, ${r.status}, rating:${r.myRating || r.googleRating || '?'}, tags:${(r.tags || []).join(',')}`
+      `[${r.id}] ${r.name} - ${r.cuisine || '?'}, ${['', '$', '$$', '$$$', '$$$$'][r.priceRange || 0] || '?'}, ${r.status}, rating:${r.myRating || r.googleRating || '?'}, tags:${(r.tags || []).join(',')}`
     ).join('\n');
 
     const prompt = `The user is craving: "${userInput}"
