@@ -30,6 +30,7 @@ if (typeof AI === 'undefined') {
 const STORAGE_KEY   = 'ftb_restaurants_v2';
 const SETTINGS_KEY  = 'ftb_settings_v1';
 const USER_KEY      = 'ftb_user_v1';
+const LOCATION_BANNER_DISMISSED_KEY = 'ftb_location_banner_dismissed_v1';
 const ALERT_RADIUS  = 805;   // ~0.5 miles - show proximity alert
 const NOTIFY_RADIUS = 1609;  // ~1 mile - browser notification
 const NOTIFY_COOLDOWN = 10 * 60 * 1000; // 10 min between alerts for same place
@@ -146,6 +147,11 @@ function loadData () {
     const s = localStorage.getItem(SETTINGS_KEY);
     state.settings = s ? JSON.parse(s) : {};
   } catch { state.settings = {}; }
+
+  // Keep location-banner dismissal sticky even if settings object is replaced.
+  if (localStorage.getItem(LOCATION_BANNER_DISMISSED_KEY) === '1') {
+    state.settings.locationBannerDismissed = true;
+  }
 
   state.dinnerRooms = state.settings.dinnerRooms && typeof state.settings.dinnerRooms === 'object'
     ? state.settings.dinnerRooms
@@ -1890,8 +1896,9 @@ function renderAll () {
 
 function updateLocationBanner () {
   const banner = document.getElementById('location-banner');
-  const dismissed = state.settings.locationBannerDismissed;
-  if (!state.locationEnabled && !dismissed) {
+  const dismissed = !!state.settings.locationBannerDismissed || localStorage.getItem(LOCATION_BANNER_DISMISSED_KEY) === '1';
+  const restoringSavedLocation = !!state.settings.locationEnabled && !state.locationEnabled;
+  if (!state.locationEnabled && !dismissed && !restoringSavedLocation) {
     banner.classList.remove('hidden');
   } else {
     banner.classList.add('hidden');
@@ -3817,6 +3824,7 @@ function setupEvents () {
   });
   document.getElementById('dismiss-location-banner').addEventListener('click', () => {
     state.settings.locationBannerDismissed = true;
+    localStorage.setItem(LOCATION_BANNER_DISMISSED_KEY, '1');
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
     hideBanner('location-banner');
   });
@@ -4630,7 +4638,9 @@ document.addEventListener('DOMContentLoaded', () => {
       () => {
         // Permission revoked or unavailable - clear persisted flag so banner shows again
         state.settings.locationEnabled = false;
+        state.locationEnabled = false;
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+        updateLocationBanner();
       },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
     );
