@@ -31,6 +31,8 @@ const STORAGE_KEY   = 'ftb_restaurants_v2';
 const SETTINGS_KEY  = 'ftb_settings_v1';
 const USER_KEY      = 'ftb_user_v1';
 const LOCATION_BANNER_DISMISSED_KEY = 'ftb_location_banner_dismissed_v1';
+const LOCATION_BANNER_SNOOZE_UNTIL_KEY = 'ftb_location_banner_snooze_until_v1';
+const LOCATION_BANNER_SNOOZE_MS = 12 * 60 * 60 * 1000;
 const ALERT_RADIUS  = 805;   // ~0.5 miles - show proximity alert
 const NOTIFY_RADIUS = 1609;  // ~1 mile - browser notification
 const NOTIFY_COOLDOWN = 10 * 60 * 1000; // 10 min between alerts for same place
@@ -664,6 +666,7 @@ function enableLocation () {
       loadHomeDiscovery();
     },
     err => {
+      if (err?.code === 1) setLocationBannerCooldown();
       showToast('Location Error', err.message || 'Unable to get location.', 'error');
     },
     { enableHighAccuracy: true, timeout: 12000 }
@@ -1898,11 +1901,28 @@ function updateLocationBanner () {
   const banner = document.getElementById('location-banner');
   const dismissed = !!state.settings.locationBannerDismissed || localStorage.getItem(LOCATION_BANNER_DISMISSED_KEY) === '1';
   const restoringSavedLocation = !!state.settings.locationEnabled && !state.locationEnabled;
-  if (!state.locationEnabled && !dismissed && !restoringSavedLocation) {
+  const snoozed = isLocationBannerSnoozed();
+  if (!state.locationEnabled && !dismissed && !restoringSavedLocation && !snoozed) {
     banner.classList.remove('hidden');
   } else {
     banner.classList.add('hidden');
   }
+}
+
+function setLocationBannerCooldown (ms = LOCATION_BANNER_SNOOZE_MS) {
+  const until = Date.now() + Math.max(0, Number(ms) || 0);
+  localStorage.setItem(LOCATION_BANNER_SNOOZE_UNTIL_KEY, String(until));
+}
+
+function isLocationBannerSnoozed () {
+  const raw = localStorage.getItem(LOCATION_BANNER_SNOOZE_UNTIL_KEY);
+  const until = Number(raw || 0);
+  if (!Number.isFinite(until) || until <= 0) return false;
+  if (Date.now() >= until) {
+    localStorage.removeItem(LOCATION_BANNER_SNOOZE_UNTIL_KEY);
+    return false;
+  }
+  return true;
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -4635,10 +4655,11 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCards();
         loadHomeDiscovery();
       },
-      () => {
+      err => {
         // Permission revoked or unavailable - clear persisted flag so banner shows again
         state.settings.locationEnabled = false;
         state.locationEnabled = false;
+        if (err?.code === 1) setLocationBannerCooldown();
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
         updateLocationBanner();
       },
@@ -7038,7 +7059,7 @@ function renderMoodPicksHome (selectedMood = null) {
   list.innerHTML = picks.map(r => {
     const meta = `${escHtml(r.cuisine || 'Restaurant')}${r.myRating ? ` • ${'★'.repeat(r.myRating)}` : ''}`;
     const dist = distOf(r);
-    const distMeta = Number.isFinite(dist) ? ` • 📍 ${fmtDist(dist)}` : '';
+    const distMeta = Number.isFinite(dist) ? ` • ${fmtDist(dist)} away` : '';
     const moodFit = Math.max(40, Math.min(98, Math.round(r._moodScore * 9.5)));
     return `<button class="mood-pick-card" type="button" data-id="${r.id}">
       <div class="mood-pick-top">
@@ -7087,7 +7108,7 @@ function renderWeeklyRecapHome () {
 
   const fav = state.restaurants.filter(r => r.isFavorite).length;
   const topCuisine = Object.entries(cuisineHits).sort((a, b) => b[1] - a[1])[0]?.[0] || 'No streak yet';
-  text.innerHTML = `🍽️ <strong>${checkins}</strong> check-in${checkins === 1 ? '' : 's'} this week · ⭐ <strong>${fav}</strong> favorite${fav === 1 ? '' : 's'} · ${cuisineEmoji(topCuisine)} <strong>${escHtml(topCuisine)}</strong> leading`;
+  text.innerHTML = `<strong>${checkins}</strong> check-in${checkins === 1 ? '' : 's'} this week • <strong>${fav}</strong> favorite${fav === 1 ? '' : 's'} • <strong>${escHtml(topCuisine)}</strong> in the lead`;
   wrap.classList.remove('hidden');
 }
 
@@ -7103,11 +7124,11 @@ function renderTodayStatusRow () {
   const avg = avgMine.length ? (avgMine.reduce((s, r) => s + (r.myRating || 0), 0) / avgMine.length).toFixed(1) : null;
 
   row.innerHTML = `
-    <span class="today-status-pill">📚 Saved <strong>${all.length}</strong></span>
-    <span class="today-status-pill">✅ Visited <strong>${visited}</strong></span>
-    <span class="today-status-pill">⭐ Favorites <strong>${favorites}</strong></span>
-    <span class="today-status-pill">📍 Nearby <strong>${nearby}</strong></span>
-    <span class="today-status-pill">💯 Avg <strong>${avg ? `${avg}★` : '-'}</strong></span>
+    <span class="today-status-pill">Saved <strong>${all.length}</strong></span>
+    <span class="today-status-pill">Visited <strong>${visited}</strong></span>
+    <span class="today-status-pill">Favorites <strong>${favorites}</strong></span>
+    <span class="today-status-pill">Nearby <strong>${nearby}</strong></span>
+    <span class="today-status-pill">Average <strong>${avg ? `${avg}★` : '-'}</strong></span>
   `;
 }
 
@@ -7117,13 +7138,13 @@ function renderTodayVibeRow () {
 
   const hour = new Date().getHours();
   const vibe = hour < 11 ? 'Brunch Hunt' : hour < 17 ? 'Lunch Mode' : hour < 22 ? 'Dinner Prime' : 'Late Bite';
-  const mood = document.querySelector('.home-mood-chip.active')?.textContent?.trim() || '⚡ Quick';
+  const mood = document.querySelector('.home-mood-chip.active')?.textContent?.trim() || 'Quick';
   const nearby = state.restaurants.filter(r => Number.isFinite(distOf(r)) && distOf(r) <= 1609).length;
 
   row.innerHTML = `
-    <span class="today-vibe-pill">🕒 ${vibe}</span>
-    <span class="today-vibe-pill">🎯 ${escHtml(mood)}</span>
-    <span class="today-vibe-pill">📍 ${nearby} near you</span>
+    <span class="today-vibe-pill">Now: ${vibe}</span>
+    <span class="today-vibe-pill">Mood: ${escHtml(mood)}</span>
+    <span class="today-vibe-pill">Nearby: ${nearby}</span>
   `;
 }
 
