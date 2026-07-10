@@ -30,6 +30,7 @@ if (typeof AI === 'undefined') {
 const STORAGE_KEY   = 'ftb_restaurants_v2';
 const SETTINGS_KEY  = 'ftb_settings_v1';
 const USER_KEY      = 'ftb_user_v1';
+const DAILY_QUEST_KEY = 'ftb_daily_quest_v1';
 const LOCATION_BANNER_DISMISSED_KEY = 'ftb_location_banner_dismissed_v1';
 const LOCATION_BANNER_SNOOZE_UNTIL_KEY = 'ftb_location_banner_snooze_until_v1';
 const LOCATION_BANNER_SNOOZE_MS = 12 * 60 * 60 * 1000;
@@ -1893,7 +1894,7 @@ function renderAll () {
   updateLocationBanner();
   // Home sections are isolated: a failure in one must never cascade and
   // abort renderAll (which would leave later init wiring unattached).
-  [renderWeeklyGoal, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
+  [renderWeeklyGoal, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome, renderDailyQuestHome]
     .forEach(fn => { try { fn(); } catch (err) { console.error(`${fn.name} failed:`, err); } });
 }
 
@@ -7246,6 +7247,174 @@ function forYouReason (item) {
   return 'Good match';
 }
 
+const DAILY_QUEST_DEFS = {
+  add_spot: {
+    title: 'Add One New Spot',
+    desc: 'Add one restaurant to your list today.',
+    cta: 'Add a Spot Now',
+    progressLabel: 'spots added'
+  },
+  rate_spot: {
+    title: 'Drop a Fresh Rating',
+    desc: 'Rate one restaurant to sharpen your recommendation engine.',
+    cta: 'Rate a Spot',
+    progressLabel: 'ratings added'
+  },
+  note_spot: {
+    title: 'Leave a Flavor Note',
+    desc: 'Write notes for one spot so future you can pick smarter.',
+    cta: 'Add Notes',
+    progressLabel: 'notes added'
+  },
+  favorite_spot: {
+    title: 'Crown a Favorite',
+    desc: 'Mark one place as favorite to train your premium picks.',
+    cta: 'Pick a Favorite',
+    progressLabel: 'favorites added'
+  },
+  visit_spot: {
+    title: 'Log a Visit',
+    desc: 'Move one restaurant into visited and keep your history current.',
+    cta: 'Log a Visit',
+    progressLabel: 'visits logged'
+  }
+};
+
+function getDailyQuestDateKey () {
+  return new Date().toISOString().split('T')[0];
+}
+
+function getQuestMetricValue (type) {
+  const all = state.restaurants || [];
+  if (type === 'add_spot') return all.length;
+  if (type === 'rate_spot') return all.filter(r => (r.myRating || 0) > 0).length;
+  if (type === 'note_spot') return all.filter(r => String(r.notes || '').trim().length >= 12).length;
+  if (type === 'favorite_spot') return all.filter(r => r.isFavorite).length;
+  if (type === 'visit_spot') return all.filter(r => r.status === 'visited').length;
+  return 0;
+}
+
+function getQuestTypeCandidates () {
+  const all = state.restaurants || [];
+  const hasRestaurants = all.length > 0;
+  const candidates = ['add_spot'];
+  if (hasRestaurants) {
+    candidates.push('rate_spot', 'note_spot', 'favorite_spot', 'visit_spot');
+  }
+  return candidates;
+}
+
+function createDailyQuest () {
+  const date = getDailyQuestDateKey();
+  const types = getQuestTypeCandidates();
+  const pick = types[miniHash(`${date}|${state.restaurants.length}`) % types.length];
+  const base = getQuestMetricValue(pick);
+  return { date, type: pick, base, claimedAt: null };
+}
+
+function loadDailyQuest () {
+  try {
+    return JSON.parse(localStorage.getItem(DAILY_QUEST_KEY)) || null;
+  } catch {
+    return null;
+  }
+}
+
+function saveDailyQuest (quest) {
+  localStorage.setItem(DAILY_QUEST_KEY, JSON.stringify(quest));
+}
+
+function getDailyQuestState () {
+  let quest = loadDailyQuest();
+  const today = getDailyQuestDateKey();
+  if (!quest || quest.date !== today || !DAILY_QUEST_DEFS[quest.type]) {
+    quest = createDailyQuest();
+    saveDailyQuest(quest);
+  }
+  return quest;
+}
+
+function getQuestActionRestaurant (type) {
+  const all = state.restaurants || [];
+  if (!all.length) return null;
+  if (type === 'rate_spot') return all.find(r => (r.myRating || 0) === 0) || all[0];
+  if (type === 'note_spot') return all.find(r => String(r.notes || '').trim().length < 12) || all[0];
+  if (type === 'favorite_spot') return all.find(r => !r.isFavorite) || all[0];
+  if (type === 'visit_spot') return all.find(r => r.status !== 'visited') || all[0];
+  return all[0];
+}
+
+function launchQuestAction (type) {
+  if (type === 'add_spot') {
+    openAddModal();
+    return;
+  }
+  const target = getQuestActionRestaurant(type);
+  if (!target) {
+    showToast('Daily Quest', 'Add at least one restaurant to start this quest.', 'info');
+    return;
+  }
+  openDetailModal(target.id);
+}
+
+function claimDailyQuestReward (quest) {
+  if (quest.claimedAt) return;
+  quest.claimedAt = Date.now();
+  saveDailyQuest(quest);
+  awardXp(20, 'Daily Quest');
+  showToast('Quest Complete', 'Daily quest reward claimed: +20 XP.', 'success');
+}
+
+function onDailyQuestPrimaryClick () {
+  const quest = getDailyQuestState();
+  const now = getQuestMetricValue(quest.type);
+  const done = now >= ((quest.base || 0) + 1);
+  if (done) {
+    claimDailyQuestReward(quest);
+    renderDailyQuestHome();
+    return;
+  }
+  launchQuestAction(quest.type);
+}
+
+function renderDailyQuestHome () {
+  const wrap = document.getElementById('daily-quest-home');
+  if (!wrap) return;
+
+  const quest = getDailyQuestState();
+  const def = DAILY_QUEST_DEFS[quest.type] || DAILY_QUEST_DEFS.add_spot;
+  const base = Number(quest.base || 0);
+  const now = getQuestMetricValue(quest.type);
+  const target = base + 1;
+  const delta = Math.max(0, now - base);
+  const pct = Math.max(0, Math.min(100, Math.round((delta / Math.max(1, target - base)) * 100)));
+  const done = now >= target;
+  const claimed = !!quest.claimedAt;
+
+  wrap.innerHTML = `
+    <div class="daily-quest-top">
+      <span class="daily-quest-kicker">Daily Quest</span>
+      <span class="daily-quest-xp">+20 XP</span>
+    </div>
+    <div class="daily-quest-title">${escHtml(def.title)}</div>
+    <div class="daily-quest-desc">${escHtml(def.desc)}</div>
+    <div class="daily-quest-progress-track"><div class="daily-quest-progress-fill" style="width:${pct}%"></div></div>
+    <div class="daily-quest-meta">Progress: ${Math.min(delta, 1)} / 1 ${escHtml(def.progressLabel)}</div>
+    <div class="daily-quest-actions">
+      <button id="daily-quest-action-btn" class="daily-quest-btn primary" type="button">${done ? (claimed ? 'Reward Claimed' : 'Claim Reward') : escHtml(def.cta)}</button>
+      <button id="daily-quest-open-achievements-btn" class="daily-quest-btn" type="button">View Achievements</button>
+    </div>
+  `;
+
+  const actionBtn = document.getElementById('daily-quest-action-btn');
+  const achievementsBtn = document.getElementById('daily-quest-open-achievements-btn');
+  if (actionBtn) {
+    actionBtn.disabled = done && claimed;
+    actionBtn.onclick = () => onDailyQuestPrimaryClick();
+  }
+  if (achievementsBtn) achievementsBtn.onclick = () => openAchievements();
+}
+
 function renderForYouHome () {
   const section = document.getElementById('for-you-home');
   const list = document.getElementById('for-you-home-list');
@@ -7313,6 +7482,7 @@ function initHomeDiscoverySection () {
   renderForYouHome();
   renderWeeklyRecapHome();
   renderMoodPicksHome();
+  renderDailyQuestHome();
   if (state.userLat && state.userLng) {
     loadHomeDiscovery();
   } else {
@@ -7344,6 +7514,7 @@ async function loadHomeDiscovery () {
     renderForYouHome();
     renderWeeklyRecapHome();
     renderMoodPicksHome();
+    renderDailyQuestHome();
     loadAiRec(_homeDiscCache);
     return;
   }
@@ -7377,6 +7548,7 @@ async function loadHomeDiscovery () {
     renderForYouHome();
     renderWeeklyRecapHome();
     renderMoodPicksHome();
+    renderDailyQuestHome();
     loadAiRec(_homeDiscCache);
   } catch (err) {
     list.innerHTML = err?.name === 'AbortError'
