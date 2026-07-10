@@ -66,20 +66,20 @@
         <div id="account-since-display" class="account-since-display">Foodie since today</div>
         <div class="account-badges-row">
           <span id="account-plan-badge" class="account-plan-badge badge-cub">Cub - Complimentary</span>
-          <span id="account-sync-badge" class="account-sync-badge">📱 Device only</span>
+          <span id="account-sync-badge" class="account-sync-badge">Device only</span>
         </div>
       </div>
       <div id="account-stats-row" class="account-stats-row"></div>
       <div class="account-portal-actions">
         <!-- Sign in row - hidden when logged in -->
         <button class="account-action-row account-signin-row" id="account-signin-row">
-          <span class="aar-icon">🔑</span><span class="aar-label">Sign in or create account</span><span class="aar-chevron">›</span>
+          <span class="aar-icon">SI</span><span class="aar-label">Sign in or create account</span><span class="aar-chevron">›</span>
         </button>
         <button class="account-action-row" id="account-edit-btn">
-          <span class="aar-icon">✏️</span><span class="aar-label">Edit Profile</span><span class="aar-chevron">›</span>
+          <span class="aar-icon">✏</span><span class="aar-label">Edit Profile</span><span class="aar-chevron">›</span>
         </button>
         <button class="account-action-row" id="account-personalize-btn">
-          <span class="aar-icon">🎨</span><span class="aar-label">Themes &amp; Personalize</span><span class="aar-chevron">›</span>
+          <span class="aar-icon">TH</span><span class="aar-label">Themes &amp; Personalize</span><span class="aar-chevron">›</span>
         </button>
         <button class="account-action-row" id="account-dishes-link-btn">
           <span class="aar-icon">TD</span><span class="aar-label">Top Dishes Leaderboard</span><span class="aar-chevron">›</span>
@@ -91,7 +91,7 @@
           <span class="aar-icon">SH</span><span class="aar-label">Share Highlights</span><span class="aar-chevron">›</span>
         </button>
         <button class="account-action-row" id="account-profile-link-btn">
-          <span class="aar-icon">👤</span><span class="aar-label">My Foodie Profile</span><span class="aar-chevron">›</span>
+          <span class="aar-icon">PF</span><span class="aar-label">My Foodie Profile</span><span class="aar-chevron">›</span>
         </button>
         <button class="account-action-row" id="account-review-link-btn">
           <span class="aar-icon">YR</span><span class="aar-label">Year in Review</span><span class="aar-chevron prem-lock">LOCK</span>
@@ -108,7 +108,7 @@
         </button>
         <!-- Sign out row - hidden when not logged in -->
         <button class="account-action-row account-signout-row hidden" id="account-signout-row">
-          <span class="aar-icon">🚪</span><span class="aar-label">Sign Out</span><span class="aar-chevron">›</span>
+          <span class="aar-icon">SO</span><span class="aar-label">Sign Out</span><span class="aar-chevron">›</span>
         </button>
       </div>
     </div>
@@ -118,7 +118,7 @@
   <div id="edit-profile-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">
     <div class="modal-card profile-setup-card">
       <div class="modal-header">
-        <h2 id="edit-profile-title">✏️ Edit Profile</h2>
+        <h2 id="edit-profile-title">Edit Profile</h2>
         <button id="edit-profile-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div style="padding:16px 20px 24px">
@@ -146,7 +146,7 @@
   <div id="personalize-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="personalize-title">
     <div class="modal-card personalize-card">
       <div class="modal-header">
-        <h2 id="personalize-title">🎨 Themes &amp; Personalize</h2>
+        <h2 id="personalize-title">Themes &amp; Personalize</h2>
         <button id="personalize-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="personalize-body">
@@ -208,7 +208,7 @@
       </div>
       <div class="auth-body">
         <p class="auth-sub">Sign in to sync across devices and unlock Grizzly features.</p>
-        <button id="auth-google-btn" class="auth-google-btn">🟠 Continue with Google</button>
+        <button id="auth-google-btn" class="auth-google-btn">Continue with Google</button>
         <div class="auth-divider"><span>or</span></div>
         <label class="form-label" for="auth-email">Email</label>
         <input id="auth-email" class="form-input" type="email" placeholder="bear@example.com" autocomplete="email" />
@@ -536,7 +536,7 @@
       <!-- Leaderboard + Price Trend row -->
       <div class="stats-charts-row">
         <div class="stats-chart-card">
-          <h3>🥇 Leaderboard</h3>
+          <h3> Leaderboard</h3>
           <div id="chart-leaderboard" class="leaderboard-list"></div>
         </div>
         <div class="stats-chart-card">
@@ -596,7 +596,7 @@
       </div>
       <div class="wg-right">
         <div class="wg-bar-track"><div class="wg-bar-fill" id="wg-fill"></div></div>
-        <button class="btn-ghost btn-sm wg-set-btn" id="wg-set-btn">✏️ Goal</button>
+        <button class="btn-ghost btn-sm wg-set-btn" id="wg-set-btn">✏ Goal</button>
       </div>
     </div>
 
@@ -698,7 +698,7 @@
 
     <!-- No results state -->
     <div id="no-results" class="empty-state hidden">
-      <div class="empty-icon">🔍</div>
+      <div class="empty-icon"></div>
       <h2>No matches yet</h2>
       <p>Try a broader search or clear a filter to reveal more options.</p>
       <button class="btn-ghost" id="no-results-clear-btn">Clear Filters</button>
@@ -923,7 +923,7 @@
         <div class="form-grid">
           <!-- Name -->
           <div class="form-group form-full">
-            <label for="form-name">Restaurant Name * <button type="button" id="ai-smart-fill-btn" class="btn-sm btn-ai">🤖 AI Smart Fill</button></label>
+            <label for="form-name">Restaurant Name * <button type="button" id="ai-smart-fill-btn" class="btn-sm btn-ai"> AI Smart Fill</button></label>
             <input type="text" id="form-name" placeholder="e.g. The Golden Spoon" required />
             <div id="ai-fill-result" class="ai-inline-result hidden"></div>
           </div>
@@ -974,7 +974,7 @@
 
           <!-- Photo -->
           <div class="form-group form-full">
-            <label for="form-photo">Photo <span class="label-hint">(URL or upload)</span> <button type="button" id="ai-photo-btn" class="btn-sm btn-ai">🤖 AI Fill</button></label>
+            <label for="form-photo">Photo <span class="label-hint">(URL or upload)</span> <button type="button" id="ai-photo-btn" class="btn-sm btn-ai"> AI Fill</button></label>
             <input type="url" id="form-photo" placeholder="https://example.com/photo.jpg" />
             <label class="photo-upload-label">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -989,7 +989,7 @@
             <div class="radio-group">
               <label class="radio-label">
                 <input type="radio" name="form-status" value="want-to-try" checked />
-                <span class="radio-pill want">🔖 Want to Try</span>
+                <span class="radio-pill want"> Want to Try</span>
               </label>
               <label class="radio-label">
                 <input type="radio" name="form-status" value="visited" />
@@ -1113,7 +1113,7 @@
           <div class="dq-group">
             <span class="dq-label">Status</span>
             <div class="dq-seg" id="dq-status">
-              <button class="dq-seg-btn" type="button" data-status="want-to-try">🔖 Want to Try</button>
+              <button class="dq-seg-btn" type="button" data-status="want-to-try"> Want to Try</button>
               <button class="dq-seg-btn" type="button" data-status="visited">Visited</button>
             </div>
           </div>
@@ -1147,9 +1147,9 @@
           <div class="detail-menu-form hidden" id="detail-menu-form">
             <input id="detail-menu-item-input" class="form-input" type="text" placeholder="Menu item (e.g. Truffle Pasta)" />
             <div class="detail-menu-reaction-row" id="detail-menu-reaction-row">
-              <button class="detail-menu-react-btn" data-reaction="liked" type="button">👍 Liked</button>
-              <button class="detail-menu-react-btn" data-reaction="disliked" type="button">👎 Didn’t Like</button>
-              <button class="detail-menu-react-btn active" data-reaction="neutral" type="button">🤔 Neutral</button>
+              <button class="detail-menu-react-btn" data-reaction="liked" type="button"> Liked</button>
+              <button class="detail-menu-react-btn" data-reaction="disliked" type="button"> Didn’t Like</button>
+              <button class="detail-menu-react-btn active" data-reaction="neutral" type="button"> Neutral</button>
             </div>
             <input id="detail-menu-note-input" class="form-input" type="text" placeholder="Quick note (optional)" />
             <label class="detail-menu-fav-check">
@@ -1173,7 +1173,7 @@
         </div>
 
         <div class="detail-reminder-wrap" id="detail-reminder-wrap">
-          <h4>🔔 Plan a Visit</h4>
+          <h4> Plan a Visit</h4>
           <div class="reminder-row">
             <input type="date" id="detail-reminder-date" />
             <input type="time" id="detail-reminder-time" value="12:00" />
@@ -1228,10 +1228,10 @@
             Route
           </button>
           <button id="detail-edit-btn" class="btn-ghost">
-            ✏️ Edit
+            ✏ Edit
           </button>
           <button id="detail-delete-btn" class="btn-danger">
-            🗑️ Delete
+             Delete
           </button>
         </div>
       </div>
@@ -1464,7 +1464,7 @@
   <div id="profile-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="profile-title">
     <div class="modal-card profile-card">
       <div class="modal-header">
-        <h2 id="profile-title">🌐 My Foodie Profile</h2>
+        <h2 id="profile-title"> My Foodie Profile</h2>
         <button id="profile-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <p class="import-subtitle">Share your top picks as a polished card. No account needed, data is encoded right in the link.</p>
@@ -1578,7 +1578,7 @@
     </div>
   </div>
 
-  <!-- 🎬 Year in Review -->
+  <!--  Year in Review -->
   <div id="review-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="review-title">
     <div class="modal-card review-card">
       <div class="modal-header">
@@ -1600,7 +1600,7 @@
     </div>
   </div>
 
-  <!-- 👥 Foodie Friends -->
+  <!--  Foodie Friends -->
   <div id="friends-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="friends-title">
     <div class="modal-card friends-card">
       <div class="modal-header">
@@ -1623,7 +1623,7 @@
     </div>
   </div>
 
-  <!-- 🗺️ Smart Discovery -->
+  <!--  Smart Discovery -->
   <div id="discover-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="discover-title">
     <div class="modal-card discover-card">
       <div class="modal-header">
@@ -1640,7 +1640,7 @@
             <option value="3219">Within 2 mi</option>
             <option value="8047">Within 5 mi</option>
           </select>
-          <button id="discover-search-btn" class="btn-sm btn-orange">🔍 Search</button>
+          <button id="discover-search-btn" class="btn-sm btn-orange"> Search</button>
         </div>
         <div id="discover-results" class="discover-results">
           <div class="discover-empty">Enable location and tap Search to find places nearby.</div>
@@ -1649,7 +1649,7 @@
     </div>
   </div>
 
-  <!-- 🎯 Custom Challenges -->
+  <!--  Custom Challenges -->
   <div id="challenges-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="challenges-title">
     <div class="modal-card challenges-card">
       <div class="modal-header">
@@ -1659,7 +1659,7 @@
       <div class="challenges-tabs">
         <button class="chal-tab active" data-tab="active">Active</button>
         <button class="chal-tab" data-tab="create">＋ Create</button>
-        <button class="chal-tab" data-tab="friend">📨 Friend</button>
+        <button class="chal-tab" data-tab="friend"> Friend</button>
       </div>
       <div id="chal-tab-active" class="chal-tab-panel">
         <div id="challenges-list" class="challenges-list"></div>
@@ -1690,7 +1690,7 @@
     </div>
   </div>
 
-  <!-- 📝 Visit Debrief (small prompt sheet) -->
+  <!--  Visit Debrief (small prompt sheet) -->
   <div id="debrief-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="debrief-title">
     <div class="modal-card debrief-card">
       <div class="modal-header">
@@ -1708,7 +1708,7 @@
   </div>
   <!-- Phase 9 Modals -->
 
-  <!-- 📊 Deep Stats -->
+  <!--  Deep Stats -->
   <div id="stats2-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="stats2-title">
     <div class="modal-card stats2-card">
       <div class="modal-header">
@@ -1790,23 +1790,23 @@
     </div>
   </div>
 
-  <!-- 📦 Export v2 - Passport + Shareable Page -->
+  <!--  Export v2 - Passport + Shareable Page -->
   <div id="export2-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="export2-title">
     <div class="modal-card export2-card">
       <div class="modal-header">
-        <h2 id="export2-title">📦 Export &amp; Share</h2>
+        <h2 id="export2-title"> Export &amp; Share</h2>
         <button id="export2-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="export2-body">
         <div class="export2-option" id="export2-passport-btn">
-          <div class="export2-icon">📄</div>
+          <div class="export2-icon"></div>
           <div>
             <div class="export2-label">Restaurant Passport</div>
             <div class="export2-sub">Print-ready card for every visited spot</div>
           </div>
         </div>
         <div class="export2-option" id="export2-page-btn">
-          <div class="export2-icon">🌐</div>
+          <div class="export2-icon"></div>
           <div>
             <div class="export2-label">Shareable Web Page</div>
             <div class="export2-sub">Download a standalone HTML you can share</div>
@@ -1823,7 +1823,7 @@
     </div>
   </div>
 
-  <!-- 🗺️ Route Planner -->
+  <!--  Route Planner -->
   <div id="route-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="route-title">
     <div class="modal-card route-card">
       <div class="modal-header">
@@ -1841,11 +1841,11 @@
     </div>
   </div>
 
-  <!-- 📲 PWA Install Banner -->
+  <!--  PWA Install Banner -->
   <div id="install-banner" class="install-banner hidden">
     <!-- Android / desktop: native prompt -->
     <div id="install-android-content" class="install-banner-text">
-      <span>📲</span>
+      <span></span>
       <div>
         <strong>Install Feed The Bear</strong>
         <div style="font-size:.75rem;color:var(--text-dim)">Works offline · feels like a real app</div>
@@ -1853,7 +1853,7 @@
     </div>
     <!-- iOS: manual instructions -->
     <div id="install-ios-content" class="install-banner-text" style="display:none;flex-direction:column;align-items:flex-start;gap:4px;flex:1">
-      <strong style="font-size:.88rem">📲 Add to Home Screen</strong>
+      <strong style="font-size:.88rem"> Add to Home Screen</strong>
       <div style="font-size:.76rem;color:var(--text-dim)">Tap <strong>Share</strong> <span style="font-size:.9rem">⎙</span> at the bottom of Safari, then <strong>"Add to Home Screen"</strong></div>
     </div>
     <button id="install-accept-btn" class="btn-primary" style="padding:6px 14px;font-size:.8rem">Install</button>
@@ -1862,11 +1862,11 @@
 
   <!-- Phase 10 Modals -->
 
-  <!-- 🏅 Achievements & XP -->
+  <!--  Achievements & XP -->
   <div id="achievements-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="ach-title">
     <div class="modal-card ach-card">
       <div class="modal-header">
-        <h2 id="ach-title">🏅 Achievements</h2>
+        <h2 id="ach-title"> Achievements</h2>
         <button id="ach-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="ach-xp-bar-wrap">
@@ -1878,14 +1878,14 @@
     </div>
   </div>
 
-  <!-- 🃏 Swipe to Decide -->
+  <!--  Swipe to Decide -->
   <div id="swipe-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="swipe-title">
     <div class="modal-card swipe-card">
       <div class="modal-header">
         <h2 id="swipe-title">Swipe to Decide</h2>
         <button id="swipe-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
-      <p class="swipe-hint">➡️ Swipe right or tap ✔ to pick tonight &nbsp;·&nbsp; ⬅️ Swipe left to skip</p>
+      <p class="swipe-hint">➡ Swipe right or tap ✔ to pick tonight &nbsp;·&nbsp; ⬅ Swipe left to skip</p>
       <div id="swipe-deck" class="swipe-deck">
         <div class="swipe-empty hidden" id="swipe-empty">
           <div style="font-size:3rem">♥</div>
@@ -1895,12 +1895,12 @@
       </div>
       <div class="swipe-btns">
         <button class="swipe-btn swipe-btn-skip" id="swipe-skip-btn" title="Skip">❌</button>
-        <button class="swipe-btn swipe-btn-pick" id="swipe-pick-btn" title="Pick tonight">❤️</button>
+        <button class="swipe-btn swipe-btn-pick" id="swipe-pick-btn" title="Pick tonight">❤</button>
       </div>
     </div>
   </div>
 
-  <!-- 🎯 Spin the Wheel -->
+  <!--  Spin the Wheel -->
   <div id="spin-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="spin-title">
     <div class="modal-card spin-card">
       <div class="modal-header">
@@ -1916,7 +1916,7 @@
     </div>
   </div>
 
-  <!-- ✈️ Travel Mode -->
+  <!-- ✈ Travel Mode -->
   <div id="travel-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="travel-title">
     <div class="modal-card travel-card">
       <div class="modal-header">
@@ -1932,14 +1932,14 @@
         <div class="travel-quick-cities">
           <div class="travel-section-label">Quick picks</div>
           <div class="travel-city-grid" id="travel-city-grid">
-            <button class="travel-city-btn" data-city="London, UK" data-lat="51.5074" data-lng="-0.1278">🇬🇧 London</button>
-            <button class="travel-city-btn" data-city="Paris, France" data-lat="48.8566" data-lng="2.3522">🇫🇷 Paris</button>
-            <button class="travel-city-btn" data-city="New York, USA" data-lat="40.7128" data-lng="-74.006">🇺🇸 New York</button>
-            <button class="travel-city-btn" data-city="Tokyo, Japan" data-lat="35.6762" data-lng="139.6503">🇯🇵 Tokyo</button>
-            <button class="travel-city-btn" data-city="Barcelona, Spain" data-lat="41.3851" data-lng="2.1734">🇪🇸 Barcelona</button>
-            <button class="travel-city-btn" data-city="Sydney, Australia" data-lat="-33.8688" data-lng="151.2093">🇦🇺 Sydney</button>
-            <button class="travel-city-btn" data-city="Bangkok, Thailand" data-lat="13.7563" data-lng="100.5018">🇹🇭 Bangkok</button>
-            <button class="travel-city-btn" data-city="Rome, Italy" data-lat="41.9028" data-lng="12.4964">🇮🇹 Rome</button>
+            <button class="travel-city-btn" data-city="London, UK" data-lat="51.5074" data-lng="-0.1278"> London</button>
+            <button class="travel-city-btn" data-city="Paris, France" data-lat="48.8566" data-lng="2.3522"> Paris</button>
+            <button class="travel-city-btn" data-city="New York, USA" data-lat="40.7128" data-lng="-74.006"> New York</button>
+            <button class="travel-city-btn" data-city="Tokyo, Japan" data-lat="35.6762" data-lng="139.6503"> Tokyo</button>
+            <button class="travel-city-btn" data-city="Barcelona, Spain" data-lat="41.3851" data-lng="2.1734"> Barcelona</button>
+            <button class="travel-city-btn" data-city="Sydney, Australia" data-lat="-33.8688" data-lng="151.2093"> Sydney</button>
+            <button class="travel-city-btn" data-city="Bangkok, Thailand" data-lat="13.7563" data-lng="100.5018"> Bangkok</button>
+            <button class="travel-city-btn" data-city="Rome, Italy" data-lat="41.9028" data-lng="12.4964"> Rome</button>
           </div>
         </div>
         <div class="travel-section-label" style="margin-top:12px">Custom city</div>
@@ -1951,7 +1951,7 @@
     </div>
   </div>
 
-  <!-- 📅 Monthly Digest -->
+  <!--  Monthly Digest -->
   <div id="digest-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="digest-title">
     <div class="modal-card digest-card">
       <div class="modal-header">
@@ -1969,7 +1969,7 @@
     </div>
   </div>
 
-  <!-- 🟢 Open Now -->
+  <!--  Open Now -->
   <div id="open-now-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="open-now-title">
     <div class="modal-card open-now-card">
       <div class="modal-header">
@@ -1994,7 +1994,7 @@
     </div>
   </div>
 
-  <!-- 🥊 AI Restaurant Duel -->
+  <!--  AI Restaurant Duel -->
   <div id="duel-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="duel-title">
     <div class="modal-card duel-card">
       <div class="modal-header">
@@ -2004,14 +2004,14 @@
       <p class="duel-hint">Pick two restaurants - Byte Cub judges the ultimate showdown.</p>
       <div class="duel-pickers">
         <div class="duel-picker-wrap">
-          <div class="duel-corner-label">🔴 Corner One</div>
+          <div class="duel-corner-label"> Corner One</div>
           <select id="duel-pick-a" class="form-input duel-select">
             <option value="">Choose a restaurant…</option>
           </select>
         </div>
         <div class="duel-vs">VS</div>
         <div class="duel-picker-wrap">
-          <div class="duel-corner-label">🔵 Corner Two</div>
+          <div class="duel-corner-label"> Corner Two</div>
           <select id="duel-pick-b" class="form-input duel-select">
             <option value="">Choose a restaurant…</option>
           </select>
@@ -2025,7 +2025,7 @@
     </div>
   </div>
 
-  <!-- 🎯 Cuisine Bingo -->
+  <!--  Cuisine Bingo -->
   <div id="bingo-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="bingo-title">
     <div class="modal-card bingo-card">
       <div class="modal-header">
@@ -2040,7 +2040,7 @@
     </div>
   </div>
 
-  <!-- 🥠 AI Food Fortune Cookie -->
+  <!--  AI Food Fortune Cookie -->
   <div id="fortune-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="fortune-title">
     <div class="modal-card fortune-card">
       <div class="modal-header">
@@ -2059,7 +2059,7 @@
     </div>
   </div>
 
-  <!-- 📅 Food Mood Calendar -->
+  <!--  Food Mood Calendar -->
   <div id="moodcal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="moodcal-title">
     <div class="modal-card moodcal-card">
       <div class="modal-header">
@@ -2082,7 +2082,7 @@
     </div>
   </div>
 
-  <!-- 🔥 Daily Foodie Challenge -->
+  <!--  Daily Foodie Challenge -->
   <div id="dailychallenge-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="dailychallenge-title">
     <div class="modal-card dailychallenge-card">
       <div class="modal-header">
@@ -2118,7 +2118,7 @@
 
   <!-- ══ PHASE 13 MODALS ══════════════════════════════════════ -->
 
-  <!-- 📋 Visit Log -->
+  <!--  Visit Log -->
   <div id="visitlog-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="visitlog-title">
     <div class="modal-card visitlog-card">
       <div class="modal-header">
@@ -2152,7 +2152,7 @@
     </div>
   </div>
 
-  <!-- 💸 Spend Tracker -->
+  <!--  Spend Tracker -->
   <div id="spend-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="spend-title">
     <div class="modal-card spend-card">
       <div class="modal-header">
@@ -2183,7 +2183,7 @@
     </div>
   </div>
 
-  <!-- 📆 AI Meal Planner -->
+  <!--  AI Meal Planner -->
   <div id="mealplanner-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="mealplanner-title">
     <div class="modal-card mealplanner-card">
       <div class="modal-header">
@@ -2217,7 +2217,7 @@
     </div>
   </div>
 
-  <!-- 🗳 Group Vote -->
+  <!--  Group Vote -->
   <div id="groupvote-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="groupvote-title">
     <div class="modal-card groupvote-card">
       <div class="modal-header">
@@ -2241,7 +2241,7 @@
     </div>
   </div>
 
-  <!-- 🌍 Cuisine World Map -->
+  <!--  Cuisine World Map -->
   <div id="worldmap-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="worldmap-title">
     <div class="modal-card worldmap-card">
       <div class="modal-header">
@@ -2256,7 +2256,7 @@
     </div>
   </div>
 
-  <!-- 🛂 Foodie Passport -->
+  <!--  Foodie Passport -->
   <div id="passport-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="passport-title">
     <div class="modal-card passport-card">
       <div class="modal-header">
