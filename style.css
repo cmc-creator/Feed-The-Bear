@@ -1776,16 +1776,16 @@ body[data-ui-motion='reduced'] * {
 body.light-mode {
   /* Velvet & Champagne - light */
   --bg:        #F6F1EA; --surface:   #FFFFFF; --surface2:  #FBF6EF;
-  --surface3:  #EFE7DC; --border:    rgba(42,20,46,.12); --text:      #2A1F2E;
-  --text-dim:  #8A7C90; --text-muted:#A99CB0;
+  --surface3:  #EFE7DC; --border:    rgba(28,36,46,.16); --text:      #1F2933;
+  --text-dim:  #5D6978; --text-muted:#4E5A67;
   --primary:   #C9963A; --primary-rgb: 201,150,58; --primary-dk: #AD7E28; --primary-lt: #E0B45E;
   --rose:      #D44B74; --rose-rgb: 212,75,116;
   --blue:      #7E63C9; --blue-rgb: 126,99,201;
   --shadow:    rgba(60,30,60,.07); --shadow-lg: rgba(60,30,60,.14);
 }
-body.light-mode .app-header { background: rgba(255,255,255,.96); box-shadow: 0 1px 0 rgba(0,0,0,.08); }
-body.light-mode .stats-bar  { background: #fff; border-bottom-color: rgba(0,0,0,.08); }
-body.light-mode .filter-bar { background: #F2EDE8; border-bottom-color: rgba(0,0,0,.08); }
+body.light-mode .app-header { background: rgba(255,255,255,.98); box-shadow: 0 1px 0 rgba(17,24,39,.14); }
+body.light-mode .stats-bar  { background: #fff; border-bottom-color: rgba(17,24,39,.14); }
+body.light-mode .filter-bar { background: #F1EBE3; border-bottom-color: rgba(17,24,39,.12); }
 body.light-mode .restaurant-card { box-shadow: 0 2px 16px rgba(0,0,0,.07); }
 body.light-mode .chat-panel { background: #fff; }
 body.light-mode .toast { background: #fff; color: #1A1117; box-shadow: 0 4px 20px rgba(0,0,0,.12); }
@@ -1794,6 +1794,16 @@ body.light-mode .mobile-bottom-nav { background: rgba(255,255,255,.98); }
 body.light-mode .bulk-bar { background: #fff; }
 body.light-mode input, body.light-mode select, body.light-mode textarea { background: var(--surface2); color: var(--text); }
 body.light-mode .modal-card { background: var(--surface); }
+body.light-mode .today-status-pill {
+  background: rgba(31,41,51,.08);
+  border-color: rgba(31,41,51,.18);
+  color: #1f2933;
+}
+body.light-mode .today-vibe-pill {
+  background: rgba(255,255,255,.78);
+  border-color: rgba(31,41,51,.16);
+  color: #1f2933;
+}
 #theme-toggle-btn .icon-sun  { display: none; }
 #theme-toggle-btn .icon-moon { display: block; }
 body.light-mode #theme-toggle-btn .icon-sun  { display: block; }
@@ -5620,7 +5630,24 @@ body[data-ui-motion='playful'] .restaurant-grid.card-enter-run .restaurant-card:
 .personalize-card { max-width: 460px; }
 .personalize-body { padding: 16px 20px 24px; }
 .personalize-label { margin-top: 14px; margin-bottom: 8px; display: block; }
+.personalize-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.personalize-quick-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.personalize-quick-actions .btn-secondary,
+.personalize-quick-actions .btn-ghost {
+  flex: 1;
+}
 .personalize-save-btn { width: 100%; margin-top: 20px; }
+@media (max-width: 640px) {
+  .personalize-grid { grid-template-columns: 1fr; }
+}
 .setup-sub {
   font-size: .84rem;
   color: var(--text-dim);

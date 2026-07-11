@@ -146,7 +146,7 @@
   <div id="personalize-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="personalize-title">
     <div class="modal-card personalize-card">
       <div class="modal-header">
-        <h2 id="personalize-title">Themes &amp; Personalize</h2>
+        <h2 id="personalize-title">Settings</h2>
         <button id="personalize-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="personalize-body">
@@ -182,7 +182,34 @@
           <option value="reduced">Reduced</option>
         </select>
 
-        <button id="personalize-save-btn" class="btn-primary personalize-save-btn">Save Personalization</button>
+        <label class="form-label personalize-label" for="personalize-nearby-radius-select">Nearby radius</label>
+        <select id="personalize-nearby-radius-select" class="form-select">
+          <option value="1">1 mile</option>
+          <option value="2">2 miles</option>
+          <option value="3">3 miles</option>
+          <option value="5">5 miles</option>
+        </select>
+
+        <div class="personalize-grid">
+          <div>
+            <label class="form-label personalize-label" for="personalize-weekly-goal-input">Weekly goal (visits)</label>
+            <input id="personalize-weekly-goal-input" class="form-input" type="number" min="0" max="30" step="1" placeholder="0" />
+          </div>
+          <div>
+            <label class="form-label personalize-label" for="personalize-avg-spend-input">Average spend ($)</label>
+            <input id="personalize-avg-spend-input" class="form-input" type="number" min="0" max="1000" step="1" placeholder="35" />
+          </div>
+        </div>
+
+        <label class="form-label personalize-label" for="personalize-monthly-budget-input">Monthly budget ($)</label>
+        <input id="personalize-monthly-budget-input" class="form-input" type="number" min="0" max="100000" step="5" placeholder="0" />
+
+        <div class="personalize-quick-actions">
+          <button id="settings-enable-location-btn" type="button" class="btn-secondary btn-sm">Enable Location</button>
+          <button id="settings-disable-location-btn" type="button" class="btn-ghost btn-sm">Disable Location</button>
+        </div>
+
+        <button id="personalize-save-btn" class="btn-primary personalize-save-btn">Save Settings</button>
       </div>
     </div>
   </div>
@@ -317,8 +344,8 @@
       <button id="craving-btn" class="icon-btn" title="Craving Engine - what should I eat tonight?">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" aria-hidden="true"><path d="M13 2s3 2 3 6-2 5-2 7 2 4 2 7c0 0-2-1-3-3-1 2-3 3-3 3s1-3 1-6-2-4-2-7 2-5 4-7z"/></svg>
       </button>
-      <button id="command-palette-btn" class="icon-btn" title="Command Palette (Ctrl/Cmd+K)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M10 19l4-14"/></svg>
+      <button id="settings-btn" class="icon-btn" title="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.36.14.76.22 1.17.22H21a2 2 0 1 1 0 4h-.43c-.41 0-.81.08-1.17.22z"/></svg>
       </button>
       <button id="add-btn" class="btn-primary">
         <span>＋</span> Add Restaurant

@@ -619,6 +619,12 @@ function openPersonalizeSettings () {
   const densitySel = document.getElementById('personalize-density-select');
   const cornersSel = document.getElementById('personalize-corners-select');
   const motionSel = document.getElementById('personalize-motion-select');
+  const nearbyRadiusSel = document.getElementById('personalize-nearby-radius-select');
+  const weeklyGoalInput = document.getElementById('personalize-weekly-goal-input');
+  const avgSpendInput = document.getElementById('personalize-avg-spend-input');
+  const monthlyBudgetInput = document.getElementById('personalize-monthly-budget-input');
+  const enableLocationBtn = document.getElementById('settings-enable-location-btn');
+  const disableLocationBtn = document.getElementById('settings-disable-location-btn');
 
   if (themeSel) {
     if (!state.settings.themeManual) {
@@ -630,12 +636,24 @@ function openPersonalizeSettings () {
   if (densitySel) densitySel.value = UI_DENSITY.has(state.settings.uiDensity) ? state.settings.uiDensity : 'cozy';
   if (cornersSel) cornersSel.value = UI_CORNERS.has(state.settings.uiCorners) ? state.settings.uiCorners : 'rounded';
   if (motionSel) motionSel.value = UI_MOTION.has(state.settings.uiMotion) ? state.settings.uiMotion : 'playful';
+  if (nearbyRadiusSel) nearbyRadiusSel.value = String(Math.max(1, Math.min(5, Number(state.settings.nearbyRadiusMiles) || 1)));
+  if (weeklyGoalInput) weeklyGoalInput.value = String(Math.max(0, Number(state.settings.weeklyGoal) || 0));
+  if (avgSpendInput) avgSpendInput.value = String(Math.max(0, Number(state.settings.avgSpend) || 35));
+  if (monthlyBudgetInput) monthlyBudgetInput.value = String(Math.max(0, Number(state.settings.monthlyBudget) || 0));
+
+  if (enableLocationBtn) enableLocationBtn.onclick = () => enableLocation();
+  if (disableLocationBtn) disableLocationBtn.onclick = () => disableLocation();
 
   document.getElementById('personalize-save-btn').onclick = () => {
     const choice = themeSel?.value || 'dark';
+    const nearbyRadius = Math.max(1, Math.min(5, Number(nearbyRadiusSel?.value) || 1));
     state.settings.uiDensity = densitySel?.value || 'cozy';
     state.settings.uiCorners = cornersSel?.value || 'rounded';
     state.settings.uiMotion = motionSel?.value || 'playful';
+    state.settings.nearbyRadiusMiles = nearbyRadius;
+    state.settings.weeklyGoal = Math.max(0, Math.min(30, Number(weeklyGoalInput?.value) || 0));
+    state.settings.avgSpend = Math.max(0, Number(avgSpendInput?.value) || 35);
+    state.settings.monthlyBudget = Math.max(0, Number(monthlyBudgetInput?.value) || 0);
     if (choice === 'auto') {
       state.settings.themeManual = false;
       state.settings.themeChoice = 'auto';
@@ -649,7 +667,10 @@ function openPersonalizeSettings () {
     persistAppearanceProfile();
     overlay.classList.add('hidden');
     maybeHideOverlay();
-    showToast('Personalization saved! ', '', 'success');
+    renderTodayStatusRow();
+    renderTodayVibeRow();
+    if (state.userLat && state.userLng) loadHomeDiscovery();
+    showToast('Settings saved!', '', 'success');
   };
 
   overlay.classList.remove('hidden');
@@ -4841,19 +4862,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('dinner-room-share-btn')?.addEventListener('click', shareDinnerRoomInvite);
   document.getElementById('dinner-room-vote-btn')?.addEventListener('click', voteDinnerRoom);
   document.getElementById('dinner-room-lock-btn')?.addEventListener('click', lockDinnerRoomWinner);
-  document.getElementById('command-palette-btn')?.addEventListener('click', openCommandPalette);
+  document.getElementById('settings-btn')?.addEventListener('click', openPersonalizeSettings);
   document.getElementById('command-palette-close-btn')?.addEventListener('click', closeCommandPalette);
   document.getElementById('command-palette-overlay')?.addEventListener('click', e => {
     if (e.target === document.getElementById('command-palette-overlay')) closeCommandPalette();
   });
   document.getElementById('command-palette-input')?.addEventListener('input', renderCommandPaletteResults);
   document.getElementById('command-palette-input')?.addEventListener('keydown', handleCommandPaletteKeydown);
-  document.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-      e.preventDefault();
-      openCommandPalette();
-    }
-  });
   // Init user profile (shows setup on first run)
   initUserProfile();
   // Show home discovery teaser or load if location ready
@@ -7106,6 +7121,14 @@ let _homeDiscCacheTime = 0;
 const HOME_DISC_TTL = 15 * 60 * 1000; // 15 min
 let _forYouSeed = Date.now();
 
+function getNearbyRadiusMiles () {
+  return Math.max(1, Math.min(5, Number(state.settings.nearbyRadiusMiles) || 1));
+}
+
+function getNearbyRadiusMeters () {
+  return getNearbyRadiusMiles() * 1609.34;
+}
+
 function getWeekStartIso () {
   const now = new Date();
   const start = new Date(now);
@@ -7227,7 +7250,7 @@ function renderTodayStatusRow () {
   const all = state.restaurants || [];
   const favorites = all.filter(r => r.isFavorite).length;
   const visited = all.filter(r => r.status === 'visited').length;
-  const nearby = all.filter(r => Number.isFinite(distOf(r)) && distOf(r) <= 1609).length;
+  const nearby = all.filter(r => Number.isFinite(distOf(r)) && distOf(r) <= getNearbyRadiusMeters()).length;
   const avgMine = all.filter(r => (r.myRating || 0) > 0);
   const avg = avgMine.length ? (avgMine.reduce((s, r) => s + (r.myRating || 0), 0) / avgMine.length).toFixed(1) : null;
 
@@ -7275,7 +7298,7 @@ function renderTodayVibeRow () {
 
   const vibeMeta = getHomeVibeMeta();
   const mood = document.querySelector('.home-mood-chip.active')?.textContent?.trim() || 'Quick';
-  const nearby = state.restaurants.filter(r => Number.isFinite(distOf(r)) && distOf(r) <= 1609).length;
+  const nearby = state.restaurants.filter(r => Number.isFinite(distOf(r)) && distOf(r) <= getNearbyRadiusMeters()).length;
 
   applyHomeVibeMood(vibeMeta.key);
   const prevVibe = row.dataset.vibe || '';
@@ -7642,7 +7665,7 @@ function initHomeDiscoverySection () {
       <div class="nearby-home-teaser-icon"></div>
       <div class="nearby-home-teaser-body">
         <div class="nearby-home-teaser-title">See what's near you right now</div>
-        <div class="nearby-home-teaser-sub">Real restaurants within 1 mile, one tap to discover.</div>
+        <div class="nearby-home-teaser-sub">Real restaurants within ${getNearbyRadiusMiles()} mile${getNearbyRadiusMiles() === 1 ? '' : 's'}, one tap to discover.</div>
       </div>
       <button class="btn-sm btn-orange nearby-home-teaser-btn" id="nearby-teaser-enable-btn">Enable</button>
     </div>`;
@@ -7677,7 +7700,8 @@ async function loadHomeDiscovery () {
   `;
   try {
     const { userLat: lat, userLng: lng } = state;
-    const q = `[out:json][timeout:15];(node["amenity"~"restaurant|cafe|fast_food|bar"](around:1609,${lat},${lng}););out body 30;`;
+    const radiusMeters = Math.round(getNearbyRadiusMeters());
+    const q = `[out:json][timeout:15];(node["amenity"~"restaurant|cafe|fast_food|bar"](around:${radiusMeters},${lat},${lng}););out body 30;`;
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 12000);
     const resp = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: q, signal: ctrl.signal });
@@ -7702,16 +7726,46 @@ async function loadHomeDiscovery () {
     renderDailyQuestHome();
     loadAiRec(_homeDiscCache);
   } catch (err) {
-    list.innerHTML = err?.name === 'AbortError'
-      ? '<div class="nearby-home-loading">Nearby search timed out. Try again in a moment.</div>'
-      : '<div class="nearby-home-loading">Nearby search is unavailable right now. Check your connection and retry.</div>';
+    renderNearbyHomeFallback(err);
   }
+}
+
+function renderNearbyHomeFallback (err = null) {
+  const list = document.getElementById('nearby-home-list');
+  if (!list) return;
+  const radiusMeters = getNearbyRadiusMeters();
+  const radiusMiles = getNearbyRadiusMiles();
+
+  const localFallback = (state.restaurants || [])
+    .map(r => ({ ...r, _distMeters: distOf(r) }))
+    .filter(r => Number.isFinite(r._distMeters) && r._distMeters <= radiusMeters)
+    .sort((a, b) => a._distMeters - b._distMeters)
+    .slice(0, 5);
+
+  if (localFallback.length) {
+    list.innerHTML = `<div class="nearby-home-loading">Live lookup is busy. Showing your saved places within ${radiusMiles} mile${radiusMiles === 1 ? '' : 's'}.</div>` +
+      localFallback.map(r => `<div class="nearby-home-card saved">
+        <div class="nearby-home-card-emoji">${cuisineEmoji(r.cuisine) || ''}</div>
+        <div class="nearby-home-card-name" title="${escHtml(r.name)}">${escHtml(r.name)}</div>
+        ${r.cuisine ? `<div class="nearby-home-card-meta">${escHtml(r.cuisine)}</div>` : ''}
+        <div class="nearby-home-card-dist">${fmtDist(r._distMeters)}</div>
+        <button class="btn-sm btn-secondary nearby-home-card-add" onclick="openDetailModal('${r.id}')">View</button>
+      </div>`).join('');
+    return;
+  }
+
+  list.innerHTML = err?.name === 'AbortError'
+    ? '<div class="nearby-home-loading">Nearby search timed out. Try again in a moment.</div>'
+    : '<div class="nearby-home-loading">Nearby live results are temporarily unavailable. Your saved list is still ready.</div>';
 }
 
 function renderHomeDiscovery ({ elements }) {
   const list = document.getElementById('nearby-home-list');
   if (!list || !elements.length) {
-    if (list) list.innerHTML = '<div class="nearby-home-loading">No nearby spots found within 1 mile yet.</div>';
+    if (list) {
+      const miles = getNearbyRadiusMiles();
+      list.innerHTML = `<div class="nearby-home-loading">No nearby spots found within ${miles} mile${miles === 1 ? '' : 's'} yet.</div>`;
+    }
     return;
   }
   const savedNames = new Set(state.restaurants.map(r => normalizeName(r.name)));
