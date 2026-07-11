@@ -2435,6 +2435,18 @@ function initTheme () {
   });
 }
 
+function setAutoAmbientTheme (announce = true) {
+  state.settings.themeManual = false;
+  state.settings.themeChoice = 'auto';
+  applyAutoThemeByClock({ persist: true, announce });
+  scheduleNextAutoThemeTick();
+}
+
+function toggleThemeFromPalette () {
+  const light = document.body.classList.contains('light-mode');
+  applyThemeChoice(light ? 'dark' : 'light', { manual: true, persist: true });
+}
+
 /* ════════════════════════════════════════════════════════════
    ONBOARDING TOUR
    ════════════════════════════════════════════════════════════ */
@@ -6381,7 +6393,8 @@ const COMMAND_PALETTE_ACTIONS = [
   { label: 'Action: Share Highlights', hint: 'Generate social card', keys: 'share highlight recap card', run: openShareHighlights },
   { label: 'Action: Discover Nearby', hint: 'Find local spots', keys: 'nearby discover find local', run: openDiscover },
   { label: 'Action: Craving Engine', hint: 'Get recommendation now', keys: 'craving recommend', run: openCravingEngine },
-  { label: 'Action: Theme Toggle', hint: 'Switch dark/light', keys: 'theme dark light', run: () => document.getElementById('theme-toggle-btn')?.click() },
+  { label: 'Action: Theme Toggle', hint: 'Switch dark/light', keys: 'theme dark light', run: toggleThemeFromPalette },
+  { label: 'Action: Theme Auto Ambient', hint: 'Return to time-based mood theme', keys: 'theme auto ambient time day night', run: () => setAutoAmbientTheme(true) },
   { label: 'Action: Collections', hint: 'Manage lists', keys: 'collections lists shared', run: () => runToolAction('collections') },
 ];
 
