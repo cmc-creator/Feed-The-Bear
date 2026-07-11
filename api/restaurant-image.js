@@ -232,9 +232,6 @@ module.exports = async function handler (req, res) {
     return res.status(400).json({ found: false, error: 'Missing name or website' });
   }
 
-  // Cache at the CDN edge for 7 days - photo for a venue rarely changes.
-  res.setHeader('Cache-Control', 'public, s-maxage=604800, stale-while-revalidate=86400');
-
   const providers = [
     ['google',    () => googlePlacesPhoto({ name, lat, lon })],
     ['foursquare', () => foursquarePhoto({ name, lat, lon })],
@@ -247,6 +244,8 @@ module.exports = async function handler (req, res) {
     try {
       const photoUrl = await fn();
       if (photoUrl && !looksLikeJunkImage(photoUrl)) {
+        // Found photos rarely change - cache at the edge for 7 days.
+        res.setHeader('Cache-Control', 'public, s-maxage=604800, stale-while-revalidate=86400');
         return res.status(200).json({ found: true, photoUrl, source });
       }
     } catch {
@@ -255,6 +254,8 @@ module.exports = async function handler (req, res) {
   }
 
   const keysConfigured = !!(process.env.GOOGLE_PLACES_API_KEY || process.env.FOURSQUARE_API_KEY || process.env.YELP_API_KEY);
+  // Cache misses briefly only, so newly added API keys or new venue photos show up fast.
+  res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=60');
   return res.status(404).json({
     found: false,
     photoUrl: '',

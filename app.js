@@ -8479,7 +8479,7 @@ function setNearbyCards (cards = [], opts = {}) {
   const preferredNearbyFallbackByCuisine = (cuisine = '', amenity = '') => {
     const raw = `${String(cuisine || '').toLowerCase()} ${String(amenity || '').toLowerCase()}`;
     if (/(mexican|taco|birria|burrito|quesadilla|enchilada)/.test(raw)) return ['assets/food/tacos.jpg', 'assets/food/burrito.jpg', 'assets/food/quesadilla.jpg'];
-    if (/(irish|pub|gastropub|fish and chips|shepherd|bangers)/.test(raw)) return ['assets/food/seafood.jpg', 'assets/food/steak.jpg', 'assets/food/fried_chicken.jpg'];
+    if (/(irish|pub|gastropub|fish and chips|shepherd|bangers)/.test(raw)) return ['assets/food/steak.jpg', 'assets/food/burger.jpg', 'assets/food/seafood.jpg'];
     if (/(italian|pasta|pizza|ristorante)/.test(raw)) return ['assets/food/italian_pasta.jpg', 'assets/food/pasta.jpg', 'assets/food/pizza.jpg'];
     if (/(japanese|sushi|ramen)/.test(raw)) return ['assets/food/sushi.jpg', 'assets/food/ramen.jpg', 'assets/food/udon.jpg'];
     if (/(korean)/.test(raw)) return ['assets/food/korean_bbq.jpg', 'assets/food/bibimbap.jpg'];
