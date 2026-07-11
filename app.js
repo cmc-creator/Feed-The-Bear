@@ -163,6 +163,10 @@ function renderNearbyVisualCard ({
   popularity = '',
   isSaved = false,
   restaurantId = '',
+  website = '',
+  address = '',
+  lat = null,
+  lon = null,
   key = '',
   savedRestaurant = null,
 } = {}) {
@@ -177,6 +181,13 @@ function renderNearbyVisualCard ({
   const safeName = escHtml(name);
   const safeNameForClick = String(name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   const safeCuisine = String(cuisine || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const websiteUrl = safeUrl(savedRestaurant?.website || website || '');
+  const directionsUrl = buildGoogleDirectionsUrl({
+    name,
+    address: savedRestaurant?.address || address || '',
+    lat: Number.isFinite(savedRestaurant?.lat) ? Number(savedRestaurant.lat) : (Number.isFinite(lat) ? Number(lat) : null),
+    lng: Number.isFinite(savedRestaurant?.lng) ? Number(savedRestaurant.lng) : (Number.isFinite(lon) ? Number(lon) : null),
+  });
   const popularityScore = Math.max(30, Math.min(98,
     Math.round((effectivePopularity === 'Very Popular' ? 92
       : effectivePopularity === 'Trending' ? 84
@@ -203,6 +214,9 @@ function renderNearbyVisualCard ({
       ${isSaved
         ? `<button class="btn-sm btn-secondary nearby-home-card-add" onclick="openDetailModal('${restaurantId}')">View</button>`
         : `<button class="btn-sm btn-orange nearby-home-card-add" onclick="openAddModalPreFilled('${safeNameForClick}','${safeCuisine}')">+ Save</button>`}
+      ${(websiteUrl || directionsUrl)
+        ? `<div class="nearby-home-card-links">${websiteUrl ? `<a class="btn-sm btn-ghost nearby-home-card-link" href="${escHtml(websiteUrl)}" target="_blank" rel="noopener">Website</a>` : ''}${directionsUrl ? `<a class="btn-sm btn-secondary nearby-home-card-link" href="${escHtml(directionsUrl)}" target="_blank" rel="noopener">Directions</a>` : ''}</div>`
+        : ''}
     </div>
   </article>`;
 }
@@ -323,14 +337,35 @@ function resolveWikimediaPhotoUrl (raw = '', width = 960) {
 }
 
 function pickRealRestaurantPhoto ({ savedRestaurant = null, tags = null, cuisine = '', amenity = 'restaurant', width = 960, height = 640, allowFallback = false } = {}) {
+  const looksLikeGoodFoodPhoto = (url = '') => {
+    const raw = safeUrl(url);
+    if (!raw) return false;
+    if (/^(?:file:|data:image\/|(?:\.\/)?assets\/)/i.test(raw)) return true;
+    try {
+      const parsed = new URL(raw, window.location.href);
+      const host = (parsed.hostname || '').toLowerCase();
+      const path = (parsed.pathname || '').toLowerCase();
+      const full = `${host}${path}`;
+
+      if (/(?:^|\.)lemon-film\.com$/.test(host)) return false;
+      if (/(?:^|\.)pinterest\./.test(host)) return false;
+
+      if (/\.(jpe?g|png|webp|gif|avif)(?:$|\?)/i.test(path)) return true;
+      if (/wikimedia|wikipedia|unsplash|cdn|images\./i.test(full)) return true;
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
   const userPhoto = safeUrl(savedRestaurant?.photo || '');
-  if (userPhoto) return { url: userPhoto, source: 'user' };
+  if (looksLikeGoodFoodPhoto(userPhoto)) return { url: userPhoto, source: 'user' };
 
   const tagImage = safeUrl(tags?.image || tags?.photo || '');
-  if (tagImage) return { url: tagImage, source: 'osm' };
+  if (looksLikeGoodFoodPhoto(tagImage)) return { url: tagImage, source: 'osm' };
 
   const wikimedia = safeUrl(resolveWikimediaPhotoUrl(tags?.wikimedia_commons || tags?.wikipedia || '', width));
-  if (wikimedia) return { url: wikimedia, source: 'wikimedia' };
+  if (looksLikeGoodFoodPhoto(wikimedia)) return { url: wikimedia, source: 'wikimedia' };
 
   if (!allowFallback) {
     return { url: '', source: 'none' };
@@ -512,12 +547,18 @@ function swipeCuisineKey (item = {}) {
 function recordSwipePreference (item, reaction = '') {
   if (!item || (reaction !== 'yes' && reaction !== 'no')) return;
 
+  const likedDishKey = extractLocalFoodKeyFromUrl(item.photoUrl || '');
+  const likedDishLabel = formatLocalFoodKeyLabel(likedDishKey);
+
   const prefs = loadSwipePrefs();
   const entry = {
     ts: Date.now(),
     reaction,
     source: item.source || (item.isSaved ? 'saved' : 'nearby'),
     cuisine: swipeCuisineKey(item),
+    term: normalizeMoodTermKey(item.cuisine || item.name || ''),
+    dishKey: likedDishKey || '',
+    dishLabel: likedDishLabel || '',
     priceLevel: Number(item.priceLevel || 0) || 0,
     distMeters: Number.isFinite(item.distMeters) ? Number(item.distMeters) : null,
   };
@@ -9094,19 +9135,41 @@ function buildMoodSwipeDeck (elements = [], savedRows = []) {
     .filter(Boolean);
 
   const roundSeed = Date.now();
+  const prefs = loadSwipePrefs();
+  const recentYes = (prefs.history || [])
+    .filter(h => h && h.reaction === 'yes')
+    .slice(-90);
+  const recentYesTerms = new Set(recentYes
+    .map(h => normalizeMoodTermKey(h.term || h.cuisine || ''))
+    .filter(Boolean));
+  const recentYesDishKeys = new Set(recentYes
+    .map(h => String(h.dishKey || '').trim().toLowerCase())
+    .filter(Boolean));
+
   const shuffled = terms
+    .filter(term => !recentYesTerms.has(normalizeMoodTermKey(term)))
     .map(term => ({ term, sort: miniHash(`${term}|${roundSeed}|mood`) }))
     .sort((a, b) => a.sort - b.sort)
-    .slice(0, 120);
+    .slice(0, 170);
 
-  return shuffled.map((item, idx) => {
+  const seenCards = new Set();
+  const deck = [];
+  shuffled.forEach((item, idx) => {
     const seed = `${item.term}-${roundSeed}-${idx}`;
     const candidates = getMoodFoodImageCandidates(item.term, seed);
     const chosen = candidates[0] || 'assets/food/pizza.jpg';
     const localKey = extractLocalFoodKeyFromUrl(chosen);
     const matchedLabel = formatLocalFoodKeyLabel(localKey) || formatCuisineLabel(item.term);
+    const normalizedTerm = normalizeMoodTermKey(item.term);
+    const dedupeKey = `${String(localKey || '').toLowerCase()}|${String(matchedLabel || '').toLowerCase()}`;
 
-    return {
+    if (localKey && recentYesDishKeys.has(String(localKey).toLowerCase())) return;
+    if (seenCards.has(dedupeKey) || seenCards.has(`term:${normalizedTerm}`)) return;
+
+    seenCards.add(dedupeKey);
+    seenCards.add(`term:${normalizedTerm}`);
+
+    deck.push({
       key: `mood-${item.term}-${idx}`,
       source: 'mood',
       name: `${matchedLabel} mood`,
@@ -9120,8 +9183,10 @@ function buildMoodSwipeDeck (elements = [], savedRows = []) {
       restaurantId: null,
       distMeters: Infinity,
       priceLevel: estimatePriceLevel({ cuisine: item.term, amenity: 'restaurant', savedRestaurant: null }),
-    };
+    });
   });
+
+  return deck.slice(0, 120);
 }
 
 function openDirectionsForSwipeItem (item) {
@@ -9252,7 +9317,7 @@ function triggerBearSwipeParty (cardEl) {
 
   const partyEl = document.createElement('div');
   partyEl.className = 'bear-swipe-party pop';
-  partyEl.innerHTML = `<video class="bear-swipe-party-video" autoplay loop controls playsinline aria-label="Dancing bear celebration" preload="auto" poster="assets/textures/babybear.jpeg"><source src="assets/videos/dancingbear.webm" type="video/webm" /><source src="assets/videos/dancingbear.mp4" type="video/mp4" /></video><div class="bear-swipe-party-actions"><a class="bear-swipe-party-open" href="assets/videos/dancingbear.webm" target="_blank" rel="noopener">Open Full Video</a><button class="bear-swipe-party-close" type="button">Close</button></div><span class="bear-swipe-party-text">SNACK DANCE</span>`;
+  partyEl.innerHTML = `<video class="bear-swipe-party-video" autoplay loop controls playsinline aria-label="Dancing bear celebration" preload="auto" poster="assets/textures/babybear.jpeg"><source src="assets/videos/dancingbear.webm" type="video/webm" /><source src="assets/videos/dancingbear.mp4" type="video/mp4" /></video><div class="bear-swipe-party-actions"><button class="bear-swipe-party-close" type="button">Close</button></div><span class="bear-swipe-party-text">SNACK DANCE</span>`;
   cardEl.appendChild(partyEl);
   partyEl.addEventListener('click', e => e.stopPropagation());
   partyEl.querySelector('.bear-swipe-party-close')?.addEventListener('click', () => partyEl.remove());
@@ -9266,8 +9331,6 @@ function triggerBearSwipeParty (cardEl) {
       gif.src = 'assets/videos/dancingbear.gif';
       gif.alt = 'Dancing bear animation fallback';
       partyVideo.replaceWith(gif);
-      const text = partyEl.querySelector('.bear-swipe-party-text');
-      if (text) text.textContent = 'SNACK DANCE (GIF fallback)';
     };
 
     partyVideo.muted = true;
@@ -9792,6 +9855,10 @@ function renderNearbyHomeFallback (err = null) {
         amenity: 'restaurant',
         photoUrl: photoPick.url,
         distMeters: r._distMeters,
+        lat: Number.isFinite(r.lat) ? Number(r.lat) : null,
+        lon: Number.isFinite(r.lng) ? Number(r.lng) : null,
+        address: r.address || '',
+        website: r.website || '',
         priceLevel,
         popularity,
         isSaved: true,
@@ -9840,7 +9907,8 @@ function renderHomeDiscovery ({ elements }) {
       name,
       cuisine,
       amenity,
-      photoUrl: photoPick.url,
+      // Live nearby cards should stay food-forward; avoid generic place/building shots.
+      photoUrl: isSaved ? photoPick.url : '',
       distMeters: el._dist,
       lat: Number.isFinite(el.lat ?? el.center?.lat) ? Number(el.lat ?? el.center?.lat) : null,
       lon: Number.isFinite(el.lon ?? el.center?.lon) ? Number(el.lon ?? el.center?.lon) : null,
