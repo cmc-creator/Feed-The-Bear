@@ -172,8 +172,8 @@ function renderNearbyVisualCard ({
   const effectivePopularity = popularity || nearbyPopularityLabel(distMeters, savedRestaurant);
   const dishes = favoriteDishesForSaved(savedRestaurant) || favoriteDishesForNearby(cuisine, amenity);
   const dishesLabel = dishes.length ? dishes.join(' • ') : 'House favorites';
-  const photo = safeUrl(photoUrl);
-  const hasPhoto = !!photo;
+  const localFallbackPhoto = safeUrl(getMoodFoodImageCandidates(cuisineLabel || amenity || 'food', key || name || 'nearby')[0] || '');
+  const photo = safeUrl(photoUrl) || localFallbackPhoto;
   const safeName = escHtml(name);
   const safeNameForClick = String(name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   const safeCuisine = String(cuisine || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -187,9 +187,7 @@ function renderNearbyVisualCard ({
 
   return `<article class="nearby-home-card${isSaved ? ' saved' : ''}" data-nearby-key="${escHtml(key || `${name}-${distText}`)}" data-nearby-price="${effectivePrice}" data-nearby-popularity="${escHtml(effectivePopularity)}">
     <div class="nearby-home-card-media">
-      ${hasPhoto
-        ? `<img class="nearby-home-card-photo" src="${photo}" alt="${escHtml(cuisineLabel)} food" loading="lazy" />`
-        : `<div class="nearby-home-card-photo-empty"><span>No verified photo yet</span></div>`}
+      <img class="nearby-home-card-photo" src="${photo}" alt="${escHtml(cuisineLabel)} food" loading="lazy" />
       <div class="nearby-home-card-badges">
         <span class="nearby-home-card-badge price">${'$'.repeat(Math.max(1, Math.min(4, effectivePrice)))}</span>
         <span class="nearby-home-card-badge pop">${escHtml(effectivePopularity)}</span>

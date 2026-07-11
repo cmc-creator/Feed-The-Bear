@@ -6328,9 +6328,20 @@ body[data-ui-motion='playful'] .restaurant-grid.card-enter-run .restaurant-card:
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
-.nearby-home-title { font-size: .9rem; font-weight: 700; color: var(--text); }
+.nearby-home-title {
+  display: block;
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: #f4e6ce;
+  letter-spacing: .01em;
+}
+.nearby-home-subtitle {
+  font-size: .76rem;
+  color: #bea889;
+  margin-top: 2px;
+}
 
 .nearby-home-header-actions {
   display: flex;
@@ -6382,22 +6393,25 @@ body[data-ui-motion='playful'] .restaurant-grid.card-enter-run .restaurant-card:
 .nearby-home-card {
   width: 100%;
   aspect-ratio: 1 / 1;
-  background: linear-gradient(160deg, var(--surface2), rgba(255,255,255,.03));
-  border: 1px solid rgba(255,255,255,.12);
-  border-radius: 14px;
+  background:
+    radial-gradient(130% 120% at 0% 0%, rgba(121,160,91,.16), transparent 60%),
+    linear-gradient(rgba(54,36,24,.84), rgba(38,25,18,.9)),
+    url('assets/textures/wood.jpg') center/cover no-repeat;
+  border: 1px solid rgba(210,173,129,.32);
+  border-radius: 16px;
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: 0;
   overflow: hidden;
   animation: modal-in .2s ease;
-  box-shadow: 0 10px 22px rgba(0,0,0,.26);
+  box-shadow: 0 14px 28px rgba(0,0,0,.32);
   transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
 }
 
 .nearby-home-card:hover {
   transform: translateY(-3px) scale(1.01);
-  border-color: rgba(var(--primary-rgb), .52);
-  box-shadow: 0 16px 28px rgba(0,0,0,.36);
+  border-color: rgba(231,192,145,.55);
+  box-shadow: 0 18px 34px rgba(0,0,0,.4);
 }
 
 .nearby-home-card:nth-child(2) { animation-delay: .03s; }
@@ -6425,6 +6439,7 @@ body[data-ui-motion='playful'] .restaurant-grid.card-enter-run .restaurant-card:
 .nearby-home-card-media {
   position: relative;
   aspect-ratio: 16 / 10;
+  border-bottom: 1px solid rgba(222,188,146,.2);
 }
 
 .nearby-home-card-photo {
@@ -6453,8 +6468,8 @@ body[data-ui-motion='playful'] .restaurant-grid.card-enter-run .restaurant-card:
   left: 0;
   right: 0;
   bottom: 0;
-  height: 44%;
-  background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.45));
+  height: 40%;
+  background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.35));
   pointer-events: none;
 }
 
@@ -6497,20 +6512,23 @@ body[data-ui-motion='playful'] .restaurant-grid.card-enter-run .restaurant-card:
 .nearby-home-card-body {
   padding: 10px 11px 6px;
   display: grid;
-  gap: 4px;
+  gap: 5px;
 }
 
 .nearby-home-card-name {
-  font-size: .9rem;
+  font-size: .93rem;
   font-weight: 800;
-  color: var(--text);
-  white-space: nowrap;
+  color: #f7ead7;
+  line-height: 1.28;
+  display: -webkit-box;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 .nearby-home-card-meta {
-  font-size: .74rem;
-  color: var(--text-muted);
+  font-size: .75rem;
+  color: #d6c2a4;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6532,7 +6550,7 @@ body[data-ui-motion='playful'] .restaurant-grid.card-enter-run .restaurant-card:
 
 .nearby-home-card-dishes {
   font-size: .72rem;
-  color: var(--text-dim);
+  color: #c6b095;
   line-height: 1.35;
   display: -webkit-box;
   line-clamp: 2;
