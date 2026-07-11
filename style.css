@@ -6645,7 +6645,7 @@ body[data-ui-motion='playful'] .restaurant-grid.card-enter-run .restaurant-card:
 
 .nearby-home-card-links {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 6px;
   margin-top: 7px;
 }
