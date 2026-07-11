@@ -8845,8 +8845,8 @@ const BEAR_SWIPE_LOCAL_FALLBACKS = [
   'assets/food/steak.jpg',
   'assets/food/fried_chicken.jpg',
   'assets/food/churros.jpg',
-  'assets/textures/forest.jpg',
-  'assets/textures/forest1.jpg'
+  'assets/food/tacos.jpg',
+  'assets/food/sushi.jpg'
 ];
 
 const BEAR_SWIPE_LOCAL_FOOD_IMAGES = {
@@ -8882,7 +8882,7 @@ const BEAR_SWIPE_LOCAL_FOOD_IMAGES = {
   quesadilla: 'assets/food/quesadilla.jpg',
   enchiladas: 'assets/food/enchiladas.jpg',
   shawarma: 'assets/food/shawarma.jpg',
-  kebab: 'assets/food/kebab.jpg',
+  kebab: 'assets/food/shawarma.jpg',
   falafel: 'assets/food/falafel.jpg',
   steak: 'assets/food/steak.jpg',
   seafood: 'assets/food/seafood.jpg',
@@ -9033,8 +9033,12 @@ function getMoodFoodImageCandidates (term = 'food', seed = '') {
 }
 
 function pickBearSwipePhotoUrl (item, idx = 0) {
+  const isLocalFoodAsset = (u = '') => /assets\/food\/[a-z0-9_\-]+\.(?:jpg|jpeg|png|webp)$/i.test(String(u || ''));
   const primary = safeUrl(item?.photoUrl || '');
-  if (primary) return primary;
+  if (primary) {
+    if (item?.source !== 'mood') return primary;
+    if (isLocalFoodAsset(primary)) return primary;
+  }
 
   const localCandidates = [
     ...(Array.isArray(item?.photoFallbacks) ? item.photoFallbacks : []),
@@ -9044,7 +9048,9 @@ function pickBearSwipePhotoUrl (item, idx = 0) {
 
   for (const c of localCandidates) {
     const safe = safeUrl(c || '');
-    if (safe) return safe;
+    if (!safe) continue;
+    if (item?.source === 'mood' && !isLocalFoodAsset(safe)) continue;
+    return safe;
   }
 
   return safeUrl('assets/food/pizza.jpg');
