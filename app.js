@@ -2842,15 +2842,17 @@ function escHtml (s) {
     .replace(/'/g, '&#39;');
 }
 
-/* Only allow http/https photo URLs; strip characters that could break CSS url() */
+/* Allow safe photo URLs, including local app assets used by offline/PWA mode. */
 function safeUrl (url) {
   if (!url) return '';
-  if (/^data:image\/(png|jpe?g|gif|webp|svg\+xml);base64,/.test(url)) return url;
+  const raw = String(url).trim();
+  if (!raw) return '';
+  if (/^data:image\/(png|jpe?g|gif|webp|svg\+xml);base64,/i.test(raw)) return raw;
+  if (/^(\.\/)?assets\//i.test(raw) || /^feedbear\.png$/i.test(raw)) return raw.replace(/["'()\\]/g, '');
   try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return '';
-    // Remove characters that would break CSS url('...') context
-    return url.replace(/['"()\\]/g, '');
+    const parsed = new URL(raw, window.location.href);
+    if (!['https:', 'http:', 'file:'].includes(parsed.protocol)) return '';
+    return parsed.href.replace(/["'()\\]/g, '');
   } catch { return ''; }
 }
 
@@ -8799,6 +8801,11 @@ function buildSwipeDeckFromSaved (savedRows = []) {
 }
 
 const BEAR_SWIPE_LOCAL_FALLBACKS = [
+  'assets/food/pizza.jpg',
+  'assets/food/pasta.jpg',
+  'assets/food/steak.jpg',
+  'assets/food/fried_chicken.jpg',
+  'assets/food/churros.jpg',
   'assets/textures/forest.jpg',
   'assets/textures/forest1.jpg'
 ];
@@ -8986,6 +8993,52 @@ function getMoodFoodImageCandidates (term = 'food', seed = '') {
   return [...local, ...BEAR_SWIPE_LOCAL_FALLBACKS];
 }
 
+function pickBearSwipePhotoUrl (item, idx = 0) {
+  const primary = safeUrl(item?.photoUrl || '');
+  if (primary) return primary;
+
+  const localCandidates = [
+    ...(Array.isArray(item?.photoFallbacks) ? item.photoFallbacks : []),
+    ...getMoodFoodImageCandidates(item?.cuisine || item?.name || 'food', `${item?.key || 'swipe'}-${idx}`),
+    ...BEAR_SWIPE_LOCAL_FALLBACKS,
+  ];
+
+  for (const c of localCandidates) {
+    const safe = safeUrl(c || '');
+    if (safe) return safe;
+  }
+
+  return safeUrl('assets/food/pizza.jpg');
+}
+
+function extractLocalFoodKeyFromUrl (url = '') {
+  const str = String(url || '');
+  const match = str.match(/assets\/food\/([a-z0-9_\-]+)\.(jpg|jpeg|png|webp)/i);
+  return match ? String(match[1]).toLowerCase() : '';
+}
+
+function formatLocalFoodKeyLabel (key = '') {
+  const k = String(key || '').trim().toLowerCase();
+  if (!k) return '';
+  const aliases = {
+    italian_pasta: 'Penne Vodka',
+    bbq_ribs: 'BBQ Ribs',
+    korean_bbq: 'Korean BBQ',
+    mac_and_cheese: 'Mac and Cheese',
+    fried_rice: 'Fried Rice',
+    french_toast: 'French Toast',
+    eggs_benedict: 'Eggs Benedict',
+    pad_thai: 'Pad Thai',
+    thai_curry: 'Thai Curry',
+    tikka_masala: 'Tikka Masala',
+    poke_bowl: 'Poke Bowl',
+    banh_mi: 'Banh Mi',
+    grilled_cheese: 'Grilled Cheese',
+    caesar_salad: 'Caesar Salad',
+  };
+  return aliases[k] || formatCuisineLabel(k.replace(/_/g, ' '));
+}
+
 function getMoodFoodImage (term = 'food', seed = '') {
   return getMoodFoodImageCandidates(term, seed)[0] || 'feedbear.png';
 }
@@ -9048,21 +9101,29 @@ function buildMoodSwipeDeck (elements = [], savedRows = []) {
     .sort((a, b) => a.sort - b.sort)
     .slice(0, 120);
 
-  return shuffled.map((item, idx) => ({
-    key: `mood-${item.term}-${idx}`,
-    source: 'mood',
-    name: `${formatCuisineLabel(item.term)} mood`,
-    cuisine: item.term,
-    cuisineLabel: formatCuisineLabel(item.term),
-    amenity: 'food',
-    photoUrl: getMoodFoodImage(item.term, `${item.term}-${roundSeed}-${idx}`),
-    photoFallbacks: getMoodFoodImageCandidates(item.term, `${item.term}-${roundSeed}-${idx}`).slice(1),
-    photoSource: 'internet',
-    isSaved: false,
-    restaurantId: null,
-    distMeters: Infinity,
-    priceLevel: estimatePriceLevel({ cuisine: item.term, amenity: 'restaurant', savedRestaurant: null }),
-  }));
+  return shuffled.map((item, idx) => {
+    const seed = `${item.term}-${roundSeed}-${idx}`;
+    const candidates = getMoodFoodImageCandidates(item.term, seed);
+    const chosen = candidates[0] || 'assets/food/pizza.jpg';
+    const localKey = extractLocalFoodKeyFromUrl(chosen);
+    const matchedLabel = formatLocalFoodKeyLabel(localKey) || formatCuisineLabel(item.term);
+
+    return {
+      key: `mood-${item.term}-${idx}`,
+      source: 'mood',
+      name: `${matchedLabel} mood`,
+      cuisine: item.term,
+      cuisineLabel: matchedLabel,
+      amenity: 'food',
+      photoUrl: chosen,
+      photoFallbacks: candidates.slice(1),
+      photoSource: 'local',
+      isSaved: false,
+      restaurantId: null,
+      distMeters: Infinity,
+      priceLevel: estimatePriceLevel({ cuisine: item.term, amenity: 'restaurant', savedRestaurant: null }),
+    };
+  });
 }
 
 function openDirectionsForSwipeItem (item) {
@@ -9273,13 +9334,20 @@ function bindBearSwipePhotoFallbacks (photoEl, item = {}) {
   };
 
   const collapseToEmpty = () => {
+    const hard = safeUrl('assets/food/pizza.jpg');
+    if (hard && photoEl.isConnected && photoEl.src !== hard) {
+      photoEl.src = hard;
+      settled = true;
+      return;
+    }
+
     const wrap = photoEl.closest('.bear-swipe-photo-wrap');
     if (wrap) {
       photoEl.remove();
       if (!wrap.querySelector('.bear-swipe-photo-empty')) {
         const empty = document.createElement('div');
         empty.className = 'bear-swipe-photo-empty';
-        empty.innerHTML = '<span>Photo loading failed</span>';
+        empty.innerHTML = '<span>Loading tasty photo...</span>';
         wrap.prepend(empty);
       }
     }
@@ -9417,14 +9485,14 @@ function renderBearSwipeCard () {
   const hiddenName = isMoodDeck ? 'Mystery craving vibe' : (item.source === 'saved' ? 'Saved mystery snack' : 'Nearby mystery snack');
   const reveal = !!state.swipeReveal;
   const progress = `${idx + 1}/${deck.length}`;
-  const swipePhoto = safeUrl(item.photoUrl || '');
+  const swipePhoto = pickBearSwipePhotoUrl(item, idx);
   const hasSwipePhoto = !!swipePhoto;
   const revealPrompt = 'Swipe left or right to train your cravings.';
   const detailPrompt = 'Swipe yes/no to train your cravings.';
 
   cardEl.innerHTML = `<div class="bear-swipe-photo-wrap">\n      ${hasSwipePhoto
       ? `<img class="bear-swipe-photo" src="${swipePhoto}" alt="${escHtml(item.cuisineLabel || 'Food photo')}" loading="lazy" />`
-      : `<div class="bear-swipe-photo-empty"><span>No verified photo yet</span></div>`}\n      <div class="bear-swipe-topline">\n        <span class="bear-swipe-chip">${escHtml(item.cuisineLabel)}</span>\n        <span class="bear-swipe-chip alt">${escHtml(progress)}</span>\n      </div>\n    </div>\n    <div class="bear-swipe-content">\n      <div class="bear-swipe-name ${reveal ? 'revealed' : 'hidden'}">${escHtml(reveal ? item.name : hiddenName)}</div>\n      <div class="bear-swipe-meta">${reveal
+      : `<div class="bear-swipe-photo-empty"><span>Loading tasty photo...</span></div>`}\n      <div class="bear-swipe-topline">\n        <span class="bear-swipe-chip">${escHtml(item.cuisineLabel)}</span>\n        <span class="bear-swipe-chip alt">${escHtml(progress)}</span>\n      </div>\n    </div>\n    <div class="bear-swipe-content">\n      <div class="bear-swipe-name ${reveal ? 'revealed' : 'hidden'}">${escHtml(reveal ? item.name : hiddenName)}</div>\n      <div class="bear-swipe-meta">${reveal
         ? (isMoodDeck
           ? 'Mood-only swipe deck: tune your appetite first, then pick a place.'
           : (item.isSaved ? 'Saved in your den. Tap details for full info.' : 'Tap details for full info. Location stays hidden here.'))

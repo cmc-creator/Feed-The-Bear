@@ -5700,9 +5700,7 @@ body.light-mode .today-vibe-pill {
   inset: 0;
   pointer-events: none;
   z-index: 2;
-  background: linear-gradient(110deg, transparent 10%, rgba(128,255,243,.07) 46%, rgba(128,255,243,.17) 50%, rgba(128,255,243,.07) 54%, transparent 88%);
-  transform: translateX(-120%);
-  animation: tracer-scan 4.8s linear infinite;
+  display: none;
 }
 
 .bear-swipe-photo-wrap::before {
@@ -7140,23 +7138,45 @@ body[data-theme-accent='neon'] {
 /* ════════════════════════════════════════════════════════════
    AUTH MODAL
    ════════════════════════════════════════════════════════════ */
-.auth-card { max-width: 400px; padding: 0; }
-.auth-body { padding: 0 24px 28px; }
-.auth-title { font-size: 1.15rem; }
+.auth-card {
+  max-width: 430px;
+  padding: 0;
+  border: 1px solid rgba(206,168,125,.36);
+  background:
+    linear-gradient(rgba(50,34,24,.78), rgba(40,27,20,.84)),
+    url('assets/textures/wood.jpg') center/cover no-repeat,
+    linear-gradient(165deg, rgba(69,45,30,.96), rgba(34,22,16,.97));
+  box-shadow: 0 18px 40px rgba(0,0,0,.5);
+}
+.auth-body { padding: 8px 24px 28px; }
+.auth-title {
+  font-size: 1.28rem;
+  color: #f6e8d2;
+}
 .auth-sub {
-  font-size: .85rem;
-  color: var(--text-dim);
-  margin-bottom: 20px;
+  font-size: .98rem;
+  color: #d8c4a7;
+  margin-bottom: 18px;
   text-wrap: balance;
-  line-height: 1.5;
+  line-height: 1.55;
+}
+.auth-hero-bear {
+  display: block;
+  width: min(82%, 270px);
+  max-height: 210px;
+  margin: 0 auto 16px;
+  object-fit: cover;
+  border-radius: 18px;
+  border: 1px solid rgba(236,199,151,.5);
+  box-shadow: 0 12px 24px rgba(0,0,0,.4);
 }
 .auth-google-btn {
   width: 100%;
   padding: 12px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
+  background: rgba(56,38,26,.85);
+  border: 1px solid rgba(206,168,125,.32);
   border-radius: var(--radius);
-  color: var(--text);
+  color: #f6ead8;
   font-family: var(--font);
   font-size: .92rem;
   font-weight: 600;
@@ -7164,21 +7184,21 @@ body[data-theme-accent='neon'] {
   transition: background .12s;
   margin-bottom: 4px;
 }
-.auth-google-btn:hover { background: var(--surface3); }
+.auth-google-btn:hover { background: rgba(74,50,35,.92); }
 .auth-divider {
   display: flex;
   align-items: center;
   gap: 10px;
   margin: 14px 0;
-  color: var(--text-dim);
+  color: #baa486;
   font-size: .78rem;
 }
 .auth-divider::before,
-.auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.auth-divider::after { content: ''; flex: 1; height: 1px; background: rgba(206,168,125,.28); }
 .auth-toggle-text {
   text-align: center;
   font-size: .82rem;
-  color: var(--text-dim);
+  color: #c7b195;
   margin-top: 14px;
 }
 .auth-link-btn {
