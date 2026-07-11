@@ -182,6 +182,10 @@ function renderNearbyVisualCard ({
   const safeNameForClick = String(name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   const safeCuisine = String(cuisine || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   const websiteUrl = safeUrl(savedRestaurant?.website || website || '');
+  const safeAddressForClick = String(savedRestaurant?.address || address || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const safeWebsiteForClick = String(savedRestaurant?.website || websiteUrl || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const prefillLat = Number.isFinite(savedRestaurant?.lat) ? Number(savedRestaurant.lat) : (Number.isFinite(lat) ? Number(lat) : null);
+  const prefillLon = Number.isFinite(savedRestaurant?.lng) ? Number(savedRestaurant.lng) : (Number.isFinite(lon) ? Number(lon) : null);
   const directionsUrl = buildGoogleDirectionsUrl({
     name,
     address: savedRestaurant?.address || address || '',
@@ -213,7 +217,7 @@ function renderNearbyVisualCard ({
     <div class="nearby-home-card-footer">
       ${isSaved
         ? `<button class="btn-sm btn-secondary nearby-home-card-add" onclick="openDetailModal('${restaurantId}')">View</button>`
-        : `<button class="btn-sm btn-orange nearby-home-card-add" onclick="openAddModalPreFilled('${safeNameForClick}','${safeCuisine}')">+ Save</button>`}
+        : `<button class="btn-sm btn-orange nearby-home-card-add" onclick="openAddModalPreFilled('${safeNameForClick}','${safeCuisine}',{name:'${safeNameForClick}',address:'${safeAddressForClick}',website:'${safeWebsiteForClick}',lat:${prefillLat == null ? 'null' : prefillLat},lon:${prefillLon == null ? 'null' : prefillLon}})">+ Save</button>`}
       ${(websiteUrl || directionsUrl)
         ? `<div class="nearby-home-card-links">${websiteUrl ? `<a class="btn-sm btn-ghost nearby-home-card-link" href="${escHtml(websiteUrl)}" target="_blank" rel="noopener">Website</a>` : ''}${directionsUrl ? `<a class="btn-sm btn-secondary nearby-home-card-link" href="${escHtml(directionsUrl)}" target="_blank" rel="noopener">Directions</a>` : ''}</div>`
         : ''}
@@ -2000,6 +2004,7 @@ function initPullToRefresh () {
 /* ── Add / Edit Modal ────────────────────────────────────── */
 function openAddModal () {
   state.editingId = null;
+  _pendingAddPrefill = null;
   state.formRating = 0;
   document.getElementById('modal-title').textContent = 'Add Restaurant';
   document.getElementById('modal-save-btn').textContent = 'Save Restaurant';
@@ -2131,6 +2136,19 @@ function handleFormSubmit (e) {
       : null,
   };
 
+  if (isNew && _pendingAddPrefill && normalizeName(_pendingAddPrefill.name || name) === normalizeName(name)) {
+    if (!entry.website && _pendingAddPrefill.website) entry.website = String(_pendingAddPrefill.website || '').trim();
+    if (!entry.address && _pendingAddPrefill.address) entry.address = String(_pendingAddPrefill.address || '').trim();
+    if (!entry.photo && _pendingAddPrefill.photo) entry.photo = String(_pendingAddPrefill.photo || '').trim();
+
+    const preLat = Number(_pendingAddPrefill.lat);
+    const preLng = Number(_pendingAddPrefill.lng ?? _pendingAddPrefill.lon);
+    if (Number.isFinite(preLat) && Number.isFinite(preLng)) {
+      entry.lat = preLat;
+      entry.lng = preLng;
+    }
+  }
+
   if (state.editingId) {
     // Preserve lat/lng from original
     const orig = state.restaurants.find(r => r.id === state.editingId);
@@ -2151,6 +2169,7 @@ function handleFormSubmit (e) {
   saveData();
   renderAll();
   closeModal();
+  _pendingAddPrefill = null;
 }
 
 /* ── Geocode via Nominatim (free, no API key) ─────────────── */
@@ -3154,6 +3173,8 @@ async function _discFetch () {
           rawCuisines,
           amenity,
           dist,
+          lat: Number.isFinite(elLat) ? Number(elLat) : null,
+          lon: Number.isFinite(elLon) ? Number(elLon) : null,
           matchScore,
           openNow,
           street,
@@ -3264,6 +3285,9 @@ function _discApplyFilters () {
 
     const safeName    = escHtml(r.name).replace(/'/g, "\\'");
     const safeCuisine = escHtml(r.cuisine).replace(/'/g, "\\'");
+    const saveAddress = [String(r.street || '').trim(), String(r.city || '').trim()].filter(Boolean).join(', ');
+    const safeAddress = saveAddress.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const safeWebsite = String(r.website || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
     return `<div class="disc-card${r.saved ? ' disc-card-saved' : ''}">
       <div class="disc-card-thumb" aria-hidden="true">${emoji}</div>
@@ -3284,7 +3308,7 @@ function _discApplyFilters () {
       <div class="disc-card-action">
         ${r.saved
           ? `<div class="disc-saved-mark">✓</div>`
-          : `<button class="disc-save-btn" onclick="openAddModalPreFilled('${safeName}','${safeCuisine}');document.getElementById('nearby-overlay').classList.add('hidden');maybeHideOverlay();" aria-label="Save ${escHtml(r.name)}">+ Save</button>`
+          : `<button class="disc-save-btn" onclick="openAddModalPreFilled('${safeName}','${safeCuisine}',{name:'${safeName}',address:'${safeAddress}',website:'${safeWebsite}',lat:${Number.isFinite(r.lat) ? Number(r.lat) : 'null'},lon:${Number.isFinite(r.lon) ? Number(r.lon) : 'null'}});document.getElementById('nearby-overlay').classList.add('hidden');maybeHideOverlay();" aria-label="Save ${escHtml(r.name)}">+ Save</button>`
         }
       </div>
     </div>`;
@@ -7798,12 +7822,16 @@ function renderFriendComparison (friendData) {
   resultEl.classList.remove('hidden');
 }
 
-function openAddModalPreFilled (name, cuisine) {
+function openAddModalPreFilled (name, cuisine, prefill = null) {
   closeFoodieFriends();
   openAddModal();
+  _pendingAddPrefill = (prefill && typeof prefill === 'object') ? { ...prefill } : null;
   setTimeout(() => {
     document.getElementById('form-name').value = name;
     if (cuisine) document.getElementById('form-cuisine').value = cuisine;
+    if (_pendingAddPrefill?.address) document.getElementById('form-address').value = String(_pendingAddPrefill.address || '').trim();
+    if (_pendingAddPrefill?.website) document.getElementById('form-website').value = String(_pendingAddPrefill.website || '').trim();
+    if (_pendingAddPrefill?.photo) document.getElementById('form-photo').value = String(_pendingAddPrefill.photo || '').trim();
   }, 100);
 }
 
@@ -7817,6 +7845,7 @@ let _forYouSeed = Date.now();
 let _nearbyFilterMode = 'all';
 let _nearbyCards = [];
 let _nearbyBannerMsg = '';
+let _pendingAddPrefill = null;
 const _placePhotoCache = new Map();
 const _placePhotoPending = new Map();
 
