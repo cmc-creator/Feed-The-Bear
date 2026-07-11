@@ -8457,23 +8457,27 @@ function setNearbyCards (cards = [], opts = {}) {
     return rows.map((card, idx) => {
       if (!card || typeof card !== 'object') return card;
 
-      const existing = safeUrl(card.photoUrl || '');
-      if (existing) return card;
+      const existingRaw = String(card.photoUrl || '').trim();
+      const existing = safeUrl(existingRaw);
+      const hasLocalFoodAsset = /^(\.\/)?assets\/food\//i.test(existingRaw);
+      const shouldForceLocal = !card.isSaved;
+
+      if (!shouldForceLocal && existing) return card;
+      if (shouldForceLocal && hasLocalFoodAsset && existing) {
+        return { ...card, photoUrl: existing, photoSource: 'local' };
+      }
 
       const term = `${card.name || ''} ${card.cuisine || card.amenity || 'food'}`.trim();
       const seed = `${card.key || idx}|${card.name || ''}|${card.cuisine || ''}`;
       const preferred = preferredNearbyFallbackByCuisine(card.cuisine || '', card.amenity || '');
-      const candidates = [...preferred, ...getMoodFoodImageCandidates(term, seed)];
-
-      let chosen = '';
-      for (const candidate of candidates) {
-        const safe = safeUrl(candidate || '');
-        if (!safe) continue;
-        chosen = safe;
-        break;
-      }
-
-      if (!chosen) chosen = safeUrl(candidates[0] || '') || safeUrl('assets/food/pizza.jpg');
+      const general = getMoodFoodImageCandidates(term, seed)
+        .map(u => safeUrl(u || ''))
+        .filter(Boolean);
+      const pool = (preferred.length ? preferred : general)
+        .map(u => safeUrl(u || ''))
+        .filter(Boolean);
+      const pickedIndex = pool.length ? (miniHash(seed) % pool.length) : 0;
+      const chosen = pool[pickedIndex] || safeUrl('assets/food/pizza.jpg');
 
       return chosen
         ? { ...card, photoUrl: chosen, photoSource: card.photoSource || 'local' }
@@ -8484,7 +8488,6 @@ function setNearbyCards (cards = [], opts = {}) {
   _nearbyCards = assignDiverseNearbyFallbackPhotos(Array.isArray(cards) ? cards : []);
   _nearbyBannerMsg = String(opts.banner || '');
   renderNearbyCardsFromState();
-  enrichNearbyCardsRealPhotos();
 }
 
 function runNearbyLuckyBite () {
@@ -9804,20 +9807,37 @@ function triggerBearSwipeParty (cardEl) {
 
   const partyEl = document.createElement('div');
   partyEl.className = 'bear-swipe-party pop';
-  partyEl.innerHTML = `<video class="bear-swipe-party-video" autoplay loop controls playsinline aria-label="Dancing bear celebration" preload="auto"><source src="assets/videos/dancingbear.webm" type="video/webm" /><source src="assets/videos/dancingbear.mp4" type="video/mp4" /></video><div class="bear-swipe-party-actions"><button class="bear-swipe-party-close" type="button">Close</button></div><span class="bear-swipe-party-text">SNACK DANCE</span>`;
+  partyEl.innerHTML = `<video class="bear-swipe-party-video" autoplay loop controls playsinline webkit-playsinline muted aria-label="Dancing bear celebration" preload="metadata"><source src="assets/videos/dancingbear.webm" type="video/webm" /><source src="assets/videos/dancingbear.mp4" type="video/mp4" /></video><div class="bear-swipe-party-actions"><button class="bear-swipe-party-close" type="button">Close</button></div><span class="bear-swipe-party-text">SNACK DANCE</span>`;
   cardEl.appendChild(partyEl);
   partyEl.addEventListener('click', e => e.stopPropagation());
   partyEl.querySelector('.bear-swipe-party-close')?.addEventListener('click', () => partyEl.remove());
   const partyVideo = partyEl.querySelector('.bear-swipe-party-video');
   if (partyVideo) {
+    const swapToGif = () => {
+      const gifUrl = safeUrl('assets/videos/dancingbear.gif');
+      if (!gifUrl || !partyVideo.isConnected) return;
+      const gif = document.createElement('img');
+      gif.className = 'bear-swipe-party-video';
+      gif.src = gifUrl;
+      gif.alt = 'Dancing bear celebration';
+      partyVideo.replaceWith(gif);
+    };
+
+    partyVideo.defaultMuted = true;
     partyVideo.muted = true;
+    partyVideo.setAttribute('muted', '');
     partyVideo.addEventListener('error', () => {
-      showToast('Bear dance unavailable', 'The celebration video did not load. Try again in a moment.', 'info');
+      swapToGif();
+      showToast('Bear dance fallback', 'Using GIF celebration for this device.', 'info');
     }, { once: true });
 
     try {
       const playTry = partyVideo.play();
-      if (playTry && typeof playTry.catch === 'function') playTry.catch(() => {});
+      if (playTry && typeof playTry.catch === 'function') {
+        playTry.catch(() => {
+          swapToGif();
+        });
+      }
     } catch (_) {}
   }
   setBearSwipeJoke('Bear dance break. Burger secured.');
