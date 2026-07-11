@@ -29,6 +29,7 @@ if (typeof AI === 'undefined') {
 /* ── Constants ───────────────────────────────────────────── */
 const STORAGE_KEY   = 'ftb_restaurants_v2';
 const SETTINGS_KEY  = 'ftb_settings_v1';
+const SWIPE_PREFS_KEY = 'ftb_swipe_prefs_v1';
 const USER_KEY      = 'ftb_user_v1';
 const DAILY_QUEST_KEY = 'ftb_daily_quest_v1';
 const LOCATION_BANNER_DISMISSED_KEY = 'ftb_location_banner_dismissed_v1';
@@ -48,6 +49,35 @@ const CUISINE_EMOJI = {
 };
 const cuisineEmoji = c => CUISINE_EMOJI[(c||'').toLowerCase()] || CUISINE_EMOJI.default;
 
+const CUISINE_FAVORITE_DISHES = {
+  mexican: ['Birria Tacos', 'Carne Asada Fries', 'Street Corn'],
+  italian: ['Spicy Vodka Rigatoni', 'Margherita Pizza', 'Tiramisu'],
+  japanese: ['Tonkotsu Ramen', 'Karaage', 'Salmon Nigiri'],
+  sushi: ['Spicy Tuna Roll', 'Dragon Roll', 'Miso Soup'],
+  chinese: ['Soup Dumplings', 'Kung Pao Chicken', 'Scallion Pancake'],
+  indian: ['Butter Chicken', 'Garlic Naan', 'Paneer Tikka'],
+  thai: ['Pad Thai', 'Drunken Noodles', 'Mango Sticky Rice'],
+  bbq: ['Brisket Plate', 'Ribs', 'Burnt Ends'],
+  burgers: ['Double Smashburger', 'Truffle Fries', 'Milkshake'],
+  american: ['Chicken Sandwich', 'Loaded Fries', 'Mac and Cheese'],
+  mediterranean: ['Chicken Shawarma', 'Falafel Plate', 'Hummus Trio'],
+  greek: ['Gyro Plate', 'Greek Salad', 'Baklava'],
+  vietnamese: ['Pho', 'Banh Mi', 'Spring Rolls'],
+  korean: ['Korean Fried Chicken', 'Bibimbap', 'Kimchi Pancake'],
+  cafe: ['Iced Latte', 'Avocado Toast', 'Blueberry Muffin'],
+  breakfast: ['Eggs Benedict', 'French Toast', 'Breakfast Burrito'],
+  brunch: ['Chicken and Waffles', 'Mimosa Flight', 'Brioche Toast'],
+  seafood: ['Fish Tacos', 'Salmon Bowl', 'Garlic Shrimp'],
+  steakhouse: ['Ribeye', 'Creamed Spinach', 'Truffle Mash'],
+  desserts: ['Cheesecake', 'Molten Cake', 'Churros'],
+  vegan: ['Cauliflower Wings', 'Falafel Wrap', 'Coconut Curry'],
+  bar: ['Wings', 'Loaded Nachos', 'Craft Burger'],
+  pub: ['Fish and Chips', 'Shepherds Pie', 'Beer Battered Onion Rings'],
+  fast_food: ['Signature Combo', 'Crispy Fries', 'House Sauce'],
+  restaurant: ['Chef Special', 'House Favorite', 'Signature Dessert'],
+  default: ['House Favorite', 'Chef Special', 'Popular Plate'],
+};
+
 function formatCuisineLabel (raw) {
   const s = String(raw || '').trim();
   if (!s) return '';
@@ -57,6 +87,122 @@ function formatCuisineLabel (raw) {
     .split(' ')
     .map(w => w ? w[0].toUpperCase() + w.slice(1).toLowerCase() : '')
     .join(' ');
+}
+
+function cuisineKey (raw) {
+  return String(raw || '').trim().toLowerCase().replace(/\s+/g, '_');
+}
+
+function estimatePriceLevel ({ tags = {}, cuisine = '', amenity = 'restaurant', savedRestaurant = null } = {}) {
+  const savedPrice = Number(savedRestaurant?.priceRange || 0);
+  if (savedPrice >= 1 && savedPrice <= 4) return savedPrice;
+
+  const key = cuisineKey(cuisine || amenity || 'restaurant');
+  const byCuisine = {
+    cafe: 1,
+    breakfast: 1,
+    brunch: 2,
+    fast_food: 1,
+    pub: 2,
+    bar: 2,
+    mexican: 2,
+    chinese: 2,
+    thai: 2,
+    vietnamese: 2,
+    korean: 2,
+    indian: 2,
+    italian: 3,
+    mediterranean: 3,
+    seafood: 3,
+    japanese: 3,
+    sushi: 3,
+    steakhouse: 4,
+    french: 4,
+  };
+  return byCuisine[key] || 2;
+}
+
+function nearbyPopularityLabel (distMeters, savedRestaurant = null) {
+  const rating = Number(savedRestaurant?.myRating || savedRestaurant?.googleRating || 0);
+  if (rating >= 4.6) return 'Very Popular';
+  if (rating >= 4.2) return 'Trending';
+  if (Number.isFinite(distMeters) && distMeters <= 500) return 'Hot Nearby';
+  if (Number.isFinite(distMeters) && distMeters <= 1200) return 'Buzzing';
+  if (Number.isFinite(distMeters) && distMeters <= 2200) return 'Local Favorite';
+  return 'Neighborhood Pick';
+}
+
+function favoriteDishesForSaved (restaurant) {
+  const rows = Array.isArray(restaurant?.dishes) ? restaurant.dishes : [];
+  const normalized = rows
+    .map(d => ({
+      name: String(d?.name || d?.dish || '').trim(),
+      score: Number(d?.rating || d?.stars || d?.score || 0),
+    }))
+    .filter(d => d.name)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map(d => d.name);
+  if (normalized.length) return normalized;
+  return null;
+}
+
+function favoriteDishesForNearby (cuisine = '', amenity = 'restaurant') {
+  const key = cuisineKey(cuisine || amenity || 'restaurant');
+  const list = CUISINE_FAVORITE_DISHES[key] || CUISINE_FAVORITE_DISHES.default;
+  return list.slice(0, 2);
+}
+
+function renderNearbyVisualCard ({
+  name = 'Unknown',
+  cuisine = '',
+  amenity = 'restaurant',
+  distMeters = Infinity,
+  priceLevel = 0,
+  popularity = '',
+  isSaved = false,
+  restaurantId = '',
+  key = '',
+  savedRestaurant = null,
+} = {}) {
+  const cuisineLabel = formatCuisineLabel(cuisine || amenity || 'Restaurant');
+  const distText = Number.isFinite(distMeters) ? fmtDist(distMeters) : 'Distance unknown';
+  const effectivePrice = Number(priceLevel) || estimatePriceLevel({ cuisine, amenity, savedRestaurant });
+  const effectivePopularity = popularity || nearbyPopularityLabel(distMeters, savedRestaurant);
+  const dishes = favoriteDishesForSaved(savedRestaurant) || favoriteDishesForNearby(cuisine, amenity);
+  const dishesLabel = dishes.length ? dishes.join(' • ') : 'House favorites';
+  const photo = getCuisinePhoto(cuisine || amenity || 'restaurant', 960, 960);
+  const safeName = escHtml(name);
+  const safeNameForClick = String(name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const safeCuisine = String(cuisine || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const popularityScore = Math.max(30, Math.min(98,
+    Math.round((effectivePopularity === 'Very Popular' ? 92
+      : effectivePopularity === 'Trending' ? 84
+        : effectivePopularity === 'Hot Nearby' ? 78
+          : effectivePopularity === 'Buzzing' ? 70
+            : effectivePopularity === 'Local Favorite' ? 62
+              : 54))));
+
+  return `<article class="nearby-home-card${isSaved ? ' saved' : ''}" data-nearby-key="${escHtml(key || `${name}-${distText}`)}" data-nearby-price="${effectivePrice}" data-nearby-popularity="${escHtml(effectivePopularity)}">
+    <div class="nearby-home-card-media">
+      <img class="nearby-home-card-photo" src="${photo}" alt="${escHtml(cuisineLabel)} food" loading="lazy" />
+      <div class="nearby-home-card-badges">
+        <span class="nearby-home-card-badge price">${'$'.repeat(Math.max(1, Math.min(4, effectivePrice)))}</span>
+        <span class="nearby-home-card-badge pop">${escHtml(effectivePopularity)}</span>
+      </div>
+    </div>
+    <div class="nearby-home-card-body">
+      <div class="nearby-home-card-name" title="${safeName}">${safeName}</div>
+      <div class="nearby-home-card-meta">${escHtml(cuisineLabel)} • ${distText}</div>
+      <div class="nearby-home-card-pop-meter"><span style="width:${popularityScore}%"></span></div>
+      <div class="nearby-home-card-dishes">Favorite dishes: ${escHtml(dishesLabel)}</div>
+    </div>
+    <div class="nearby-home-card-footer">
+      ${isSaved
+        ? `<button class="btn-sm btn-secondary nearby-home-card-add" onclick="openDetailModal('${restaurantId}')">View</button>`
+        : `<button class="btn-sm btn-orange nearby-home-card-add" onclick="openAddModalPreFilled('${safeNameForClick}','${safeCuisine}')">+ Save</button>`}
+    </div>
+  </article>`;
 }
 
 /* ── Cuisine → gradient map ───────────────────────────────── */
@@ -141,6 +287,33 @@ let state = {
   dinnerRooms: {},
   activeDinnerRoomCode: '',
   commandPaletteIndex: 0,
+  swipeDeck: [],
+  swipeIndex: 0,
+  swipeReveal: false,
+  swipeLikes: [],
+};
+
+const BEAR_SWIPE_JOKES = [
+  'I can bear-ly choose, so you pick the vibe.',
+  'You are the pawsident of dinner tonight.',
+  'No pressure, just pure snack instincts.',
+  'Swipe like nobody is judging your cravings.',
+  'This card is either destiny or a hard pass.',
+  'Dad joke of the day: I am pawsitive this one smells amazing.',
+  'Un-bear-lievable food decisions happening right now.',
+];
+
+const BEAR_REACTION_COPY = {
+  yes: [
+    'Paw-sitive pick. Adding that to your craving trail.',
+    'Big bear energy. Great yes.',
+    'That got an immediate yes claw.',
+  ],
+  no: [
+    'Nope noted. Back to foraging.',
+    'That one can hibernate for now.',
+    'Hard pass, soft paws.',
+  ],
 };
 
 /* ════════════════════════════════════════════════════════════
@@ -204,6 +377,149 @@ function saveData () {
   setTimeout(renderWeeklyGoal, 0);
   // Sync to Firestore if user is signed in (debounced)
   if (typeof fbDebouncedSync === 'function') fbDebouncedSync();
+}
+
+function loadSwipePrefs () {
+  try {
+    const raw = localStorage.getItem(SWIPE_PREFS_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== 'object') return { history: [] };
+    if (!Array.isArray(parsed.history)) parsed.history = [];
+    return parsed;
+  } catch {
+    return { history: [] };
+  }
+}
+
+function saveSwipePrefs (prefs) {
+  try {
+    localStorage.setItem(SWIPE_PREFS_KEY, JSON.stringify(prefs || { history: [] }));
+  } catch {
+    // Best-effort persistence.
+  }
+}
+
+function swipeCuisineKey (item = {}) {
+  return cuisineKey(item.cuisine || item.amenity || 'restaurant') || 'restaurant';
+}
+
+function recordSwipePreference (item, reaction = '') {
+  if (!item || (reaction !== 'yes' && reaction !== 'no')) return;
+
+  const prefs = loadSwipePrefs();
+  const entry = {
+    ts: Date.now(),
+    reaction,
+    source: item.source || (item.isSaved ? 'saved' : 'nearby'),
+    cuisine: swipeCuisineKey(item),
+    priceLevel: Number(item.priceLevel || 0) || 0,
+    distMeters: Number.isFinite(item.distMeters) ? Number(item.distMeters) : null,
+  };
+
+  prefs.history = (prefs.history || []).concat([entry]).slice(-240);
+  saveSwipePrefs(prefs);
+  if (!document.getElementById('personalize-overlay')?.classList.contains('hidden')) {
+    renderTasteLearningSettingsCard();
+  }
+}
+
+function getSwipePreferenceProfile () {
+  const prefs = loadSwipePrefs();
+  const history = (prefs.history || []).slice(-120);
+  const profile = {
+    total: history.length,
+    byCuisine: {},
+    priceBias: 0,
+    nearBias: 0,
+  };
+
+  if (!history.length) return profile;
+
+  let priceSum = 0;
+  let priceCount = 0;
+  let distSum = 0;
+  let distCount = 0;
+
+  history.forEach(h => {
+    const w = h.reaction === 'yes' ? 1 : -1;
+    const ck = cuisineKey(h.cuisine || 'restaurant') || 'restaurant';
+    profile.byCuisine[ck] = (profile.byCuisine[ck] || 0) + w;
+
+    if (Number(h.priceLevel) > 0) {
+      priceSum += w * Number(h.priceLevel);
+      priceCount += 1;
+    }
+    if (Number.isFinite(h.distMeters)) {
+      // Positive when liking closer places.
+      const nearVal = Math.max(0, 1 - (Number(h.distMeters) / 3000));
+      distSum += w * nearVal;
+      distCount += 1;
+    }
+  });
+
+  profile.priceBias = priceCount ? (priceSum / priceCount) : 0;
+  profile.nearBias = distCount ? (distSum / distCount) : 0;
+  return profile;
+}
+
+function getSwipePreferenceReasonForCandidate (c) {
+  const profile = getSwipePreferenceProfile();
+  if (profile.total < 6) return '';
+
+  const ck = swipeCuisineKey(c);
+  const cScore = Number(profile.byCuisine[ck] || 0);
+  if (cScore >= 3) return `Because you liked ${formatCuisineLabel(c.cuisine || c.amenity || 'this cuisine')} picks`;
+  if (cScore <= -3) return `You usually skip ${formatCuisineLabel(c.cuisine || c.amenity || 'this cuisine')} picks`;
+  if (profile.nearBias > 0.15 && Number.isFinite(c.distMeters) && c.distMeters <= 1200) return 'Because you like nearby quick wins';
+  if (profile.priceBias > 0.2 && Number(c.priceLevel || 0) >= 3) return 'Because you leaned toward splurge picks';
+  if (profile.priceBias < -0.2 && Number(c.priceLevel || 0) > 0 && Number(c.priceLevel || 0) <= 2) return 'Because you leaned toward budget picks';
+  return '';
+}
+
+function renderTasteLearningSettingsCard () {
+  const countEl = document.getElementById('taste-learning-count');
+  const summaryEl = document.getElementById('taste-learning-summary');
+  const tagsEl = document.getElementById('taste-learning-tags');
+  if (!countEl || !summaryEl || !tagsEl) return;
+
+  const profile = getSwipePreferenceProfile();
+  countEl.textContent = `${profile.total} swipe${profile.total === 1 ? '' : 's'}`;
+
+  if (!profile.total) {
+    summaryEl.textContent = 'Swipe a few cards and I will start learning your flavor patterns.';
+    tagsEl.innerHTML = '';
+    return;
+  }
+
+  const topPos = Object.entries(profile.byCuisine || {})
+    .sort((a, b) => b[1] - a[1])
+    .find(([, score]) => Number(score) >= 2);
+  const topNeg = Object.entries(profile.byCuisine || {})
+    .sort((a, b) => a[1] - b[1])
+    .find(([, score]) => Number(score) <= -2);
+
+  const summaryParts = [];
+  if (topPos) summaryParts.push(`You are leaning toward ${formatCuisineLabel(topPos[0])}`);
+  if (topNeg) summaryParts.push(`you often skip ${formatCuisineLabel(topNeg[0])}`);
+  if (profile.nearBias > 0.12) summaryParts.push('you usually prefer closer spots');
+  if (profile.priceBias > 0.2) summaryParts.push('you have been choosing pricier picks');
+  if (profile.priceBias < -0.2) summaryParts.push('you have been choosing budget picks');
+  summaryEl.textContent = summaryParts.length
+    ? `${summaryParts.join(' • ')}.`
+    : 'Your preferences are warming up. A few more swipes will sharpen your picks.';
+
+  const chips = [];
+  if (topPos) chips.push({ label: `Likes ${formatCuisineLabel(topPos[0])}`, cls: 'positive' });
+  if (topNeg) chips.push({ label: `Skips ${formatCuisineLabel(topNeg[0])}`, cls: 'negative' });
+  if (profile.nearBias > 0.12) chips.push({ label: 'Prefers nearby', cls: 'positive' });
+  if (profile.nearBias < -0.12) chips.push({ label: 'Open to farther spots', cls: 'positive' });
+  if (profile.priceBias > 0.2) chips.push({ label: 'Leans splurge', cls: 'positive' });
+  if (profile.priceBias < -0.2) chips.push({ label: 'Leans budget', cls: 'positive' });
+
+  tagsEl.innerHTML = chips
+    .slice(0, 5)
+    .map(c => `<span class="taste-learning-tag ${c.cls}">${escHtml(c.label)}</span>`)
+    .join('');
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -276,8 +592,8 @@ const AVATAR_OPTIONS = ['FTB', 'VIP', 'DINE', 'CHEF', 'TABLE', 'CITY', 'DATE', '
 const DEFAULT_AVATAR = 'FTB';
 const PROFILE_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 const THEME_PRESETS = {
-  dark:     { mode: 'dark',  accent: 'orange' },
-  light:    { mode: 'light', accent: 'orange' },
+  dark:     { mode: 'dark',  accent: 'forest' },
+  light:    { mode: 'light', accent: 'mint' },
   forest:   { mode: 'dark',  accent: 'forest' },
   ocean:    { mode: 'dark',  accent: 'ocean' },
   sunset:   { mode: 'light', accent: 'sunset' },
@@ -636,6 +952,7 @@ function openPersonalizeSettings () {
   const monthlyBudgetInput = document.getElementById('personalize-monthly-budget-input');
   const enableLocationBtn = document.getElementById('settings-enable-location-btn');
   const disableLocationBtn = document.getElementById('settings-disable-location-btn');
+  const resetTasteBtn = document.getElementById('taste-learning-reset-btn');
 
   if (themeSel) {
     if (!state.settings.themeManual) {
@@ -654,6 +971,14 @@ function openPersonalizeSettings () {
 
   if (enableLocationBtn) enableLocationBtn.onclick = () => enableLocation();
   if (disableLocationBtn) disableLocationBtn.onclick = () => disableLocation();
+  if (resetTasteBtn) {
+    resetTasteBtn.onclick = () => {
+      saveSwipePrefs({ history: [] });
+      renderTasteLearningSettingsCard();
+      showToast('Taste learning reset', 'Swipe cards again to retrain your picks.', 'info');
+    };
+  }
+  renderTasteLearningSettingsCard();
 
   document.getElementById('personalize-save-btn').onclick = () => {
     const choice = themeSel?.value || 'dark';
@@ -1691,12 +2016,31 @@ async function geocodeAddress (id, address) {
 }
 
 /* ── External links ──────────────────────────────────────── */
+function buildDirectionsDestination (place) {
+  if (!place) return '';
+  const lat = Number(place.lat);
+  const lon = Number(place.lon ?? place.lng);
+  if (Number.isFinite(lat) && Number.isFinite(lon)) return `${lat},${lon}`;
+
+  const name = String(place.name || '').trim();
+  const address = String(place.address || '').trim();
+  if (name && address) return `${name}, ${address}`;
+  return address || name;
+}
+
+function buildGoogleDirectionsUrl (place) {
+  const dest = buildDirectionsDestination(place);
+  if (!dest) return '';
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}&travelmode=driving`;
+}
+
 function openDirections (r) {
-  if (r.address) {
-    window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(r.address)}`, '_blank', 'noopener');
-  } else {
-    showToast('No Address', 'This restaurant has no address saved.', 'error');
+  const url = buildGoogleDirectionsUrl(r);
+  if (!url) {
+    showToast('No Location', 'This restaurant needs an address or coordinates for directions.', 'error');
+    return;
   }
+  window.open(url, '_blank', 'noopener');
 }
 function openWebsite (r) {
   if (r.website) {
@@ -4361,16 +4705,15 @@ function setupEvents () {
   document.querySelectorAll('.ai-quick-btn').forEach(btn => btn.addEventListener('click', () => handleAiQuickBtn(btn.dataset.prompt)));
 
   // AI Core - API key setup
-  document.getElementById('ai-save-key-btn').addEventListener('click', () => {
-    const val = document.getElementById('ai-gemini-key-input').value.trim();
+  document.getElementById('ai-save-key-btn')?.addEventListener('click', () => {
+    const val = document.getElementById('ai-gemini-key-input')?.value?.trim() || '';
     if (!val.startsWith('AIza')) { showToast('Invalid Key', 'Gemini keys start with AIza\u2026', 'error'); return; }
     AI.setKey(val);
     _syncAiKeyUI();
-    showToast('\u2728 Gemini Connected!', 'AI features are now unlocked.', 'success');
+    showToast('\u2728 Dev key saved', 'Server AI remains the default for all users.', 'success');
   });
-  document.getElementById('ai-change-key-btn').addEventListener('click', () => {
-    document.getElementById('ai-key-setup').classList.remove('hidden');
-    document.getElementById('ai-key-active').classList.add('hidden');
+  document.getElementById('ai-change-key-btn')?.addEventListener('click', () => {
+    showToast('Grizzly feature', 'Byte Cub AI is unlocked with Grizzly upgrade.', 'info');
   });
 
   // AI - Detail modal
@@ -4381,7 +4724,7 @@ function setupEvents () {
   document.getElementById('ai-smart-fill-btn').addEventListener('click', async () => {
     const name = document.getElementById('form-name').value.trim();
     if (!name) { showToast('Name needed', 'Enter a restaurant name first.', 'info'); return; }
-    if (!AI.hasKey()) { openAiPanel(); return; }
+    if (!ensureAiUpgradeAccess('Byte Cub AI')) return;
     const fillResult = document.getElementById('ai-fill-result');
     fillResult.classList.remove('hidden');
     fillResult.innerHTML = '\uD83D\uDC3B <span class="ai-thinking-inline"><span></span><span></span><span></span></span>';
@@ -4410,7 +4753,7 @@ function setupEvents () {
   document.getElementById('ai-notes-btn').addEventListener('click', async () => {
     const notes = document.getElementById('form-notes').value.trim();
     if (!notes) { showToast('Write a note first', 'Jot down something and let AI enrich it.', 'info'); return; }
-    if (!AI.hasKey()) { openAiPanel(); return; }
+    if (!ensureAiUpgradeAccess('Byte Cub AI')) return;
     const notesResult = document.getElementById('ai-notes-result');
     notesResult.classList.remove('hidden');
     notesResult.innerHTML = '\uD83D\uDC3B <span class="ai-thinking-inline"><span></span><span></span><span></span></span>';
@@ -4435,7 +4778,7 @@ function setupEvents () {
   document.getElementById('lightbox-ai-caption-btn').addEventListener('click', async () => {
     const img = document.getElementById('lightbox-img');
     if (!img.src || img.src === window.location.href) return;
-    if (!AI.hasKey()) { openAiPanel(); return; }
+    if (!ensureAiUpgradeAccess('Byte Cub AI')) return;
     const captionBtn = document.getElementById('lightbox-ai-caption-btn');
     captionBtn.disabled = true; captionBtn.textContent = '\u2728 Captioning\u2026';
     try {
@@ -4458,7 +4801,7 @@ function setupEvents () {
   // AI - Monthly wrap narrative
   const wrapAiBtn = document.getElementById('wrap-ai-btn');
   if (wrapAiBtn) wrapAiBtn.addEventListener('click', async () => {
-    if (!AI.hasKey()) { openAiPanel(); return; }
+    if (!ensureAiUpgradeAccess('Byte Cub AI')) return;
     const digestEl = document.getElementById('wrap-ai-digest');
     digestEl.classList.remove('hidden');
     digestEl.innerHTML = '\uD83D\uDC3B <span class="ai-thinking-inline"><span></span><span></span><span></span></span>';
@@ -4474,7 +4817,7 @@ function setupEvents () {
   // AI - Year review narrative
   const reviewAiBtn = document.getElementById('review-ai-btn');
   if (reviewAiBtn) reviewAiBtn.addEventListener('click', async () => {
-    if (!AI.hasKey()) { openAiPanel(); return; }
+    if (!ensureAiUpgradeAccess('Byte Cub AI')) return;
     const digestEl = document.getElementById('review-ai-digest');
     digestEl.classList.remove('hidden');
     digestEl.innerHTML = '\uD83D\uDC3B <span class="ai-thinking-inline"><span></span><span></span><span></span></span>';
@@ -4489,7 +4832,7 @@ function setupEvents () {
   // AI - Taste Profile (stats view)
   const tasteBtn = document.getElementById('ai-taste-profile-btn');
   if (tasteBtn) tasteBtn.addEventListener('click', async () => {
-    if (!AI.hasKey()) { openAiPanel(); return; }
+    if (!ensureAiUpgradeAccess('Byte Cub AI')) return;
     const card = document.getElementById('ai-taste-profile-result');
     card.classList.remove('hidden');
     card.innerHTML = '\uD83D\uDC3B <span class="ai-thinking-inline"><span></span><span></span><span></span></span>';
@@ -4718,6 +5061,83 @@ function clearFilters () {
   renderCards();
 }
 
+let _bearRoarAudioCtx = null;
+
+function playBearRoarSfx () {
+  const ACtx = window.AudioContext || window.webkitAudioContext;
+  if (!ACtx) return;
+
+  if (!_bearRoarAudioCtx) {
+    _bearRoarAudioCtx = new ACtx();
+  }
+
+  const ctx = _bearRoarAudioCtx;
+  if (ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+
+  const now = ctx.currentTime;
+  const duration = 0.34;
+  const noiseBuffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * duration), ctx.sampleRate);
+  const data = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) {
+    data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+  }
+
+  const noise = ctx.createBufferSource();
+  noise.buffer = noiseBuffer;
+  const noiseFilter = ctx.createBiquadFilter();
+  noiseFilter.type = 'lowpass';
+  noiseFilter.frequency.setValueAtTime(520, now);
+  noiseFilter.Q.setValueAtTime(0.9, now);
+
+  const bodyOsc = ctx.createOscillator();
+  bodyOsc.type = 'sawtooth';
+  bodyOsc.frequency.setValueAtTime(95, now);
+  bodyOsc.frequency.exponentialRampToValueAtTime(62, now + duration);
+
+  const growlOsc = ctx.createOscillator();
+  growlOsc.type = 'triangle';
+  growlOsc.frequency.setValueAtTime(160, now);
+  growlOsc.frequency.exponentialRampToValueAtTime(75, now + duration * 0.9);
+
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.14, now + 0.04);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.setValueAtTime(-20, now);
+  limiter.knee.setValueAtTime(14, now);
+  limiter.ratio.setValueAtTime(8, now);
+
+  noise.connect(noiseFilter);
+  noiseFilter.connect(gain);
+  bodyOsc.connect(gain);
+  growlOsc.connect(gain);
+  gain.connect(limiter);
+  limiter.connect(ctx.destination);
+
+  noise.start(now);
+  noise.stop(now + duration);
+  bodyOsc.start(now);
+  bodyOsc.stop(now + duration);
+  growlOsc.start(now);
+  growlOsc.stop(now + duration);
+}
+
+function initBearRoarInteractions () {
+  document.querySelectorAll('img.bear-mark').forEach(el => {
+    if (el.dataset.roarBound === '1') return;
+    el.dataset.roarBound = '1';
+    el.title = el.title || 'Tap for a bear roar';
+    el.addEventListener('click', () => {
+      playBearRoarSfx();
+      hapticTap('light');
+    });
+  });
+}
+
 /* ════════════════════════════════════════════════════════════
    INIT
    ════════════════════════════════════════════════════════════ */
@@ -4735,6 +5155,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDetailQuickCapture();
   initReminders();
   initInstallPrompt();
+  initBearRoarInteractions();
   checkAndNudge();
   checkAchievements();
   // Restore travel mode state on load
@@ -4782,6 +5203,16 @@ document.addEventListener('DOMContentLoaded', () => {
   if (_compareMode) addCompareCheckboxes();
   // Wire home discovery buttons
   document.getElementById('nearby-home-more-btn')?.addEventListener('click', openDiscover);
+  document.getElementById('nearby-lucky-btn')?.addEventListener('click', () => {
+    hapticTap('medium');
+    runNearbyLuckyBite();
+  });
+  document.getElementById('nearby-home-filters')?.addEventListener('click', e => {
+    const chip = e.target.closest('.nearby-filter-chip[data-nearby-filter]');
+    if (!chip) return;
+    hapticTap('light');
+    applyNearbyFilterMode(chip.dataset.nearbyFilter || 'all');
+  });
   document.getElementById('home-quick-pick-btn')?.addEventListener('click', () => { hapticTap('medium'); showTonightsPick(); });
   document.getElementById('home-quick-nearby-btn')?.addEventListener('click', () => { hapticTap('medium'); openDiscover(); });
   document.getElementById('home-quick-plan-btn')?.addEventListener('click', () => { hapticTap('medium'); openSmartPlanner(); });
@@ -5000,14 +5431,96 @@ function closeTonightsPick () {
   document.getElementById('tonight-overlay').classList.add('hidden');
   maybeHideOverlay();
 }
-function runTonightsPick () {
+function scoreTonightDiscoveryCandidate (c, moods = []) {
+  const cuisine = String(c.cuisine || '').toLowerCase();
+  let s = Math.random() * 0.35;
+  const profile = getSwipePreferenceProfile();
+
+  if (Number.isFinite(c.distMeters)) {
+    s += Math.max(0, 3.2 - (c.distMeters / 700));
+  }
+  if (/Very Popular|Trending|Hot Nearby|Buzzing/i.test(String(c.popularity || ''))) s += 1.8;
+  if (Number(c.priceLevel || 0) > 0) s += 0.4;
+
+  if (moods.includes('new') && !c.isSaved) s += 2.4;
+  if (moods.includes('budget') && Number(c.priceLevel || 0) <= 2) s += 2;
+  if (moods.includes('fancy') && Number(c.priceLevel || 0) >= 3) s += 1.9;
+  if (moods.includes('date') && Number(c.priceLevel || 0) >= 2) s += 1;
+  if (moods.includes('comfort') && ['italian', 'american', 'mexican', 'japanese', 'chinese', 'indian'].some(x => cuisine.includes(x))) s += 1.7;
+  if (moods.includes('healthy') && ['mediterranean', 'japanese', 'vietnamese', 'thai', 'greek', 'vegan'].some(x => cuisine.includes(x))) s += 1.8;
+  if (moods.includes('quick') && Number(c.priceLevel || 0) <= 2) s += 1.1;
+  if (moods.includes('surprise')) s += Math.random() * 2;
+
+  // Learned swipe preferences (yes/no history).
+  if (profile.total >= 6) {
+    const ck = swipeCuisineKey(c);
+    const cScore = Number(profile.byCuisine[ck] || 0);
+    s += Math.max(-2.4, Math.min(2.4, cScore * 0.55));
+
+    if (Number(c.priceLevel || 0) > 0) {
+      s += Math.max(-1.1, Math.min(1.1, profile.priceBias * (Number(c.priceLevel || 0) - 2) * 0.35));
+    }
+    if (Number.isFinite(c.distMeters)) {
+      const nearVal = Math.max(0, 1 - (Number(c.distMeters) / 3000));
+      s += Math.max(-1.1, Math.min(1.1, profile.nearBias * nearVal * 2.2));
+    }
+  }
+
+  return s;
+}
+
+async function runTonightsPick () {
   const moods = [...document.querySelectorAll('.mood-chip.selected')].map(c => c.dataset.mood);
-  const all   = state.restaurants;
+
+  // Foodie-first mode: prioritize nearby live discovery cards.
+  let nearbyLive = (_nearbyCards || []).filter(c => !c.isSaved);
+  if (!nearbyLive.length && state.userLat && state.userLng) {
+    try {
+      await loadHomeDiscovery();
+      nearbyLive = (_nearbyCards || []).filter(c => !c.isSaved);
+    } catch (_) {
+      // Ignore and continue to fallbacks below.
+    }
+  }
+
+  if (nearbyLive.length) {
+    const scored = nearbyLive.map(c => ({ c, s: scoreTonightDiscoveryCandidate(c, moods) }))
+      .sort((a, b) => b.s - a.s);
+    const p = scored[0].c;
+    const price = Number(p.priceLevel || 0) ? '$'.repeat(Math.max(1, Math.min(4, Number(p.priceLevel || 0)))) : '';
+    const cuisineLabel = formatCuisineLabel(p.cuisine || p.amenity || 'Restaurant');
+    const dist = Number.isFinite(p.distMeters) ? fmtDist(p.distMeters) : '';
+    const reason = getSwipePreferenceReasonForCandidate(p);
+    const mapsDest = Number.isFinite(p.lat) && Number.isFinite(p.lon)
+      ? `${p.lat},${p.lon}`
+      : (p.address || p.name);
+
+    const res = document.getElementById('tonight-result');
+    res.innerHTML = '<div class="pick-name">' + escHtml(p.name) + '</div>'
+      + '<div class="pick-meta">' + escHtml(cuisineLabel)
+      + (price ? ' · ' + price : '')
+      + (dist ? ' · ' + dist + ' away' : '')
+      + (p.popularity ? ' · ' + escHtml(p.popularity) : '')
+      + ' · Nearby discovery</div>'
+      + (reason ? '<div class="pick-address">' + escHtml(reason) + '</div>' : '')
+      + '<div class="pick-address">Fresh find around you, cub boss. Tap save to add it to your list.</div>'
+      + '<div class="pick-actions">'
+      + '<button class="btn-sm btn-orange" onclick="openAddModalPreFilled(\'' + String(p.name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\',\'' + String(p.cuisine || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\')">+ Save Spot</button>'
+      + (mapsDest ? '<a class="btn-sm btn-secondary" style="text-decoration:none;display:inline-flex;align-items:center" href="https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(mapsDest) + '&travelmode=driving" target="_blank" rel="noopener"> Directions</a>' : '')
+      + '</div>';
+    res.classList.remove('hidden');
+    return;
+  }
+
+  const all = state.restaurants;
   if (!all.length) {
-    document.getElementById('tonight-result').innerHTML = '<p style="text-align:center;color:var(--text-dim)">No restaurants saved yet!</p>';
+    document.getElementById('tonight-result').innerHTML = state.userLat && state.userLng
+      ? '<p style="text-align:center;color:var(--text-dim)">No nearby foodie finds right now. Try Discover Nearby for a wider scan.</p>'
+      : '<p style="text-align:center;color:var(--text-dim)">Enable location and I will pick from nearby spots around you, not just saved places.</p>';
     document.getElementById('tonight-result').classList.remove('hidden');
     return;
   }
+
   const scored = all.map(r => {
     let s = Math.random() * 0.3;
     if (r.myRating >= 4) s += 2; else if (r.myRating === 3) s += 1;
@@ -5033,7 +5546,7 @@ function runTonightsPick () {
     + (p.address ? '<div class="pick-address"> ' + escHtml(p.address) + '</div>' : '')
     + '<div class="pick-actions">'
     + '<button class="btn-sm btn-orange" onclick="openDetailModal(\'' + p.id + '\');closeTonightsPick()">View Details</button>'
-    + (p.address ? '<a class="btn-sm btn-secondary" style="text-decoration:none;display:inline-flex;align-items:center" href="https://maps.google.com/?q=' + encodeURIComponent(p.address) + '" target="_blank" rel="noopener"> Directions</a>' : '')
+    + (buildDirectionsDestination(p) ? '<a class="btn-sm btn-secondary" style="text-decoration:none;display:inline-flex;align-items:center" href="' + buildGoogleDirectionsUrl(p) + '" target="_blank" rel="noopener"> Directions</a>' : '')
     + '</div>';
   res.classList.remove('hidden');
 }
@@ -5161,11 +5674,7 @@ function checkIncomingChallenge () {
    ------------------------------------------------------------ */
 
 async function aiPhotoFill () {
-  if (!AI.hasKey()) {
-    openAiPanel();
-    showToast('\uD83D\uDC3B Add API Key', 'Enter your Gemini key in the Byte Cub panel to use AI photo fill.', 'info');
-    return;
-  }
+  if (!ensureAiUpgradeAccess('Byte Cub AI')) return;
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
   input.onchange = async () => {
@@ -7134,6 +7643,9 @@ let _homeDiscCache = null;
 let _homeDiscCacheTime = 0;
 const HOME_DISC_TTL = 15 * 60 * 1000; // 15 min
 let _forYouSeed = Date.now();
+let _nearbyFilterMode = 'all';
+let _nearbyCards = [];
+let _nearbyBannerMsg = '';
 
 function getNearbyRadiusMiles () {
   return Math.max(1, Math.min(5, Number(state.settings.nearbyRadiusMiles) || 1));
@@ -7143,66 +7655,130 @@ function getNearbyRadiusMeters () {
   return getNearbyRadiusMiles() * 1609.34;
 }
 
+function getFilteredNearbyCards (cards = _nearbyCards, mode = _nearbyFilterMode) {
+  if (!Array.isArray(cards) || !cards.length) return [];
+  if (mode === 'trending') {
+    return cards.filter(c => /Very Popular|Trending|Hot Nearby|Buzzing/i.test(String(c.popularity || '')));
+  }
+  if (mode === 'budget') {
+    return cards.filter(c => Number(c.priceLevel || 0) <= 2);
+  }
+  return cards;
+}
+
+function renderNearbyCardsFromState () {
+  const list = document.getElementById('nearby-home-list');
+  if (!list) return;
+  const filtered = getFilteredNearbyCards();
+
+  if (!filtered.length) {
+    const msg = _nearbyFilterMode === 'budget'
+      ? 'No budget picks in this batch yet. Try All or Trending.'
+      : _nearbyFilterMode === 'trending'
+        ? 'No trending picks right now. Try All for more options.'
+        : 'No nearby cards to show yet.';
+    list.innerHTML = `<div class="nearby-home-loading">${escHtml(msg)}</div>`;
+    return;
+  }
+
+  list.innerHTML = `${_nearbyBannerMsg ? `<div class="nearby-home-loading">${escHtml(_nearbyBannerMsg)}</div>` : ''}` +
+    filtered.map(card => renderNearbyVisualCard(card)).join('');
+}
+
+function setNearbyCards (cards = [], opts = {}) {
+  _nearbyCards = Array.isArray(cards) ? cards : [];
+  _nearbyBannerMsg = String(opts.banner || '');
+  renderNearbyCardsFromState();
+}
+
+function runNearbyLuckyBite () {
+  const picks = getFilteredNearbyCards();
+  if (!picks.length) {
+    showToast('No bites yet', 'No nearby cards are available for Lucky Bite right now.', 'info');
+    return;
+  }
+  const pick = picks[Math.floor(Math.random() * picks.length)];
+  const list = document.getElementById('nearby-home-list');
+  if (list) {
+    list.querySelectorAll('.nearby-home-card.lucky').forEach(el => el.classList.remove('lucky'));
+    const cardEl = list.querySelector(`.nearby-home-card[data-nearby-key="${pick.key}"]`);
+    if (cardEl) {
+      cardEl.classList.add('lucky');
+      cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    }
+  }
+
+  showToast('Lucky Bite!', `${pick.name} is tonight's wild card.`, 'success');
+  if (pick.isSaved && pick.restaurantId) {
+    setTimeout(() => openDetailModal(pick.restaurantId), 180);
+  } else {
+    setTimeout(() => openAddModalPreFilled(pick.name, pick.cuisine), 180);
+  }
+}
+
+function applyNearbyFilterMode (mode = 'all') {
+  _nearbyFilterMode = ['all', 'trending', 'budget'].includes(mode) ? mode : 'all';
+  document.querySelectorAll('.nearby-filter-chip').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.nearbyFilter === _nearbyFilterMode);
+  });
+  renderNearbyCardsFromState();
+}
+
 async function fetchOverpassElements (query, opts = {}) {
-  const timeoutMs = Number(opts.timeoutMs) || 15000;
+  const timeoutMs = Number(opts.timeoutMs) || 6000;
   const endpoints = opts.endpoints || [
     'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
     'https://overpass.private.coffee/api/interpreter'
   ];
 
-  let lastErr = null;
-
-  for (const endpoint of endpoints) {
-    // Try form-encoded POST first (most compatible with public Overpass instances).
-    try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), timeoutMs);
-      const body = new URLSearchParams({ data: query });
-      const resp = await fetch(endpoint, {
-        method: 'POST',
-        body,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-        signal: ctrl.signal,
-      });
-      clearTimeout(t);
-      if (!resp.ok) throw new Error(`Overpass ${resp.status}`);
-      const json = await resp.json();
-      return (json.elements || []);
-    } catch (err) {
-      lastErr = err;
+  const overpassAttempt = async () => {
+    let lastErr = null;
+    for (const endpoint of endpoints) {
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), timeoutMs);
+        const body = new URLSearchParams({ data: query });
+        const resp = await fetch(endpoint, {
+          method: 'POST',
+          body,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+          signal: ctrl.signal,
+        });
+        clearTimeout(t);
+        if (!resp.ok) throw new Error(`Overpass ${resp.status}`);
+        const json = await resp.json();
+        const elements = json.elements || [];
+        if (elements.length) return elements;
+      } catch (err) {
+        lastErr = err;
+      }
     }
+    throw lastErr || new Error('Nearby lookup unavailable');
+  };
 
-    // Fallback to GET style query param.
-    try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), timeoutMs);
-      const url = endpoint + '?data=' + encodeURIComponent(query);
-      const resp = await fetch(url, { signal: ctrl.signal });
-      clearTimeout(t);
-      if (!resp.ok) throw new Error(`Overpass ${resp.status}`);
-      const json = await resp.json();
-      return (json.elements || []);
-    } catch (err) {
-      lastErr = err;
-    }
+  const useNominatim = opts.nominatimFallback && Number.isFinite(opts.lat) && Number.isFinite(opts.lng);
+  if (!useNominatim) {
+    return overpassAttempt();
   }
 
-  if (opts.nominatimFallback && Number.isFinite(opts.lat) && Number.isFinite(opts.lng)) {
-    try {
-      const fallback = await fetchNominatimNearbyElements(
-        opts.lat,
-        opts.lng,
-        Number(opts.radiusMeters) || 1609,
-        Number(opts.limit) || 30
-      );
-      if (fallback.length) return fallback;
-    } catch (err) {
-      lastErr = err;
-    }
-  }
+  const nominatimAttempt = async () => {
+    const fallback = await fetchNominatimNearbyElements(
+      opts.lat,
+      opts.lng,
+      Number(opts.radiusMeters) || 1609,
+      Number(opts.limit) || 30
+    );
+    if (!fallback.length) throw new Error('Nominatim empty');
+    return fallback;
+  };
 
-  throw lastErr || new Error('Nearby lookup unavailable');
+  try {
+    // Return whichever source responds first with usable nearby places.
+    return await Promise.any([overpassAttempt(), nominatimAttempt()]);
+  } catch (err) {
+    throw err || new Error('Nearby lookup unavailable');
+  }
 }
 
 async function fetchNominatimNearbyElements (lat, lng, radiusMeters = 1609, limit = 30) {
@@ -7778,9 +8354,397 @@ function renderForYouHome () {
   });
 }
 
+function pickRandom (arr = []) {
+  if (!arr.length) return '';
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function setBearSwipeJoke (text = '') {
+  const jokeEl = document.getElementById('bear-swipe-joke');
+  if (!jokeEl) return;
+  jokeEl.textContent = text || pickRandom(BEAR_SWIPE_JOKES);
+}
+
+function buildSwipeDeckFromElements (elements = []) {
+  const profile = getSwipePreferenceProfile();
+  return (elements || []).slice(0, 24).map((el, idx) => {
+    const tags = el.tags || {};
+    const cuisine = (tags.cuisine || '').split(';')[0];
+    const amenity = tags.amenity || 'restaurant';
+    const cuisineLabel = formatCuisineLabel(cuisine || amenity || 'restaurant');
+    const lat = el.lat ?? el.center?.lat ?? null;
+    const lon = el.lon ?? el.center?.lon ?? null;
+    const address = [tags['addr:housenumber'], tags['addr:street'], tags['addr:city']].filter(Boolean).join(' ');
+    return {
+      key: `nearby-${el.id || idx}`,
+      source: 'nearby',
+      name: tags.name || 'Mystery Spot',
+      cuisine,
+      cuisineLabel,
+      amenity,
+      distMeters: Number.isFinite(el._dist) ? el._dist : Infinity,
+      lat,
+      lon,
+      address,
+      photoUrl: getCuisinePhoto(cuisine || amenity, 960, 640),
+      isSaved: false,
+      restaurantId: null,
+      priceLevel: estimatePriceLevel({ cuisine, amenity, savedRestaurant: null }),
+    };
+  }).sort((a, b) => {
+    const aC = Number(profile.byCuisine[swipeCuisineKey(a)] || 0);
+    const bC = Number(profile.byCuisine[swipeCuisineKey(b)] || 0);
+    let aS = Math.max(-2.2, Math.min(2.2, aC * 0.5));
+    let bS = Math.max(-2.2, Math.min(2.2, bC * 0.5));
+    if (Number(a.priceLevel || 0) > 0) aS += Math.max(-0.8, Math.min(0.8, profile.priceBias * (Number(a.priceLevel || 0) - 2) * 0.3));
+    if (Number(b.priceLevel || 0) > 0) bS += Math.max(-0.8, Math.min(0.8, profile.priceBias * (Number(b.priceLevel || 0) - 2) * 0.3));
+    if (Number.isFinite(a.distMeters)) aS += Math.max(-0.8, Math.min(0.8, profile.nearBias * Math.max(0, 1 - (Number(a.distMeters) / 3000)) * 2));
+    if (Number.isFinite(b.distMeters)) bS += Math.max(-0.8, Math.min(0.8, profile.nearBias * Math.max(0, 1 - (Number(b.distMeters) / 3000)) * 2));
+    return bS - aS;
+  }).slice(0, 12);
+}
+
+function buildSwipeDeckFromSaved (savedRows = []) {
+  const profile = getSwipePreferenceProfile();
+  return (savedRows || []).slice(0, 20).map((r, idx) => {
+    const cuisine = r.cuisine || '';
+    const cuisineLabel = formatCuisineLabel(cuisine || 'Restaurant');
+    return {
+      key: `saved-${r.id || idx}`,
+      source: 'saved',
+      name: r.name || 'Saved Spot',
+      cuisine,
+      cuisineLabel,
+      amenity: 'restaurant',
+      distMeters: Number.isFinite(r._distMeters) ? r._distMeters : Infinity,
+      lat: Number.isFinite(r.lat) ? r.lat : null,
+      lon: Number.isFinite(r.lng) ? r.lng : null,
+      address: r.address || '',
+      photoUrl: getCuisinePhoto(cuisine || 'restaurant', 960, 640),
+      isSaved: true,
+      restaurantId: r.id || null,
+      priceLevel: Number(r.priceRange || 0) || estimatePriceLevel({ cuisine, amenity: 'restaurant', savedRestaurant: r }),
+    };
+  }).sort((a, b) => {
+    const aC = Number(profile.byCuisine[swipeCuisineKey(a)] || 0);
+    const bC = Number(profile.byCuisine[swipeCuisineKey(b)] || 0);
+    let aS = Math.max(-2, Math.min(2, aC * 0.45));
+    let bS = Math.max(-2, Math.min(2, bC * 0.45));
+    if (Number(a.priceLevel || 0) > 0) aS += Math.max(-0.7, Math.min(0.7, profile.priceBias * (Number(a.priceLevel || 0) - 2) * 0.3));
+    if (Number(b.priceLevel || 0) > 0) bS += Math.max(-0.7, Math.min(0.7, profile.priceBias * (Number(b.priceLevel || 0) - 2) * 0.3));
+    return bS - aS;
+  }).slice(0, 10);
+}
+
+function openDirectionsForSwipeItem (item) {
+  if (!item) return;
+
+  if (item.isSaved && item.restaurantId) {
+    const r = state.restaurants.find(x => x.id === item.restaurantId);
+    if (r) {
+      openDirections(r);
+      return;
+    }
+  }
+
+  if (Number.isFinite(item.lat) && Number.isFinite(item.lon)) {
+    const dest = `${item.lat},${item.lon}`;
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}`, '_blank', 'noopener');
+    return;
+  }
+
+  const q = item.address || item.name;
+  if (q) {
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(q)}&travelmode=driving`, '_blank', 'noopener');
+    return;
+  }
+
+  showToast('Directions unavailable', 'No location details are available for this spot yet.', 'info');
+}
+
+function openSwipeChoiceDetails (item) {
+  if (!item) return;
+  if (item.isSaved && item.restaurantId) {
+    openDetailModal(item.restaurantId);
+    return;
+  }
+  openAddModalPreFilled(item.name, item.cuisine);
+}
+
+function hideBearSwipeHome () {
+  const mod = document.getElementById('bear-swipe-home');
+  if (mod) mod.classList.add('hidden');
+}
+
+const SWIPE_DRAG_THRESHOLD_PX = 90;
+const SWIPE_DRAG_ROTATION_FACTOR = 0.045;
+let _swipeGestureIgnoreClickUntil = 0;
+let _swipeDragState = {
+  active: false,
+  pointerId: null,
+  startX: 0,
+  startY: 0,
+  dx: 0,
+  dy: 0,
+  moved: false,
+};
+
+function resetBearSwipeDragVisual (cardEl) {
+  if (!cardEl) return;
+  cardEl.style.transform = '';
+  cardEl.style.removeProperty('--swipe-dx');
+  cardEl.dataset.dragDir = '';
+  cardEl.classList.remove('is-dragging', 'swipe-throw-left', 'swipe-throw-right', 'swipe-snap-back');
+}
+
+function animateBearSwipeThrow (cardEl, reaction) {
+  if (!cardEl) return;
+  const throwClass = reaction === 'yes' ? 'swipe-throw-right' : 'swipe-throw-left';
+  cardEl.classList.remove('swipe-snap-back');
+  cardEl.classList.add(throwClass);
+  _swipeGestureIgnoreClickUntil = Date.now() + 280;
+
+  window.setTimeout(() => {
+    cardEl.classList.remove(throwClass);
+    resetBearSwipeDragVisual(cardEl);
+    nextBearSwipeCard(reaction);
+  }, 180);
+}
+
+function attachBearSwipeDragHandlers (cardEl) {
+  if (!cardEl || cardEl.dataset.dragBound === '1') return;
+
+  cardEl.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (e.target.closest('button, a, input, textarea, select, [data-swipe-details], [data-swipe-directions]')) return;
+
+    _swipeDragState.active = true;
+    _swipeDragState.pointerId = e.pointerId;
+    _swipeDragState.startX = e.clientX;
+    _swipeDragState.startY = e.clientY;
+    _swipeDragState.dx = 0;
+    _swipeDragState.dy = 0;
+    _swipeDragState.moved = false;
+    cardEl.classList.add('is-dragging');
+    cardEl.style.transition = 'none';
+    try {
+      cardEl.setPointerCapture?.(e.pointerId);
+    } catch (_) {
+      // Some synthetic or legacy pointer flows may not support capture here.
+    }
+  });
+
+  cardEl.addEventListener('pointermove', e => {
+    if (!_swipeDragState.active || _swipeDragState.pointerId !== e.pointerId) return;
+    const dx = e.clientX - _swipeDragState.startX;
+    const dy = e.clientY - _swipeDragState.startY;
+
+    _swipeDragState.dx = dx;
+    _swipeDragState.dy = dy;
+    _swipeDragState.moved = Math.abs(dx) > 6 || Math.abs(dy) > 6;
+
+    if (Math.abs(dx) < Math.abs(dy) * 0.9) return;
+
+    const rotation = Math.max(-10, Math.min(10, dx * SWIPE_DRAG_ROTATION_FACTOR));
+    cardEl.style.transform = `translateX(${dx}px) rotate(${rotation}deg)`;
+    cardEl.style.setProperty('--swipe-dx', `${dx}px`);
+    cardEl.dataset.dragDir = dx > 14 ? 'right' : dx < -14 ? 'left' : '';
+  });
+
+  const endDrag = e => {
+    if (!_swipeDragState.active || _swipeDragState.pointerId !== e.pointerId) return;
+
+    const dx = _swipeDragState.dx;
+    const dy = _swipeDragState.dy;
+    const wasDrag = _swipeDragState.moved;
+    const horizontalIntent = Math.abs(dx) > Math.abs(dy) * 0.9;
+
+    cardEl.classList.remove('is-dragging');
+    cardEl.style.transition = '';
+
+    _swipeDragState.active = false;
+    _swipeDragState.pointerId = null;
+
+    if (wasDrag && horizontalIntent && Math.abs(dx) >= SWIPE_DRAG_THRESHOLD_PX) {
+      animateBearSwipeThrow(cardEl, dx > 0 ? 'yes' : 'no');
+      return;
+    }
+
+    if (wasDrag) {
+      _swipeGestureIgnoreClickUntil = Date.now() + 180;
+    }
+
+    cardEl.classList.add('swipe-snap-back');
+    window.setTimeout(() => {
+      cardEl.classList.remove('swipe-snap-back');
+      resetBearSwipeDragVisual(cardEl);
+    }, 180);
+  };
+
+  cardEl.addEventListener('pointerup', endDrag);
+  cardEl.addEventListener('pointercancel', endDrag);
+  cardEl.dataset.dragBound = '1';
+}
+
+function renderBearSwipeCard () {
+  const cardEl = document.getElementById('bear-swipe-card');
+  const moduleEl = document.getElementById('bear-swipe-home');
+  if (!cardEl || !moduleEl) return;
+
+  const deck = state.swipeDeck || [];
+  const idx = state.swipeIndex || 0;
+  if (!deck.length || idx >= deck.length) {
+    cardEl.innerHTML = `<div class="bear-swipe-empty">\n      <div class="bear-swipe-empty-title">Out of cards, cub boss.</div>\n      <div class="bear-swipe-empty-sub">Hit New Stack and we will keep the snack hunt going.</div>\n    </div>`;
+    setBearSwipeJoke('That stack was un-bear-lievably fast. New stack?');
+    return;
+  }
+
+  const item = deck[idx];
+  const hiddenName = item.source === 'saved' ? 'Saved mystery snack' : 'Nearby mystery snack';
+  const reveal = !!state.swipeReveal;
+  const progress = `${idx + 1}/${deck.length}`;
+
+  cardEl.innerHTML = `<div class="bear-swipe-photo-wrap">\n      <img class="bear-swipe-photo" src="${item.photoUrl}" alt="${escHtml(item.cuisineLabel || 'Food photo')}" loading="lazy" />\n      <div class="bear-swipe-topline">\n        <span class="bear-swipe-chip">${escHtml(item.cuisineLabel)}</span>\n        <span class="bear-swipe-chip alt">${escHtml(progress)}</span>\n      </div>\n    </div>\n    <div class="bear-swipe-content">\n      <div class="bear-swipe-name ${reveal ? 'revealed' : 'hidden'}">${escHtml(reveal ? item.name : hiddenName)}</div>\n      <div class="bear-swipe-meta">${reveal ? (item.isSaved ? 'Saved in your den. Tap image for full details.' : 'Tap image for full details. Location stays hidden here.') : 'Tap image to reveal this pick.'}</div>\n      ${reveal ? `<div class="bear-swipe-reveal-row">\n          <button class="btn-sm btn-secondary" data-swipe-details="1" type="button">Details</button>\n          <button class="btn-sm btn-orange" data-swipe-directions="1" type="button">Directions</button>\n        </div>` : `<div class="bear-swipe-secret">Tap image to reveal, then tap again for details.</div>`}\n    </div>`;
+
+  cardEl.classList.toggle('is-revealed', reveal);
+
+  const photoEl = cardEl.querySelector('.bear-swipe-photo');
+  photoEl?.addEventListener('click', e => {
+    e.stopPropagation();
+    if (Date.now() < _swipeGestureIgnoreClickUntil) return;
+    if (!state.swipeReveal) {
+      revealBearSwipeCard();
+      return;
+    }
+    openSwipeChoiceDetails(item);
+  });
+
+  cardEl.querySelector('[data-swipe-details]')?.addEventListener('click', e => {
+    e.stopPropagation();
+    openSwipeChoiceDetails(item);
+  });
+
+  cardEl.querySelector('[data-swipe-directions]')?.addEventListener('click', e => {
+    e.stopPropagation();
+    openDirectionsForSwipeItem(item);
+  });
+
+  attachBearSwipeDragHandlers(cardEl);
+}
+
+function nextBearSwipeCard (reaction = '') {
+  const deck = state.swipeDeck || [];
+  const idx = state.swipeIndex || 0;
+  const item = deck[idx];
+
+  if (item && (reaction === 'yes' || reaction === 'no')) {
+    recordSwipePreference(item, reaction);
+  }
+
+  if (reaction === 'yes' && item) {
+    state.swipeLikes = (state.swipeLikes || []).concat([{ key: item.key, ts: Date.now() }]).slice(-50);
+  }
+  if (reaction === 'yes' || reaction === 'no') {
+    setBearSwipeJoke(pickRandom(BEAR_REACTION_COPY[reaction] || BEAR_SWIPE_JOKES));
+  }
+
+  state.swipeIndex = idx + 1;
+  state.swipeReveal = false;
+  renderBearSwipeCard();
+}
+
+function revealBearSwipeCard () {
+  const deck = state.swipeDeck || [];
+  if (!deck.length || state.swipeIndex >= deck.length) return;
+  if (state.swipeReveal) return;
+  state.swipeReveal = true;
+  setBearSwipeJoke('Reveal unlocked. Bear in mind: calories are emotional math.');
+  renderBearSwipeCard();
+}
+
+function renderBearSwipeHomeFromElements (elements = []) {
+  const mod = document.getElementById('bear-swipe-home');
+  if (!mod) return;
+  const deck = buildSwipeDeckFromElements(elements);
+  if (!deck.length) {
+    hideBearSwipeHome();
+    return;
+  }
+  mod.classList.remove('hidden');
+  state.swipeDeck = deck;
+  state.swipeIndex = 0;
+  state.swipeReveal = false;
+  renderBearSwipeCard();
+  setBearSwipeJoke();
+}
+
+function renderBearSwipeHomeFromSaved (savedRows = []) {
+  const mod = document.getElementById('bear-swipe-home');
+  if (!mod) return;
+  const deck = buildSwipeDeckFromSaved(savedRows);
+  if (!deck.length) {
+    hideBearSwipeHome();
+    return;
+  }
+  mod.classList.remove('hidden');
+  state.swipeDeck = deck;
+  state.swipeIndex = 0;
+  state.swipeReveal = false;
+  renderBearSwipeCard();
+  setBearSwipeJoke('Nearby data is napping, but your saved stack is ready.');
+}
+
+function initBearSwipeHome () {
+  const mod = document.getElementById('bear-swipe-home');
+  const card = document.getElementById('bear-swipe-card');
+  const noBtn = document.getElementById('bear-swipe-no-btn');
+  const yesBtn = document.getElementById('bear-swipe-yes-btn');
+  const refreshBtn = document.getElementById('bear-swipe-refresh-btn');
+  if (!mod || !card || !noBtn || !yesBtn || !refreshBtn) return;
+  if (mod.dataset.bound === '1') return;
+
+  card.addEventListener('click', () => {
+    if (Date.now() < _swipeGestureIgnoreClickUntil) return;
+    revealBearSwipeCard();
+  });
+  card.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (Date.now() < _swipeGestureIgnoreClickUntil) return;
+      revealBearSwipeCard();
+      return;
+    }
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      nextBearSwipeCard('no');
+      return;
+    }
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      nextBearSwipeCard('yes');
+    }
+  });
+  noBtn.addEventListener('click', () => nextBearSwipeCard('no'));
+  yesBtn.addEventListener('click', () => nextBearSwipeCard('yes'));
+  refreshBtn.addEventListener('click', () => {
+    if (_homeDiscCache?.elements?.length) {
+      renderBearSwipeHomeFromElements(_homeDiscCache.elements);
+      return;
+    }
+    const localRows = (state.restaurants || [])
+      .map(r => ({ ...r, _distMeters: distOf(r) }))
+      .filter(r => Number.isFinite(r._distMeters) && r._distMeters <= getNearbyRadiusMeters())
+      .sort((a, b) => a._distMeters - b._distMeters);
+    renderBearSwipeHomeFromSaved(localRows);
+  });
+
+  mod.dataset.bound = '1';
+}
+
 function initHomeDiscoverySection () {
   const list = document.getElementById('nearby-home-list');
   if (!list) return;
+  initBearSwipeHome();
   renderTodayStatusRow();
   renderTodayVibeRow();
   stageHomeModules();
@@ -7791,12 +8755,21 @@ function initHomeDiscoverySection () {
   if (state.userLat && state.userLng) {
     loadHomeDiscovery();
   } else {
+    const savedRows = (state.restaurants || [])
+      .slice()
+      .sort((a, b) => (Number(b.myRating || 0) - Number(a.myRating || 0)) || (Number(b.googleRating || 0) - Number(a.googleRating || 0)))
+      .slice(0, 12);
+    if (savedRows.length) {
+      renderBearSwipeHomeFromSaved(savedRows);
+    } else {
+      hideBearSwipeHome();
+    }
     // Show teaser CTA when location is not yet enabled
     list.innerHTML = `<div class="nearby-home-teaser" id="nearby-home-teaser">
       <div class="nearby-home-teaser-icon"></div>
       <div class="nearby-home-teaser-body">
-        <div class="nearby-home-teaser-title">See what's near you right now</div>
-        <div class="nearby-home-teaser-sub">Real restaurants within ${getNearbyRadiusMiles()} mile${getNearbyRadiusMiles() === 1 ? '' : 's'}, one tap to discover.</div>
+        <div class="nearby-home-teaser-title">Sniff what is near your cave right now</div>
+        <div class="nearby-home-teaser-sub">Real restaurants within ${getNearbyRadiusMiles()} mile${getNearbyRadiusMiles() === 1 ? '' : 's'} and exactly zero unbearable decisions.</div>
       </div>
       <button class="btn-sm btn-orange nearby-home-teaser-btn" id="nearby-teaser-enable-btn">Enable</button>
     </div>`;
@@ -7816,12 +8789,26 @@ async function loadHomeDiscovery () {
     renderTodayStatusRow();
     renderTodayVibeRow();
     renderHomeDiscovery(_homeDiscCache);
+    renderBearSwipeHomeFromElements(_homeDiscCache.elements || []);
     renderForYouHome();
     renderWeeklyRecapHome();
     renderMoodPicksHome();
     renderDailyQuestHome();
     loadAiRec(_homeDiscCache);
     return;
+  }
+
+  // If cache is stale, still render it immediately for instant UX while refreshing.
+  if (_homeDiscCache?.elements?.length) {
+    renderTodayStatusRow();
+    renderTodayVibeRow();
+    renderHomeDiscovery(_homeDiscCache);
+    renderBearSwipeHomeFromElements(_homeDiscCache.elements || []);
+    renderForYouHome();
+    renderWeeklyRecapHome();
+    renderMoodPicksHome();
+    renderDailyQuestHome();
+    loadAiRec(_homeDiscCache);
   }
 
   list.innerHTML = `
@@ -7834,7 +8821,7 @@ async function loadHomeDiscovery () {
     const radiusMeters = Math.round(getNearbyRadiusMeters());
     const q = `[out:json][timeout:15];(node["amenity"~"restaurant|cafe|fast_food|bar"](around:${radiusMeters},${lat},${lng}););out body 30;`;
     const elementsRaw = await fetchOverpassElements(q, {
-      timeoutMs: 12000,
+      timeoutMs: 4500,
       nominatimFallback: true,
       lat,
       lng,
@@ -7854,6 +8841,7 @@ async function loadHomeDiscovery () {
     renderTodayStatusRow();
     renderTodayVibeRow();
     renderHomeDiscovery(_homeDiscCache);
+    renderBearSwipeHomeFromElements(withDist);
     renderForYouHome();
     renderWeeklyRecapHome();
     renderMoodPicksHome();
@@ -7877,57 +8865,79 @@ function renderNearbyHomeFallback (err = null) {
     .slice(0, 5);
 
   if (localFallback.length) {
-    list.innerHTML = `<div class="nearby-home-loading">Live lookup is busy. Showing your saved places within ${radiusMiles} mile${radiusMiles === 1 ? '' : 's'}.</div>` +
-      localFallback.map(r => `<div class="nearby-home-card saved">
-        ${cuisineEmoji(r.cuisine) ? `<div class="nearby-home-card-emoji">${cuisineEmoji(r.cuisine)}</div>` : ''}
-        <div class="nearby-home-card-name" title="${escHtml(r.name)}">${escHtml(r.name)}</div>
-        ${r.cuisine ? `<div class="nearby-home-card-meta">${escHtml(formatCuisineLabel(r.cuisine))}</div>` : ''}
-        <div class="nearby-home-card-dist">${fmtDist(r._distMeters)}</div>
-        <button class="btn-sm btn-secondary nearby-home-card-add" onclick="openDetailModal('${r.id}')">View</button>
-      </div>`).join('');
+    renderBearSwipeHomeFromSaved(localFallback);
+    const cards = localFallback.map((r, idx) => {
+      const priceLevel = estimatePriceLevel({ cuisine: r.cuisine, amenity: 'restaurant', savedRestaurant: r });
+      const popularity = nearbyPopularityLabel(r._distMeters, r);
+      return {
+        key: `saved-${r.id || idx}`,
+        name: r.name,
+        cuisine: r.cuisine,
+        amenity: 'restaurant',
+        distMeters: r._distMeters,
+        priceLevel,
+        popularity,
+        isSaved: true,
+        restaurantId: r.id,
+        savedRestaurant: r,
+      };
+    });
+    setNearbyCards(cards, {
+      banner: `Live lookup is busy, so your bear assistant is foraging in saved places within ${radiusMiles} mile${radiusMiles === 1 ? '' : 's'}.`,
+    });
     return;
   }
 
+  hideBearSwipeHome();
+
   list.innerHTML = err?.name === 'AbortError'
-    ? '<div class="nearby-home-loading">Nearby search timed out. Try again in a moment.</div>'
-    : '<div class="nearby-home-loading">Nearby live results are temporarily unavailable. Your saved list is still ready.</div>';
+    ? '<div class="nearby-home-loading">Nearby search took a quick hibernation break. Try again in a moment.</div>'
+    : '<div class="nearby-home-loading">Nearby live results are temporarily unavailable, but your saved den is still open for business.</div>';
 }
 
 function renderHomeDiscovery ({ elements }) {
   const list = document.getElementById('nearby-home-list');
   if (!list || !elements.length) {
+    hideBearSwipeHome();
     if (list) {
       const miles = getNearbyRadiusMiles();
-      list.innerHTML = `<div class="nearby-home-loading">No nearby spots found within ${miles} mile${miles === 1 ? '' : 's'} yet.</div>`;
+      list.innerHTML = `<div class="nearby-home-loading">No nearby spots found within ${miles} mile${miles === 1 ? '' : 's'} yet. The bear keeps looking.</div>`;
     }
     return;
   }
   const savedNames = new Set(state.restaurants.map(r => normalizeName(r.name)));
-  list.innerHTML = elements.map(el => {
+  const cards = elements.map((el, idx) => {
     const tags    = el.tags || {};
     const name    = tags.name || 'Unknown';
     const isSaved = savedNames.has(normalizeName(name));
     const cuisine = (tags.cuisine || '').split(';')[0];
     const amenity = tags.amenity || 'restaurant';
-    const emoji   = cuisineEmoji(cuisine);
-    const cuisineLabel = formatCuisineLabel(cuisine || amenity || 'Restaurant');
-    const dist    = el._dist < Infinity ? fmtDist(el._dist) : '';
-    const safe    = escHtml(name).replace(/'/g, "\\'");
-    const safeCu  = escHtml(cuisine).replace(/'/g, "\\'");
-    return `<div class="nearby-home-card${isSaved ? ' saved' : ''}">
-      ${emoji ? `<div class="nearby-home-card-emoji">${emoji}</div>` : ''}
-      <div class="nearby-home-card-name" title="${escHtml(name)}">${escHtml(name)}</div>
-      <div class="nearby-home-card-meta">${escHtml(cuisineLabel)}</div>
-      ${dist    ? `<div class="nearby-home-card-dist"> ${dist}</div>` : ''}
-      ${isSaved
-        ? '<div class="nearby-home-card-saved">✓ In your list</div>'
-        : `<button class="btn-sm btn-orange nearby-home-card-add" onclick="openAddModalPreFilled('${safe}','${safeCu}')">+ Save</button>`}
-    </div>`;
-  }).join('');
+    const savedRestaurant = isSaved
+      ? state.restaurants.find(r => normalizeName(r.name) === normalizeName(name)) || null
+      : null;
+    const priceLevel = estimatePriceLevel({ cuisine, amenity, savedRestaurant });
+    const popularity = nearbyPopularityLabel(el._dist, savedRestaurant);
+    return {
+      key: `live-${el.id || idx}`,
+      name,
+      cuisine,
+      amenity,
+      distMeters: el._dist,
+      lat: Number.isFinite(el.lat ?? el.center?.lat) ? Number(el.lat ?? el.center?.lat) : null,
+      lon: Number.isFinite(el.lon ?? el.center?.lon) ? Number(el.lon ?? el.center?.lon) : null,
+      address: [tags['addr:housenumber'], tags['addr:street'], tags['addr:city']].filter(Boolean).join(' '),
+      priceLevel,
+      popularity,
+      isSaved,
+      restaurantId: savedRestaurant?.id || '',
+      savedRestaurant,
+    };
+  });
+  setNearbyCards(cards);
 }
 
 async function loadAiRec (discData) {
-  if (!window.AI || !AI.hasKey()) return;
+  if (!window.AI || (typeof isPremium === 'function' && !isPremium())) return;
   const banner = document.getElementById('ai-rec-banner');
   const textEl = document.getElementById('ai-rec-text');
   if (!banner || !textEl) return;
@@ -8480,7 +9490,20 @@ function renderVisitHeatmap (visited) {
 
 const _aiHistory = [];
 
+function ensureAiUpgradeAccess (featureName = 'Byte Cub AI') {
+  if (typeof isPremium === 'function' && !isPremium()) {
+    if (typeof requiresPremium === 'function') {
+      requiresPremium(featureName, () => {});
+    } else if (typeof openUpgradeModal === 'function') {
+      openUpgradeModal(featureName);
+    }
+    return false;
+  }
+  return true;
+}
+
 function openAiPanel () {
+  if (!ensureAiUpgradeAccess('Byte Cub AI')) return;
   _syncAiKeyUI();
   document.getElementById('ai-panel-overlay').classList.remove('hidden');
   document.body.classList.add('overlay-open');
@@ -8493,8 +9516,8 @@ function closeAiPanel () {
 
 function _syncAiKeyUI () {
   const hasKey = AI.hasKey();
-  document.getElementById('ai-key-setup').classList.toggle('hidden', hasKey);
-  document.getElementById('ai-key-active').classList.toggle('hidden', !hasKey);
+  document.getElementById('ai-key-setup')?.classList.toggle('hidden', hasKey);
+  document.getElementById('ai-key-active')?.classList.toggle('hidden', !hasKey);
 }
 
 function _appendAiMsg (role, text) {
@@ -8527,12 +9550,13 @@ function _buildListContext () {
 
 async function sendAiMessage (userText) {
   if (!userText.trim()) return;
+  if (!ensureAiUpgradeAccess('Byte Cub AI')) return;
   _appendAiMsg('user', userText);
   document.getElementById('ai-chat-input').value = '';
 
   if (!AI.hasKey()) {
     const ruleResp = typeof chatResponse === 'function' ? chatResponse(userText) : "I need a Gemini API key to give smart answers!";
-    _appendAiMsg('assistant', ruleResp + '\n\n*Add a Gemini API key above for full AI-powered answers!*');
+    _appendAiMsg('assistant', ruleResp);
     return;
   }
 
@@ -8544,9 +9568,14 @@ async function sendAiMessage (userText) {
   } catch (err) {
     thinking.remove();
     if (err.message === 'NO_KEY') {
-      _appendAiMsg('assistant', 'Add your Gemini API key above to enable AI chat. \uD83D\uDC3B');
+      _appendAiMsg('assistant', 'Byte Cub is included by default. If AI is unavailable right now, please try again in a moment.');
     } else {
-      _appendAiMsg('assistant', '\u26A0\uFE0F ' + (err.message || 'Connection error. Check your API key and internet.'));
+      const ruleResp = typeof chatResponse === 'function' ? chatResponse(userText) : '';
+      if (ruleResp) {
+        _appendAiMsg('assistant', ruleResp + '\n\n(Cloud AI is temporarily unavailable, so I switched to built-in recommendations.)');
+      } else {
+        _appendAiMsg('assistant', '\u26A0\uFE0F ' + (err.message || 'Connection error. Please try again shortly.'));
+      }
     }
   }
 }
@@ -8564,6 +9593,7 @@ function handleAiQuickBtn (prompt) {
 }
 
 async function getAiDetailSummary (restaurantId) {
+  if (!ensureAiUpgradeAccess('Byte Cub AI')) return;
   const r  = state.restaurants.find(x => x.id === restaurantId);
   if (!r) return;
   const el = document.getElementById('detail-ai-summary');
@@ -8585,6 +9615,7 @@ async function getAiDetailSummary (restaurantId) {
 }
 
 async function getAiDishRecs (restaurantId) {
+  if (!ensureAiUpgradeAccess('Byte Cub AI')) return;
   const r = state.restaurants.find(x => x.id === restaurantId);
   if (!r) return;
   const el = document.getElementById('detail-ai-summary');
@@ -11229,4 +12260,5 @@ function _ftbHandleTouch(e) {
     g.touchTargetX = Math.max(g.bear.w / 2, Math.min(g.canvas.width - g.bear.w / 2, cx));
   }
 }
+
 

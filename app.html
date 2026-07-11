@@ -155,13 +155,13 @@
           <option value="auto">Auto Ambient (Time of Day)</option>
           <option value="dark">Velvet &amp; Champagne</option>
           <option value="light">Champagne Cream</option>
-          <option value="forest">Forest Mint</option>
-          <option value="ocean">Ocean Blue</option>
-          <option value="sunset">Sunset Coral</option>
-          <option value="midnight">Midnight Gold</option>
-          <option value="berry">Berry Jam</option>
-          <option value="mint">Mint Pop</option>
-          <option value="neon">Neon Night</option>
+          <option value="forest">Moss &amp; Pine</option>
+          <option value="ocean">Glacier Lake</option>
+          <option value="sunset">Campfire Ember</option>
+          <option value="midnight">Moonlit Cedar</option>
+          <option value="berry">Wild Berry Bark</option>
+          <option value="mint">River Stone Mint</option>
+          <option value="neon">Aurora Night</option>
         </select>
 
         <label class="form-label personalize-label" for="personalize-density-select">Card density</label>
@@ -208,6 +208,16 @@
           <button id="settings-enable-location-btn" type="button" class="btn-secondary btn-sm">Enable Location</button>
           <button id="settings-disable-location-btn" type="button" class="btn-ghost btn-sm">Disable Location</button>
         </div>
+
+        <section class="taste-learning-card" aria-labelledby="taste-learning-title">
+          <div class="taste-learning-head">
+            <h3 id="taste-learning-title">Taste learning</h3>
+            <span id="taste-learning-count" class="taste-learning-count">0 swipes</span>
+          </div>
+          <p id="taste-learning-summary" class="taste-learning-summary">Swipe a few cards and I will start learning your flavor patterns.</p>
+          <div id="taste-learning-tags" class="taste-learning-tags"></div>
+          <button id="taste-learning-reset-btn" type="button" class="btn-ghost btn-sm taste-learning-reset-btn">Reset taste learning</button>
+        </section>
 
         <button id="personalize-save-btn" class="btn-primary personalize-save-btn">Save Settings</button>
       </div>
@@ -606,7 +616,7 @@
   <div id="map-container" class="map-container hidden"></div>
 
   <!-- ── Pull-to-refresh indicator ───────────────────────────── -->
-  <div id="ptr-indicator" class="ptr-indicator" aria-hidden="true"><span class="ptr-bear">FTB</span></div>
+  <div id="ptr-indicator" class="ptr-indicator" aria-hidden="true"><span class="ptr-bear"><img class="bear-mark" src="feedbear.png" alt="" aria-hidden="true" /></span></div>
 
   <!-- ── Main Content ─────────────────────────────────────────── -->
   <main class="main-content" id="main-content">
@@ -710,10 +720,35 @@
         </div>
         <div id="mood-picks-list" class="mood-picks-list"></div>
       </div>
+
+      <div id="bear-swipe-home" class="bear-swipe-home home-module hidden" aria-label="Bear swipe picks">
+        <div class="bear-swipe-header">
+          <div>
+            <div class="bear-swipe-title">Bear Swipe</div>
+            <div class="bear-swipe-sub">Food photos first. Tap card to reveal who made it.</div>
+          </div>
+          <button id="bear-swipe-refresh-btn" class="btn-ghost btn-sm" type="button">New Stack ↻</button>
+        </div>
+        <div id="bear-swipe-card" class="bear-swipe-card" role="button" tabindex="0" aria-label="Reveal nearby restaurant card"></div>
+        <div class="bear-swipe-actions">
+          <button id="bear-swipe-no-btn" class="bear-swipe-action no" type="button">Nope Paw</button>
+          <button id="bear-swipe-yes-btn" class="bear-swipe-action yes" type="button">Heck Yes</button>
+        </div>
+        <div id="bear-swipe-joke" class="bear-swipe-joke">I can bear-ly decide, so swipe your mood.</div>
+      </div>
+
       <!-- Nearby strip -->
       <div class="nearby-home-header">
         <span class="nearby-home-title">Near You Now</span>
-        <button id="nearby-home-more-btn" class="btn-ghost btn-sm">See all →</button>
+        <div class="nearby-home-header-actions">
+          <button id="nearby-lucky-btn" class="btn-secondary btn-sm" type="button">Lucky Bite</button>
+          <button id="nearby-home-more-btn" class="btn-ghost btn-sm">See all →</button>
+        </div>
+      </div>
+      <div class="nearby-home-filters" id="nearby-home-filters" aria-label="Nearby quick filters">
+        <button class="nearby-filter-chip active" data-nearby-filter="all" type="button">All</button>
+        <button class="nearby-filter-chip" data-nearby-filter="trending" type="button">Trending</button>
+        <button class="nearby-filter-chip" data-nearby-filter="budget" type="button">Budget</button>
       </div>
       <div id="nearby-home-list" class="nearby-home-list">
         <div class="nearby-home-loading">Finding restaurants near you…</div>
@@ -725,7 +760,7 @@
 
     <!-- Empty state -->
     <div id="empty-state" class="empty-state hidden">
-      <div class="empty-icon">FTB</div>
+      <div class="empty-icon"><img class="bear-mark" src="feedbear.png" alt="" aria-hidden="true" /></div>
       <h2>Your list is ready for its first star.</h2>
       <p>Add the restaurants you have tried or the ones you are saving for your next great night out.</p>
       <button class="btn-primary" id="empty-add-btn">＋ Add Your First Spot</button>
@@ -1276,7 +1311,7 @@
   <!-- ── Chat Panel ─────────────────────────────────────────── -->
   <aside id="chat-panel" class="chat-panel hidden" aria-label="Byte Cub Chat">
     <div class="chat-header">
-      <div class="chat-avatar">FTB</div>
+      <div class="chat-avatar"><img class="bear-mark" src="feedbear.png" alt="" aria-hidden="true" /></div>
       <div>
         <div class="chat-title">Byte Cub</div>
         <div class="chat-subtitle">Your personal food guide</div>
@@ -1786,12 +1821,12 @@
       </div>
       <div class="ai-panel-body">
 
-        <!-- API Key Setup -->
-        <div id="ai-key-setup" class="ai-key-setup">
+        <!-- Developer key override (normally hidden) -->
+        <div id="ai-key-setup" class="ai-key-setup hidden">
           <div class="ai-key-setup-inner">
-            <div class="ai-key-icon">AI</div>
-            <h3>Unlock Real AI</h3>
-            <p>Add your free Google Gemini API key to power every AI feature in Feed The Bear.</p>
+            <div class="ai-key-icon">DEV</div>
+            <h3>Developer Override</h3>
+            <p>Byte Cub is already included for users. This field is only for local developer fallback testing.</p>
             <div class="ai-key-input-row">
               <input type="password" id="ai-gemini-key-input" class="form-input" placeholder="Paste Gemini API key (AIza…)" autocomplete="off" />
               <button id="ai-save-key-btn" class="btn-primary btn-sm">Save</button>
@@ -1800,10 +1835,10 @@
           </div>
         </div>
 
-        <!-- Active state (key saved) -->
-        <div id="ai-key-active" class="ai-key-active hidden">
-          <span class="ai-status-dot"></span> Gemini connected
-          <button id="ai-change-key-btn" class="btn-ghost btn-xs">Change key</button>
+        <!-- Active state -->
+        <div id="ai-key-active" class="ai-key-active">
+          <span class="ai-status-dot"></span> Byte Cub AI is a Grizzly upgrade feature
+          <button id="ai-change-key-btn" class="btn-ghost btn-xs">Info</button>
         </div>
 
         <div class="ai-quick-btns">
