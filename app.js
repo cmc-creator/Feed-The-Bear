@@ -8285,7 +8285,16 @@ async function fetchPlacePhotoFromWikiClient (card = {}) {
   const lat = Number(card.lat);
   const lon = Number(card.lon);
 
-  // 1) Nearby geosearch with thumbnail.
+  const nameTokens = name.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+    .filter(t => t.length > 2 && !['the', 'and', 'restaurant', 'cafe', 'bar', 'grill'].includes(t));
+  const titleMatchesVenue = (title = '') => {
+    if (!nameTokens.length) return false;
+    const t = String(title || '').toLowerCase();
+    const hits = nameTokens.filter(tok => t.includes(tok)).length;
+    return hits / nameTokens.length >= 0.6;
+  };
+
+  // 1) Nearby geosearch with thumbnail - only accept pages titled like the venue.
   if (Number.isFinite(lat) && Number.isFinite(lon)) {
     const geoUrl = new URL('https://en.wikipedia.org/w/api.php');
     geoUrl.searchParams.set('action', 'query');
@@ -8293,7 +8302,7 @@ async function fetchPlacePhotoFromWikiClient (card = {}) {
     geoUrl.searchParams.set('formatversion', '2');
     geoUrl.searchParams.set('generator', 'geosearch');
     geoUrl.searchParams.set('ggscoord', `${lat}|${lon}`);
-    geoUrl.searchParams.set('ggsradius', '1200');
+    geoUrl.searchParams.set('ggsradius', '400');
     geoUrl.searchParams.set('ggslimit', '10');
     geoUrl.searchParams.set('prop', 'pageimages');
     geoUrl.searchParams.set('piprop', 'thumbnail');
@@ -8304,12 +8313,12 @@ async function fetchPlacePhotoFromWikiClient (card = {}) {
     if (geoResp.ok) {
       const geoJson = await geoResp.json();
       const pages = Object.values(geoJson?.query?.pages || {});
-      const img = pages.find(p => safeUrl(p?.thumbnail?.source || ''))?.thumbnail?.source || '';
-      if (img) return safeUrl(img);
+      const match = pages.find(p => titleMatchesVenue(p?.title) && safeUrl(p?.thumbnail?.source || ''));
+      if (match) return safeUrl(match.thumbnail.source);
     }
   }
 
-  // 2) Name search fallback.
+  // 2) Name search fallback - only accept a result titled like the venue.
   const q = `${name} restaurant`;
   const searchUrl = new URL('https://en.wikipedia.org/w/api.php');
   searchUrl.searchParams.set('action', 'query');
@@ -8323,7 +8332,7 @@ async function fetchPlacePhotoFromWikiClient (card = {}) {
   const searchResp = await fetch(searchUrl.toString());
   if (!searchResp.ok) return '';
   const searchJson = await searchResp.json();
-  const first = (searchJson?.query?.search || [])[0];
+  const first = (searchJson?.query?.search || []).find(r => titleMatchesVenue(r?.title));
   if (!first?.pageid) return '';
 
   const pageUrl = new URL('https://en.wikipedia.org/w/api.php');

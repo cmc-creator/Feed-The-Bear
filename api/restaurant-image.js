@@ -181,7 +181,7 @@ async function scrapeWebsiteImage (website = '') {
 }
 
 /* ── 5. Wikipedia (landmarks only) ──────────────────────────── */
-async function wikiGeoImage ({ lat, lon }) {
+async function wikiGeoImage ({ name, lat, lon }) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return '';
 
   const geo = new URL(WIKI_API);
@@ -200,7 +200,18 @@ async function wikiGeoImage ({ lat, lon }) {
   if (!r.ok) return '';
   const j = await r.json();
   const pages = Object.values(j?.query?.pages || {});
+
+  // Only accept a page whose TITLE matches the venue name. A generic
+  // geosearch hit returns city/neighborhood pages whose photos are
+  // skylines - exactly the wrong-image bug.
+  const nameTokens = String(name || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+    .filter(t => t.length > 2 && !['the', 'and', 'restaurant', 'cafe', 'bar', 'grill'].includes(t));
+  if (!nameTokens.length) return '';
+
   for (const p of pages) {
+    const title = String(p?.title || '').toLowerCase();
+    const matches = nameTokens.filter(t => title.includes(t)).length;
+    if (matches / nameTokens.length < 0.6) continue;
     const img = safeHttpUrl(p?.thumbnail?.source || '');
     if (img && !looksLikeJunkImage(img)) return img;
   }
@@ -229,7 +240,7 @@ module.exports = async function handler (req, res) {
     ['foursquare', () => foursquarePhoto({ name, lat, lon })],
     ['yelp',      () => yelpPhoto({ name, lat, lon })],
     ['website',   () => scrapeWebsiteImage(website)],
-    ['wikipedia', () => wikiGeoImage({ lat, lon })],
+    ['wikipedia', () => wikiGeoImage({ name, lat, lon })],
   ];
 
   for (const [source, fn] of providers) {
