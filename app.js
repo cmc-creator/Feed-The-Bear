@@ -157,6 +157,7 @@ function renderNearbyVisualCard ({
   name = 'Unknown',
   cuisine = '',
   amenity = 'restaurant',
+  photoUrl = '',
   distMeters = Infinity,
   priceLevel = 0,
   popularity = '',
@@ -171,7 +172,8 @@ function renderNearbyVisualCard ({
   const effectivePopularity = popularity || nearbyPopularityLabel(distMeters, savedRestaurant);
   const dishes = favoriteDishesForSaved(savedRestaurant) || favoriteDishesForNearby(cuisine, amenity);
   const dishesLabel = dishes.length ? dishes.join(' • ') : 'House favorites';
-  const photo = getCuisinePhoto(cuisine || amenity || 'restaurant', 960, 960);
+  const photo = safeUrl(photoUrl);
+  const hasPhoto = !!photo;
   const safeName = escHtml(name);
   const safeNameForClick = String(name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   const safeCuisine = String(cuisine || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -185,7 +187,9 @@ function renderNearbyVisualCard ({
 
   return `<article class="nearby-home-card${isSaved ? ' saved' : ''}" data-nearby-key="${escHtml(key || `${name}-${distText}`)}" data-nearby-price="${effectivePrice}" data-nearby-popularity="${escHtml(effectivePopularity)}">
     <div class="nearby-home-card-media">
-      <img class="nearby-home-card-photo" src="${photo}" alt="${escHtml(cuisineLabel)} food" loading="lazy" />
+      ${hasPhoto
+        ? `<img class="nearby-home-card-photo" src="${photo}" alt="${escHtml(cuisineLabel)} food" loading="lazy" />`
+        : `<div class="nearby-home-card-photo-empty"><span>No verified photo yet</span></div>`}
       <div class="nearby-home-card-badges">
         <span class="nearby-home-card-badge price">${'$'.repeat(Math.max(1, Math.min(4, effectivePrice)))}</span>
         <span class="nearby-home-card-badge pop">${escHtml(effectivePopularity)}</span>
@@ -232,7 +236,7 @@ const cuisineGrad = c => CUISINE_GRAD[(c||'').toLowerCase()] || CUISINE_GRAD.def
 // Curated Unsplash photo IDs - free, no API key needed
 const CUISINE_PHOTOS = {
   italian:       'photo-1555396273-367ea4eb4db5',
-  pizza:         'photo-1565299624946-b28f40a0ae38',
+  pizza:         'photo-1513104890138-7c749659a591',
   japanese:      'photo-1579871494447-9811cf80d66c',
   sushi:         'photo-1563245372-f21724e3856d',
   mexican:       'photo-1565299585323-38d6b0865b47',
@@ -263,6 +267,45 @@ function getCuisinePhoto (cuisine, w = 600, h = 400) {
   const key = (cuisine || '').toLowerCase();
   const id  = CUISINE_PHOTOS[key] || CUISINE_PHOTOS.default;
   return `https://images.unsplash.com/${id}?w=${w}&h=${h}&fit=crop&crop=center&q=80&auto=format`;
+}
+
+function resolveWikimediaPhotoUrl (raw = '', width = 960) {
+  const value = String(raw || '').trim();
+  if (!value) return '';
+
+  if (/^https?:\/\//i.test(value)) {
+    if (value.includes('commons.wikimedia.org/wiki/File:')) {
+      const fileName = decodeURIComponent(value.split('/wiki/File:')[1] || '').trim();
+      if (!fileName) return '';
+      return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(fileName)}?width=${Math.max(320, Number(width) || 960)}`;
+    }
+    return value;
+  }
+
+  const fileMatch = value.match(/^(?:File:)?(.+)$/i);
+  const fileName = fileMatch?.[1] ? fileMatch[1].trim() : '';
+  if (!fileName) return '';
+  return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(fileName)}?width=${Math.max(320, Number(width) || 960)}`;
+}
+
+function pickRealRestaurantPhoto ({ savedRestaurant = null, tags = null, cuisine = '', amenity = 'restaurant', width = 960, height = 640, allowFallback = false } = {}) {
+  const userPhoto = safeUrl(savedRestaurant?.photo || '');
+  if (userPhoto) return { url: userPhoto, source: 'user' };
+
+  const tagImage = safeUrl(tags?.image || tags?.photo || '');
+  if (tagImage) return { url: tagImage, source: 'osm' };
+
+  const wikimedia = safeUrl(resolveWikimediaPhotoUrl(tags?.wikimedia_commons || tags?.wikipedia || '', width));
+  if (wikimedia) return { url: wikimedia, source: 'wikimedia' };
+
+  if (!allowFallback) {
+    return { url: '', source: 'none' };
+  }
+
+  return {
+    url: getCuisinePhoto(cuisine || amenity || 'restaurant', width, height),
+    source: 'fallback',
+  };
 }
 
 /* ── State ───────────────────────────────────────────────── */
@@ -301,6 +344,12 @@ const BEAR_SWIPE_JOKES = [
   'This card is either destiny or a hard pass.',
   'Dad joke of the day: I am pawsitive this one smells amazing.',
   'Un-bear-lievable food decisions happening right now.',
+  'Dad joke alert: I told my fridge a joke. It cracked up.',
+  'Bear with me, your next craving is loading.',
+  'If this dish were a movie, it would be a snack-buster hit.',
+  'Pawdon me, but this looks ridiculously good.',
+  'I am not lion... wait wrong animal. Still a tasty pick.',
+  'Call it instinct, call it hunger, call it bear science.',
 ];
 
 const BEAR_REACTION_COPY = {
@@ -308,11 +357,15 @@ const BEAR_REACTION_COPY = {
     'Paw-sitive pick. Adding that to your craving trail.',
     'Big bear energy. Great yes.',
     'That got an immediate yes claw.',
+    'That one passed the bear minimum. Love it.',
+    'Snack approved. Fur real.',
   ],
   no: [
     'Nope noted. Back to foraging.',
     'That one can hibernate for now.',
     'Hard pass, soft paws.',
+    'Not your vibe. We keep hunting.',
+    'No worries, cub boss. Next bite incoming.',
   ],
 };
 
@@ -355,13 +408,19 @@ function pruneLegacyDemoRestaurants (list) {
     'Cafe Lumiere',
     'Café Lumiere',
     'Spice Route',
+    'QA Bistro',
+    'No Photo Test',
+    'Test Spot',
+    'NoPic Spot',
   ]);
   const cleaned = list.filter(r => {
     const website = String(r?.website || '').toLowerCase();
     const name = String(r?.name || '').trim();
+    const notes = String(r?.notes || '').toLowerCase();
     const isDemoWebsite = website.includes('.example.com');
     const isKnownDemo = demoNames.has(name);
-    return !(isDemoWebsite || isKnownDemo);
+    const isQaSeed = notes.includes('seeded for qa flow');
+    return !(isDemoWebsite || isKnownDemo || isQaSeed);
   });
   if (list.length !== cleaned.length) {
     const removed = list.length - cleaned.length;
@@ -1339,9 +1398,16 @@ function buildCard (r) {
 
   const dist = distOf(r);
   const distStr = dist < Infinity ? fmtDist(dist) : '';
-  // Use saved photo if available, else a cuisine-matched Unsplash image
-  const photoSrc  = r.photo || getCuisinePhoto(r.cuisine);
-  const isUnsplash = !r.photo;
+  const photoPick = pickRealRestaurantPhoto({
+    savedRestaurant: r,
+    cuisine: r.cuisine,
+    amenity: 'restaurant',
+    width: 1200,
+    height: 900,
+    allowFallback: false,
+  });
+  const photoSrc = photoPick.url;
+  const hasPhoto = !!photoSrc;
 
   // Collection badge
   const col = (state.settings.collections||[]).find(c => c.id === r.collectionId);
@@ -1354,7 +1420,9 @@ function buildCard (r) {
   card.innerHTML = `
     <div class="card-checkbox${state.selectedIds.has(r.id) ? ' checked' : ''}" title="Select"></div>
     <div class="card-photo">
-      <img src="${escHtml(photoSrc)}" alt="${escHtml(r.name)}" loading="lazy" class="${isUnsplash ? 'photo-unsplash' : ''}" onload="this.classList.add('loaded')" />
+      ${hasPhoto
+        ? `<img src="${escHtml(photoSrc)}" alt="${escHtml(r.name)}" loading="lazy" onload="this.classList.add('loaded')" />`
+        : `<div class="card-photo-empty"><span>No verified photo yet</span></div>`}
       <div class="card-img-overlay"></div>
       <span class="card-status-badge ${r.status === 'want-to-try' ? 'want' : 'visited'}">
         ${r.status === 'want-to-try' ? 'Want to Try' : 'Visited'}
@@ -7646,6 +7714,184 @@ let _forYouSeed = Date.now();
 let _nearbyFilterMode = 'all';
 let _nearbyCards = [];
 let _nearbyBannerMsg = '';
+const _placePhotoCache = new Map();
+const _placePhotoPending = new Map();
+
+function getPlacePhotoLookupKey (card = {}) {
+  const name = normalizeName(card.name || '');
+  const lat = Number.isFinite(card.lat) ? Number(card.lat).toFixed(4) : '';
+  const lon = Number.isFinite(card.lon) ? Number(card.lon).toFixed(4) : '';
+  return `${name}|${lat}|${lon}`;
+}
+
+async function fetchPlacePhotoFromApi (card = {}) {
+  const name = String(card.name || '').trim();
+  if (!name) return '';
+
+  const params = new URLSearchParams();
+  params.set('name', name);
+  if (Number.isFinite(card.lat)) params.set('lat', String(card.lat));
+  if (Number.isFinite(card.lon)) params.set('lon', String(card.lon));
+  if (card.address) {
+    const cityGuess = String(card.address).split(',').slice(-1)[0].trim();
+    if (cityGuess) params.set('city', cityGuess);
+  }
+
+  if (card.website) params.set('website', String(card.website));
+
+  let resp = await fetch(`/api/restaurant-image?${params.toString()}`);
+  if (!resp.ok) {
+    resp = await fetch(`/api/place-photo?${params.toString()}`);
+  }
+  if (!resp.ok) return '';
+  const data = await resp.json();
+  return safeUrl(data?.photoUrl || '');
+}
+
+async function fetchPlacePhotoFromWikiClient (card = {}) {
+  const name = String(card.name || '').trim();
+  if (!name) return '';
+
+  const lat = Number(card.lat);
+  const lon = Number(card.lon);
+
+  // 1) Nearby geosearch with thumbnail.
+  if (Number.isFinite(lat) && Number.isFinite(lon)) {
+    const geoUrl = new URL('https://en.wikipedia.org/w/api.php');
+    geoUrl.searchParams.set('action', 'query');
+    geoUrl.searchParams.set('format', 'json');
+    geoUrl.searchParams.set('formatversion', '2');
+    geoUrl.searchParams.set('generator', 'geosearch');
+    geoUrl.searchParams.set('ggscoord', `${lat}|${lon}`);
+    geoUrl.searchParams.set('ggsradius', '1200');
+    geoUrl.searchParams.set('ggslimit', '10');
+    geoUrl.searchParams.set('prop', 'pageimages');
+    geoUrl.searchParams.set('piprop', 'thumbnail');
+    geoUrl.searchParams.set('pithumbsize', '1200');
+    geoUrl.searchParams.set('origin', '*');
+
+    const geoResp = await fetch(geoUrl.toString());
+    if (geoResp.ok) {
+      const geoJson = await geoResp.json();
+      const pages = Object.values(geoJson?.query?.pages || {});
+      const img = pages.find(p => safeUrl(p?.thumbnail?.source || ''))?.thumbnail?.source || '';
+      if (img) return safeUrl(img);
+    }
+  }
+
+  // 2) Name search fallback.
+  const q = `${name} restaurant`;
+  const searchUrl = new URL('https://en.wikipedia.org/w/api.php');
+  searchUrl.searchParams.set('action', 'query');
+  searchUrl.searchParams.set('format', 'json');
+  searchUrl.searchParams.set('formatversion', '2');
+  searchUrl.searchParams.set('list', 'search');
+  searchUrl.searchParams.set('srlimit', '5');
+  searchUrl.searchParams.set('srsearch', q);
+  searchUrl.searchParams.set('origin', '*');
+
+  const searchResp = await fetch(searchUrl.toString());
+  if (!searchResp.ok) return '';
+  const searchJson = await searchResp.json();
+  const first = (searchJson?.query?.search || [])[0];
+  if (!first?.pageid) return '';
+
+  const pageUrl = new URL('https://en.wikipedia.org/w/api.php');
+  pageUrl.searchParams.set('action', 'query');
+  pageUrl.searchParams.set('format', 'json');
+  pageUrl.searchParams.set('formatversion', '2');
+  pageUrl.searchParams.set('pageids', String(first.pageid));
+  pageUrl.searchParams.set('prop', 'pageimages');
+  pageUrl.searchParams.set('piprop', 'thumbnail');
+  pageUrl.searchParams.set('pithumbsize', '1200');
+  pageUrl.searchParams.set('origin', '*');
+
+  const pageResp = await fetch(pageUrl.toString());
+  if (!pageResp.ok) return '';
+  const pageJson = await pageResp.json();
+  const page = Object.values(pageJson?.query?.pages || {})[0] || null;
+  return safeUrl(page?.thumbnail?.source || '');
+}
+
+async function getOrFetchPlacePhoto (card = {}) {
+  const key = getPlacePhotoLookupKey(card);
+  if (!key || key === '||') return '';
+
+  if (_placePhotoCache.has(key)) return _placePhotoCache.get(key) || '';
+  if (_placePhotoPending.has(key)) return _placePhotoPending.get(key);
+
+  const pending = (async () => {
+    try {
+      let url = '';
+      try {
+        url = await fetchPlacePhotoFromApi(card);
+      } catch {
+        url = '';
+      }
+      if (!url) {
+        try {
+          url = await fetchPlacePhotoFromWikiClient(card);
+        } catch {
+          url = '';
+        }
+      }
+      _placePhotoCache.set(key, url || '');
+      return url || '';
+    } catch {
+      _placePhotoCache.set(key, '');
+      return '';
+    } finally {
+      _placePhotoPending.delete(key);
+    }
+  })();
+
+  _placePhotoPending.set(key, pending);
+  return pending;
+}
+
+function syncSwipeDeckPhotosFromNearby () {
+  const deck = Array.isArray(state.swipeDeck) ? state.swipeDeck : [];
+  if (!deck.length) return;
+
+  const byKey = new Map((_nearbyCards || []).map(c => [String(c.key || ''), c]));
+  let changed = false;
+  state.swipeDeck = deck.map(item => {
+    if (!item || item.source !== 'nearby') return item;
+    if (safeUrl(item.photoUrl || '')) return item;
+    const fromNearby = byKey.get(String(item.key || ''));
+    const nextPhoto = safeUrl(fromNearby?.photoUrl || '');
+    if (!nextPhoto) return item;
+    changed = true;
+    return { ...item, photoUrl: nextPhoto, photoSource: 'wikipedia' };
+  });
+
+  if (changed) renderBearSwipeCard();
+}
+
+async function enrichNearbyCardsRealPhotos () {
+  const candidates = (_nearbyCards || [])
+    .filter(c => !safeUrl(c.photoUrl || ''))
+    .filter(c => !c.isSaved)
+    .slice(0, 8);
+
+  if (!candidates.length) return;
+
+  let changed = false;
+  for (const card of candidates) {
+    const url = await getOrFetchPlacePhoto(card);
+    if (!url) continue;
+    const idx = _nearbyCards.findIndex(c => String(c.key) === String(card.key));
+    if (idx < 0) continue;
+    if (safeUrl(_nearbyCards[idx].photoUrl || '')) continue;
+    _nearbyCards[idx] = { ..._nearbyCards[idx], photoUrl: url, photoSource: 'wikipedia' };
+    changed = true;
+  }
+
+  if (changed) {
+    renderNearbyCardsFromState();
+    syncSwipeDeckPhotosFromNearby();
+  }
+}
 
 function getNearbyRadiusMiles () {
   return Math.max(1, Math.min(5, Number(state.settings.nearbyRadiusMiles) || 1));
@@ -7689,6 +7935,7 @@ function setNearbyCards (cards = [], opts = {}) {
   _nearbyCards = Array.isArray(cards) ? cards : [];
   _nearbyBannerMsg = String(opts.banner || '');
   renderNearbyCardsFromState();
+  enrichNearbyCardsRealPhotos();
 }
 
 function runNearbyLuckyBite () {
@@ -8271,19 +8518,26 @@ function renderDailyQuestHome () {
   const pct = Math.max(0, Math.min(100, Math.round((delta / Math.max(1, target - base)) * 100)));
   const done = now >= target;
   const claimed = !!quest.claimedAt;
+  const label = done ? (claimed ? 'Reward claimed' : 'Claim reward') : def.cta;
+  const meterDeg = Math.round((pct / 100) * 360);
 
+  wrap.classList.add('compact-quest-pill');
   wrap.innerHTML = `
-    <div class="daily-quest-top">
-      <span class="daily-quest-kicker">Daily Quest</span>
-      <span class="daily-quest-xp">+20 XP</span>
-    </div>
-    <div class="daily-quest-title">${escHtml(def.title)}</div>
-    <div class="daily-quest-desc">${escHtml(def.desc)}</div>
-    <div class="daily-quest-progress-track"><div class="daily-quest-progress-fill" style="width:${pct}%"></div></div>
-    <div class="daily-quest-meta">Progress: ${Math.min(delta, 1)} / 1 ${escHtml(def.progressLabel)}</div>
-    <div class="daily-quest-actions">
-      <button id="daily-quest-action-btn" class="daily-quest-btn primary" type="button">${done ? (claimed ? 'Reward Claimed' : 'Claim Reward') : escHtml(def.cta)}</button>
-      <button id="daily-quest-open-achievements-btn" class="daily-quest-btn" type="button">View Achievements</button>
+    <div class="daily-quest-compact-wrap">
+      <button
+        id="daily-quest-action-btn"
+        class="daily-quest-pulse-btn ${done && !claimed ? 'is-ready' : ''} ${done && claimed ? 'is-claimed' : ''}"
+        type="button"
+        title="${escHtml(def.title)} - ${escHtml(def.desc)}"
+        style="--quest-arc:${meterDeg}deg;"
+      >
+        <span class="daily-quest-pulse-core">DQ</span>
+      </button>
+      <div class="daily-quest-compact-meta">
+        <div class="daily-quest-compact-title">Daily Quest ${done && !claimed ? 'Ready' : ''}</div>
+        <div class="daily-quest-compact-desc">${escHtml(label)} • ${Math.min(delta, 1)}/1</div>
+      </div>
+      <button id="daily-quest-open-achievements-btn" class="daily-quest-btn" type="button">Stats</button>
     </div>
   `;
 
@@ -8337,14 +8591,24 @@ function renderForYouHome () {
     const dist = Number.isFinite(r._distMeters) ? fmtDist(r._distMeters) : '';
     const rating = r.myRating ? ` • You ${'★'.repeat(r.myRating)}` : (r.googleRating ? ` • ⭐${r.googleRating}` : '');
     const match = Math.max(45, Math.min(99, Math.round(r._score * 1.7)));
+    const basePhoto = pickRealRestaurantPhoto({ savedRestaurant: r, cuisine: r.cuisine, amenity: 'restaurant', allowFallback: false });
+    const cachedPhoto = safeUrl(_placePhotoCache.get(getPlacePhotoLookupKey({ name: r.name, lat: r.lat, lon: r.lng })) || '');
+    const photoUrl = safeUrl(basePhoto.url || '') || cachedPhoto;
+    const sourceLabel = basePhoto.source === 'user' ? 'Your photo' : (cachedPhoto ? 'Wikipedia photo' : 'No photo yet');
     return `<button class="for-you-card" data-id="${r.id}" type="button" title="Open ${escHtml(r.name)}">
       <div class="for-you-card-top">
         <span class="for-you-chip">${escHtml(reason)}</span>
         <span class="for-you-chip alt">${match}% match</span>
       </div>
-      <div class="for-you-card-name">${escHtml(r.name)}</div>
-      <div class="for-you-card-meta">${escHtml(r.cuisine || 'Restaurant')}${rating}</div>
-      <div class="for-you-card-meta">${dist ? ` ${dist}` : (r.status === 'want-to-try' ? 'Ready when you are' : 'Saved in your den')}</div>
+      <div class="for-you-row">
+        ${photoUrl ? `<img class="for-you-thumb" src="${escHtml(photoUrl)}" alt="${escHtml(r.name)}" loading="lazy" />` : ''}
+        <div class="for-you-content">
+        <div class="for-you-card-name">${escHtml(r.name)}</div>
+        <div class="for-you-card-meta">${escHtml(r.cuisine || 'Restaurant')}${rating}</div>
+        <div class="for-you-card-meta">${dist ? ` ${dist}` : (r.status === 'want-to-try' ? 'Ready when you are' : 'Saved in your den')}</div>
+        <div class="for-you-source">${escHtml(sourceLabel)}</div>
+        </div>
+      </div>
       <div class="for-you-meter"><span style="width:${match}%"></span></div>
     </button>`;
   }).join('');
@@ -8352,6 +8616,29 @@ function renderForYouHome () {
   list.querySelectorAll('.for-you-card[data-id]').forEach(el => {
     el.addEventListener('click', () => openDetailModal(el.dataset.id));
   });
+
+  enrichForYouHomePhotos(scored);
+}
+
+async function enrichForYouHomePhotos (scoredRows = []) {
+  const rows = Array.isArray(scoredRows) ? scoredRows : [];
+  const targets = rows
+    .filter(r => !safeUrl(r.photo || ''))
+    .slice(0, 3);
+
+  if (!targets.length) return;
+
+  let changed = false;
+  for (const r of targets) {
+    const key = getPlacePhotoLookupKey({ name: r.name, lat: r.lat, lon: r.lng });
+    if (_placePhotoCache.has(key) && _placePhotoCache.get(key)) continue;
+    const found = await getOrFetchPlacePhoto({ name: r.name, lat: r.lat, lon: r.lng, address: r.address });
+    if (found) changed = true;
+  }
+
+  if (changed) {
+    renderForYouHome();
+  }
 }
 
 function pickRandom (arr = []) {
@@ -8372,6 +8659,7 @@ function buildSwipeDeckFromElements (elements = []) {
     const cuisine = (tags.cuisine || '').split(';')[0];
     const amenity = tags.amenity || 'restaurant';
     const cuisineLabel = formatCuisineLabel(cuisine || amenity || 'restaurant');
+    const photoPick = pickRealRestaurantPhoto({ tags, cuisine, amenity, width: 960, height: 640 });
     const lat = el.lat ?? el.center?.lat ?? null;
     const lon = el.lon ?? el.center?.lon ?? null;
     const address = [tags['addr:housenumber'], tags['addr:street'], tags['addr:city']].filter(Boolean).join(' ');
@@ -8386,7 +8674,8 @@ function buildSwipeDeckFromElements (elements = []) {
       lat,
       lon,
       address,
-      photoUrl: getCuisinePhoto(cuisine || amenity, 960, 640),
+      photoUrl: photoPick.url,
+      photoSource: photoPick.source,
       isSaved: false,
       restaurantId: null,
       priceLevel: estimatePriceLevel({ cuisine, amenity, savedRestaurant: null }),
@@ -8409,6 +8698,7 @@ function buildSwipeDeckFromSaved (savedRows = []) {
   return (savedRows || []).slice(0, 20).map((r, idx) => {
     const cuisine = r.cuisine || '';
     const cuisineLabel = formatCuisineLabel(cuisine || 'Restaurant');
+    const photoPick = pickRealRestaurantPhoto({ savedRestaurant: r, cuisine, amenity: 'restaurant', width: 960, height: 640 });
     return {
       key: `saved-${r.id || idx}`,
       source: 'saved',
@@ -8420,7 +8710,8 @@ function buildSwipeDeckFromSaved (savedRows = []) {
       lat: Number.isFinite(r.lat) ? r.lat : null,
       lon: Number.isFinite(r.lng) ? r.lng : null,
       address: r.address || '',
-      photoUrl: getCuisinePhoto(cuisine || 'restaurant', 960, 640),
+      photoUrl: photoPick.url,
+      photoSource: photoPick.source,
       isSaved: true,
       restaurantId: r.id || null,
       priceLevel: Number(r.priceRange || 0) || estimatePriceLevel({ cuisine, amenity: 'restaurant', savedRestaurant: r }),
@@ -8436,8 +8727,56 @@ function buildSwipeDeckFromSaved (savedRows = []) {
   }).slice(0, 10);
 }
 
+function getMoodFoodImage (term = 'food', seed = '') {
+  void seed;
+  const key = String(term || 'food').trim().toLowerCase().split(/\s+/)[0] || 'food';
+  // Stable real-photo links so mood cards consistently render.
+  return getCuisinePhoto(key, 960, 640);
+}
+
+function buildMoodSwipeDeck (elements = [], savedRows = []) {
+  void elements;
+  void savedRows;
+
+  const defaults = [
+    'pizza', 'ramen', 'tacos', 'sushi', 'bbq', 'pasta', 'burger',
+    'fried chicken', 'dumplings', 'pho', 'curry', 'brunch', 'dessert', 'steak', 'seafood',
+    'sandwich', 'noodles', 'kebab', 'shawarma', 'paella', 'bibimbap', 'burrito', 'gelato'
+  ];
+
+  const profile = getSwipePreferenceProfile();
+  const preferred = Object.entries(profile?.byCuisine || {})
+    .filter(([, score]) => Number(score) > 0)
+    .sort((a, b) => Number(b[1]) - Number(a[1]))
+    .map(([c]) => String(c || '').trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, 8);
+
+  const terms = [...new Set([...preferred, ...defaults])].slice(0, 18);
+
+  return terms.map((term, idx) => ({
+    key: `mood-${term}-${idx}`,
+    source: 'mood',
+    name: `${formatCuisineLabel(term)} mood`,
+    cuisine: term,
+    cuisineLabel: formatCuisineLabel(term),
+    amenity: 'food',
+    photoUrl: getMoodFoodImage(term, `${term}-${idx}`),
+    photoSource: 'internet',
+    isSaved: false,
+    restaurantId: null,
+    distMeters: Infinity,
+    priceLevel: estimatePriceLevel({ cuisine: term, amenity: 'restaurant', savedRestaurant: null }),
+  }));
+}
+
 function openDirectionsForSwipeItem (item) {
   if (!item) return;
+
+  if (item.source === 'mood') {
+    showToast('Mood swipe', 'This deck is for craving vibes. Pick For Me uses your swipes to find nearby spots.', 'info');
+    return;
+  }
 
   if (item.isSaved && item.restaurantId) {
     const r = state.restaurants.find(x => x.id === item.restaurantId);
@@ -8464,6 +8803,11 @@ function openDirectionsForSwipeItem (item) {
 
 function openSwipeChoiceDetails (item) {
   if (!item) return;
+  if (item.source === 'mood') {
+    showTonightsPick();
+    showToast('Mood locked in', `${item.cuisineLabel || 'Food'} vibe noted.`, 'success');
+    return;
+  }
   if (item.isSaved && item.restaurantId) {
     openDetailModal(item.restaurantId);
     return;
@@ -8500,12 +8844,18 @@ function resetBearSwipeDragVisual (cardEl) {
 function animateBearSwipeThrow (cardEl, reaction) {
   if (!cardEl) return;
   const throwClass = reaction === 'yes' ? 'swipe-throw-right' : 'swipe-throw-left';
+  const clawClass = reaction === 'yes' ? 'claw-right' : 'claw-left';
   cardEl.classList.remove('swipe-snap-back');
   cardEl.classList.add(throwClass);
+  cardEl.classList.add(clawClass);
+  const mediaEl = cardEl.querySelector('.bear-swipe-photo-wrap');
+  mediaEl?.classList.remove('claw-left', 'claw-right');
+  mediaEl?.classList.add(clawClass);
   _swipeGestureIgnoreClickUntil = Date.now() + 280;
 
   window.setTimeout(() => {
-    cardEl.classList.remove(throwClass);
+    cardEl.classList.remove(throwClass, clawClass);
+    mediaEl?.classList.remove('claw-left', 'claw-right');
     resetBearSwipeDragVisual(cardEl);
     nextBearSwipeCard(reaction);
   }, 180);
@@ -8600,11 +8950,22 @@ function renderBearSwipeCard () {
   }
 
   const item = deck[idx];
-  const hiddenName = item.source === 'saved' ? 'Saved mystery snack' : 'Nearby mystery snack';
+  const isMoodDeck = item.source === 'mood';
+  const hiddenName = isMoodDeck ? 'Mystery craving vibe' : (item.source === 'saved' ? 'Saved mystery snack' : 'Nearby mystery snack');
   const reveal = !!state.swipeReveal;
   const progress = `${idx + 1}/${deck.length}`;
+  const swipePhoto = safeUrl(item.photoUrl || '');
+  const hasSwipePhoto = !!swipePhoto;
+  const revealPrompt = hasSwipePhoto ? 'Tap image to reveal this vibe.' : 'Tap card to reveal this vibe.';
+  const detailPrompt = 'Swipe yes/no to train your cravings.';
 
-  cardEl.innerHTML = `<div class="bear-swipe-photo-wrap">\n      <img class="bear-swipe-photo" src="${item.photoUrl}" alt="${escHtml(item.cuisineLabel || 'Food photo')}" loading="lazy" />\n      <div class="bear-swipe-topline">\n        <span class="bear-swipe-chip">${escHtml(item.cuisineLabel)}</span>\n        <span class="bear-swipe-chip alt">${escHtml(progress)}</span>\n      </div>\n    </div>\n    <div class="bear-swipe-content">\n      <div class="bear-swipe-name ${reveal ? 'revealed' : 'hidden'}">${escHtml(reveal ? item.name : hiddenName)}</div>\n      <div class="bear-swipe-meta">${reveal ? (item.isSaved ? 'Saved in your den. Tap image for full details.' : 'Tap image for full details. Location stays hidden here.') : 'Tap image to reveal this pick.'}</div>\n      ${reveal ? `<div class="bear-swipe-reveal-row">\n          <button class="btn-sm btn-secondary" data-swipe-details="1" type="button">Details</button>\n          <button class="btn-sm btn-orange" data-swipe-directions="1" type="button">Directions</button>\n        </div>` : `<div class="bear-swipe-secret">Tap image to reveal, then tap again for details.</div>`}\n    </div>`;
+  cardEl.innerHTML = `<div class="bear-swipe-photo-wrap">\n      ${hasSwipePhoto
+      ? `<img class="bear-swipe-photo" src="${swipePhoto}" alt="${escHtml(item.cuisineLabel || 'Food photo')}" loading="lazy" />`
+      : `<div class="bear-swipe-photo-empty"><span>No verified photo yet</span></div>`}\n      <div class="bear-swipe-topline">\n        <span class="bear-swipe-chip">${escHtml(item.cuisineLabel)}</span>\n        <span class="bear-swipe-chip alt">${escHtml(progress)}</span>\n      </div>\n    </div>\n    <div class="bear-swipe-content">\n      <div class="bear-swipe-name ${reveal ? 'revealed' : 'hidden'}">${escHtml(reveal ? item.name : hiddenName)}</div>\n      <div class="bear-swipe-meta">${reveal
+        ? (isMoodDeck
+          ? 'Mood-only swipe deck: tune your appetite first, then pick a place.'
+          : (item.isSaved ? 'Saved in your den. Tap details for full info.' : 'Tap details for full info. Location stays hidden here.'))
+        : revealPrompt}</div>\n      ${reveal && !isMoodDeck ? `<div class="bear-swipe-reveal-row">\n          <button class="btn-sm btn-secondary" data-swipe-details="1" type="button">Details</button>\n          <button class="btn-sm btn-orange" data-swipe-directions="1" type="button">Directions</button>\n        </div>` : `<div class="bear-swipe-secret">${escHtml(detailPrompt)}</div>`}\n    </div>`;
 
   cardEl.classList.toggle('is-revealed', reveal);
 
@@ -8616,7 +8977,9 @@ function renderBearSwipeCard () {
       revealBearSwipeCard();
       return;
     }
-    openSwipeChoiceDetails(item);
+    if (!isMoodDeck) {
+      openSwipeChoiceDetails(item);
+    }
   });
 
   cardEl.querySelector('[data-swipe-details]')?.addEventListener('click', e => {
@@ -8665,7 +9028,8 @@ function revealBearSwipeCard () {
 function renderBearSwipeHomeFromElements (elements = []) {
   const mod = document.getElementById('bear-swipe-home');
   if (!mod) return;
-  const deck = buildSwipeDeckFromElements(elements);
+  const savedRows = (state.restaurants || []).slice(0, 24);
+  const deck = buildMoodSwipeDeck(elements, savedRows);
   if (!deck.length) {
     hideBearSwipeHome();
     return;
@@ -8681,7 +9045,7 @@ function renderBearSwipeHomeFromElements (elements = []) {
 function renderBearSwipeHomeFromSaved (savedRows = []) {
   const mod = document.getElementById('bear-swipe-home');
   if (!mod) return;
-  const deck = buildSwipeDeckFromSaved(savedRows);
+  const deck = buildMoodSwipeDeck([], savedRows);
   if (!deck.length) {
     hideBearSwipeHome();
     return;
@@ -8691,7 +9055,7 @@ function renderBearSwipeHomeFromSaved (savedRows = []) {
   state.swipeIndex = 0;
   state.swipeReveal = false;
   renderBearSwipeCard();
-  setBearSwipeJoke('Nearby data is napping, but your saved stack is ready.');
+  setBearSwipeJoke('Mood deck loaded. Trust your paws.' );
 }
 
 function initBearSwipeHome () {
@@ -8869,11 +9233,13 @@ function renderNearbyHomeFallback (err = null) {
     const cards = localFallback.map((r, idx) => {
       const priceLevel = estimatePriceLevel({ cuisine: r.cuisine, amenity: 'restaurant', savedRestaurant: r });
       const popularity = nearbyPopularityLabel(r._distMeters, r);
+      const photoPick = pickRealRestaurantPhoto({ savedRestaurant: r, cuisine: r.cuisine, amenity: 'restaurant', width: 960, height: 960 });
       return {
         key: `saved-${r.id || idx}`,
         name: r.name,
         cuisine: r.cuisine,
         amenity: 'restaurant',
+        photoUrl: photoPick.url,
         distMeters: r._distMeters,
         priceLevel,
         popularity,
@@ -8915,6 +9281,7 @@ function renderHomeDiscovery ({ elements }) {
     const savedRestaurant = isSaved
       ? state.restaurants.find(r => normalizeName(r.name) === normalizeName(name)) || null
       : null;
+    const photoPick = pickRealRestaurantPhoto({ savedRestaurant, tags, cuisine, amenity, width: 960, height: 960 });
     const priceLevel = estimatePriceLevel({ cuisine, amenity, savedRestaurant });
     const popularity = nearbyPopularityLabel(el._dist, savedRestaurant);
     return {
@@ -8922,10 +9289,12 @@ function renderHomeDiscovery ({ elements }) {
       name,
       cuisine,
       amenity,
+      photoUrl: photoPick.url,
       distMeters: el._dist,
       lat: Number.isFinite(el.lat ?? el.center?.lat) ? Number(el.lat ?? el.center?.lat) : null,
       lon: Number.isFinite(el.lon ?? el.center?.lon) ? Number(el.lon ?? el.center?.lon) : null,
       address: [tags['addr:housenumber'], tags['addr:street'], tags['addr:city']].filter(Boolean).join(' '),
+      website: tags.website || tags['contact:website'] || tags.url || '',
       priceLevel,
       popularity,
       isSaved,
@@ -12260,5 +12629,7 @@ function _ftbHandleTouch(e) {
     g.touchTargetX = Math.max(g.bear.w / 2, Math.min(g.canvas.width - g.bear.w / 2, cx));
   }
 }
+
+
 
 

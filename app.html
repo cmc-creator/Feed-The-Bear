@@ -357,7 +357,7 @@
       <button id="settings-btn" class="icon-btn" title="Settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.36.14.76.22 1.17.22H21a2 2 0 1 1 0 4h-.43c-.41 0-.81.08-1.17.22z"/></svg>
       </button>
-      <button id="add-btn" class="btn-primary">
+      <button id="add-btn" class="btn-primary" title="Add Restaurant" aria-label="Add Restaurant">
         <span>＋</span> Add Restaurant
       </button>
       <button id="chat-toggle-btn" class="chat-toggle-btn" title="Byte Cub Chat">
@@ -441,7 +441,7 @@
   </header>
 
   <!-- ── Stats Bar ─────────────────────────────────────────── -->
-  <section class="stats-bar" id="stats-bar">
+  <section class="stats-bar hidden" id="stats-bar">
     <div class="stat-item tappable" data-view-filter="all" role="button" tabindex="0" aria-label="Show all saved">
       <span class="stat-value" id="stat-total">0</span>
       <span class="stat-label">Saved</span>
@@ -695,7 +695,7 @@
       </div>
       <div id="today-status-row" class="today-status-row home-module" aria-label="Today status"></div>
       <div id="today-vibe-row" class="today-vibe-row home-module" aria-label="Tonight vibe"></div>
-      <div id="daily-quest-home" class="daily-quest-home home-module" aria-label="Daily quest"></div>
+      <div id="daily-quest-home" class="daily-quest-home" aria-label="Daily quest"></div>
       <!-- Personal recommendation strip -->
       <div id="for-you-home" class="for-you-home home-module hidden">
         <div class="for-you-home-header">
