@@ -8079,15 +8079,11 @@ function renderNearbyCardsFromState () {
 
 function setNearbyCards (cards = [], opts = {}) {
   const assignDiverseNearbyFallbackPhotos = (rows = []) => {
-    const used = new Set();
     return rows.map((card, idx) => {
       if (!card || typeof card !== 'object') return card;
 
       const existing = safeUrl(card.photoUrl || '');
-      if (existing) {
-        used.add(existing);
-        return card;
-      }
+      if (existing) return card;
 
       const term = `${card.name || ''} ${card.cuisine || card.amenity || 'food'}`.trim();
       const seed = `${card.key || idx}|${card.name || ''}|${card.cuisine || ''}`;
@@ -8097,13 +8093,11 @@ function setNearbyCards (cards = [], opts = {}) {
       for (const candidate of candidates) {
         const safe = safeUrl(candidate || '');
         if (!safe) continue;
-        if (used.has(safe)) continue;
         chosen = safe;
         break;
       }
 
       if (!chosen) chosen = safeUrl(candidates[0] || '') || safeUrl('assets/food/pizza.jpg');
-      if (chosen) used.add(chosen);
 
       return chosen
         ? { ...card, photoUrl: chosen, photoSource: card.photoSource || 'local' }
@@ -9028,6 +9022,7 @@ function getLocalDishCandidates (raw = '', key = 'default') {
   if (/(cake|gelato|dessert|donut|donuts|churro|cheesecake|tiramisu|pastry)/.test(text)) ['gelato', 'cheesecake', 'churros'].forEach(add);
   if (/(sandwich|blt|grilled cheese|toastie|panini|banh mi)/.test(text)) ['banh_mi', 'grilled_cheese'].forEach(add);
   if (/(american|fried chicken|mac|meatloaf|comfort food|diner)/.test(text)) ['fried_chicken', 'mac_and_cheese', 'burger'].forEach(add);
+  if (/(irish|pub|gastropub|fish and chips|shepherd|shepherds pie|bangers and mash)/.test(text)) ['salmon', 'steak', 'fried_chicken'].forEach(add);
   if (/(salad|caesar|cobb|greek)/.test(text)) add('caesar_salad');
   if (/(poke)/.test(text)) add('poke_bowl');
   if (/(pho)/.test(text)) add('pho');
@@ -9050,7 +9045,7 @@ function getLocalDishCandidates (raw = '', key = 'default') {
     desserts: ['gelato', 'cheesecake', 'churros'],
     sandwich: ['banh_mi', 'grilled_cheese'],
     american: ['fried_chicken', 'mac_and_cheese', 'burger'],
-    default: ['pizza', 'pasta', 'ramen', 'fried_chicken'],
+    default: ['burger', 'steak', 'fried_chicken', 'salmon'],
   };
 
   (byCuisine[key] || byCuisine.default).forEach(add);
@@ -9078,6 +9073,7 @@ function getMoodFoodImageCandidates (term = 'food', seed = '') {
     if (/(cake|gelato|dessert|donut|donuts|churro|cheesecake|tiramisu|pastry)/.test(raw)) return 'desserts';
     if (/(sandwich|blt|grilled cheese|toastie|panini)/.test(raw)) return 'sandwich';
     if (/(american|fried chicken|mac|meatloaf|comfort food|diner)/.test(raw)) return 'american';
+    if (/(irish|pub|gastropub|fish and chips|shepherd|shepherds pie|bangers and mash)/.test(raw)) return 'irish';
     return normalized;
   })();
   const variants = {
@@ -9098,14 +9094,43 @@ function getMoodFoodImageCandidates (term = 'food', seed = '') {
     breakfast: ['pancakes breakfast', 'eggs and toast', 'waffles', 'breakfast platter'],
     sandwich: ['club sandwich', 'deli sandwich', 'grilled cheese', 'chicken sandwich'],
     american: ['american diner food', 'mac and cheese', 'fried chicken dinner', 'comfort food'],
+    irish: ['irish pub food', 'fish and chips', 'shepherds pie', 'steak and potatoes'],
     default: ['beautiful food', 'restaurant dish', 'chef plated food', 'dinner plate']
+  };
+
+  const cuisineFallbackByKey = {
+    breakfast: ['pancakes', 'waffles', 'french_toast', 'eggs_benedict', 'omelette'],
+    burgers: ['burger', 'fries'],
+    pizza: ['pizza'],
+    sushi: ['sushi'],
+    ramen: ['ramen', 'udon'],
+    mexican: ['tacos', 'burrito', 'quesadilla', 'enchiladas'],
+    italian: ['italian_pasta', 'pasta', 'lasagna', 'gnocchi'],
+    korean: ['bibimbap', 'korean_bbq'],
+    chinese: ['dumplings', 'fried_rice', 'chow_mein'],
+    indian: ['biryani', 'butter_chicken', 'tikka_masala', 'dosa', 'indian_curry'],
+    thai: ['pad_thai', 'thai_curry'],
+    bbq: ['kebab', 'shawarma', 'steak'],
+    seafood: ['seafood', 'salmon', 'shrimp', 'paella'],
+    steakhouse: ['steak'],
+    desserts: ['gelato', 'cheesecake', 'churros'],
+    sandwich: ['banh_mi', 'grilled_cheese'],
+    american: ['fried_chicken', 'mac_and_cheese', 'burger'],
+    irish: ['salmon', 'steak', 'fried_chicken'],
+    default: ['burger', 'steak', 'fried_chicken', 'salmon'],
   };
 
   const picks = variants[key] || variants.default;
   const hash = Math.abs(miniHash(`${key}|${seed || Date.now()}`));
   const phrase = picks[hash % picks.length];
   const local = getLocalDishCandidates(raw || phrase, key);
-  return [...local, ...BEAR_SWIPE_LOCAL_FALLBACKS];
+  const cuisineFallback = (cuisineFallbackByKey[key] || cuisineFallbackByKey.default)
+    .map(k => BEAR_SWIPE_LOCAL_FOOD_IMAGES[k])
+    .filter(Boolean);
+  const base = [...local, ...cuisineFallback].filter(Boolean);
+  const unique = [...new Set(base)];
+  if (unique.length) return unique;
+  return [...BEAR_SWIPE_LOCAL_FALLBACKS];
 }
 
 function pickBearSwipePhotoUrl (item, idx = 0) {
