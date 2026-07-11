@@ -8254,6 +8254,30 @@ async function fetchPlacePhotoFromApi (card = {}) {
   return safeUrl(data?.photoUrl || '');
 }
 
+function isLikelyRealPlacePhotoUrl (url = '') {
+  const safe = safeUrl(url || '');
+  if (!safe) return false;
+  const raw = safe.toLowerCase();
+
+  // Avoid known non-photo assets that frequently come from meta tags.
+  if (/(logo|icon|favicon|avatar|gravatar|sprite|placeholder|default[_-]?image|og-default|map[_-]?pin|marker)/i.test(raw)) {
+    return false;
+  }
+  return true;
+}
+
+function hasReliableNearbyCardPhoto (card = {}) {
+  const raw = String(card?.photoUrl || '').trim();
+  const safe = safeUrl(raw);
+  if (!safe) return false;
+
+  // Local food assets are acceptable placeholders, but not "proper place" photos.
+  if (/^(\.\/)?assets\/food\//i.test(raw)) return false;
+
+  if (/^https?:\/\//i.test(safe)) return isLikelyRealPlacePhotoUrl(safe);
+  return true;
+}
+
 async function fetchPlacePhotoFromWikiClient (card = {}) {
   const name = String(card.name || '').trim();
   if (!name) return '';
@@ -8363,12 +8387,12 @@ function syncSwipeDeckPhotosFromNearby () {
   let changed = false;
   state.swipeDeck = deck.map(item => {
     if (!item || item.source !== 'nearby') return item;
-    if (safeUrl(item.photoUrl || '')) return item;
     const fromNearby = byKey.get(String(item.key || ''));
     const nextPhoto = safeUrl(fromNearby?.photoUrl || '');
-    if (!nextPhoto) return item;
+    if (!nextPhoto || !hasReliableNearbyCardPhoto(fromNearby)) return item;
+    if (hasReliableNearbyCardPhoto(item) && safeUrl(item.photoUrl || '') === nextPhoto) return item;
     changed = true;
-    return { ...item, photoUrl: nextPhoto, photoSource: 'wikipedia' };
+    return { ...item, photoUrl: nextPhoto, photoSource: fromNearby?.photoSource || 'place' };
   });
 
   if (changed) renderBearSwipeCard();
@@ -8376,7 +8400,7 @@ function syncSwipeDeckPhotosFromNearby () {
 
 async function enrichNearbyCardsRealPhotos () {
   const candidates = (_nearbyCards || [])
-    .filter(c => !safeUrl(c.photoUrl || ''))
+    .filter(c => !hasReliableNearbyCardPhoto(c))
     .filter(c => !c.isSaved)
     .slice(0, 8);
 
@@ -8385,11 +8409,11 @@ async function enrichNearbyCardsRealPhotos () {
   let changed = false;
   for (const card of candidates) {
     const url = await getOrFetchPlacePhoto(card);
-    if (!url) continue;
+    if (!url || !isLikelyRealPlacePhotoUrl(url)) continue;
     const idx = _nearbyCards.findIndex(c => String(c.key) === String(card.key));
     if (idx < 0) continue;
-    if (safeUrl(_nearbyCards[idx].photoUrl || '')) continue;
-    _nearbyCards[idx] = { ..._nearbyCards[idx], photoUrl: url, photoSource: 'wikipedia' };
+    if (hasReliableNearbyCardPhoto(_nearbyCards[idx])) continue;
+    _nearbyCards[idx] = { ..._nearbyCards[idx], photoUrl: url, photoSource: 'place' };
     changed = true;
   }
 
@@ -8460,10 +8484,10 @@ function setNearbyCards (cards = [], opts = {}) {
       const existingRaw = String(card.photoUrl || '').trim();
       const existing = safeUrl(existingRaw);
       const hasLocalFoodAsset = /^(\.\/)?assets\/food\//i.test(existingRaw);
-      const shouldForceLocal = !card.isSaved;
+      const canKeepExisting = card.isSaved ? !!existing : hasReliableNearbyCardPhoto(card);
 
-      if (!shouldForceLocal && existing) return card;
-      if (shouldForceLocal && hasLocalFoodAsset && existing) {
+      if (canKeepExisting) return card;
+      if (hasLocalFoodAsset && existing) {
         return { ...card, photoUrl: existing, photoSource: 'local' };
       }
 
@@ -8479,15 +8503,14 @@ function setNearbyCards (cards = [], opts = {}) {
       const pickedIndex = pool.length ? (miniHash(seed) % pool.length) : 0;
       const chosen = pool[pickedIndex] || safeUrl('assets/food/pizza.jpg');
 
-      return chosen
-        ? { ...card, photoUrl: chosen, photoSource: card.photoSource || 'local' }
-        : card;
+      return chosen ? { ...card, photoUrl: chosen, photoSource: 'local' } : card;
     });
   };
 
   _nearbyCards = assignDiverseNearbyFallbackPhotos(Array.isArray(cards) ? cards : []);
   _nearbyBannerMsg = String(opts.banner || '');
   renderNearbyCardsFromState();
+  enrichNearbyCardsRealPhotos();
 }
 
 function runNearbyLuckyBite () {
