@@ -44,9 +44,20 @@ const CUISINE_EMOJI = {
   chinese:'CHN',desserts:'DES',french:'FR',greek:'GR',indian:'IND',italian:'IT',
   japanese:'JP',korean:'KR',mediterranean:'MED',mexican:'MX',pizza:'PIZ',
   seafood:'SEA',steakhouse:'STK',sushi:'SUS',thai:'TH',vegan:'VGN',
-  vietnamese:'VN',default:'DIN'
+  vietnamese:'VN',default:''
 };
 const cuisineEmoji = c => CUISINE_EMOJI[(c||'').toLowerCase()] || CUISINE_EMOJI.default;
+
+function formatCuisineLabel (raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  return s
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .split(' ')
+    .map(w => w ? w[0].toUpperCase() + w.slice(1).toLowerCase() : '')
+    .join(' ');
+}
 
 /* ── Cuisine → gradient map ───────────────────────────────── */
 const CUISINE_GRAD = {
@@ -7868,9 +7879,9 @@ function renderNearbyHomeFallback (err = null) {
   if (localFallback.length) {
     list.innerHTML = `<div class="nearby-home-loading">Live lookup is busy. Showing your saved places within ${radiusMiles} mile${radiusMiles === 1 ? '' : 's'}.</div>` +
       localFallback.map(r => `<div class="nearby-home-card saved">
-        <div class="nearby-home-card-emoji">${cuisineEmoji(r.cuisine) || ''}</div>
+        ${cuisineEmoji(r.cuisine) ? `<div class="nearby-home-card-emoji">${cuisineEmoji(r.cuisine)}</div>` : ''}
         <div class="nearby-home-card-name" title="${escHtml(r.name)}">${escHtml(r.name)}</div>
-        ${r.cuisine ? `<div class="nearby-home-card-meta">${escHtml(r.cuisine)}</div>` : ''}
+        ${r.cuisine ? `<div class="nearby-home-card-meta">${escHtml(formatCuisineLabel(r.cuisine))}</div>` : ''}
         <div class="nearby-home-card-dist">${fmtDist(r._distMeters)}</div>
         <button class="btn-sm btn-secondary nearby-home-card-add" onclick="openDetailModal('${r.id}')">View</button>
       </div>`).join('');
@@ -7898,14 +7909,15 @@ function renderHomeDiscovery ({ elements }) {
     const isSaved = savedNames.has(normalizeName(name));
     const cuisine = (tags.cuisine || '').split(';')[0];
     const amenity = tags.amenity || 'restaurant';
-    const emoji   = cuisineEmoji(cuisine) || ({ restaurant:'', cafe:'☕', fast_food:'', bar:'' }[amenity] || '');
+    const emoji   = cuisineEmoji(cuisine);
+    const cuisineLabel = formatCuisineLabel(cuisine || amenity || 'Restaurant');
     const dist    = el._dist < Infinity ? fmtDist(el._dist) : '';
     const safe    = escHtml(name).replace(/'/g, "\\'");
     const safeCu  = escHtml(cuisine).replace(/'/g, "\\'");
     return `<div class="nearby-home-card${isSaved ? ' saved' : ''}">
-      <div class="nearby-home-card-emoji">${emoji}</div>
+      ${emoji ? `<div class="nearby-home-card-emoji">${emoji}</div>` : ''}
       <div class="nearby-home-card-name" title="${escHtml(name)}">${escHtml(name)}</div>
-      ${cuisine ? `<div class="nearby-home-card-meta">${escHtml(cuisine)}</div>` : ''}
+      <div class="nearby-home-card-meta">${escHtml(cuisineLabel)}</div>
       ${dist    ? `<div class="nearby-home-card-dist"> ${dist}</div>` : ''}
       ${isSaved
         ? '<div class="nearby-home-card-saved">✓ In your list</div>'

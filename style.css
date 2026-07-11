@@ -5533,22 +5533,37 @@ body[data-ui-motion='playful'] .restaurant-grid.card-enter-run .restaurant-card:
 
 .nearby-home-card {
   width: 100%;
-  background: var(--surface2);
-  border: 1px solid var(--border);
+  background: linear-gradient(160deg, var(--surface2), rgba(255,255,255,.03));
+  border: 1px solid rgba(255,255,255,.12);
   border-radius: 14px;
   padding: 12px 12px 10px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   animation: modal-in .2s ease;
 }
 .nearby-home-card.saved {
   border-color: var(--green);
   background: rgba(46,204,113,.06);
 }
-.nearby-home-card-emoji { font-size: 1.5rem; margin-bottom: 2px; }
+.nearby-home-card-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: .66rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+  color: var(--primary);
+  background: rgba(var(--primary-rgb), .14);
+  border: 1px solid rgba(var(--primary-rgb), .28);
+  margin-bottom: 2px;
+}
 .nearby-home-card-name {
-  font-size: .82rem;
+  font-size: .86rem;
   font-weight: 700;
   color: var(--text);
   white-space: nowrap;
@@ -5556,8 +5571,8 @@ body[data-ui-motion='playful'] .restaurant-grid.card-enter-run .restaurant-card:
   text-overflow: ellipsis;
 }
 .nearby-home-card-meta {
-  font-size: .71rem;
-  color: var(--text-dim);
+  font-size: .74rem;
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
