@@ -2592,11 +2592,14 @@ async function _discFetch () {
 
   try {
     const q = `[out:json][timeout:20];(node["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${radius},${lat},${lng});way["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${radius},${lat},${lng}););out center 60;`;
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 18000);
-    const resp  = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: q, signal: ctrl.signal });
-    clearTimeout(timer);
-    const json  = await resp.json();
+    const elementsRaw = await fetchOverpassElements(q, {
+      timeoutMs: 18000,
+      nominatimFallback: true,
+      lat,
+      lng,
+      radiusMeters: radius,
+      limit: 60,
+    });
 
     const savedNames = new Set(state.restaurants.map(r => normalizeName(r.name)));
     const myCuisines = {};
@@ -2605,7 +2608,7 @@ async function _discFetch () {
       myCuisines[c] = (myCuisines[c] || 0) + (r.myRating || 3);
     });
 
-    _discAllResults = (json.elements || [])
+    _discAllResults = (elementsRaw || [])
       .filter(el => el.tags?.name)
       .map(el => {
         const tags   = el.tags || {};
@@ -7129,6 +7132,123 @@ function getNearbyRadiusMeters () {
   return getNearbyRadiusMiles() * 1609.34;
 }
 
+async function fetchOverpassElements (query, opts = {}) {
+  const timeoutMs = Number(opts.timeoutMs) || 15000;
+  const endpoints = opts.endpoints || [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter'
+  ];
+
+  let lastErr = null;
+
+  for (const endpoint of endpoints) {
+    // Try form-encoded POST first (most compatible with public Overpass instances).
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), timeoutMs);
+      const body = new URLSearchParams({ data: query });
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        body,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        signal: ctrl.signal,
+      });
+      clearTimeout(t);
+      if (!resp.ok) throw new Error(`Overpass ${resp.status}`);
+      const json = await resp.json();
+      return (json.elements || []);
+    } catch (err) {
+      lastErr = err;
+    }
+
+    // Fallback to GET style query param.
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), timeoutMs);
+      const url = endpoint + '?data=' + encodeURIComponent(query);
+      const resp = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(t);
+      if (!resp.ok) throw new Error(`Overpass ${resp.status}`);
+      const json = await resp.json();
+      return (json.elements || []);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  if (opts.nominatimFallback && Number.isFinite(opts.lat) && Number.isFinite(opts.lng)) {
+    try {
+      const fallback = await fetchNominatimNearbyElements(
+        opts.lat,
+        opts.lng,
+        Number(opts.radiusMeters) || 1609,
+        Number(opts.limit) || 30
+      );
+      if (fallback.length) return fallback;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  throw lastErr || new Error('Nearby lookup unavailable');
+}
+
+async function fetchNominatimNearbyElements (lat, lng, radiusMeters = 1609, limit = 30) {
+  const safeLat = Number(lat);
+  const safeLng = Number(lng);
+  if (!Number.isFinite(safeLat) || !Number.isFinite(safeLng)) return [];
+
+  const dLat = radiusMeters / 111320;
+  const dLng = radiusMeters / (111320 * Math.max(0.2, Math.cos(safeLat * Math.PI / 180)));
+  const left = safeLng - dLng;
+  const right = safeLng + dLng;
+  const top = safeLat + dLat;
+  const bottom = safeLat - dLat;
+  const viewbox = `${left},${top},${right},${bottom}`;
+  const terms = ['restaurant', 'cafe', 'fast food', 'bar'];
+
+  const responses = await Promise.all(terms.map(async term => {
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&bounded=1&extratags=1&addressdetails=1&limit=${Math.max(6, Math.ceil(limit / terms.length))}&viewbox=${encodeURIComponent(viewbox)}&q=${encodeURIComponent(term)}`;
+    const resp = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    if (!resp.ok) return [];
+    const json = await resp.json();
+    return Array.isArray(json) ? json : [];
+  }));
+
+  const seen = new Set();
+  const merged = [];
+  responses.flat().forEach(item => {
+    const nLat = Number(item.lat);
+    const nLng = Number(item.lon);
+    if (!Number.isFinite(nLat) || !Number.isFinite(nLng)) return;
+
+    const name = String(item.name || item.display_name || '').split(',')[0].trim();
+    if (!name) return;
+
+    const key = `${normalizeName(name)}|${nLat.toFixed(5)}|${nLng.toFixed(5)}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    merged.push({
+      lat: nLat,
+      lon: nLng,
+      tags: {
+        name,
+        amenity: String(item.type || 'restaurant').replace(/_/g, ' '),
+        cuisine: item.extratags?.cuisine || '',
+        opening_hours: item.extratags?.opening_hours || '',
+        website: item.extratags?.website || '',
+        phone: item.extratags?.phone || '',
+        'addr:street': item.address?.road || item.address?.pedestrian || item.address?.suburb || '',
+        'addr:city': item.address?.city || item.address?.town || item.address?.village || item.address?.county || '',
+      },
+    });
+  });
+
+  return merged.slice(0, limit);
+}
+
 function getWeekStartIso () {
   const now = new Date();
   const start = new Date(now);
@@ -7702,12 +7822,15 @@ async function loadHomeDiscovery () {
     const { userLat: lat, userLng: lng } = state;
     const radiusMeters = Math.round(getNearbyRadiusMeters());
     const q = `[out:json][timeout:15];(node["amenity"~"restaurant|cafe|fast_food|bar"](around:${radiusMeters},${lat},${lng}););out body 30;`;
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 12000);
-    const resp = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: q, signal: ctrl.signal });
-    clearTimeout(t);
-    const json = await resp.json();
-    const raw = (json.elements || []).filter(el => el.tags?.name);
+    const elementsRaw = await fetchOverpassElements(q, {
+      timeoutMs: 12000,
+      nominatimFallback: true,
+      lat,
+      lng,
+      radiusMeters,
+      limit: 30,
+    });
+    const raw = (elementsRaw || []).filter(el => el.tags?.name);
     const withDist = raw.map(el => {
       const elLat = el.lat ?? el.center?.lat;
       const elLon = el.lon ?? el.center?.lon;
@@ -7853,16 +7976,17 @@ async function runDiscover () {
   // Overpass API query: restaurants + cafes within radius
   const lat = state.userLat, lng = state.userLng;
   const overpassQuery = `[out:json][timeout:15];(node["amenity"~"restaurant|cafe|fast_food|bar"](around:${radius},${lat},${lng}););out body 30;`;
-  const overpassUrl = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(overpassQuery);
 
   try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 12000);
-    const resp = await fetch(overpassUrl, { signal: ctrl.signal });
-    clearTimeout(t);
-    if (!resp.ok) throw new Error(`Overpass error ${resp.status}`);
-    const json = await resp.json();
-    const elements = (json.elements || []).filter(el => el.tags?.name);
+    const elementsRaw = await fetchOverpassElements(overpassQuery, {
+      timeoutMs: 12000,
+      nominatimFallback: true,
+      lat,
+      lng,
+      radiusMeters: radius,
+      limit: 30,
+    });
+    const elements = (elementsRaw || []).filter(el => el.tags?.name);
 
     if (!elements.length) {
       resultsEl.innerHTML = '<div class="discover-empty">No places found nearby. Try a larger radius.</div>';
@@ -9343,14 +9467,8 @@ async function runOpenNowSearch () {
   const query = `[out:json][timeout:20];(node["amenity"~"restaurant|cafe|fast_food|bar"]["opening_hours"](around:${radius},${lat},${lng}););out body 40;`;
 
   try {
-    const ctrl2 = new AbortController();
-    const t2 = setTimeout(() => ctrl2.abort(), 18000);
-    const resp = await fetch('https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query), {
-      signal: ctrl2.signal
-    });
-    clearTimeout(t2);
-    const json = await resp.json();
-    const elements = (json.elements || []).filter(el => el.tags?.name);
+    const elementsRaw = await fetchOverpassElements(query, { timeoutMs: 18000 });
+    const elements = (elementsRaw || []).filter(el => el.tags?.name);
 
     if (!elements.length) {
       resultsEl.innerHTML = '<div class="open-now-loading">No places found nearby. Try increasing the radius.</div>';
