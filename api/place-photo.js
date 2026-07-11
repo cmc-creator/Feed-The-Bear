@@ -57,7 +57,10 @@ function pickBestPageFromQuery (queryJson, name) {
     .map(p => ({ p, score: scoreTitle(p?.title || '', name) }))
     .sort((a, b) => b.score - a.score);
 
-  return ranked[0]?.p || null;
+  // Require the page title to actually match the venue name - otherwise
+  // geosearch returns city/neighborhood pages (skylines, city halls).
+  if (!ranked[0] || ranked[0].score < 0.6) return null;
+  return ranked[0].p;
 }
 
 async function lookupByGeo (name, lat, lon) {
@@ -104,7 +107,7 @@ async function lookupByTitleSearch (name, city = '') {
     }))
     .sort((a, b) => b.score - a.score)[0];
 
-  if (!best?.pageid) return null;
+  if (!best?.pageid || best.score < 0.6) return null;
 
   const pageUrl = new URL(WIKI_API);
   pageUrl.searchParams.set('action', 'query');

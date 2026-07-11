@@ -8415,9 +8415,15 @@ async function enrichNearbyCardsRealPhotos () {
 
   if (!candidates.length) return;
 
-  const results = await Promise.allSettled(
-    candidates.map(async card => ({ card, url: await getOrFetchPlacePhoto(card) }))
-  );
+  // Small batches so we do not trip provider rate limits (Yelp ~5 QPS).
+  const results = [];
+  for (let i = 0; i < candidates.length; i += 3) {
+    const batch = candidates.slice(i, i + 3);
+    const settled = await Promise.allSettled(
+      batch.map(async card => ({ card, url: await getOrFetchPlacePhoto(card) }))
+    );
+    results.push(...settled);
+  }
 
   let changed = false;
   for (const r of results) {
