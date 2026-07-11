@@ -8803,6 +8803,58 @@ const BEAR_SWIPE_LOCAL_FALLBACKS = [
   'assets/textures/forest1.jpg'
 ];
 
+const BEAR_SWIPE_LOCAL_FOOD_IMAGES = {
+  pancakes: 'assets/food/pancakes.jpg',
+  waffles: 'assets/food/waffles.jpg',
+  omelette: 'assets/food/omelette.jpg',
+  french_toast: 'assets/food/french_toast.jpg',
+  eggs_benedict: 'assets/food/eggs_benedict.jpg',
+  burger: 'assets/food/burger.jpg',
+  fries: 'assets/food/fries.jpg',
+  pizza: 'assets/food/pizza.jpg',
+  pasta: 'assets/food/pasta.jpg',
+  lasagna: 'assets/food/lasagna.jpg',
+  gnocchi: 'assets/food/gnocchi.jpg',
+  italian_pasta: 'assets/food/italian_pasta.jpg',
+  sushi: 'assets/food/sushi.jpg',
+  ramen: 'assets/food/ramen.jpg',
+  udon: 'assets/food/udon.jpg',
+  dumplings: 'assets/food/dumplings.jpg',
+  fried_rice: 'assets/food/fried_rice.jpg',
+  chow_mein: 'assets/food/chow_mein.jpg',
+  biryani: 'assets/food/biryani.jpg',
+  butter_chicken: 'assets/food/butter_chicken.jpg',
+  tikka_masala: 'assets/food/tikka_masala.jpg',
+  dosa: 'assets/food/dosa.jpg',
+  indian_curry: 'assets/food/indian_curry.jpg',
+  pad_thai: 'assets/food/pad_thai.jpg',
+  thai_curry: 'assets/food/thai_curry.jpg',
+  pho: 'assets/food/pho.jpg',
+  banh_mi: 'assets/food/banh_mi.jpg',
+  tacos: 'assets/food/tacos.jpg',
+  burrito: 'assets/food/burrito.jpg',
+  quesadilla: 'assets/food/quesadilla.jpg',
+  enchiladas: 'assets/food/enchiladas.jpg',
+  shawarma: 'assets/food/shawarma.jpg',
+  kebab: 'assets/food/kebab.jpg',
+  falafel: 'assets/food/falafel.jpg',
+  steak: 'assets/food/steak.jpg',
+  seafood: 'assets/food/seafood.jpg',
+  salmon: 'assets/food/salmon.jpg',
+  shrimp: 'assets/food/shrimp.jpg',
+  fried_chicken: 'assets/food/fried_chicken.jpg',
+  mac_and_cheese: 'assets/food/mac_and_cheese.jpg',
+  grilled_cheese: 'assets/food/grilled_cheese.jpg',
+  caesar_salad: 'assets/food/caesar_salad.jpg',
+  poke_bowl: 'assets/food/poke_bowl.jpg',
+  bibimbap: 'assets/food/bibimbap.jpg',
+  korean_bbq: 'assets/food/korean_bbq.jpg',
+  paella: 'assets/food/paella.jpg',
+  gelato: 'assets/food/gelato.jpg',
+  cheesecake: 'assets/food/cheesecake.jpg',
+  churros: 'assets/food/churros.jpg',
+};
+
 const BEAR_SWIPE_FOOD_BANK = {
   breakfast: [['pancakes', 'breakfast'], ['waffles', 'brunch'], ['omelette', 'breakfast']],
   burgers: [['burger', 'fries'], ['cheeseburger', 'food'], ['smashburger', 'burger']],
@@ -8826,6 +8878,61 @@ const BEAR_SWIPE_FOOD_BANK = {
 
 function getCuisineBankPairs (key = 'default') {
   return BEAR_SWIPE_FOOD_BANK[key] || BEAR_SWIPE_FOOD_BANK.default;
+}
+
+function getLocalDishCandidates (raw = '', key = 'default') {
+  const picks = [];
+  const add = k => {
+    const url = BEAR_SWIPE_LOCAL_FOOD_IMAGES[k];
+    if (url && !picks.includes(url)) picks.push(url);
+  };
+
+  const text = String(raw || '').toLowerCase();
+
+  if (/(penne|vodka|lasagna|gnocchi|spaghetti|carbonara|alfredo|ravioli|pasta)/.test(text)) add('italian_pasta');
+  if (/(pancake|waffle|french toast|eggs benedict|hash brown|omelette|breakfast|brunch)/.test(text)) ['pancakes', 'waffles', 'french_toast', 'eggs_benedict', 'omelette'].forEach(add);
+  if (/(burger|cheeseburger|fries|smash burger)/.test(text)) ['burger', 'fries'].forEach(add);
+  if (/(pizza|margherita|deep dish|pepperoni)/.test(text)) add('pizza');
+  if (/(sushi|nigiri|sashimi|chirashi|roll)/.test(text)) add('sushi');
+  if (/(ramen|udon|tsukemen|tonkotsu|shoyu|miso ramen)/.test(text)) ['ramen', 'udon'].forEach(add);
+  if (/(taco|burrito|quesadilla|enchilada|birria|al pastor|pozole)/.test(text)) ['tacos', 'burrito', 'quesadilla', 'enchiladas'].forEach(add);
+  if (/(korean|bibimbap|kimchi|tteokbokki|japchae|korean bbq)/.test(text)) ['bibimbap', 'korean_bbq'].forEach(add);
+  if (/(dumpling|fried rice|chow mein|mapo|peking|dim sum|bao|kung pao)/.test(text)) ['dumplings', 'fried_rice', 'chow_mein'].forEach(add);
+  if (/(biryani|butter chicken|tandoori|paneer|masala|naan|dal|dosa|indian)/.test(text)) ['biryani', 'butter_chicken', 'tikka_masala', 'dosa', 'indian_curry'].forEach(add);
+  if (/(pad thai|thai curry|tom yum|pad see ew|thai basil)/.test(text)) ['pad_thai', 'thai_curry'].forEach(add);
+  if (/(shawarma|kebab|falafel|hummus)/.test(text)) ['kebab', 'shawarma', 'falafel'].forEach(add);
+  if (/(seafood|salmon|shrimp|fish|lobster|octopus|paella)/.test(text)) ['seafood', 'salmon', 'shrimp', 'paella'].forEach(add);
+  if (/(steak|ribeye|filet|sirloin|prime rib|steakhouse)/.test(text)) add('steak');
+  if (/(cake|gelato|dessert|donut|donuts|churro|cheesecake|tiramisu|pastry)/.test(text)) ['gelato', 'cheesecake', 'churros'].forEach(add);
+  if (/(sandwich|blt|grilled cheese|toastie|panini|banh mi)/.test(text)) ['banh_mi', 'grilled_cheese'].forEach(add);
+  if (/(american|fried chicken|mac|meatloaf|comfort food|diner)/.test(text)) ['fried_chicken', 'mac_and_cheese', 'burger'].forEach(add);
+  if (/(salad|caesar|cobb|greek)/.test(text)) add('caesar_salad');
+  if (/(poke)/.test(text)) add('poke_bowl');
+  if (/(pho)/.test(text)) add('pho');
+
+  const byCuisine = {
+    breakfast: ['pancakes', 'waffles', 'french_toast', 'eggs_benedict', 'omelette'],
+    burgers: ['burger', 'fries'],
+    pizza: ['pizza'],
+    sushi: ['sushi'],
+    ramen: ['ramen', 'udon'],
+    mexican: ['tacos', 'burrito', 'quesadilla', 'enchiladas'],
+    italian: ['italian_pasta', 'pasta', 'lasagna', 'gnocchi'],
+    korean: ['bibimbap', 'korean_bbq'],
+    chinese: ['dumplings', 'fried_rice', 'chow_mein'],
+    indian: ['biryani', 'butter_chicken', 'tikka_masala', 'dosa', 'indian_curry'],
+    thai: ['pad_thai', 'thai_curry'],
+    bbq: ['kebab', 'shawarma', 'steak'],
+    seafood: ['seafood', 'salmon', 'shrimp', 'paella'],
+    steakhouse: ['steak'],
+    desserts: ['gelato', 'cheesecake', 'churros'],
+    sandwich: ['banh_mi', 'grilled_cheese'],
+    american: ['fried_chicken', 'mac_and_cheese', 'burger'],
+    default: ['pizza', 'pasta', 'ramen', 'fried_chicken'],
+  };
+
+  (byCuisine[key] || byCuisine.default).forEach(add);
+  return picks;
 }
 
 function getMoodFoodImageCandidates (term = 'food', seed = '') {
@@ -8875,27 +8982,8 @@ function getMoodFoodImageCandidates (term = 'food', seed = '') {
   const picks = variants[key] || variants.default;
   const hash = Math.abs(miniHash(`${key}|${seed || Date.now()}`));
   const phrase = picks[hash % picks.length];
-  const sig = hash % 100000;
-  const bank = getCuisineBankPairs(key);
-  const pairA = bank[hash % bank.length] || ['food', 'dish'];
-  const pairB = bank[(hash + 1) % bank.length] || pairA;
-  const rawTokens = raw
-    .replace(/[^a-z0-9\s-]/g, ' ')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 3);
-  const tokenA = rawTokens[0] || pairA[0] || 'food';
-  const tokenB = rawTokens[1] || pairA[1] || 'dish';
-  const safePhrase = encodeURIComponent(phrase || `${tokenA} ${tokenB}`);
-
-  return [
-    `https://loremflickr.com/960/640/${tokenA},${tokenB},food?lock=${sig + 1}`,
-    `https://loremflickr.com/960/640/${pairA[0]},${pairA[1]}?lock=${sig}`,
-    `https://loremflickr.com/960/640/${pairB[0]},${pairB[1]}?lock=${sig + 7}`,
-    `https://loremflickr.com/960/640/${safePhrase.replace(/%20/g, ',')}?lock=${sig + 13}`,
-    ...BEAR_SWIPE_LOCAL_FALLBACKS,
-  ];
+  const local = getLocalDishCandidates(raw || phrase, key);
+  return [...local, ...BEAR_SWIPE_LOCAL_FALLBACKS];
 }
 
 function getMoodFoodImage (term = 'food', seed = '') {
