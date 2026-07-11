@@ -2555,7 +2555,7 @@ function renderAll () {
   updateLocationBanner();
   // Home sections are isolated: a failure in one must never cascade and
   // abort renderAll (which would leave later init wiring unattached).
-  [renderWeeklyGoal, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome, renderDailyQuestHome]
+  [renderWeeklyGoal, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
     .forEach(fn => { try { fn(); } catch (err) { console.error(`${fn.name} failed:`, err); } });
 }
 
@@ -4752,11 +4752,6 @@ function setupEvents () {
   document.getElementById('add-btn')?.addEventListener('click', openAddModal);
   document.getElementById('empty-add-btn')?.addEventListener('click', openAddModal);
 
-  // Header Daily Quest
-  document.getElementById('header-daily-quest-btn')?.addEventListener('click', () => {
-    onDailyQuestPrimaryClick();
-  });
-
   // Modal close
   document.getElementById('modal-close-btn').addEventListener('click', closeModal);
   document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
@@ -5512,11 +5507,11 @@ function setupEvents () {
     _moodCalMonth++; if (_moodCalMonth > 11) { _moodCalMonth = 0; _moodCalYear++; } _renderMoodCal();
   });
 
-  // Phase 12 - Daily Challenge
-  document.getElementById('dailychallenge-close-btn').addEventListener('click', safeFn('closeDailyChallenge'));
-  document.getElementById('dailychallenge-overlay').addEventListener('click', e => { if (e.target === document.getElementById('dailychallenge-overlay')) safeFn('closeDailyChallenge')(); });
-  document.getElementById('dc-complete-btn').addEventListener('click', safeFn('completeDailyChallenge'));
-  document.getElementById('dc-skip-btn').addEventListener('click', safeFn('skipDailyChallenge'));
+  // Phase 12 - Daily Challenge (disabled)
+  document.getElementById('dailychallenge-close-btn')?.addEventListener('click', safeFn('closeDailyChallenge'));
+  document.getElementById('dailychallenge-overlay')?.addEventListener('click', e => { if (e.target === document.getElementById('dailychallenge-overlay')) safeFn('closeDailyChallenge')(); });
+  document.getElementById('dc-complete-btn')?.addEventListener('click', safeFn('completeDailyChallenge'));
+  document.getElementById('dc-skip-btn')?.addEventListener('click', safeFn('skipDailyChallenge'));
 
   // Phase 13 - Visit Log
   document.getElementById('visitlog-close-btn').addEventListener('click', safeFn('closeVisitLog'));
@@ -7637,7 +7632,6 @@ const TOOL_ACTIONS = {
   'fortune':          openFortune,
   'moodcal':          openMoodCal,
   'feedbear':         openFeedBearGame,
-  'dailychallenge':   openDailyChallenge,
   'passport':         openPassport,
   'worldmap':         openWorldMap,
   'visitlog':         openVisitLog,
@@ -7678,7 +7672,7 @@ const HUB_SECTIONS = [
   ]},
   { title: ' Play & earn', items: [
     ['challenge','','Challenges'], ['achievements','','Achievements'],
-    ['bingo','','Cuisine Bingo'], ['dailychallenge','','Daily Challenge'],
+    ['bingo','','Cuisine Bingo'],
     ['feedbear','','Feed the Bear'], ['passport','','Passport'],
     ['moodcal','','Mood Calendar'],
   ]},
@@ -10207,7 +10201,6 @@ function initHomeDiscoverySection () {
   renderForYouHome();
   renderWeeklyRecapHome();
   renderMoodPicksHome();
-  renderDailyQuestHome();
   if (state.userLat && state.userLng) {
     loadHomeDiscovery();
   } else {
@@ -10249,7 +10242,6 @@ async function loadHomeDiscovery () {
     renderForYouHome();
     renderWeeklyRecapHome();
     renderMoodPicksHome();
-    renderDailyQuestHome();
     loadAiRec(_homeDiscCache);
     return;
   }
@@ -10263,7 +10255,6 @@ async function loadHomeDiscovery () {
     renderForYouHome();
     renderWeeklyRecapHome();
     renderMoodPicksHome();
-    renderDailyQuestHome();
     loadAiRec(_homeDiscCache);
   }
 
@@ -10301,7 +10292,6 @@ async function loadHomeDiscovery () {
     renderForYouHome();
     renderWeeklyRecapHome();
     renderMoodPicksHome();
-    renderDailyQuestHome();
     loadAiRec(_homeDiscCache);
   } catch (err) {
     renderNearbyHomeFallback(err);
@@ -12743,15 +12733,18 @@ function _initDailyChallenge () {
   return dc;
 }
 function openDailyChallenge () {
-  document.getElementById('dailychallenge-overlay').classList.remove('hidden');
+  const overlay = document.getElementById('dailychallenge-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('hidden');
   document.body.classList.add('overlay-open');
   _renderDailyChallenge();
 }
 function closeDailyChallenge () {
-  document.getElementById('dailychallenge-overlay').classList.add('hidden');
+  document.getElementById('dailychallenge-overlay')?.classList.add('hidden');
   maybeHideOverlay();
 }
 function _renderDailyChallenge () {
+  if (!document.getElementById('dailychallenge-overlay')) return;
   const dc = _initDailyChallenge();
   document.getElementById('dc-streak-count').textContent = dc.streak || 0;
   document.getElementById('dc-xp-count').textContent = dc.xp || 0;

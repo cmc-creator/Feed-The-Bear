@@ -356,7 +356,6 @@
       <button id="settings-btn" class="icon-btn" title="Settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.36.14.76.22 1.17.22H21a2 2 0 1 1 0 4h-.43c-.41 0-.81.08-1.17.22z"/></svg>
       </button>
-      <button id="header-daily-quest-btn" class="daily-quest-pulse-btn header-quest-btn" type="button" title="Daily Quest" aria-label="Daily Quest" style="--quest-arc:280deg;"><span class="daily-quest-pulse-core">DQ</span></button>
       <button id="chat-toggle-btn" class="chat-toggle-btn" title="Byte Cub Chat">
         <span class="nav-badge-text">Byte Cub</span><span>Ask Byte Cub</span>
       </button>
@@ -379,7 +378,6 @@
           <button class="more-menu-item" data-more="duel">Restaurant Duel</button>
           <button class="more-menu-item" data-more="bingo">Cuisine Bingo</button>
           <button class="more-menu-item" data-more="fortune">Fortune Cookie</button>
-          <button class="more-menu-item" data-more="dailychallenge">Daily Challenge</button>
           <button class="more-menu-item" data-more="moodcal">Mood Calendar</button>
           <button class="more-menu-item" data-more="feedbear">Feed the Bear!</button>
           <button class="more-menu-item" data-more="passport">Foodie Passport</button>
@@ -714,7 +712,6 @@
       </div>
       <div id="today-status-row" class="today-status-row home-module" aria-label="Today status"></div>
       <div id="today-vibe-row" class="today-vibe-row home-module" aria-label="Tonight vibe"></div>
-      <div id="daily-quest-home" class="daily-quest-home" aria-label="Daily quest"></div>
       <!-- Personal recommendation strip -->
       <div id="for-you-home" class="for-you-home home-module hidden">
         <div class="for-you-home-header">
@@ -800,8 +797,17 @@
 
   <footer class="app-footer" aria-label="App footer">
     <div class="app-footer-inner">
-      <span class="app-footer-brand">Feed The Bear</span>
-      <span class="app-footer-copy">Save your favorites, find your next bite, and keep the den delicious.</span>
+      <div class="app-footer-left">
+        <span class="app-footer-brand">Feed The Bear</span>
+        <span class="app-footer-copy">Save favorites, discover nearby, and decide faster.</span>
+      </div>
+      <div class="app-footer-right">
+        <span class="app-footer-item">Map</span>
+        <span class="app-footer-dot">•</span>
+        <span class="app-footer-item">Stats</span>
+        <span class="app-footer-dot">•</span>
+        <span class="app-footer-item">Byte Cub</span>
+      </div>
     </div>
   </footer>
 
@@ -2232,40 +2238,6 @@
       </div>
       <div id="moodcal-grid" class="moodcal-grid"></div>
       <div id="moodcal-detail" class="moodcal-detail hidden"></div>
-    </div>
-  </div>
-
-  <!--  Daily Foodie Challenge -->
-  <div id="dailychallenge-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="dailychallenge-title">
-    <div class="modal-card dailychallenge-card">
-      <div class="modal-header">
-        <h2 id="dailychallenge-title">Daily Challenge</h2>
-        <button id="dailychallenge-close-btn" class="icon-btn" aria-label="Close">✕</button>
-      </div>
-      <div class="dc-streak-row">
-        <div class="dc-streak-badge">
-          <span class="dc-streak-flame">STREAK</span>
-          <span id="dc-streak-count" class="dc-streak-count">0</span>
-          <span class="dc-streak-label">day streak</span>
-        </div>
-        <div class="dc-xp-badge">
-          <span id="dc-xp-count" class="dc-xp-count">0</span>
-          <span class="dc-xp-label">XP</span>
-        </div>
-      </div>
-      <div id="dc-challenge-card" class="dc-challenge-card">
-        <div class="dc-challenge-emoji" id="dc-emoji">GO</div>
-        <div class="dc-challenge-text" id="dc-text">Loading today's challenge…</div>
-        <div class="dc-challenge-desc" id="dc-desc"></div>
-      </div>
-      <div class="dc-actions">
-        <button id="dc-complete-btn" class="btn-primary dc-complete-btn">Mark Complete</button>
-        <button id="dc-skip-btn" class="btn-sm">Skip today</button>
-      </div>
-      <div id="dc-completed-banner" class="dc-completed-banner hidden">
-          <span>Challenge completed! +25 XP</span>
-      </div>
-      <div id="dc-history" class="dc-history"></div>
     </div>
   </div>
 
