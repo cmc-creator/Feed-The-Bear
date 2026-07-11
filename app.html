@@ -657,6 +657,15 @@
         <button id="ai-rec-refresh-btn" class="ai-rec-refresh" title="Refresh recommendation">↻</button>
       </div>
       <div class="home-quick-actions home-module" id="home-quick-actions" aria-label="Quick actions">
+        <button class="home-quick-btn" id="home-quick-decision-btn" type="button">
+          <span class="home-quick-emoji" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M9 12h6"/></svg>
+          </span>
+          <span class="home-quick-copy">
+            <span class="home-quick-label">Decision Mode</span>
+            <span class="home-quick-sub">Top 3 in under a minute</span>
+          </span>
+        </button>
         <button class="home-quick-btn" id="home-quick-pick-btn" type="button">
           <span class="home-quick-emoji" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.8 5.7L21 10l-4.5 4.4L17.6 21 12 18l-5.6 3 1.1-6.6L3 10l6.2-.3L12 3z"/></svg>
@@ -896,6 +905,60 @@
       </div>
       <button id="smart-plan-run-btn" class="btn-primary smart-plan-run-btn">Build Plan</button>
       <div id="smart-plan-results" class="smart-plan-results"></div>
+    </div>
+  </div>
+
+  <!-- ── Decision Mode ──────────────────────────────────── -->
+  <div id="decision-mode-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="decision-mode-title">
+    <div class="modal-card decision-mode-card">
+      <div class="modal-header">
+        <h2 id="decision-mode-title">Decision Mode</h2>
+        <button id="decision-mode-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="dish-board-subtitle">Set quick constraints, then get your top 3 with one clear winner.</p>
+
+      <div id="decision-mode-grid" class="decision-mode-grid">
+        <div class="decision-mode-group" id="decision-mode-mood" aria-label="Mood">
+          <div class="decision-mode-label">Mood</div>
+          <div class="decision-mode-chips">
+            <button class="decision-chip active" data-group="mood" data-value="quick" type="button">Quick</button>
+            <button class="decision-chip" data-group="mood" data-value="date" type="button">Date</button>
+            <button class="decision-chip" data-group="mood" data-value="comfort" type="button">Comfort</button>
+            <button class="decision-chip" data-group="mood" data-value="healthy" type="button">Light</button>
+          </div>
+        </div>
+
+        <div class="decision-mode-group" id="decision-mode-budget" aria-label="Budget">
+          <div class="decision-mode-label">Budget</div>
+          <div class="decision-mode-chips">
+            <button class="decision-chip active" data-group="budget" data-value="0" type="button">Any</button>
+            <button class="decision-chip" data-group="budget" data-value="1" type="button">$</button>
+            <button class="decision-chip" data-group="budget" data-value="2" type="button">$$</button>
+            <button class="decision-chip" data-group="budget" data-value="3" type="button">$$$+</button>
+          </div>
+        </div>
+
+        <div class="decision-mode-group" id="decision-mode-distance" aria-label="Distance">
+          <div class="decision-mode-label">Distance</div>
+          <div class="decision-mode-chips">
+            <button class="decision-chip" data-group="miles" data-value="2" type="button">2 mi</button>
+            <button class="decision-chip active" data-group="miles" data-value="5" type="button">5 mi</button>
+            <button class="decision-chip" data-group="miles" data-value="10" type="button">10 mi</button>
+          </div>
+        </div>
+
+        <div class="decision-mode-group" id="decision-mode-party" aria-label="Party size">
+          <div class="decision-mode-label">Party Size</div>
+          <div class="decision-mode-chips">
+            <button class="decision-chip" data-group="party" data-value="1" type="button">Solo</button>
+            <button class="decision-chip active" data-group="party" data-value="2" type="button">2</button>
+            <button class="decision-chip" data-group="party" data-value="4" type="button">4+</button>
+          </div>
+        </div>
+      </div>
+
+      <button id="decision-mode-run-btn" class="btn-primary smart-plan-run-btn" type="button">Get My Top 3</button>
+      <div id="decision-mode-results" class="decision-mode-results"></div>
     </div>
   </div>
 

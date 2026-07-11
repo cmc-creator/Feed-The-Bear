@@ -30,6 +30,7 @@ if (typeof AI === 'undefined') {
 const STORAGE_KEY   = 'ftb_restaurants_v2';
 const SETTINGS_KEY  = 'ftb_settings_v1';
 const SWIPE_PREFS_KEY = 'ftb_swipe_prefs_v1';
+const PRODUCT_EVENTS_KEY = 'ftb_product_events_v1';
 const USER_KEY      = 'ftb_user_v1';
 const DAILY_QUEST_KEY = 'ftb_daily_quest_v1';
 const LOCATION_BANNER_DISMISSED_KEY = 'ftb_location_banner_dismissed_v1';
@@ -527,6 +528,37 @@ function saveData () {
   setTimeout(renderWeeklyGoal, 0);
   // Sync to Firestore if user is signed in (debounced)
   if (typeof fbDebouncedSync === 'function') fbDebouncedSync();
+}
+
+function loadProductEvents () {
+  try {
+    const raw = localStorage.getItem(PRODUCT_EVENTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== 'object') return { counts: {}, recent: [] };
+    if (!parsed.counts || typeof parsed.counts !== 'object') parsed.counts = {};
+    if (!Array.isArray(parsed.recent)) parsed.recent = [];
+    return parsed;
+  } catch {
+    return { counts: {}, recent: [] };
+  }
+}
+
+function trackProductEvent (eventName, payload = {}) {
+  const name = String(eventName || '').trim();
+  if (!name) return;
+  const store = loadProductEvents();
+  store.counts[name] = Number(store.counts[name] || 0) + 1;
+  store.recent.unshift({
+    name,
+    ts: Date.now(),
+    payload: payload && typeof payload === 'object' ? payload : {},
+  });
+  store.recent = store.recent.slice(0, 120);
+  try {
+    localStorage.setItem(PRODUCT_EVENTS_KEY, JSON.stringify(store));
+  } catch {
+    // Best-effort analytics.
+  }
 }
 
 function loadSwipePrefs () {
@@ -3957,6 +3989,233 @@ function closeSmartPlanner () {
   maybeHideOverlay();
 }
 
+let _decisionModeState = {
+  mood: 'quick',
+  budget: 0,
+  miles: 5,
+  party: 2,
+};
+
+function resetDecisionModeState () {
+  _decisionModeState = {
+    mood: 'quick',
+    budget: 0,
+    miles: 5,
+    party: 2,
+  };
+}
+
+function syncDecisionModeChips () {
+  document.querySelectorAll('.decision-chip[data-group][data-value]').forEach(btn => {
+    const group = btn.dataset.group;
+    const value = btn.dataset.value;
+    const current = _decisionModeState[group];
+    btn.classList.toggle('active', String(current) === String(value));
+  });
+}
+
+function setDecisionModeConstraint (group, value) {
+  if (!group) return;
+  if (group === 'mood') {
+    _decisionModeState.mood = String(value || 'quick');
+  } else if (group === 'budget') {
+    _decisionModeState.budget = Math.max(0, Number(value || 0));
+  } else if (group === 'miles') {
+    _decisionModeState.miles = Math.max(1, Number(value || 5));
+  } else if (group === 'party') {
+    _decisionModeState.party = Math.max(1, Number(value || 2));
+  }
+  syncDecisionModeChips();
+}
+
+function openDecisionMode () {
+  resetDecisionModeState();
+  syncDecisionModeChips();
+  const out = document.getElementById('decision-mode-results');
+  if (out) out.innerHTML = '';
+  document.getElementById('decision-mode-overlay')?.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  trackProductEvent('decision_session_started', {
+    from: 'home',
+    locationEnabled: !!state.locationEnabled,
+    restaurantCount: Number(state.restaurants.length || 0),
+  });
+}
+
+function closeDecisionMode () {
+  document.getElementById('decision-mode-overlay')?.classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function decisionConfidenceLabel (level = 0) {
+  if (level >= 0.8) return 'High';
+  if (level >= 0.5) return 'Medium';
+  return 'Low';
+}
+
+function buildDecisionModeShortlist () {
+  const mood = _decisionModeState.mood || 'quick';
+  const budget = Number(_decisionModeState.budget || 0);
+  const maxMeters = Math.max(1, Number(_decisionModeState.miles || 5)) * 1609.34;
+  const party = Math.max(1, Number(_decisionModeState.party || 2));
+
+  const scored = state.restaurants.map(r => {
+    const distance = distOf(r);
+    let score = scoreMoodPick(r, mood);
+
+    if (budget > 0) {
+      if ((r.priceRange || 0) > budget) score -= 3.2;
+      if ((r.priceRange || 0) > 0 && (r.priceRange || 0) <= budget) score += 0.9;
+    }
+
+    if (Number.isFinite(distance)) {
+      if (distance <= maxMeters) score += 1.2;
+      else score -= Math.min(2.4, (distance - maxMeters) / 2200);
+    }
+
+    const cuisine = String(r.cuisine || '').toLowerCase();
+    if (party >= 4) {
+      if ((r.priceRange || 0) <= 2) score += 0.8;
+      if (/(pizza|mexican|american|bbq|thai|chinese|italian)/.test(cuisine)) score += 0.8;
+    } else if (party === 1) {
+      if (/(cafe|japanese|sushi|mediterranean|vietnamese|thai)/.test(cuisine)) score += 0.6;
+    }
+
+    const imageConfidence = safeUrl(r.photo || '') ? 0.9 : 0.55;
+    const menuConfidence = r.website ? 0.9 : (r.address ? 0.55 : 0.35);
+    const distanceConfidence = Number.isFinite(distance)
+      ? (distance <= maxMeters ? 0.92 : distance <= maxMeters * 1.5 ? 0.62 : 0.35)
+      : 0.42;
+
+    const reasons = [];
+    reasons.push(mood === 'date' ? 'date-night fit' : mood === 'comfort' ? 'comfort match' : mood === 'healthy' ? 'lighter option' : 'fast decision pick');
+    if (budget > 0 && (r.priceRange || 0) > 0 && (r.priceRange || 0) <= budget) reasons.push('inside budget');
+    if (Number.isFinite(distance) && distance <= maxMeters) reasons.push('close enough now');
+    if (party >= 4 && (r.priceRange || 0) <= 2) reasons.push('good for groups');
+    if (!reasons.length) reasons.push('balanced overall score');
+
+    return {
+      r,
+      score,
+      distance,
+      imageConfidence,
+      menuConfidence,
+      distanceConfidence,
+      reasons,
+    };
+  });
+
+  return scored
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+}
+
+function renderDecisionModeResults (shortlist = []) {
+  const out = document.getElementById('decision-mode-results');
+  if (!out) return;
+
+  if (!state.restaurants.length) {
+    out.innerHTML = '<div class="dish-empty">Add a few spots first, then Decision Mode can pick your winner.</div>';
+    return;
+  }
+
+  if (!shortlist.length) {
+    out.innerHTML = '<div class="dish-empty">No matches yet. Try widening distance or budget.</div>';
+    return;
+  }
+
+  out.innerHTML = shortlist.map((item, idx) => {
+    const r = item.r;
+    const rankLabel = idx === 0 ? 'Winner' : `Option ${idx + 1}`;
+    const distText = Number.isFinite(item.distance) ? fmtDist(item.distance) : 'distance n/a';
+    const menuUrl = buildMenuSearchUrl({ name: r.name, address: r.address || '' });
+    const directionsUrl = buildGoogleDirectionsUrl({ name: r.name, address: r.address || '', lat: r.lat, lon: r.lng });
+    const canMenu = !!menuUrl;
+    const canDirections = !!directionsUrl;
+    const fit = Math.max(40, Math.min(99, Math.round(item.score * 9.5)));
+
+    return `<article class="decision-result-card${idx === 0 ? ' winner' : ''}" data-id="${r.id}">
+      <div class="decision-result-top">
+        <span class="decision-result-rank">${rankLabel}</span>
+        <span class="decision-result-fit">${fit}% fit</span>
+      </div>
+      <div class="decision-result-name">${escHtml(r.name || 'Restaurant')}</div>
+      <div class="decision-result-meta">${escHtml(r.cuisine || 'Restaurant')} • ${distText}${r.priceRange ? ` • ${'$'.repeat(Math.max(1, Math.min(4, Number(r.priceRange))))}` : ''}</div>
+      <div class="decision-result-why">${escHtml(item.reasons.slice(0, 2).join(' • '))}</div>
+      <div class="decision-result-confidence">
+        <span>Image: ${decisionConfidenceLabel(item.imageConfidence)}</span>
+        <span>Menu: ${decisionConfidenceLabel(item.menuConfidence)}</span>
+        <span>Distance: ${decisionConfidenceLabel(item.distanceConfidence)}</span>
+      </div>
+      <div class="decision-result-actions">
+        <button class="btn-primary btn-sm decision-result-action" data-action="choose" data-id="${r.id}" type="button">Choose This</button>
+        <button class="btn-secondary btn-sm decision-result-action" data-action="backup" data-id="${r.id}" type="button">Save Backup</button>
+        <button class="btn-ghost btn-sm decision-result-action" data-action="menu" data-id="${r.id}" ${canMenu ? '' : 'disabled'} type="button">View Menu</button>
+        <button class="btn-ghost btn-sm decision-result-action" data-action="directions" data-id="${r.id}" ${canDirections ? '' : 'disabled'} type="button">Directions</button>
+      </div>
+    </article>`;
+  }).join('');
+}
+
+function runDecisionMode () {
+  const shortlist = buildDecisionModeShortlist();
+  renderDecisionModeResults(shortlist);
+}
+
+function handleDecisionModeActionClick (btn) {
+  const action = btn?.dataset?.action;
+  const id = btn?.dataset?.id;
+  if (!action || !id) return;
+  const r = state.restaurants.find(x => x.id === id);
+  if (!r) return;
+
+  trackProductEvent('decision_option_selected', {
+    action,
+    restaurantId: id,
+    mood: _decisionModeState.mood,
+    budget: _decisionModeState.budget,
+    miles: _decisionModeState.miles,
+    party: _decisionModeState.party,
+  });
+
+  if (action === 'choose') {
+    trackProductEvent('decision_session_completed', {
+      restaurantId: id,
+      mood: _decisionModeState.mood,
+    });
+    closeDecisionMode();
+    setTimeout(() => openDetailModal(id), 120);
+    return;
+  }
+
+  if (action === 'backup') {
+    r.isFavorite = true;
+    saveData();
+    renderCards();
+    showToast('Backup saved', `${r.name} is now pinned as a backup pick.`, 'success');
+    return;
+  }
+
+  if (action === 'menu') {
+    const url = buildMenuSearchUrl({ name: r.name, address: r.address || '' });
+    if (!url) {
+      showToast('No menu found', 'Try adding a website for this place first.', 'error');
+      return;
+    }
+    window.open(url, '_blank', 'noopener');
+    return;
+  }
+
+  if (action === 'directions') {
+    const url = buildGoogleDirectionsUrl({ name: r.name, address: r.address || '', lat: r.lat, lon: r.lng });
+    if (!url) {
+      showToast('No location', 'This place needs an address or coordinates first.', 'error');
+      return;
+    }
+    window.open(url, '_blank', 'noopener');
+  }
+}
+
 function runSmartPlanner () {
   const budget = Number(document.getElementById('smart-budget')?.value || 0);
   const miles = Math.max(1, Number(document.getElementById('smart-distance')?.value || 8));
@@ -5415,6 +5674,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hapticTap('light');
     applyNearbyFilterMode(chip.dataset.nearbyFilter || 'all');
   });
+  document.getElementById('home-quick-decision-btn')?.addEventListener('click', () => { hapticTap('medium'); openDecisionMode(); });
   document.getElementById('home-quick-pick-btn')?.addEventListener('click', () => { hapticTap('medium'); showTonightsPick(); });
   document.getElementById('home-quick-nearby-btn')?.addEventListener('click', () => { hapticTap('medium'); openDiscover(); });
   document.getElementById('home-quick-plan-btn')?.addEventListener('click', () => { hapticTap('medium'); openSmartPlanner(); });
@@ -5485,6 +5745,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === document.getElementById('smart-planner-overlay')) closeSmartPlanner();
   });
   document.getElementById('smart-plan-run-btn')?.addEventListener('click', runSmartPlanner);
+  document.getElementById('decision-mode-close-btn')?.addEventListener('click', closeDecisionMode);
+  document.getElementById('decision-mode-overlay')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('decision-mode-overlay')) closeDecisionMode();
+  });
+  document.getElementById('decision-mode-grid')?.addEventListener('click', e => {
+    const chip = e.target.closest('.decision-chip[data-group][data-value]');
+    if (!chip) return;
+    setDecisionModeConstraint(chip.dataset.group, chip.dataset.value);
+  });
+  document.getElementById('decision-mode-run-btn')?.addEventListener('click', runDecisionMode);
+  document.getElementById('decision-mode-results')?.addEventListener('click', e => {
+    const btn = e.target.closest('.decision-result-action[data-action][data-id]');
+    if (!btn) return;
+    handleDecisionModeActionClick(btn);
+  });
   document.getElementById('share-highlights-close-btn')?.addEventListener('click', closeShareHighlights);
   document.getElementById('share-highlights-overlay')?.addEventListener('click', e => {
     if (e.target === document.getElementById('share-highlights-overlay')) closeShareHighlights();
@@ -7134,6 +7409,7 @@ const COMMAND_PALETTE_ACTIONS = [
   { label: 'View: Map', hint: 'Switch to map view', keys: 'view map', run: () => setView('map') },
   { label: 'View: Stats', hint: 'Switch to stats view', keys: 'view stats analytics', run: () => setView('stats') },
   { label: 'Action: Add Restaurant', hint: 'Open add modal', keys: 'add new create restaurant', run: openAddModal },
+  { label: 'Action: Decision Mode', hint: 'Top 3 in under a minute', keys: 'decision mode winner shortlist quick', run: openDecisionMode },
   { label: 'Action: Smart Planner', hint: 'Build tonight plan', keys: 'planner plan tonight', run: openSmartPlanner },
   { label: 'Action: Smart Itinerary', hint: 'Generate multi-stop route', keys: 'itinerary route crawl', run: openSmartItinerary },
   { label: 'Action: Dinner Rooms', hint: 'Create or join voting room', keys: 'room rooms vote social', run: openDinnerRooms },
