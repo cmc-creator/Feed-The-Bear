@@ -40,7 +40,7 @@
   --transition:  .2s ease;
   --font:        'Manrope', system-ui, sans-serif;
 
-  --header-h:    64px;
+  --header-h:    58px;
   --stats-h:     64px;
   --filter-h:    60px;
 
@@ -90,9 +90,9 @@ img { display: block; }
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 12px;
-  overflow: hidden;
+  gap: 8px;
+  padding: 0 8px;
+  overflow: visible;
 }
 
 .app-header::before {
@@ -133,9 +133,14 @@ img { display: block; }
   object-fit: contain;
   flex-shrink: 0;
 }
-.brand-icon { width: 2.35rem; height: 2.35rem; opacity: .98; }
+.brand-icon {
+  width: 4.8rem;
+  height: 4.8rem;
+  opacity: .99;
+  filter: drop-shadow(0 4px 14px rgba(0,0,0,.42));
+}
 .brand-name {
-  font-size: 1.12rem;
+  font-size: .98rem;
   font-weight: 800;
   letter-spacing: .01em;
   background: linear-gradient(135deg, #cfe5be, #7db17a);
@@ -147,17 +152,17 @@ img { display: block; }
 
 .header-nav {
   display: flex;
-  gap: 4px;
+  gap: 3px;
   background: rgba(255,255,255,.04);
   border: 1px solid rgba(255,255,255,.08);
   border-radius: var(--radius-xl);
-  padding: 4px;
+  padding: 3px;
   flex-shrink: 0;
 }
 .nav-btn {
-  padding: 6px 16px;
+  padding: 4px 11px;
   border-radius: 20px;
-  font-size: .79rem;
+  font-size: .7rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .04em;
@@ -422,14 +427,16 @@ button:focus-visible,
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 20px;
-  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 .search-wrap {
   position: relative;
-  flex: 1;
-  min-width: 180px;
+  flex: 1 0 210px;
+  min-width: 190px;
 }
 .search-icon {
   position: absolute;
@@ -443,13 +450,13 @@ button:focus-visible,
 }
 #search-input {
   width: 100%;
-  padding: 9px 12px 9px 36px;
-  font-size: .85rem;
+  padding: 7px 10px 7px 34px;
+  font-size: .79rem;
 }
 .filter-select {
-  padding: 9px 12px;
-  font-size: .82rem;
-  min-width: 120px;
+  padding: 7px 9px;
+  font-size: .76rem;
+  min-width: 96px;
   cursor: pointer;
   appearance: auto;
 }
@@ -458,9 +465,14 @@ button:focus-visible,
 
 /* ── Main Content ────────────────────────────────────────── */
 .main-content {
-  padding: 20px;
+  padding: 10px 12px 14px;
   max-width: 1400px;
   margin: 0 auto;
+}
+
+#group-by-btn,
+.quick-chips {
+  display: none !important;
 }
 
 /* Location banner */
@@ -4780,7 +4792,7 @@ body.light-mode #profile-btn {
    HOME DISCOVERY - Near You Now + AI Rec Banner
    ════════════════════════════════════════════════════════════ */
 .home-discovery {
-  padding: 4px 16px 12px;
+  padding: 2px 4px 8px;
 }
 
 .home-module {
@@ -4872,23 +4884,27 @@ body.light-mode #profile-btn {
 .home-quick-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.home-quick-actions .home-quick-btn:nth-child(n+4) {
+  display: none;
 }
 
 .home-quick-btn {
   border: 1px solid rgba(255,255,255,.2);
-  border-radius: 14px;
+  border-radius: 12px;
   background: linear-gradient(145deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
   color: #edf3fb;
-  padding: 12px 10px;
+  padding: 8px 8px;
   display: flex;
   align-items: center;
   gap: 8px;
   justify-content: center;
   font-weight: 700;
   letter-spacing: .01em;
-  box-shadow: 0 8px 20px rgba(0,0,0,.24);
+  box-shadow: 0 6px 14px rgba(0,0,0,.22);
   transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
 }
 
@@ -4914,13 +4930,13 @@ body.light-mode #profile-btn {
   width: .92rem;
   height: .92rem;
 }
-.home-quick-label { font-size: .8rem; }
+.home-quick-label { font-size: .74rem; }
 
 .today-status-row {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
-  margin: 0 0 12px;
+  margin: 0 0 8px;
 }
 
 .today-status-pill {
@@ -4928,8 +4944,8 @@ body.light-mode #profile-btn {
   align-items: center;
   gap: 6px;
   border-radius: 999px;
-  padding: 6px 11px;
-  font-size: .73rem;
+  padding: 4px 9px;
+  font-size: .69rem;
   font-weight: 700;
   border: 1px solid rgba(255,255,255,.28);
   background: rgba(255,255,255,.12);
@@ -4942,16 +4958,7 @@ body.light-mode #profile-btn {
 }
 
 .today-vibe-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-  margin: 0 0 14px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,.14);
-  background: linear-gradient(140deg, rgba(var(--blue-rgb),.16), rgba(26,188,156,.1));
-  transition: background .45s ease, border-color .45s ease, box-shadow .45s ease;
+  display: none !important;
 }
 
 .today-vibe-pill {

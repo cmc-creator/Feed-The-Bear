@@ -238,6 +238,7 @@ const CUISINE_PHOTOS = {
   italian:       'photo-1555396273-367ea4eb4db5',
   pizza:         'photo-1513104890138-7c749659a591',
   japanese:      'photo-1579871494447-9811cf80d66c',
+  ramen:         'photo-1617093727343-374698b1b08d',
   sushi:         'photo-1563245372-f21724e3856d',
   mexican:       'photo-1565299585323-38d6b0865b47',
   american:      'photo-1568901346375-23c9450c58cd',
@@ -263,6 +264,41 @@ const CUISINE_PHOTOS = {
   lebanese:      'photo-1565557623262-b51c2513a641',
   default:       'photo-1414235077428-338989a2e8c0',
 };
+
+const MOOD_TERM_ALIASES = {
+  'fried chicken': 'chicken',
+  'chicken': 'chicken',
+  'dumplings': 'dumplings',
+  'pho': 'pho',
+  'curry': 'indian',
+  'brunch': 'brunch',
+  'dessert': 'desserts',
+  'sweets': 'desserts',
+  'steak': 'steakhouse',
+  'sandwich': 'sandwich',
+  'noodles': 'ramen',
+  'kebab': 'turkish',
+  'shawarma': 'lebanese',
+  'paella': 'spanish',
+  'bibimbap': 'korean',
+  'burrito': 'mexican',
+  'gelato': 'desserts',
+  'burger': 'burgers',
+  'bbq': 'bbq',
+  'pasta': 'italian',
+  'seafood': 'seafood',
+  'pizza': 'pizza',
+  'ramen': 'ramen',
+  'sushi': 'sushi',
+  'tacos': 'mexican',
+};
+
+function normalizeMoodTermKey (term = '') {
+  const raw = String(term || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!raw) return 'default';
+  return MOOD_TERM_ALIASES[raw] || MOOD_TERM_ALIASES[raw.split(' ')[0]] || raw.split(' ')[0] || 'default';
+}
+
 function getCuisinePhoto (cuisine, w = 600, h = 400) {
   const key = (cuisine || '').toLowerCase();
   const id  = CUISINE_PHOTOS[key] || CUISINE_PHOTOS.default;
@@ -8729,7 +8765,7 @@ function buildSwipeDeckFromSaved (savedRows = []) {
 
 function getMoodFoodImage (term = 'food', seed = '') {
   void seed;
-  const key = String(term || 'food').trim().toLowerCase().split(/\s+/)[0] || 'food';
+  const key = normalizeMoodTermKey(term);
   // Stable real-photo links so mood cards consistently render.
   return getCuisinePhoto(key, 960, 640);
 }
