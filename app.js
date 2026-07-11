@@ -6388,7 +6388,7 @@ function getAutoThemePresetByHour (hour = new Date().getHours()) {
     return { mode: 'light', accent: 'mint', part: 'morning' };
   }
   if (hour >= 11 && hour < 17) {
-    return { mode: 'light', accent: 'sunset', part: 'day' };
+    return { mode: 'light', accent: 'mint', part: 'day' };
   }
   if (hour >= 17 && hour < 22) {
     return { mode: 'dark', accent: 'midnight', part: 'evening' };
