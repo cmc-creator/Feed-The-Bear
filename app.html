@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Feed The Bear: Dining Concierge</title>
+  <title>Feed The Bear</title>
   <meta name="description" content="Feed The Bear helps you save, discover, and revisit your favorite restaurants with smart lists, maps, reminders, and foodie insights." />
   <meta property="og:title" content="Feed The Bear" />
   <meta property="og:description" content="Your personal foodie tracker for saved spots, map discovery, restaurant stats, and smart recommendations." />
@@ -12,9 +12,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Feed The Bear" />
-  <link rel="apple-touch-icon" href="icon.svg" />
-  <link rel="apple-touch-icon" sizes="180x180" href="icon.svg" />
-  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="apple-touch-icon" href="feedbear.png?v=woods1" />
+  <link rel="apple-touch-icon" sizes="180x180" href="feedbear.png?v=woods1" />
+  <link rel="icon" type="image/png" href="feedbear.png?v=woods1" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg?v=woods1" />
   <link rel="manifest" href="manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -285,8 +286,8 @@
             <div class="upgrade-plan-badge">Most popular</div>
             <div class="upgrade-plan-name">Grizzly</div>
             <div class="upgrade-price-row">
-              <span id="upgrade-price-main" class="upgrade-price-main">$19.99</span>
-              <span id="upgrade-price-sub" class="upgrade-price-sub">/ year - save 44%!</span>
+              <span id="upgrade-price-main" class="upgrade-price-main">$53.89</span>
+              <span id="upgrade-price-sub" class="upgrade-price-sub">/ year • about $4.49/mo (10% off)</span>
             </div>
             <ul class="upgrade-plan-features">
               <li>✓ Unlimited restaurants</li>
@@ -348,23 +349,15 @@
         <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       </button>
-      <button id="voice-btn" class="icon-btn" title="Voice Add">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/></svg>
-      </button>
       <button id="craving-btn" class="icon-btn" title="Craving Engine - what should I eat tonight?">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" aria-hidden="true"><path d="M13 2s3 2 3 6-2 5-2 7 2 4 2 7c0 0-2-1-3-3-1 2-3 3-3 3s1-3 1-6-2-4-2-7 2-5 4-7z"/></svg>
       </button>
       <button id="settings-btn" class="icon-btn" title="Settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.36.14.76.22 1.17.22H21a2 2 0 1 1 0 4h-.43c-.41 0-.81.08-1.17.22z"/></svg>
       </button>
-      <button id="add-btn" class="btn-primary" title="Add Restaurant" aria-label="Add Restaurant">
-        <span>＋</span> Add Restaurant
-      </button>
+      <button id="header-daily-quest-btn" class="daily-quest-pulse-btn header-quest-btn" type="button" title="Daily Quest" aria-label="Daily Quest" style="--quest-arc:280deg;"><span class="daily-quest-pulse-core">DQ</span></button>
       <button id="chat-toggle-btn" class="chat-toggle-btn" title="Byte Cub Chat">
         <span class="nav-badge-text">Byte Cub</span><span>Ask Byte Cub</span>
-      </button>
-      <button id="account-btn" class="account-header-btn" title="My Account" aria-label="My Account">
-        <span id="header-avatar">FTB</span>
       </button>
 
       <!-- Discover & Play hub launcher (legacy dropdown kept as fallback) -->
@@ -422,9 +415,13 @@
           <button class="more-menu-item" data-more="location">Location</button>
         </div>
       </div>
+      <button id="account-btn" class="account-header-btn" title="My Account" aria-label="My Account">
+        <span id="header-avatar">FTB</span>
+      </button>
 
       <!-- Hidden but still in DOM for JS compatibility -->
       <button id="export-btn" style="display:none"></button>
+      <button id="add-btn" style="display:none"></button>
       <button id="import-bookmarks-btn" style="display:none"></button>
       <button id="location-toggle-btn" style="display:none"></button>
       <button id="bulk-select-btn" style="display:none"></button>
@@ -473,6 +470,9 @@
         <circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/>
       </svg>
       <input type="text" id="search-input" placeholder="Search restaurants, cuisine, notes" autocomplete="off" />
+      <button id="search-voice-btn" class="search-voice-btn" type="button" title="Voice search or add" aria-label="Voice search or add">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/></svg>
+      </button>
     </div>
 
     <select id="filter-cuisine" class="filter-select" aria-label="Filter by cuisine">
@@ -660,19 +660,28 @@
           <span class="home-quick-emoji" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.8 5.7L21 10l-4.5 4.4L17.6 21 12 18l-5.6 3 1.1-6.6L3 10l6.2-.3L12 3z"/></svg>
           </span>
-          <span class="home-quick-label">Pick For Me</span>
+          <span class="home-quick-copy">
+            <span class="home-quick-label">Pick For Me</span>
+            <span class="home-quick-sub">AI picks one now</span>
+          </span>
         </button>
         <button class="home-quick-btn" id="home-quick-nearby-btn" type="button">
           <span class="home-quick-emoji" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s5.5-5.2 5.5-10A5.5 5.5 0 1 0 6.5 11c0 4.8 5.5 10 5.5 10z"/><circle cx="12" cy="11" r="1.8"/></svg>
           </span>
-          <span class="home-quick-label">Nearby Now</span>
+          <span class="home-quick-copy">
+            <span class="home-quick-label">Nearby Now</span>
+            <span class="home-quick-sub">Fast local finder</span>
+          </span>
         </button>
         <button class="home-quick-btn" id="home-quick-plan-btn" type="button">
           <span class="home-quick-emoji" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>
           </span>
-          <span class="home-quick-label">Plan Tonight</span>
+          <span class="home-quick-copy">
+            <span class="home-quick-label">Plan Tonight</span>
+            <span class="home-quick-sub">Build a food route</span>
+          </span>
         </button>
         <button class="home-quick-btn" id="home-quick-share-btn" type="button">
           <span class="home-quick-emoji" aria-hidden="true">
@@ -725,7 +734,7 @@
         <div class="bear-swipe-header">
           <div>
             <div class="bear-swipe-title">Bear Swipe</div>
-            <div class="bear-swipe-sub">Food photos first. Tap card to reveal who made it.</div>
+            <div class="bear-swipe-sub">Food photos first. Swipe your way to tonight's winner.</div>
           </div>
           <button id="bear-swipe-refresh-btn" class="btn-ghost btn-sm" type="button">New Stack ↻</button>
         </div>

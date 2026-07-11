@@ -331,8 +331,8 @@ function _setUpgradePlan (period) {
   const isYearly = period === 'yearly';
   el('upgrade-monthly-btn')?.classList.toggle('active', !isYearly);
   el('upgrade-yearly-btn')?.classList.toggle('active',  isYearly);
-  if (el('upgrade-price-main')) el('upgrade-price-main').textContent = isYearly ? '$19.99' : '$2.99';
-  if (el('upgrade-price-sub'))  el('upgrade-price-sub').textContent  = isYearly ? '/ year, save 44%' : '/ month';
+  if (el('upgrade-price-main')) el('upgrade-price-main').textContent = isYearly ? '$53.89' : '$4.99';
+  if (el('upgrade-price-sub'))  el('upgrade-price-sub').textContent  = isYearly ? '/ year • about $4.49/mo (10% off)' : '/ month';
   if (el('upgrade-cta-btn'))    el('upgrade-cta-btn').dataset.period = period;
 }
 

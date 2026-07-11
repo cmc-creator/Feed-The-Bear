@@ -3,28 +3,28 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sign In - Feed The Bear 🐻</title>
+  <title>Sign In - Feed The Bear</title>
   <meta name="description" content="Sign in or create your free Feed The Bear account to track restaurants, sync across devices, and unlock Grizzly features." />
-  <meta name="theme-color" content="#FF6B35" />
+  <meta name="theme-color" content="#4f7f50" />
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg:         #0D0D1A;
-      --surface:    #16162A;
-      --surface2:   #1E1E35;
-      --surface3:   #252540;
+      --bg:         #0f1712;
+      --surface:    #1b271f;
+      --surface2:   #253328;
+      --surface3:   #2f4133;
       --border:     rgba(255,255,255,.08);
-      --primary:    #FF6B35;
-      --primary-dk: #E5541E;
-      --primary-lt: #FF8C5A;
+      --primary:    #6aa26b;
+      --primary-dk: #4f7f50;
+      --primary-lt: #92c48d;
       --green:      #2ECC71;
       --red:        #E74C3C;
-      --text:       #EAEAEA;
-      --text-muted: #8892A4;
-      --text-dim:   #5A6478;
+      --text:       #eef4ea;
+      --text-muted: #b5c5b4;
+      --text-dim:   #7d8f7f;
       --radius:     12px;
       --radius-lg:  20px;
       --font:       'Poppins', system-ui, sans-serif;
@@ -33,7 +33,10 @@
     html { height: 100%; }
     body {
       font-family: var(--font);
-      background: var(--bg);
+      background:
+        linear-gradient(rgba(15,22,17,.68), rgba(15,22,17,.8)),
+        url('assets/textures/forest1.jpg') center/cover fixed no-repeat,
+        var(--bg);
       color: var(--text);
       min-height: 100vh;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -55,7 +58,10 @@
     /* ── AUTH CARD ── */
     .auth-card {
       width: 100%; max-width: 420px;
-      background: var(--surface);
+      background:
+        linear-gradient(rgba(30,44,34,.86), rgba(26,36,29,.9)),
+        url('assets/textures/bark3.jpg') center/cover no-repeat,
+        var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
       padding: 40px 36px;
@@ -64,7 +70,16 @@
     .auth-brand {
       text-align: center; margin-bottom: 28px;
     }
-    .auth-bear { font-size: 2.8rem; display: block; margin-bottom: 8px; }
+    .auth-bear {
+      width: 3.6rem;
+      height: 3.6rem;
+      display: block;
+      margin: 0 auto 10px;
+      object-fit: contain;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,.18);
+      box-shadow: 0 10px 24px rgba(0,0,0,.35);
+    }
     .auth-brand-name { font-weight: 800; font-size: 1.2rem; }
 
     /* ── TABS ── */
@@ -100,7 +115,7 @@
     }
     .form-input:focus {
       border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(255,107,53,.12);
+      box-shadow: 0 0 0 3px rgba(106,162,107,.18);
     }
     .form-input::placeholder { color: var(--text-dim); }
 
@@ -115,7 +130,7 @@
       box-shadow: 0 4px 16px rgba(255,107,53,.3);
       margin-top: 4px;
     }
-    .btn-primary:hover { background: var(--primary-dk); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(255,107,53,.4); }
+    .btn-primary:hover { background: var(--primary-dk); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(80,132,84,.4); }
     .btn-primary:disabled { opacity: .6; transform: none; cursor: not-allowed; }
 
     .btn-google {
@@ -200,7 +215,7 @@
 
   <div class="auth-card">
     <div class="auth-brand">
-      <span class="auth-bear">🐻</span>
+      <img class="auth-bear" src="feedbear.png" alt="Feed The Bear mascot" />
       <div class="auth-brand-name">Feed The Bear</div>
     </div>
 

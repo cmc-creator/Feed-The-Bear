@@ -386,6 +386,13 @@ const BEAR_SWIPE_JOKES = [
   'Pawdon me, but this looks ridiculously good.',
   'I am not lion... wait wrong animal. Still a tasty pick.',
   'Call it instinct, call it hunger, call it bear science.',
+  'Forest forecast: 98% chance of snacks.',
+  'Welcome to the dencision engine.',
+  'One does not simply walk into dinner without swiping.',
+  'Honey levels rising. Appetite confirmed.',
+  'If this flops, we blame raccoons and try again.',
+  'Tracking dinner by pawprint, one swipe at a time.',
+  'Cabin vibes, cozy bites, no wrong answers.',
 ];
 
 const BEAR_REACTION_COPY = {
@@ -395,6 +402,9 @@ const BEAR_REACTION_COPY = {
     'That got an immediate yes claw.',
     'That one passed the bear minimum. Love it.',
     'Snack approved. Fur real.',
+    'Stamped with the official paw of approval.',
+    'This one made the den menu.',
+    'Honey, that is a heck yes.',
   ],
   no: [
     'Nope noted. Back to foraging.',
@@ -402,6 +412,9 @@ const BEAR_REACTION_COPY = {
     'Hard pass, soft paws.',
     'Not your vibe. We keep hunting.',
     'No worries, cub boss. Next bite incoming.',
+    'That snack wandered off trail. Next.',
+    'Nope. We leave that one in the woods.',
+    'Not today. The bear palate demands better.',
   ],
 };
 
@@ -4312,8 +4325,13 @@ function setupEvents () {
   });
 
   // Add button
-  document.getElementById('add-btn').addEventListener('click', openAddModal);
-  document.getElementById('empty-add-btn').addEventListener('click', openAddModal);
+  document.getElementById('add-btn')?.addEventListener('click', openAddModal);
+  document.getElementById('empty-add-btn')?.addEventListener('click', openAddModal);
+
+  // Header Daily Quest
+  document.getElementById('header-daily-quest-btn')?.addEventListener('click', () => {
+    onDailyQuestPrimaryClick();
+  });
 
   // Modal close
   document.getElementById('modal-close-btn').addEventListener('click', closeModal);
@@ -4642,7 +4660,8 @@ function setupEvents () {
   });
 
   // Phase 7 - Voice
-  document.getElementById('voice-btn').addEventListener('click', startVoiceAdd);
+  document.getElementById('search-voice-btn')?.addEventListener('click', startVoiceAdd);
+  document.getElementById('voice-btn')?.addEventListener('click', startVoiceAdd);
   document.getElementById('voice-cancel-btn').addEventListener('click', stopVoice);
 
   // Phase 7 - Gallery
@@ -6432,6 +6451,13 @@ function updateChallengeBtnBadge () {
 
 let _voiceRecognition = null;
 
+function setVoiceButtonsListening (isListening) {
+  document.querySelectorAll('#search-voice-btn, #voice-btn').forEach(el => {
+    if (isListening) el.classList.add('listening');
+    else el.classList.remove('listening');
+  });
+}
+
 function startVoiceAdd () {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
@@ -6442,7 +6468,7 @@ function startVoiceAdd () {
   const status = document.getElementById('voice-status');
   const transcript = document.getElementById('voice-transcript');
   overlay.classList.remove('hidden');
-  document.getElementById('voice-btn').classList.add('listening');
+  setVoiceButtonsListening(true);
   status.textContent = 'Listening...';
   transcript.textContent = 'Say: "Add [name] on [address]" or just "[name]"';
 
@@ -6469,7 +6495,7 @@ function startVoiceAdd () {
 function stopVoice () {
   if (_voiceRecognition) { try { _voiceRecognition.stop(); } catch(_){} _voiceRecognition = null; }
   document.getElementById('voice-overlay').classList.add('hidden');
-  document.getElementById('voice-btn').classList.remove('listening');
+  setVoiceButtonsListening(false);
 }
 function parseVoiceInput (text) {
   text = text.trim();
@@ -7995,7 +8021,14 @@ function runNearbyLuckyBite () {
   if (pick.isSaved && pick.restaurantId) {
     setTimeout(() => openDetailModal(pick.restaurantId), 180);
   } else {
-    setTimeout(() => openAddModalPreFilled(pick.name, pick.cuisine), 180);
+    setTimeout(() => {
+      if (Number.isFinite(pick.lat) && Number.isFinite(pick.lon)) {
+        const dest = `${pick.lat},${pick.lon}`;
+        window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dest)}`, '_blank', 'noopener');
+      } else {
+        openDiscover();
+      }
+    }, 180);
   }
 }
 
@@ -8711,6 +8744,7 @@ function buildSwipeDeckFromElements (elements = []) {
       lon,
       address,
       photoUrl: photoPick.url,
+      photoFallbacks: getMoodFoodImageCandidates(cuisine || amenity || 'food', `nearby-${el.id || idx}`).slice(1),
       photoSource: photoPick.source,
       isSaved: false,
       restaurantId: null,
@@ -8747,6 +8781,7 @@ function buildSwipeDeckFromSaved (savedRows = []) {
       lon: Number.isFinite(r.lng) ? r.lng : null,
       address: r.address || '',
       photoUrl: photoPick.url,
+      photoFallbacks: getMoodFoodImageCandidates(cuisine || 'food', `saved-${r.id || idx}`).slice(1),
       photoSource: photoPick.source,
       isSaved: true,
       restaurantId: r.id || null,
@@ -8763,11 +8798,108 @@ function buildSwipeDeckFromSaved (savedRows = []) {
   }).slice(0, 10);
 }
 
+const BEAR_SWIPE_LOCAL_FALLBACKS = [
+  'assets/textures/forest.jpg',
+  'assets/textures/forest1.jpg'
+];
+
+const BEAR_SWIPE_FOOD_BANK = {
+  breakfast: [['pancakes', 'breakfast'], ['waffles', 'brunch'], ['omelette', 'breakfast']],
+  burgers: [['burger', 'fries'], ['cheeseburger', 'food'], ['smashburger', 'burger']],
+  pizza: [['pizza', 'slice'], ['margherita', 'pizza'], ['pepperoni', 'pizza']],
+  sushi: [['sushi', 'nigiri'], ['sashimi', 'sushi'], ['sushi', 'rolls']],
+  ramen: [['ramen', 'noodles'], ['tonkotsu', 'ramen'], ['miso', 'ramen']],
+  mexican: [['tacos', 'mexican'], ['burrito', 'mexican'], ['quesadilla', 'mexican']],
+  italian: [['pasta', 'italian'], ['lasagna', 'italian'], ['gnocchi', 'italian']],
+  korean: [['bibimbap', 'korean'], ['korean', 'bbq'], ['tteokbokki', 'korean']],
+  chinese: [['dumplings', 'chinese'], ['fried-rice', 'chinese'], ['chow-mein', 'chinese']],
+  indian: [['butter-chicken', 'indian'], ['biryani', 'indian'], ['tandoori', 'indian']],
+  thai: [['pad-thai', 'thai'], ['thai-curry', 'thai'], ['tom-yum', 'thai']],
+  bbq: [['bbq', 'ribs'], ['brisket', 'bbq'], ['smoked-meat', 'bbq']],
+  seafood: [['seafood', 'platter'], ['salmon', 'dish'], ['shrimp', 'seafood']],
+  steakhouse: [['steak', 'dinner'], ['ribeye', 'steak'], ['filet', 'steak']],
+  desserts: [['dessert', 'cake'], ['gelato', 'dessert'], ['churros', 'dessert']],
+  sandwich: [['sandwich', 'deli'], ['grilled-cheese', 'sandwich'], ['panini', 'sandwich']],
+  american: [['diner', 'food'], ['comfort-food', 'dinner'], ['fried-chicken', 'meal']],
+  default: [['food', 'dish'], ['restaurant', 'food'], ['plated', 'food']]
+};
+
+function getCuisineBankPairs (key = 'default') {
+  return BEAR_SWIPE_FOOD_BANK[key] || BEAR_SWIPE_FOOD_BANK.default;
+}
+
+function getMoodFoodImageCandidates (term = 'food', seed = '') {
+  const raw = String(term || '').trim().toLowerCase();
+  const normalized = normalizeMoodTermKey(raw);
+  const key = (() => {
+    if (/(pancake|waffle|french toast|eggs benedict|hash brown|omelette|breakfast|brunch)/.test(raw)) return 'breakfast';
+    if (/(burger|cheeseburger|fries|smash burger)/.test(raw)) return 'burgers';
+    if (/(pizza|margherita|deep dish|pepperoni)/.test(raw)) return 'pizza';
+    if (/(sushi|nigiri|sashimi|chirashi|roll)/.test(raw)) return 'sushi';
+    if (/(ramen|udon|tsukemen|tonkotsu|shoyu|miso ramen)/.test(raw)) return 'ramen';
+    if (/(taco|burrito|quesadilla|enchilada|birria|al pastor|pozole)/.test(raw)) return 'mexican';
+    if (/(pasta|lasagna|gnocchi|risotto|carbonara|alfredo|spaghetti|ravioli|penne)/.test(raw)) return 'italian';
+    if (/(korean|bibimbap|kimchi|tteokbokki|japchae|korean bbq)/.test(raw)) return 'korean';
+    if (/(dumpling|fried rice|chow mein|mapo|peking|dim sum|bao|kung pao)/.test(raw)) return 'chinese';
+    if (/(biryani|butter chicken|tandoori|paneer|masala|naan|dal|dosa|indian)/.test(raw)) return 'indian';
+    if (/(pad thai|thai curry|tom yum|pad see ew|thai basil)/.test(raw)) return 'thai';
+    if (/(bbq|brisket|ribs|smoked|pulled pork|burnt ends)/.test(raw)) return 'bbq';
+    if (/(seafood|salmon|shrimp|fish and chips|lobster|octopus|paella)/.test(raw)) return 'seafood';
+    if (/(steak|ribeye|filet|sirloin|prime rib|steakhouse)/.test(raw)) return 'steakhouse';
+    if (/(cake|gelato|dessert|donut|donuts|churro|cheesecake|tiramisu|pastry)/.test(raw)) return 'desserts';
+    if (/(sandwich|blt|grilled cheese|toastie|panini)/.test(raw)) return 'sandwich';
+    if (/(american|fried chicken|mac|meatloaf|comfort food|diner)/.test(raw)) return 'american';
+    return normalized;
+  })();
+  const variants = {
+    ramen: ['ramen bowl', 'tonkotsu ramen', 'miso ramen', 'shoyu ramen'],
+    pizza: ['margherita pizza', 'wood fired pizza', 'pepperoni pizza', 'detroit pizza'],
+    sushi: ['sushi platter', 'nigiri sushi', 'sashimi set', 'sushi rolls'],
+    burgers: ['burger and fries', 'smash burger', 'classic cheeseburger', 'double burger'],
+    mexican: ['street tacos', 'burrito bowl', 'quesadilla', 'enchiladas'],
+    italian: ['fresh pasta', 'lasagna', 'gnocchi', 'italian dinner'],
+    bbq: ['barbecue brisket', 'bbq ribs', 'smoked meats', 'pulled pork'],
+    desserts: ['dessert plate', 'gelato', 'cake slice', 'pastry'],
+    seafood: ['grilled salmon', 'seafood platter', 'shrimp dish', 'fish tacos'],
+    steakhouse: ['ribeye steak', 'steak dinner', 'filet mignon', 'grilled steak'],
+    korean: ['bibimbap', 'korean bbq', 'kimchi fried rice', 'tteokbokki'],
+    chinese: ['dumplings', 'chinese noodles', 'wok stir fry', 'fried rice'],
+    indian: ['butter chicken', 'biryani', 'indian curry', 'tandoori'],
+    thai: ['pad thai', 'thai curry', 'thai noodles', 'tom yum soup'],
+    breakfast: ['pancakes breakfast', 'eggs and toast', 'waffles', 'breakfast platter'],
+    sandwich: ['club sandwich', 'deli sandwich', 'grilled cheese', 'chicken sandwich'],
+    american: ['american diner food', 'mac and cheese', 'fried chicken dinner', 'comfort food'],
+    default: ['beautiful food', 'restaurant dish', 'chef plated food', 'dinner plate']
+  };
+
+  const picks = variants[key] || variants.default;
+  const hash = Math.abs(miniHash(`${key}|${seed || Date.now()}`));
+  const phrase = picks[hash % picks.length];
+  const sig = hash % 100000;
+  const bank = getCuisineBankPairs(key);
+  const pairA = bank[hash % bank.length] || ['food', 'dish'];
+  const pairB = bank[(hash + 1) % bank.length] || pairA;
+  const rawTokens = raw
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 3);
+  const tokenA = rawTokens[0] || pairA[0] || 'food';
+  const tokenB = rawTokens[1] || pairA[1] || 'dish';
+  const safePhrase = encodeURIComponent(phrase || `${tokenA} ${tokenB}`);
+
+  return [
+    `https://loremflickr.com/960/640/${tokenA},${tokenB},food?lock=${sig + 1}`,
+    `https://loremflickr.com/960/640/${pairA[0]},${pairA[1]}?lock=${sig}`,
+    `https://loremflickr.com/960/640/${pairB[0]},${pairB[1]}?lock=${sig + 7}`,
+    `https://loremflickr.com/960/640/${safePhrase.replace(/%20/g, ',')}?lock=${sig + 13}`,
+    ...BEAR_SWIPE_LOCAL_FALLBACKS,
+  ];
+}
+
 function getMoodFoodImage (term = 'food', seed = '') {
-  void seed;
-  const key = normalizeMoodTermKey(term);
-  // Stable real-photo links so mood cards consistently render.
-  return getCuisinePhoto(key, 960, 640);
+  return getMoodFoodImageCandidates(term, seed)[0] || 'feedbear.png';
 }
 
 function buildMoodSwipeDeck (elements = [], savedRows = []) {
@@ -8775,9 +8907,39 @@ function buildMoodSwipeDeck (elements = [], savedRows = []) {
   void savedRows;
 
   const defaults = [
-    'pizza', 'ramen', 'tacos', 'sushi', 'bbq', 'pasta', 'burger',
-    'fried chicken', 'dumplings', 'pho', 'curry', 'brunch', 'dessert', 'steak', 'seafood',
-    'sandwich', 'noodles', 'kebab', 'shawarma', 'paella', 'bibimbap', 'burrito', 'gelato'
+    'burger', 'fries', 'club sandwich', 'breakfast platter', 'pancakes', 'waffles', 'omelette',
+    'pizza', 'pasta', 'lasagna', 'gnocchi', 'risotto', 'sushi', 'ramen', 'udon',
+    'dumplings', 'fried rice', 'chow mein', 'hot and sour soup', 'biryani', 'butter chicken',
+    'naan', 'tikka masala', 'dosa', 'pad thai', 'thai curry', 'pho', 'banh mi',
+    'tacos', 'burrito', 'quesadilla', 'enchiladas', 'shawarma', 'kebab', 'falafel',
+    'bbq ribs', 'brisket', 'steak', 'seafood platter', 'salmon', 'shrimp scampi',
+    'fried chicken', 'mac and cheese', 'grilled cheese', 'caesar salad', 'poke bowl',
+    'bibimbap', 'korean bbq', 'paella', 'gelato', 'cheesecake', 'churros'
+  ];
+
+  const largeCuisinePool = [
+    'american burger', 'double cheeseburger', 'loaded fries', 'club sandwich', 'blt sandwich', 'turkey sandwich',
+    'breakfast burrito', 'french toast', 'eggs benedict', 'hash browns', 'chicken and waffles', 'avocado toast',
+    'new york pizza', 'deep dish pizza', 'wood fired pizza', 'margherita pizza',
+    'spaghetti bolognese', 'fettuccine alfredo', 'penne vodka', 'ravioli', 'carbonara',
+    'sushi rolls', 'nigiri', 'sashimi', 'chirashi bowl', 'tempura',
+    'ramen tonkotsu', 'miso ramen', 'shoyu ramen', 'spicy ramen', 'tsukemen',
+    'dim sum', 'bao buns', 'kung pao chicken', 'mapo tofu', 'peking duck',
+    'biryani rice', 'palak paneer', 'chana masala', 'dal makhani', 'tandoori chicken',
+    'pad see ew', 'green curry', 'red curry', 'thai basil chicken', 'mango sticky rice',
+    'pho bo', 'bun cha', 'spring rolls', 'banh xeo', 'com tam',
+    'street tacos', 'carne asada tacos', 'al pastor', 'birria tacos', 'pozole',
+    'shawarma wrap', 'lamb kebab', 'chicken kebab', 'falafel bowl', 'hummus plate',
+    'bbq brisket', 'pulled pork', 'smoked ribs', 'burnt ends', 'cornbread',
+    'ribeye steak', 'filet mignon', 'sirloin steak', 'steak frites', 'prime rib',
+    'lobster roll', 'fish and chips', 'clam chowder', 'seafood paella', 'grilled octopus',
+    'fried chicken sandwich', 'nashville hot chicken', 'buffalo wings', 'chicken tenders',
+    'mac n cheese', 'meatloaf', 'chili bowl', 'pot roast',
+    'cobb salad', 'greek salad', 'caesar salad', 'mediterranean bowl',
+    'poke bowl', 'acai bowl', 'grain bowl',
+    'bibimbap bowl', 'korean fried chicken', 'tteokbokki', 'japchae',
+    'paella valenciana', 'gazpacho', 'patatas bravas',
+    'gelato scoop', 'cheesecake slice', 'chocolate cake', 'tiramisu', 'donuts', 'churros'
   ];
 
   const profile = getSwipePreferenceProfile();
@@ -8786,23 +8948,32 @@ function buildMoodSwipeDeck (elements = [], savedRows = []) {
     .sort((a, b) => Number(b[1]) - Number(a[1]))
     .map(([c]) => String(c || '').trim().toLowerCase())
     .filter(Boolean)
-    .slice(0, 8);
+    .slice(0, 16);
 
-  const terms = [...new Set([...preferred, ...defaults])].slice(0, 18);
+  const terms = [...new Set([...preferred, ...defaults, ...largeCuisinePool])]
+    .map(t => String(t || '').trim().toLowerCase())
+    .filter(Boolean);
 
-  return terms.map((term, idx) => ({
-    key: `mood-${term}-${idx}`,
+  const roundSeed = Date.now();
+  const shuffled = terms
+    .map(term => ({ term, sort: miniHash(`${term}|${roundSeed}|mood`) }))
+    .sort((a, b) => a.sort - b.sort)
+    .slice(0, 120);
+
+  return shuffled.map((item, idx) => ({
+    key: `mood-${item.term}-${idx}`,
     source: 'mood',
-    name: `${formatCuisineLabel(term)} mood`,
-    cuisine: term,
-    cuisineLabel: formatCuisineLabel(term),
+    name: `${formatCuisineLabel(item.term)} mood`,
+    cuisine: item.term,
+    cuisineLabel: formatCuisineLabel(item.term),
     amenity: 'food',
-    photoUrl: getMoodFoodImage(term, `${term}-${idx}`),
+    photoUrl: getMoodFoodImage(item.term, `${item.term}-${roundSeed}-${idx}`),
+    photoFallbacks: getMoodFoodImageCandidates(item.term, `${item.term}-${roundSeed}-${idx}`).slice(1),
     photoSource: 'internet',
     isSaved: false,
     restaurantId: null,
     distMeters: Infinity,
-    priceLevel: estimatePriceLevel({ cuisine: term, amenity: 'restaurant', savedRestaurant: null }),
+    priceLevel: estimatePriceLevel({ cuisine: item.term, amenity: 'restaurant', savedRestaurant: null }),
   }));
 }
 
@@ -8856,7 +9027,7 @@ function hideBearSwipeHome () {
   if (mod) mod.classList.add('hidden');
 }
 
-const SWIPE_DRAG_THRESHOLD_PX = 90;
+const SWIPE_DRAG_THRESHOLD_PX = 68;
 const SWIPE_DRAG_ROTATION_FACTOR = 0.045;
 let _swipeGestureIgnoreClickUntil = 0;
 let _swipeDragState = {
@@ -8881,49 +9052,190 @@ function animateBearSwipeThrow (cardEl, reaction) {
   if (!cardEl) return;
   const throwClass = reaction === 'yes' ? 'swipe-throw-right' : 'swipe-throw-left';
   const clawClass = reaction === 'yes' ? 'claw-right' : 'claw-left';
+  cardEl.classList.remove('swipe-throw-left', 'swipe-throw-right', 'claw-left', 'claw-right', 'swipe-snap-back');
+  const mediaEl = cardEl.querySelector('.bear-swipe-photo-wrap');
+  mediaEl?.classList.remove('claw-left', 'claw-right');
+  // Force reflow so repeated fast swipes always replay claw/tracer animations.
+  void cardEl.offsetWidth;
+  if (mediaEl) void mediaEl.offsetWidth;
+
   cardEl.classList.remove('swipe-snap-back');
   cardEl.classList.add(throwClass);
   cardEl.classList.add(clawClass);
-  const mediaEl = cardEl.querySelector('.bear-swipe-photo-wrap');
-  mediaEl?.classList.remove('claw-left', 'claw-right');
   mediaEl?.classList.add(clawClass);
-  _swipeGestureIgnoreClickUntil = Date.now() + 280;
+  playBearSwipeScratch(mediaEl, reaction);
+  _swipeGestureIgnoreClickUntil = Date.now() + 420;
 
   window.setTimeout(() => {
     cardEl.classList.remove(throwClass, clawClass);
     mediaEl?.classList.remove('claw-left', 'claw-right');
     resetBearSwipeDragVisual(cardEl);
     nextBearSwipeCard(reaction);
-  }, 180);
+  }, 320);
+}
+
+function playBearSwipeScratch (mediaEl, reaction) {
+  if (!mediaEl) return;
+  mediaEl.querySelector('.bear-swipe-scratch')?.remove();
+
+  const scratch = document.createElement('div');
+  scratch.className = `bear-swipe-scratch ${reaction === 'yes' ? 'right' : 'left'}`;
+  mediaEl.appendChild(scratch);
+  window.setTimeout(() => scratch.remove(), 520);
+}
+
+function triggerBearSwipeParty (cardEl) {
+  if (!cardEl) return;
+  const existing = cardEl.querySelector('.bear-swipe-party');
+  if (existing) {
+    existing.classList.remove('pop');
+    void existing.offsetWidth;
+    existing.classList.add('pop');
+    const existingVideo = existing.querySelector('.bear-swipe-party-video');
+    if (existingVideo) {
+      try {
+        existingVideo.currentTime = 0;
+        const playTry = existingVideo.play();
+        if (playTry && typeof playTry.catch === 'function') playTry.catch(() => {});
+      } catch (_) {}
+    }
+    setBearSwipeJoke('Bear dance break. Burger secured.');
+    return;
+  }
+
+  const partyEl = document.createElement('div');
+  partyEl.className = 'bear-swipe-party pop';
+  partyEl.innerHTML = `<video class="bear-swipe-party-video" autoplay loop controls playsinline aria-label="Dancing bear celebration" preload="auto" poster="assets/textures/babybear.jpeg"><source src="assets/videos/dancingbear.webm" type="video/webm" /><source src="assets/videos/dancingbear.mp4" type="video/mp4" /></video><div class="bear-swipe-party-actions"><a class="bear-swipe-party-open" href="assets/videos/dancingbear.webm" target="_blank" rel="noopener">Open Full Video</a><button class="bear-swipe-party-close" type="button">Close</button></div><span class="bear-swipe-party-text">SNACK DANCE</span>`;
+  cardEl.appendChild(partyEl);
+  partyEl.addEventListener('click', e => e.stopPropagation());
+  partyEl.querySelector('.bear-swipe-party-close')?.addEventListener('click', () => partyEl.remove());
+  const partyVideo = partyEl.querySelector('.bear-swipe-party-video');
+  if (partyVideo) {
+    const swapToGifFallback = () => {
+      if (!partyEl.isConnected) return;
+      if (!partyEl.querySelector('.bear-swipe-party-video')) return;
+      const gif = document.createElement('img');
+      gif.className = 'bear-swipe-party-video';
+      gif.src = 'assets/videos/dancingbear.gif';
+      gif.alt = 'Dancing bear animation fallback';
+      partyVideo.replaceWith(gif);
+      const text = partyEl.querySelector('.bear-swipe-party-text');
+      if (text) text.textContent = 'SNACK DANCE (GIF fallback)';
+    };
+
+    partyVideo.muted = true;
+    partyVideo.addEventListener('error', () => {
+      swapToGifFallback();
+    }, { once: true });
+
+    window.setTimeout(() => {
+      if (!partyVideo.isConnected) return;
+      if (partyVideo.readyState < 2) swapToGifFallback();
+    }, 1600);
+
+    try {
+      const playTry = partyVideo.play();
+      if (playTry && typeof playTry.catch === 'function') playTry.catch(() => {});
+    } catch (_) {}
+  }
+  setBearSwipeJoke('Bear dance break. Burger secured.');
+}
+
+function bindBearSwipePhotoFallbacks (photoEl, item = {}) {
+  if (!photoEl) return;
+  const normalizeFallbackUrl = u => {
+    const raw = String(u || '').trim();
+    if (!raw) return '';
+    if (/^(assets\/|\.\/assets\/|feedbear\.png$|file:\/\/)/i.test(raw)) return raw;
+    return safeUrl(raw);
+  };
+
+  const queue = [
+    ...(Array.isArray(item.photoFallbacks) ? item.photoFallbacks : []),
+    ...BEAR_SWIPE_LOCAL_FALLBACKS,
+  ].map(normalizeFallbackUrl).filter(Boolean);
+
+  let idx = 0;
+  let settled = false;
+  let timeoutId = null;
+
+  const armTimeout = () => {
+    if (timeoutId) window.clearTimeout(timeoutId);
+    timeoutId = window.setTimeout(() => {
+      if (settled) return;
+      if (!photoEl.complete || photoEl.naturalWidth <= 0) {
+        if (useNext()) {
+          armTimeout();
+          return;
+        }
+        collapseToEmpty();
+      }
+    }, 1400);
+  };
+
+  const useNext = () => {
+    while (idx < queue.length) {
+      const next = queue[idx++];
+      if (next && next !== photoEl.src) {
+        photoEl.src = next;
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const collapseToEmpty = () => {
+    const wrap = photoEl.closest('.bear-swipe-photo-wrap');
+    if (wrap) {
+      photoEl.remove();
+      if (!wrap.querySelector('.bear-swipe-photo-empty')) {
+        const empty = document.createElement('div');
+        empty.className = 'bear-swipe-photo-empty';
+        empty.innerHTML = '<span>Photo loading failed</span>';
+        wrap.prepend(empty);
+      }
+    }
+  };
+
+  armTimeout();
+
+  photoEl.addEventListener('load', () => {
+    if (photoEl.naturalWidth > 0) {
+      settled = true;
+      if (timeoutId) window.clearTimeout(timeoutId);
+    }
+  });
+
+  photoEl.addEventListener('error', () => {
+    if (useNext()) {
+      armTimeout();
+      return;
+    }
+    collapseToEmpty();
+  });
 }
 
 function attachBearSwipeDragHandlers (cardEl) {
   if (!cardEl || cardEl.dataset.dragBound === '1') return;
 
-  cardEl.addEventListener('pointerdown', e => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    if (e.target.closest('button, a, input, textarea, select, [data-swipe-details], [data-swipe-directions]')) return;
+  const isBlockedTarget = target => target?.closest?.('button, a, input, textarea, select, [data-swipe-details], [data-swipe-directions]');
 
+  const startDrag = (x, y, id) => {
     _swipeDragState.active = true;
-    _swipeDragState.pointerId = e.pointerId;
-    _swipeDragState.startX = e.clientX;
-    _swipeDragState.startY = e.clientY;
+    _swipeDragState.pointerId = id;
+    _swipeDragState.startX = x;
+    _swipeDragState.startY = y;
     _swipeDragState.dx = 0;
     _swipeDragState.dy = 0;
     _swipeDragState.moved = false;
     cardEl.classList.add('is-dragging');
     cardEl.style.transition = 'none';
-    try {
-      cardEl.setPointerCapture?.(e.pointerId);
-    } catch (_) {
-      // Some synthetic or legacy pointer flows may not support capture here.
-    }
-  });
+  };
 
-  cardEl.addEventListener('pointermove', e => {
-    if (!_swipeDragState.active || _swipeDragState.pointerId !== e.pointerId) return;
-    const dx = e.clientX - _swipeDragState.startX;
-    const dy = e.clientY - _swipeDragState.startY;
+  const moveDrag = (x, y, id) => {
+    if (!_swipeDragState.active || _swipeDragState.pointerId !== id) return;
+    const dx = x - _swipeDragState.startX;
+    const dy = y - _swipeDragState.startY;
 
     _swipeDragState.dx = dx;
     _swipeDragState.dy = dy;
@@ -8935,10 +9247,10 @@ function attachBearSwipeDragHandlers (cardEl) {
     cardEl.style.transform = `translateX(${dx}px) rotate(${rotation}deg)`;
     cardEl.style.setProperty('--swipe-dx', `${dx}px`);
     cardEl.dataset.dragDir = dx > 14 ? 'right' : dx < -14 ? 'left' : '';
-  });
+  };
 
-  const endDrag = e => {
-    if (!_swipeDragState.active || _swipeDragState.pointerId !== e.pointerId) return;
+  const endDrag = id => {
+    if (!_swipeDragState.active || _swipeDragState.pointerId !== id) return;
 
     const dx = _swipeDragState.dx;
     const dy = _swipeDragState.dy;
@@ -8956,9 +9268,7 @@ function attachBearSwipeDragHandlers (cardEl) {
       return;
     }
 
-    if (wasDrag) {
-      _swipeGestureIgnoreClickUntil = Date.now() + 180;
-    }
+    if (wasDrag) _swipeGestureIgnoreClickUntil = Date.now() + 180;
 
     cardEl.classList.add('swipe-snap-back');
     window.setTimeout(() => {
@@ -8967,8 +9277,37 @@ function attachBearSwipeDragHandlers (cardEl) {
     }, 180);
   };
 
-  cardEl.addEventListener('pointerup', endDrag);
-  cardEl.addEventListener('pointercancel', endDrag);
+  cardEl.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (isBlockedTarget(e.target)) return;
+    startDrag(e.clientX, e.clientY, `ptr-${e.pointerId}`);
+    try { cardEl.setPointerCapture?.(e.pointerId); } catch (_) {}
+  });
+  cardEl.addEventListener('pointermove', e => moveDrag(e.clientX, e.clientY, `ptr-${e.pointerId}`));
+  cardEl.addEventListener('pointerup', e => endDrag(`ptr-${e.pointerId}`));
+  cardEl.addEventListener('pointercancel', e => endDrag(`ptr-${e.pointerId}`));
+
+  cardEl.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    if (isBlockedTarget(e.target)) return;
+    startDrag(e.clientX, e.clientY, 'mouse');
+  });
+  window.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY, 'mouse'));
+  window.addEventListener('mouseup', () => endDrag('mouse'));
+
+  cardEl.addEventListener('touchstart', e => {
+    if (isBlockedTarget(e.target)) return;
+    const t = e.touches?.[0];
+    if (!t) return;
+    startDrag(t.clientX, t.clientY, 'touch');
+  }, { passive: true });
+  cardEl.addEventListener('touchmove', e => {
+    const t = e.touches?.[0];
+    if (!t) return;
+    moveDrag(t.clientX, t.clientY, 'touch');
+  }, { passive: true });
+  cardEl.addEventListener('touchend', () => endDrag('touch'));
+
   cardEl.dataset.dragBound = '1';
 }
 
@@ -8992,7 +9331,7 @@ function renderBearSwipeCard () {
   const progress = `${idx + 1}/${deck.length}`;
   const swipePhoto = safeUrl(item.photoUrl || '');
   const hasSwipePhoto = !!swipePhoto;
-  const revealPrompt = hasSwipePhoto ? 'Tap image to reveal this vibe.' : 'Tap card to reveal this vibe.';
+  const revealPrompt = 'Swipe left or right to train your cravings.';
   const detailPrompt = 'Swipe yes/no to train your cravings.';
 
   cardEl.innerHTML = `<div class="bear-swipe-photo-wrap">\n      ${hasSwipePhoto
@@ -9005,17 +9344,20 @@ function renderBearSwipeCard () {
 
   cardEl.classList.toggle('is-revealed', reveal);
 
+  cardEl.onclick = e => {
+    if (Date.now() < _swipeGestureIgnoreClickUntil) return;
+    if (e.target?.closest?.('button, a, input, textarea, select, [data-swipe-details], [data-swipe-directions]')) return;
+    if (!state.swipeReveal) revealBearSwipeCard();
+    triggerBearSwipeParty(cardEl);
+  };
+
   const photoEl = cardEl.querySelector('.bear-swipe-photo');
+  bindBearSwipePhotoFallbacks(photoEl, item);
   photoEl?.addEventListener('click', e => {
     e.stopPropagation();
     if (Date.now() < _swipeGestureIgnoreClickUntil) return;
-    if (!state.swipeReveal) {
-      revealBearSwipeCard();
-      return;
-    }
-    if (!isMoodDeck) {
-      openSwipeChoiceDetails(item);
-    }
+    if (!state.swipeReveal) revealBearSwipeCard();
+    triggerBearSwipeParty(cardEl);
   });
 
   cardEl.querySelector('[data-swipe-details]')?.addEventListener('click', e => {
@@ -9045,6 +9387,14 @@ function nextBearSwipeCard (reaction = '') {
   }
   if (reaction === 'yes' || reaction === 'no') {
     setBearSwipeJoke(pickRandom(BEAR_REACTION_COPY[reaction] || BEAR_SWIPE_JOKES));
+  }
+
+  if (reaction === 'no' && item?.cuisine) {
+    const blocked = normalizeMoodTermKey(item.cuisine);
+    state.swipeDeck = deck.filter((d, i) => {
+      if (i <= idx) return true;
+      return normalizeMoodTermKey(d.cuisine) !== blocked;
+    });
   }
 
   state.swipeIndex = idx + 1;
@@ -9105,27 +9455,38 @@ function initBearSwipeHome () {
 
   card.addEventListener('click', () => {
     if (Date.now() < _swipeGestureIgnoreClickUntil) return;
-    revealBearSwipeCard();
+    if (!state.swipeReveal) {
+      revealBearSwipeCard();
+      return;
+    }
+    triggerBearSwipeParty(card);
   });
   card.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       if (Date.now() < _swipeGestureIgnoreClickUntil) return;
-      revealBearSwipeCard();
+      if (!state.swipeReveal) revealBearSwipeCard();
+      else triggerBearSwipeParty(card);
       return;
     }
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      nextBearSwipeCard('no');
+      animateBearSwipeThrow(card, 'no');
       return;
     }
     if (e.key === 'ArrowRight') {
       e.preventDefault();
-      nextBearSwipeCard('yes');
+      animateBearSwipeThrow(card, 'yes');
     }
   });
-  noBtn.addEventListener('click', () => nextBearSwipeCard('no'));
-  yesBtn.addEventListener('click', () => nextBearSwipeCard('yes'));
+  noBtn.addEventListener('click', () => {
+    if (Date.now() < _swipeGestureIgnoreClickUntil) return;
+    animateBearSwipeThrow(card, 'no');
+  });
+  yesBtn.addEventListener('click', () => {
+    if (Date.now() < _swipeGestureIgnoreClickUntil) return;
+    animateBearSwipeThrow(card, 'yes');
+  });
   refreshBtn.addEventListener('click', () => {
     if (_homeDiscCache?.elements?.length) {
       renderBearSwipeHomeFromElements(_homeDiscCache.elements);
