@@ -785,10 +785,10 @@ const DEFAULT_AVATAR = 'FTB';
 const PROFILE_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 const THEME_PRESETS = {
   dark:     { mode: 'dark',  accent: 'midnight' },
-  light:    { mode: 'light', accent: 'sunset' },
+  light:    { mode: 'light', accent: 'mint' },
   forest:   { mode: 'dark',  accent: 'forest' },
   ocean:    { mode: 'dark',  accent: 'ocean' },
-  sunset:   { mode: 'light', accent: 'sunset' },
+  sunset:   { mode: 'dark',  accent: 'sunset' },
   midnight: { mode: 'dark',  accent: 'midnight' },
   berry:    { mode: 'dark',  accent: 'berry' },
   mint:     { mode: 'light', accent: 'mint' },
@@ -3119,7 +3119,7 @@ function toggleThemeFromPalette () {
    ONBOARDING TOUR
    ════════════════════════════════════════════════════════════ */
 const ONBOARDING_STEPS = [
-  { title: 'Welcome to Feed The Bear', desc: 'Build your private dining archive: save standout spots, track visits, and keep every great find in one polished home.' },
+  { title: 'Welcome to Feed The Bear', desc: 'Let\u2019s put some food in your den! Save standout spots, track visits, and keep every great find in one place.' },
   { title: 'Capture Places Instantly', desc: 'Add restaurants in seconds, or paste a Google Maps URL to auto-fill details and save time.' },
   { title: 'Discover Around You', desc: 'Use Map view and Nearby Discovery to find what is close now, then save your favorites with one tap.' },
   { title: 'See Your Food Story', desc: 'Stats turns your history into insight: top cuisines, ratings, trends, and your strongest picks.' },
