@@ -365,15 +365,19 @@ function updateProfileVisuals (profile = null) {
   updateHeaderAvatar(normalizedAvatar);
 }
 
-function applyThemeChoice (choice = 'dark') {
+function applyThemeChoice (choice = 'dark', opts = {}) {
+  const markManual = opts.manual !== false;
+  const shouldPersist = opts.persist !== false;
   const preset = THEME_PRESETS[choice] || THEME_PRESETS.dark;
   document.body.classList.toggle('light-mode', preset.mode === 'light');
   document.body.dataset.themeAccent = preset.accent;
   state.settings.theme = preset.mode;
   state.settings.themeChoice = choice;
-  state.settings.themeManual = true;
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
-  persistAppearanceProfile();
+  if (markManual) state.settings.themeManual = true;
+  if (shouldPersist) {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+    persistAppearanceProfile();
+  }
   syncThemeMetaColor();
 }
 
@@ -616,7 +620,13 @@ function openPersonalizeSettings () {
   const cornersSel = document.getElementById('personalize-corners-select');
   const motionSel = document.getElementById('personalize-motion-select');
 
-  if (themeSel) themeSel.value = state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark');
+  if (themeSel) {
+    if (!state.settings.themeManual) {
+      themeSel.value = 'auto';
+    } else {
+      themeSel.value = state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark');
+    }
+  }
   if (densitySel) densitySel.value = UI_DENSITY.has(state.settings.uiDensity) ? state.settings.uiDensity : 'cozy';
   if (cornersSel) cornersSel.value = UI_CORNERS.has(state.settings.uiCorners) ? state.settings.uiCorners : 'rounded';
   if (motionSel) motionSel.value = UI_MOTION.has(state.settings.uiMotion) ? state.settings.uiMotion : 'playful';
@@ -626,7 +636,14 @@ function openPersonalizeSettings () {
     state.settings.uiDensity = densitySel?.value || 'cozy';
     state.settings.uiCorners = cornersSel?.value || 'rounded';
     state.settings.uiMotion = motionSel?.value || 'playful';
-    applyThemeChoice(choice);
+    if (choice === 'auto') {
+      state.settings.themeManual = false;
+      state.settings.themeChoice = 'auto';
+      applyAutoThemeByClock({ persist: true, announce: true });
+      scheduleNextAutoThemeTick();
+    } else {
+      applyThemeChoice(choice);
+    }
     applyPersonalizationSettings();
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
     persistAppearanceProfile();
@@ -2405,8 +2422,11 @@ function initTheme () {
   if (!state.settings.uiCorners && appearance.uiCorners) state.settings.uiCorners = appearance.uiCorners;
   if (!state.settings.uiMotion && appearance.uiMotion) state.settings.uiMotion = appearance.uiMotion;
 
+  if (state.settings.themeChoice === 'auto') state.settings.themeManual = false;
   const initialChoice = state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark');
-  applyThemeChoice(initialChoice);
+  if (initialChoice !== 'auto') {
+    applyThemeChoice(initialChoice, { manual: !!state.settings.themeManual, persist: true });
+  }
   applyPersonalizationSettings();
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
   document.getElementById('theme-toggle-btn').addEventListener('click', () => {
@@ -4660,6 +4680,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initPwa();
   initTheme();
   initAutoTheme();
+  initHomeVibeTicker();
   initCollections();
   initOfflineIndicator();
   initSwipeGestures();
@@ -5252,22 +5273,67 @@ function checkConfettiMilestones (prev, next) {
    PHASE 6 • AUTO DARK / LIGHT MODE
    ------------------------------------------------------------ */
 
+let _autoThemeTimer = null;
+
+function getAutoThemePresetByHour (hour = new Date().getHours()) {
+  if (hour >= 6 && hour < 11) {
+    return { mode: 'light', accent: 'mint', part: 'morning' };
+  }
+  if (hour >= 11 && hour < 17) {
+    return { mode: 'light', accent: 'sunset', part: 'day' };
+  }
+  if (hour >= 17 && hour < 22) {
+    return { mode: 'dark', accent: 'midnight', part: 'evening' };
+  }
+  return { mode: 'dark', accent: 'neon', part: 'late-night' };
+}
+
+function applyAutoThemeByClock (opts = {}) {
+  if (state.settings.themeManual) return;
+  const preset = getAutoThemePresetByHour();
+  const partChanged = state.settings.autoThemePart !== preset.part;
+
+  document.body.classList.toggle('light-mode', preset.mode === 'light');
+  document.body.dataset.themeAccent = preset.accent;
+  syncThemeMetaColor();
+
+  state.settings.theme = preset.mode;
+  state.settings.themeChoice = preset.mode === 'light' ? 'light' : 'dark';
+  state.settings.autoThemePart = preset.part;
+
+  if (opts.persist) {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+  }
+  if (partChanged && opts.announce) {
+    const labels = {
+      morning: 'Morning mode',
+      day: 'Day mode',
+      evening: 'Dinner mode',
+      'late-night': 'Late night mode'
+    };
+    showToast('Ambient Theme', labels[preset.part] || 'Theme refreshed.', 'info');
+  }
+}
+
+function scheduleNextAutoThemeTick () {
+  if (_autoThemeTimer) clearTimeout(_autoThemeTimer);
+  const now = new Date();
+  const next = new Date(now);
+  next.setMinutes(0, 0, 0);
+  next.setHours(now.getHours() + 1);
+  const waitMs = Math.max(1000, next.getTime() - now.getTime() + 200);
+  _autoThemeTimer = setTimeout(() => {
+    applyAutoThemeByClock({ persist: true, announce: true });
+    scheduleNextAutoThemeTick();
+  }, waitMs);
+}
+
 function initAutoTheme () {
-  const mq = window.matchMedia('(prefers-color-scheme: light)');
-  const apply = (isLight) => {
-    if (state.settings.themeManual) return; // user overrode - respect their choice
-    document.body.classList.toggle('light-mode', isLight);
-    document.body.dataset.themeAccent = 'orange';
-    syncThemeMetaColor();
-    const btn = document.getElementById('theme-toggle-btn');
-    if (btn) {
-      btn.querySelector('.icon-moon')?.style && (btn.querySelector('.icon-moon').style.display = isLight ? '' : 'none');
-      btn.querySelector('.icon-sun')?.style  && (btn.querySelector('.icon-sun').style.display  = isLight ? 'none' : '');
-    }
-  };
-  mq.addEventListener('change', e => apply(e.matches));
   // Only apply auto if no manual preference saved yet
-  if (!state.settings.themeManual) apply(mq.matches);
+  if (!state.settings.themeManual) {
+    applyAutoThemeByClock({ persist: true, announce: false });
+    scheduleNextAutoThemeTick();
+  }
 }
 
 /* ------------------------------------------------------------
@@ -7161,20 +7227,65 @@ function renderTodayStatusRow () {
   `;
 }
 
+let _homeVibeTicker = null;
+
+function getHomeVibeMeta (hour = new Date().getHours()) {
+  if (hour < 11) {
+    return { key: 'morning', label: 'Brunch Hunt' };
+  }
+  if (hour < 17) {
+    return { key: 'day', label: 'Lunch Mode' };
+  }
+  if (hour < 22) {
+    return { key: 'evening', label: 'Dinner Prime' };
+  }
+  return { key: 'night', label: 'Late Bite' };
+}
+
+function applyHomeVibeMood (vibeKey) {
+  if (!vibeKey) return;
+
+  const prev = document.body.dataset.homeVibe || '';
+  document.body.dataset.homeVibe = vibeKey;
+
+  const header = document.querySelector('.app-header');
+  if (header && prev && prev !== vibeKey) {
+    header.classList.remove('header-vibe-shift');
+    void header.offsetWidth;
+    header.classList.add('header-vibe-shift');
+  }
+}
+
 function renderTodayVibeRow () {
   const row = document.getElementById('today-vibe-row');
   if (!row) return;
 
-  const hour = new Date().getHours();
-  const vibe = hour < 11 ? 'Brunch Hunt' : hour < 17 ? 'Lunch Mode' : hour < 22 ? 'Dinner Prime' : 'Late Bite';
+  const vibeMeta = getHomeVibeMeta();
   const mood = document.querySelector('.home-mood-chip.active')?.textContent?.trim() || 'Quick';
   const nearby = state.restaurants.filter(r => Number.isFinite(distOf(r)) && distOf(r) <= 1609).length;
 
+  applyHomeVibeMood(vibeMeta.key);
+  const prevVibe = row.dataset.vibe || '';
+  row.dataset.vibe = vibeMeta.key;
+  if (prevVibe && prevVibe !== vibeMeta.key) {
+    row.classList.remove('today-vibe-refresh');
+    void row.offsetWidth;
+    row.classList.add('today-vibe-refresh');
+  }
+
   row.innerHTML = `
-    <span class="today-vibe-pill">Now: ${vibe}</span>
+    <span class="today-vibe-pill">Now: ${vibeMeta.label}</span>
     <span class="today-vibe-pill">Mood: ${escHtml(mood)}</span>
     <span class="today-vibe-pill">Nearby: ${nearby}</span>
   `;
+}
+
+function initHomeVibeTicker () {
+  if (_homeVibeTicker) clearInterval(_homeVibeTicker);
+  _homeVibeTicker = setInterval(() => {
+    if (document.visibilityState === 'hidden') return;
+    renderTodayVibeRow();
+  }, 15 * 60 * 1000);
 }
 
 function stageHomeModules () {

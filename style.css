@@ -43,6 +43,10 @@
   --header-h:    64px;
   --stats-h:     64px;
   --filter-h:    60px;
+
+  --header-vibe-a: rgba(111,142,199,.3);
+  --header-vibe-b: rgba(214,168,107,.24);
+  --header-vibe-c: rgba(16,19,25,.9);
 }
 
 /* ── Reset ───────────────────────────────────────────────── */
@@ -88,6 +92,34 @@ img { display: block; }
   align-items: center;
   gap: 20px;
   padding: 0 20px;
+  overflow: hidden;
+}
+
+.app-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 110% at 0% 0%, var(--header-vibe-a), transparent 55%),
+    linear-gradient(120deg, var(--header-vibe-b), transparent 58%),
+    linear-gradient(180deg, var(--header-vibe-c), rgba(16,19,25,.9));
+  opacity: .9;
+  transition: opacity .35s ease;
+}
+
+.app-header > * {
+  position: relative;
+  z-index: 1;
+}
+
+.app-header.header-vibe-shift::before {
+  animation: header-vibe-shift .7s ease;
+}
+
+@keyframes header-vibe-shift {
+  0% { opacity: .25; }
+  100% { opacity: .9; }
 }
 
 .header-brand {
@@ -4721,6 +4753,7 @@ body.light-mode #profile-btn {
   border-radius: 14px;
   border: 1px solid rgba(255,255,255,.14);
   background: linear-gradient(140deg, rgba(var(--blue-rgb),.16), rgba(26,188,156,.1));
+  transition: background .45s ease, border-color .45s ease, box-shadow .45s ease;
 }
 
 .today-vibe-pill {
@@ -4734,6 +4767,75 @@ body.light-mode #profile-btn {
   color: #f3f7ff;
   font-size: .74rem;
   font-weight: 700;
+  transition: background .35s ease, transform .2s ease;
+}
+
+.today-vibe-row.today-vibe-refresh .today-vibe-pill {
+  animation: today-vibe-pill-pop .45s ease;
+}
+
+@keyframes today-vibe-pill-pop {
+  0% { transform: translateY(4px); opacity: .55; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+body[data-home-vibe='morning'] {
+  --header-vibe-a: rgba(141,168,219,.34);
+  --header-vibe-b: rgba(214,168,107,.24);
+  --header-vibe-c: rgba(16,19,25,.9);
+}
+
+body[data-home-vibe='day'] {
+  --header-vibe-a: rgba(45,143,213,.32);
+  --header-vibe-b: rgba(34,184,148,.2);
+  --header-vibe-c: rgba(16,19,25,.9);
+}
+
+body[data-home-vibe='evening'] {
+  --header-vibe-a: rgba(239,91,79,.3);
+  --header-vibe-b: rgba(207,169,58,.28);
+  --header-vibe-c: rgba(14,16,24,.92);
+}
+
+body[data-home-vibe='night'] {
+  --header-vibe-a: rgba(122,92,255,.32);
+  --header-vibe-b: rgba(111,142,199,.2);
+  --header-vibe-c: rgba(10,12,22,.94);
+}
+
+.today-vibe-row[data-vibe='morning'] {
+  background: linear-gradient(140deg, rgba(111,142,199,.2), rgba(214,168,107,.16));
+  border-color: rgba(141,168,219,.3);
+}
+
+.today-vibe-row[data-vibe='day'] {
+  background: linear-gradient(140deg, rgba(45,143,213,.2), rgba(34,184,148,.14));
+  border-color: rgba(45,143,213,.32);
+}
+
+.today-vibe-row[data-vibe='evening'] {
+  background: linear-gradient(140deg, rgba(239,91,79,.2), rgba(207,169,58,.16));
+  border-color: rgba(239,91,79,.34);
+}
+
+.today-vibe-row[data-vibe='night'] {
+  background: linear-gradient(140deg, rgba(122,92,255,.2), rgba(111,142,199,.16));
+  border-color: rgba(122,92,255,.32);
+}
+
+body.light-mode .today-vibe-pill {
+  background: rgba(255,255,255,.66);
+  color: #1f2833;
+  border-color: rgba(0,0,0,.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-header::before,
+  .today-vibe-row,
+  .today-vibe-pill {
+    transition: none !important;
+    animation: none !important;
+  }
 }
 
 .daily-quest-home {
