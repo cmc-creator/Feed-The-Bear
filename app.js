@@ -8402,13 +8402,18 @@ async function enrichNearbyCardsRealPhotos () {
   const candidates = (_nearbyCards || [])
     .filter(c => !hasReliableNearbyCardPhoto(c))
     .filter(c => !c.isSaved)
-    .slice(0, 8);
+    .slice(0, 12);
 
   if (!candidates.length) return;
 
+  const results = await Promise.allSettled(
+    candidates.map(async card => ({ card, url: await getOrFetchPlacePhoto(card) }))
+  );
+
   let changed = false;
-  for (const card of candidates) {
-    const url = await getOrFetchPlacePhoto(card);
+  for (const r of results) {
+    if (r.status !== 'fulfilled') continue;
+    const { card, url } = r.value;
     if (!url || !isLikelyRealPlacePhotoUrl(url)) continue;
     const idx = _nearbyCards.findIndex(c => String(c.key) === String(card.key));
     if (idx < 0) continue;
