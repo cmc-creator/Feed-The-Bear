@@ -417,20 +417,37 @@
     </div>
   </nav>
 
-  <!-- ── HERO ── -->
-  <section class="hero">
-    <div class="hero-glow"></div>
-    <div class="hero-badge">Forest-tested food finding</div>
-    <img class="hero-bear bear-mark" src="feedbear.png" alt="Hungry bear mascot" />
-    <h1 class="hero-title">Stop doom-scrolling dinner. <span>Feed the bear.</span></h1>
-    <p class="hero-sub">Feed The Bear is your cozy food den: stash your best bites, track your go-to dishes, and let Byte Cub settle "where are we eating?" in one tap.</p>
-    <div class="hero-ctas">
-      <a href="auth.html?mode=signup" class="btn-hero-primary">Start For Free</a>
-      <a href="auth.html?mode=signin" class="btn-hero-secondary">Sign In</a>
-    </div>
-    <div class="hero-social-proof">
-      <div class="hero-proof-kicker">Sniff. Swipe. Supper.</div>
-      <span>Less app-juggling, more paw-picked meals.</span>
+    <select id="filter-cuisine" class="filter-select" aria-label="Filter by cuisine">
+      <option value="">All Cuisines</option>
+    </select>
+
+    <select id="filter-price" class="filter-select" aria-label="Filter by price">
+      <option value="">Any Price</option>
+      <option value="1">$ Budget</option>
+      <option value="2">$$ Casual</option>
+      <option value="3">$$$ Upscale</option>
+      <option value="4">$$$$ Fine Dining</option>
+    </select>
+
+    <select id="sort-select" class="filter-select" aria-label="Sort by">
+      <option value="date-desc">Newest First</option>
+      <option value="date-asc">Oldest First</option>
+      <option value="name-asc">Name A–Z</option>
+      <option value="name-desc">Name Z–A</option>
+      <option value="rating-desc">Highest Rated (Google)</option>
+      <option value="my-rating-desc">Highest Rated (Mine)</option>
+      <option value="distance-asc">Nearest</option>
+    </select>
+
+    <select id="filter-collection" class="filter-select" aria-label="Filter by list">
+      <option value="">All Lists</option>
+    </select>
+    <button id="clear-filters-btn" class="btn-ghost btn-sm hidden">✕ Clear</button>
+    <button id="group-by-btn" class="btn-ghost btn-sm" title="Group by cuisine">⊞ Group</button>
+    <div class="quick-chips">
+      <button class="quick-chip" data-action="top-rated">⭐ Top Rated</button>
+      <button class="quick-chip" data-action="nearest">📍 Near Me</button>
+      <button class="quick-chip" data-action="discover">🔍 Discover Nearby</button>
     </div>
   </section>
 
@@ -463,15 +480,70 @@
             </div>
           </div>
         </div>
-        <div class="mockup-card">
-          <span class="mockup-card-emoji">M</span>
-          <div class="mockup-card-body">
-            <div class="mockup-card-name">El Compadre Tacos</div>
-            <div class="mockup-card-tags">
-              <span class="mockup-tag tag-green">✓ Visited</span>
-              <span class="mockup-tag tag-gold">★ 4 stars</span>
-              <span class="mockup-tag tag-orange">Mexican</span>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Restaurant Detail Modal ───────────────────────────── -->
+  <div id="detail-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="detail-name">
+    <div class="modal-card detail-card">
+      <div class="detail-hero" id="detail-hero">
+        <button id="detail-close-btn" class="icon-btn detail-close" aria-label="Close">✕</button>
+        <div class="detail-hero-content">
+          <div class="detail-cuisine-badge" id="detail-cuisine-badge"></div>
+          <h2 id="detail-name"></h2>
+          <div class="detail-address" id="detail-address"></div>
+        </div>
+      </div>
+
+      <div class="detail-body">
+        <div class="detail-ratings-row">
+          <div class="detail-rating-block">
+            <div class="g-rating-display" id="detail-google-rating"></div>
+          </div>
+          <div class="detail-rating-block">
+            <div class="my-rating-display" id="detail-my-rating"></div>
+          </div>
+          <div class="detail-rating-block">
+            <div class="price-display" id="detail-price"></div>
+          </div>
+        </div>
+
+        <div class="detail-tags-wrap" id="detail-tags-wrap"></div>
+
+        <div class="detail-notes" id="detail-notes-wrap">
+          <h4>📝 My Notes</h4>
+          <p id="detail-notes"></p>
+        </div>
+
+        <div class="detail-visit-log" id="detail-visit-log-wrap">
+          <div class="visit-log-header">
+            <h4>📅 Visit Log</h4>
+            <button id="detail-checkin-btn" class="btn-sm btn-orange">+ Check In</button>
+          </div>
+          <div id="detail-checkin-form" class="checkin-form hidden" data-rating="0">
+            <div class="checkin-star-row" role="radiogroup" aria-label="Visit rating">
+              <button type="button" class="checkin-star" data-val="1" aria-label="1 star">★</button>
+              <button type="button" class="checkin-star" data-val="2" aria-label="2 stars">★</button>
+              <button type="button" class="checkin-star" data-val="3" aria-label="3 stars">★</button>
+              <button type="button" class="checkin-star" data-val="4" aria-label="4 stars">★</button>
+              <button type="button" class="checkin-star" data-val="5" aria-label="5 stars">★</button>
             </div>
+            <textarea class="checkin-note" rows="2" placeholder="Quick note (optional)…" maxlength="500"></textarea>
+            <div class="checkin-actions">
+              <button type="button" id="detail-checkin-submit" class="btn-sm btn-orange">✅ Log Visit</button>
+              <button type="button" id="detail-checkin-cancel" class="btn-ghost btn-sm">Cancel</button>
+            </div>
+          </div>
+          <div id="detail-visit-log-list"></div>
+        </div>
+
+        <div class="detail-reminder-wrap" id="detail-reminder-wrap">
+          <h4>🔔 Plan a Visit</h4>
+          <div class="reminder-row">
+            <input type="date" id="detail-reminder-date" />
+            <input type="time" id="detail-reminder-time" value="12:00" />
+            <button id="detail-set-reminder-btn" class="btn-sm btn-orange">Set Reminder</button>
           </div>
         </div>
       </div>

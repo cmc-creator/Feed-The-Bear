@@ -762,7 +762,7 @@ function seedData () {
 }
 
 function uid () {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2-3);
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 function iso (offsetDays = 0) {
   const d = new Date();
@@ -1416,6 +1416,8 @@ function getFiltered () {
       list.sort((a,b) => a.name.localeCompare(b.name)); break;
     case 'name-desc':
       list.sort((a,b) => b.name.localeCompare(a.name)); break;
+    case 'my-rating-desc':
+      list.sort((a,b) => (b.myRating||0) - (a.myRating||0)); break;
     case 'rating-desc':
       list.sort((a,b) => (b.googleRating||0) - (a.googleRating||0)); break;
     case 'distance-asc':
@@ -1792,9 +1794,20 @@ function openDetailModal (id) {
     : '<div class="visit-log-empty">No visits logged yet.</div>';
 
   document.getElementById('detail-checkin-btn').onclick = () => {
-    const note = prompt('Quick note for this visit (optional):') || '';
-    const ratingStr = prompt('Your rating 1-5 (optional):') || '0';
-    const rating = Math.min(5, Math.max(0, parseInt(ratingStr) || 0));
+    const form = document.getElementById('detail-checkin-form');
+    const isVisible = !form.classList.contains('hidden');
+    form.classList.toggle('hidden', isVisible);
+    if (!isVisible) {
+      form.querySelector('.checkin-note').value = '';
+      setCheckinStars(0);
+      form.querySelector('.checkin-note').focus();
+    }
+  };
+
+  document.getElementById('detail-checkin-submit').onclick = () => {
+    const form = document.getElementById('detail-checkin-form');
+    const note   = form.querySelector('.checkin-note').value.trim();
+    const rating = parseInt(form.dataset.rating || '0') || 0;
     const visitEntry = { date: iso(), note, rating };
     const idx = state.restaurants.findIndex(x => x.id === id);
     if (idx !== -1) {
@@ -1809,6 +1822,10 @@ function openDetailModal (id) {
       showToast('✅ Checked In!', `Visit logged for ${state.restaurants[idx].name}`, 'success');
       celebrateMilestones();
     }
+  };
+
+  document.getElementById('detail-checkin-cancel').onclick = () => {
+    document.getElementById('detail-checkin-form').classList.add('hidden');
   };
 
   // Reminder
@@ -1846,7 +1863,16 @@ function openDetailModal (id) {
 
   document.getElementById('detail-overlay').classList.remove('hidden');
   document.getElementById('ui-overlay').classList.remove('hidden');
-  // Phase 9 - load cuisine photo + hide stale AI summary
+  // Reset check-in form so it starts collapsed on each open
+  const checkinForm = document.getElementById('detail-checkin-form');
+  if (checkinForm) {
+    checkinForm.classList.add('hidden');
+    checkinForm.dataset.rating = '0';
+    const note = checkinForm.querySelector('.checkin-note');
+    if (note) note.value = '';
+    setCheckinStars(0);
+  }
+  // Phase 9 — load cuisine photo + hide stale AI summary
   loadDetailPhoto(r);
   const aiSumEl = document.getElementById('detail-ai-summary');
   if (aiSumEl) aiSumEl.classList.add('hidden');
@@ -2133,6 +2159,15 @@ function setFormStars (n) {
   });
 }
 
+function setCheckinStars (n) {
+  const form = document.getElementById('detail-checkin-form');
+  if (!form) return;
+  form.dataset.rating = n;
+  form.querySelectorAll('.checkin-star').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.val) <= n);
+  });
+}
+
 function handleFormSubmit (e) {
   e.preventDefault();
   const name = document.getElementById('form-name').value.trim();
@@ -2217,7 +2252,7 @@ function handleFormSubmit (e) {
 async function geocodeAddress (id, address) {
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
-    const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'FeedTheBear/1.0 (github.com/cmc-creator/Feed-The-Bear)' } });
     const data = await res.json();
     if (data && data.length > 0) {
       const idx = state.restaurants.findIndex(r => r.id === id);
@@ -2260,10 +2295,12 @@ function buildMenuSearchUrl (place) {
 }
 
 function openDirections (r) {
-  const url = buildGoogleDirectionsUrl(r);
-  if (!url) {
-    showToast('No Location', 'This restaurant needs an address or coordinates for directions.', 'error');
-    return;
+  if (r.lat && r.lng) {
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lng}`, '_blank', 'noopener');
+  } else if (r.address) {
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(r.address)}`, '_blank', 'noopener');
+  } else {
+    showToast('No Address', 'This restaurant has no address saved.', 'error');
   }
   window.open(url, '_blank', 'noopener');
 }
@@ -3252,74 +3289,26 @@ async function _discFetch () {
   const radius = parseInt(document.getElementById('disc-radius')?.value) || 3219;
 
   try {
-    const q = `[out:json][timeout:20];(node["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${radius},${lat},${lng});way["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${radius},${lat},${lng}););out center 250;`;
-    const elementsRaw = await fetchOverpassElements(q, {
-      timeoutMs: 18000,
-      nominatimFallback: true,
-      lat,
-      lng,
-      radiusMeters: radius,
-      limit: 250,
-    });
-
-    const savedNames = new Set(state.restaurants.map(r => normalizeName(r.name)));
-    const myCuisines = {};
-    state.restaurants.filter(r => r.myRating >= 4 && r.cuisine).forEach(r => {
-      const c = (r.cuisine || '').toLowerCase();
-      myCuisines[c] = (myCuisines[c] || 0) + (r.myRating || 3);
-    });
-
-    _discAllResults = (elementsRaw || [])
-      .filter(el => el.tags?.name)
-      .map(el => {
-        const tags   = el.tags || {};
-        const elLat  = el.lat ?? el.center?.lat;
-        const elLon  = el.lon ?? el.center?.lon;
-        const dist   = (elLat != null && elLon != null) ? haversine(lat, lng, elLat, elLon) : Infinity;
-        const rawCuisines = (tags.cuisine || '').split(';').map(s => s.trim().replace(/_/g, ' ')).filter(Boolean);
-        const cuisine = rawCuisines[0] || '';
-        const amenity = tags.amenity || 'restaurant';
-
-        // Taste-match score
-        let matchScore = 0;
-        Object.entries(myCuisines).forEach(([c, w]) => {
-          if (cuisine.toLowerCase().includes(c) || c.includes(cuisine.toLowerCase())) matchScore += w;
-        });
-        if (amenity === 'restaurant') matchScore += 5;
-        if (tags.opening_hours)       matchScore += 3;
-        if (tags.website)             matchScore += 2;
-        if (tags['addr:street'])      matchScore += 1;
-
-        // Check if open now (simple heuristic - mark unknown if no hours)
-        const openNow = _discIsOpenNow(tags.opening_hours);
-
-        const street = [tags['addr:housenumber'], tags['addr:street']].filter(Boolean).join(' ');
-        const city   = tags['addr:city'] || '';
-
-        return {
-          name: tags.name,
-          cuisine,
-          rawCuisines,
-          amenity,
-          dist,
-          lat: Number.isFinite(elLat) ? Number(elLat) : null,
-          lon: Number.isFinite(elLon) ? Number(elLon) : null,
-          matchScore,
-          openNow,
-          street,
-          city,
-          website: tags.website || '',
-          phone:   tags.phone || '',
-          saved:   savedNames.has(normalizeName(tags.name)),
-        };
-      })
-      .sort((a, b) => a.dist - b.dist);   // default: nearest first
-
-    if (!_discAllResults.length) {
-      resultsEl.innerHTML = `<div class="disc-empty">
-        <div class="disc-empty-icon">FTB</div>
-        <div class="disc-empty-title">No spots found nearby</div>
-        <div class="disc-empty-sub">Try increasing the radius above.</div>
+    const { userLat: lat, userLng: lng } = state;
+    const query = `[out:json][timeout:15];(node["amenity"="restaurant"](around:1000,${lat},${lng});way["amenity"="restaurant"](around:1000,${lat},${lng}););out center 20;`;
+    const res  = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:query, signal: AbortSignal.timeout(15000) });
+    const data = await res.json();
+    const els  = (data.elements || []).slice(0, 20);
+    if (!els.length) { document.getElementById('nearby-results').innerHTML = '<div class="nearby-empty">No restaurants found within 1 km. Try a different area!</div>'; return; }
+    const html = els.map(el => {
+      const tags = el.tags || {};
+      const elLat = el.lat ?? el.center?.lat, elLon = el.lon ?? el.center?.lon;
+      const name = tags.name || 'Unknown Restaurant';
+      const cuisine = (tags.cuisine || '').split(';')[0];
+      const dist = (elLat && elLon) ? haversine(lat, lng, elLat, elLon) : null;
+      const saved = state.restaurants.some(r => r.name.toLowerCase() === name.toLowerCase());
+      return `<div class="nearby-item">
+        <div class="nearby-item-info">
+          <div class="nearby-item-name">${escHtml(name)}</div>
+          <div class="nearby-item-meta">${cuisine ? `${cuisineEmoji(cuisine)} ${escHtml(cuisine)} · ` : ''}${dist ? fmtDist(dist)+' away' : ''}</div>
+        </div>
+        ${saved ? '<span class="nearby-saved-badge">✓ Saved</span>' :
+          `<button class="btn-sm btn-orange nearby-add-btn" data-name="${escHtml(name)}" data-cuisine="${escHtml(cuisine)}" data-lat="${elLat||''}" data-lng="${elLon||''}">+ Add</button>`}
       </div>`;
       return;
     }
@@ -3361,44 +3350,21 @@ function _discBuildChips (results, wrap) {
       const label = c.charAt(0).toUpperCase() + c.slice(1);
       return `<button class="disc-chip" data-cuisine="${escHtml(c)}">${emoji} ${escHtml(label)} <span class="disc-chip-count">${counts[c]}</span></button>`;
     }).join('');
-}
-
-function _discApplyFilters () {
-  const query   = (document.getElementById('disc-search')?.value || '').trim().toLowerCase();
-  const cuisine = _discActiveCuisine;
-  const sort    = document.getElementById('disc-sort')?.value || 'distance';
-  const metaEl  = document.getElementById('disc-result-meta');
-
-  let results = _discAllResults.filter(r => {
-    if (cuisine !== 'all' && r.cuisine !== cuisine && r.amenity !== cuisine) return false;
-    if (query && !r.name.toLowerCase().includes(query) && !r.cuisine.toLowerCase().includes(query)) return false;
-    return true;
-  });
-
-  if (sort === 'distance') {
-    results = results.slice().sort((a, b) => a.dist - b.dist);
-  } else if (sort === 'match') {
-    results = results.slice().sort((a, b) => b.matchScore - a.matchScore);
-  } else if (sort === 'type') {
-    results = results.slice().sort((a, b) => a.amenity.localeCompare(b.amenity) || a.dist - b.dist);
-  }
-
-  const shown = results.slice(0, Math.max(DISC_PAGE_SIZE, _discRenderLimit));
-
-  if (metaEl) {
-    metaEl.textContent = results.length
-      ? `${shown.length} of ${results.length} spot${results.length !== 1 ? 's' : ''} shown`
-      : '';
-  }
-
-  const resultsEl = document.getElementById('nearby-results');
-  if (!results.length) {
-    resultsEl.innerHTML = `<div class="disc-empty">
-      <div class="disc-empty-icon"></div>
-      <div class="disc-empty-title">No matches</div>
-      <div class="disc-empty-sub">Try a different filter or search term.</div>
-    </div>`;
-    return;
+    document.getElementById('nearby-results').innerHTML = html;
+    document.querySelectorAll('.nearby-add-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        overlay.classList.add('hidden'); maybeHideOverlay();
+        openAddModal();
+        document.getElementById('form-name').value    = btn.dataset.name;
+        document.getElementById('form-cuisine').value = btn.dataset.cuisine;
+        showToast('Pre-filled!', 'Review the details and save.', 'info');
+      });
+    });
+  } catch (err) {
+    const msg = (err?.name === 'TimeoutError' || err?.name === 'AbortError')
+      ? 'Request timed out — check your connection and try again.'
+      : 'Could not fetch — check your connection.';
+    document.getElementById('nearby-results').innerHTML = `<div class="nearby-empty">${msg}</div>`;
   }
 
   const myCuisines = new Set(
@@ -4812,6 +4778,16 @@ function setupEvents () {
     if (!btn) return;
     const val = parseInt(btn.dataset.val);
     setFormStars(state.formRating === val ? 0 : val); // toggle off if same
+  });
+
+  // Check-in inline form star picker
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.checkin-star');
+    if (!btn) return;
+    const val = parseInt(btn.dataset.val);
+    const form = btn.closest('#detail-checkin-form');
+    const current = parseInt(form?.dataset.rating || '0');
+    setCheckinStars(current === val ? 0 : val);
   });
 
   // Filters

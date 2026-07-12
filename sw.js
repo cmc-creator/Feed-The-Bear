@@ -3,7 +3,7 @@
    Offline-first cache strategy
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-const CACHE  = 'ftb-v39';
+const CACHE  = 'ftb-v20';
 const ASSETS = [
   './',
   './index.html',
@@ -35,16 +35,17 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  const url = e.request.url;
-
-  // Always bypass SW for API routes and external APIs
-  if (url.includes('/api/') ||
-      url.includes('overpass-api.de') ||
-      url.includes('nominatim.openstreetmap.org') ||
-      url.includes('firestore.googleapis.com') ||
-      url.includes('identitytoolkit.googleapis.com') ||
-      url.includes('securetoken.googleapis.com')) {
-    e.respondWith(fetch(e.request).catch(() => new Response('', { status: 503 })));
+  // Network-first for Nominatim geocoding — results must always be fresh
+  if (new URL(e.request.url).hostname === 'nominatim.openstreetmap.org') {
+    const req = new Request(e.request, {
+      headers: new Headers({ ...Object.fromEntries(e.request.headers), 'User-Agent': 'FeedTheBear/1.0 (github.com/cmc-creator/Feed-The-Bear)' }),
+    });
+    e.respondWith(fetch(req).catch(() => new Response('[]', { headers: { 'Content-Type': 'application/json' } })));
+    return;
+  }
+  // Network-first for Overpass API — restaurant results must always be live, never cached
+  if (new URL(e.request.url).hostname === 'overpass-api.de') {
+    e.respondWith(fetch(e.request).catch(() => new Response('{"elements":[]}', { headers: { 'Content-Type': 'application/json' } })));
     return;
   }
 

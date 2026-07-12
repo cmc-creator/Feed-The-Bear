@@ -2664,6 +2664,38 @@ body.bulk-mode .card-checkbox { display: flex; }
   padding: 8px 0;
 }
 
+/* ── Inline Check-in Form ─────────────────────────────── */
+.checkin-form {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.checkin-star-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.checkin-star {
+  font-size: 1.4rem;
+  color: var(--text-dim);
+  line-height: 1;
+  padding: 0 2px;
+  transition: color var(--transition), transform var(--transition);
+}
+.checkin-star.active, .checkin-star:hover { color: var(--gold); transform: scale(1.15); }
+.checkin-note {
+  width: 100%;
+  resize: vertical;
+  padding: 8px 10px;
+  font-size: .85rem;
+  min-height: 52px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+}
+.checkin-actions { display: flex; gap: 8px; }
+
 /* ══════════════════════════════════════════════════════════
    REMINDER / PLAN A VISIT
    ══════════════════════════════════════════════════════════ */
