@@ -206,7 +206,7 @@ function renderNearbyVisualCard ({
             : effectivePopularity === 'Local Favorite' ? 62
               : 54))));
 
-  return `<article class="nearby-home-card${isSaved ? ' saved' : ''}" data-nearby-key="${escHtml(key || `${name}-${distText}`)}" data-nearby-price="${effectivePrice}" data-nearby-popularity="${escHtml(effectivePopularity)}">
+  return `<article class="nearby-home-card${isSaved ? ' saved' : ''}" data-nearby-key="${escHtml(key || `${name}-${distText}`)}" data-nearby-price="${effectivePrice}" data-nearby-popularity="${escHtml(effectivePopularity)}" data-card-link="${escHtml(websiteUrl || menuUrl || directionsUrl || '')}" role="link" tabindex="0" title="Open ${safeName}">
     <div class="nearby-home-card-media">
       <img class="nearby-home-card-photo" src="${photo}" alt="${escHtml(cuisineLabel)} food" loading="lazy" />
       <div class="nearby-home-card-badges">
@@ -1156,7 +1156,7 @@ function openPersonalizeSettings () {
   if (densitySel) densitySel.value = UI_DENSITY.has(state.settings.uiDensity) ? state.settings.uiDensity : 'cozy';
   if (cornersSel) cornersSel.value = UI_CORNERS.has(state.settings.uiCorners) ? state.settings.uiCorners : 'rounded';
   if (motionSel) motionSel.value = UI_MOTION.has(state.settings.uiMotion) ? state.settings.uiMotion : 'playful';
-  if (nearbyRadiusSel) nearbyRadiusSel.value = String(Math.max(1, Math.min(5, Number(state.settings.nearbyRadiusMiles) || 1)));
+  if (nearbyRadiusSel) nearbyRadiusSel.value = String(Math.max(1, Math.min(100, Number(state.settings.nearbyRadiusMiles) || 25)));
   if (weeklyGoalInput) weeklyGoalInput.value = String(Math.max(0, Number(state.settings.weeklyGoal) || 0));
   if (avgSpendInput) avgSpendInput.value = String(Math.max(0, Number(state.settings.avgSpend) || 35));
   if (monthlyBudgetInput) monthlyBudgetInput.value = String(Math.max(0, Number(state.settings.monthlyBudget) || 0));
@@ -8444,7 +8444,7 @@ async function enrichNearbyCardsRealPhotos () {
 }
 
 function getNearbyRadiusMiles () {
-  return Math.max(1, Math.min(5, Number(state.settings.nearbyRadiusMiles) || 1));
+  return Math.max(1, Math.min(100, Number(state.settings.nearbyRadiusMiles) || 25));
 }
 
 function getNearbyRadiusMeters () {
@@ -8479,6 +8479,21 @@ function renderNearbyCardsFromState () {
 
   list.innerHTML = `${_nearbyBannerMsg ? `<div class="nearby-home-loading">${escHtml(_nearbyBannerMsg)}</div>` : ''}` +
     filtered.map(card => renderNearbyVisualCard(card)).join('');
+
+  // Whole-card click opens the venue's website (or menu/directions fallback).
+  list.querySelectorAll('.nearby-home-card[data-card-link]').forEach(cardEl => {
+    const link = cardEl.dataset.cardLink || '';
+    if (!link) return;
+    cardEl.style.cursor = 'pointer';
+    cardEl.addEventListener('click', e => {
+      if (e.target.closest('a, button')) return;
+      window.open(link, '_blank', 'noopener');
+    });
+    cardEl.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' || e.target.closest('a, button')) return;
+      window.open(link, '_blank', 'noopener');
+    });
+  });
 }
 
 function setNearbyCards (cards = [], opts = {}) {
@@ -9200,7 +9215,7 @@ function renderForYouHome () {
     const basePhoto = pickRealRestaurantPhoto({ savedRestaurant: r, cuisine: r.cuisine, amenity: 'restaurant', allowFallback: false });
     const cachedPhoto = safeUrl(_placePhotoCache.get(getPlacePhotoLookupKey({ name: r.name, lat: r.lat, lon: r.lng })) || '');
     const photoUrl = safeUrl(basePhoto.url || '') || cachedPhoto;
-    const sourceLabel = basePhoto.source === 'user' ? 'Your photo' : (cachedPhoto ? 'Wikipedia photo' : 'No photo yet');
+    const sourceLabel = basePhoto.source === 'user' ? 'Your photo' : '';
     return `<button class="for-you-card" data-id="${r.id}" type="button" title="Open ${escHtml(r.name)}">
       <div class="for-you-card-top">
         <span class="for-you-chip">${escHtml(reason)}</span>

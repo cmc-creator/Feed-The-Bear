@@ -151,6 +151,7 @@
         <button id="personalize-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="personalize-body">
+        <div class="personalize-section-title">Appearance</div>
         <label class="form-label" for="personalize-theme-select">Theme</label>
         <select id="personalize-theme-select" class="form-select">
           <option value="auto">Auto Ambient (Time of Day)</option>
@@ -183,14 +184,19 @@
           <option value="reduced">Reduced</option>
         </select>
 
+        <div class="personalize-section-title">Discovery</div>
         <label class="form-label personalize-label" for="personalize-nearby-radius-select">Nearby radius</label>
         <select id="personalize-nearby-radius-select" class="form-select">
           <option value="1">1 mile</option>
           <option value="2">2 miles</option>
-          <option value="3">3 miles</option>
           <option value="5">5 miles</option>
+          <option value="10">10 miles</option>
+          <option value="25">25 miles</option>
+          <option value="50">50 miles</option>
+          <option value="100">100 miles</option>
         </select>
 
+        <div class="personalize-section-title">Budget &amp; Goals</div>
         <div class="personalize-grid">
           <div>
             <label class="form-label personalize-label" for="personalize-weekly-goal-input">Weekly goal (visits)</label>
@@ -712,30 +718,6 @@
       </div>
       <div id="today-status-row" class="today-status-row home-module" aria-label="Today status"></div>
       <div id="today-vibe-row" class="today-vibe-row home-module" aria-label="Tonight vibe"></div>
-      <!-- Personal recommendation strip -->
-      <div id="for-you-home" class="for-you-home home-module hidden">
-        <div class="for-you-home-header">
-          <span class="for-you-home-title">For You Tonight</span>
-          <button id="for-you-refresh-btn" class="btn-ghost btn-sm">Shuffle ↻</button>
-        </div>
-        <div id="for-you-home-list" class="for-you-home-list"></div>
-      </div>
-      <div id="week-recap-home" class="week-recap-home home-module hidden">
-        <div class="week-recap-title">Your Week So Far</div>
-        <div id="week-recap-text" class="week-recap-text"></div>
-      </div>
-      <div id="mood-picks-home" class="mood-picks-home home-module hidden">
-        <div class="mood-picks-home-header">
-          <span class="mood-picks-home-title">Mood Picks</span>
-        </div>
-        <div id="mood-picks-chips" class="mood-picks-chips">
-          <button class="home-mood-chip active" data-mood="quick" type="button">Quick</button>
-          <button class="home-mood-chip" data-mood="date" type="button">Date</button>
-          <button class="home-mood-chip" data-mood="comfort" type="button">Comfort</button>
-          <button class="home-mood-chip" data-mood="healthy" type="button">Light</button>
-        </div>
-        <div id="mood-picks-list" class="mood-picks-list"></div>
-      </div>
 
       <div id="bear-swipe-home" class="bear-swipe-home home-module hidden" aria-label="Bear swipe picks">
         <div class="bear-swipe-header">
@@ -771,6 +753,31 @@
       </div>
       <div id="nearby-home-list" class="nearby-home-list">
         <div class="nearby-home-loading">Finding restaurants near you…</div>
+      </div>
+
+      <!-- Personal recommendation strip (below nearby) -->
+      <div id="for-you-home" class="for-you-home home-module hidden">
+        <div class="for-you-home-header">
+          <span class="for-you-home-title">For You Tonight</span>
+          <button id="for-you-refresh-btn" class="btn-ghost btn-sm">Shuffle ↻</button>
+        </div>
+        <div id="for-you-home-list" class="for-you-home-list"></div>
+      </div>
+      <div id="mood-picks-home" class="mood-picks-home home-module hidden">
+        <div class="mood-picks-home-header">
+          <span class="mood-picks-home-title">Mood Picks</span>
+        </div>
+        <div id="mood-picks-chips" class="mood-picks-chips">
+          <button class="home-mood-chip active" data-mood="quick" type="button">Quick</button>
+          <button class="home-mood-chip" data-mood="date" type="button">Date</button>
+          <button class="home-mood-chip" data-mood="comfort" type="button">Comfort</button>
+          <button class="home-mood-chip" data-mood="healthy" type="button">Light</button>
+        </div>
+        <div id="mood-picks-list" class="mood-picks-list"></div>
+      </div>
+      <div id="week-recap-home" class="week-recap-home home-module hidden">
+        <div class="week-recap-title">Your Week So Far</div>
+        <div id="week-recap-text" class="week-recap-text"></div>
       </div>
     </section>
 
@@ -1541,16 +1548,17 @@
   <aside id="collections-panel" class="collections-panel" aria-label="My Lists">
     <h3>My Lists</h3>
     <button id="collections-panel-close" class="icon-btn panel-close" aria-label="Close">✕</button>
-    <div class="collection-share-row">
-      <input type="text" id="join-list-input" placeholder="Paste shared list link" maxlength="500" />
-      <button id="join-list-btn" class="btn-sm btn-secondary">Join</button>
-    </div>
-    <div id="collections-list" class="collections-list"></div>
     <div class="new-collection-row">
       <input type="text" id="new-collection-name" placeholder="New list name" maxlength="40" />
       <button id="add-collection-btn" class="btn-sm btn-orange">Add</button>
     </div>
+    <div id="collections-list" class="collections-list"></div>
     <div class="collection-colors" id="collection-color-swatches"></div>
+    <div class="collection-join-label">Did a friend share a list with you?</div>
+    <div class="collection-share-row">
+      <input type="text" id="join-list-input" placeholder="Paste shared list link" maxlength="500" />
+      <button id="join-list-btn" class="btn-sm btn-secondary">Join</button>
+    </div>
   </aside>
 
   <!-- ── Share Card Canvas (hidden) ─────────────────────── -->

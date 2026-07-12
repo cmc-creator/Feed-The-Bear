@@ -2581,7 +2581,7 @@ body.bulk-mode .card-checkbox { display: flex; }
 .collection-item:hover .collection-item-manage { opacity: 1; color: var(--blue); }
 .collection-item-del { opacity: 0; color: var(--danger); font-size: .8rem; background: none; border: none; cursor: pointer; padding: 2px 4px; }
 .collection-item:hover .collection-item-del { opacity: 1; }
-.new-collection-row { display: flex; gap: 6px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.new-collection-row { display: flex; gap: 6px; margin-top: 4px; }
 .new-collection-row input { flex: 1; }
 .collection-colors { display: flex; gap: 8px; margin: 10px 0 4px; flex-wrap: wrap; }
 .collection-color-swatch { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: border-color .15s; }
@@ -5047,7 +5047,7 @@ body.light-mode #profile-btn {
     linear-gradient(155deg, rgba(60,39,27,.94), rgba(33,22,17,.95));
   box-shadow: 0 10px 26px rgba(0,0,0,.24);
   backdrop-filter: blur(6px);
-  padding: 10px 12px;
+  padding: 12px 14px 14px;
   position: relative;
   overflow: hidden;
 }
@@ -5629,6 +5629,7 @@ body.light-mode .today-vibe-pill {
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 8px;
+  padding-bottom: 2px;
 }
 
 .home-mood-chip {
@@ -7021,6 +7022,17 @@ body[data-ui-motion='playful'] .restaurant-grid.card-enter-run .restaurant-card:
   width: 100%;
 }
 .personalize-save-btn { width: 100%; margin-top: 20px; }
+.personalize-section-title {
+  margin: 20px 0 4px;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--primary);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, rgba(var(--primary-rgb), .35));
+  padding-bottom: 5px;
+}
+.personalize-section-title:first-child { margin-top: 0; }
 @media (max-width: 640px) {
   .personalize-grid { grid-template-columns: 1fr; }
 }
@@ -7622,15 +7634,16 @@ body.light-mode .aar-icon {
   white-space: nowrap;
 }
 .upgrade-plan-name {
-  font-size: .9rem;
-  font-weight: 700;
+  font-size: .92rem;
+  font-weight: 800;
   margin-bottom: 6px;
   margin-top: 4px;
+  color: #ffe9cd;
 }
 .upgrade-plan-price {
   font-size: 1.4rem;
   font-weight: 800;
-  color: var(--text-dim);
+  color: #f2e5d0;
   margin-bottom: 10px;
 }
 .upgrade-price-row { margin-bottom: 10px; }
@@ -7640,8 +7653,8 @@ body.light-mode .aar-icon {
   color: var(--primary);
 }
 .upgrade-price-sub {
-  font-size: .75rem;
-  color: var(--text-dim);
+  font-size: .78rem;
+  color: #dcc7ab;
   display: block;
   margin-top: 2px;
 }
@@ -7651,11 +7664,11 @@ body.light-mode .aar-icon {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  font-size: .78rem;
-  color: var(--text-muted);
+  gap: 6px;
+  font-size: .8rem;
+  color: #ecdfc9;
 }
-.upgrade-plan-features li.dim { color: var(--text-dim); opacity: .55; }
+.upgrade-plan-features li.dim { color: #b3a189; opacity: .8; }
 .upgrade-period-toggle {
   display: flex;
   gap: 8px;
@@ -7682,8 +7695,8 @@ body.light-mode .aar-icon {
 .upgrade-cta-btn { width: 100%; padding: 14px; font-size: 1rem; }
 .upgrade-footer {
   text-align: center;
-  font-size: .73rem;
-  color: rgba(239,220,196,.7);
+  font-size: .75rem;
+  color: #e3d1b6;
   margin-top: 10px;
 }
 

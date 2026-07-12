@@ -27,9 +27,15 @@ const _PRICES = {
 };
 
 // ─── INIT ─────────────────────────────────────────────────────
-firebase.initializeApp(_FB_CONFIG);
-const _auth = firebase.auth();
-const _db   = firebase.firestore();
+let _auth = null;
+let _db = null;
+try {
+  firebase.initializeApp(_FB_CONFIG);
+  _auth = firebase.auth();
+  _db = firebase.firestore();
+} catch (err) {
+  console.error('[FTB] Firebase init failed - auth/sync disabled but UI stays functional:', err);
+}
 
 let _syncTimer = null;
 
@@ -337,7 +343,7 @@ function _setUpgradePlan (period) {
 }
 
 async function _handleUpgradeClick () {
-  const user = _auth.currentUser;
+  const user = _auth?.currentUser;
   if (!user) {
     closeUpgradeModal();
     setTimeout(openAuthModal, 200);
@@ -403,4 +409,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ─── KICK IT OFF ──────────────────────────────────────────────
-initFirebaseAuth();
+if (_auth) initFirebaseAuth();
