@@ -7,10 +7,14 @@ const CACHE  = 'ftb-v20';
 const ASSETS = [
   './',
   './index.html',
+  './app.html',
+  './auth.html',
   './app.js',
   './ai.js',
+  './firebase.js',
   './style.css',
   './manifest.json',
+  './icon.svg',
   'https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
@@ -44,6 +48,26 @@ self.addEventListener('fetch', e => {
     e.respondWith(fetch(e.request).catch(() => new Response('{"elements":[]}', { headers: { 'Content-Type': 'application/json' } })));
     return;
   }
+
+  // Network-first for our own app files (JS, HTML, CSS) so updates always land
+  const isAppFile = url.includes(self.location.origin) &&
+    (url.endsWith('.js') || url.endsWith('.html') || url.endsWith('.css') ||
+     url.endsWith('.json') || url.endsWith('.svg') || url === self.location.origin + '/');
+
+  if (isAppFile) {
+    e.respondWith(
+      fetch(e.request).then(resp => {
+        if (resp.ok) {
+          const clone = resp.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return resp;
+      }).catch(() => caches.match(e.request).then(cached => cached || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // Cache-first for third-party assets (fonts, Leaflet, etc.)
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request).then(resp => {
       if (resp.ok && e.request.method === 'GET') {
@@ -51,14 +75,7 @@ self.addEventListener('fetch', e => {
         caches.open(CACHE).then(c => c.put(e.request, clone));
       }
       return resp;
-    }).catch(() => {
-      // Only return the app shell for page navigations, not for JS/CSS/image assets.
-      // Returning HTML for a .js request causes a parse error and breaks the app.
-      if (e.request.mode === 'navigate') {
-        return caches.match('./index.html');
-      }
-      return new Response('/* offline */', { status: 503, headers: { 'Content-Type': 'application/javascript' } });
-    }))
+    }).catch(() => new Response('', { status: 503 })))
   );
 });
 

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="wood" cx="50%" cy="45%" r="70%">
+      <stop offset="0%" stop-color="#9c6e45"/>
+      <stop offset="55%" stop-color="#74492c"/>
+      <stop offset="100%" stop-color="#4f301a"/>
+    </radialGradient>
+    <clipPath id="round">
+      <rect x="26" y="26" width="460" height="460" rx="108" ry="108"/>
+    </clipPath>
+    <clipPath id="bearCircle">
+      <circle cx="256" cy="256" r="136"/>
+    </clipPath>
+  </defs>
+
+  <rect x="26" y="26" width="460" height="460" rx="108" ry="108" fill="url(#wood)"/>
+  <circle cx="256" cy="256" r="182" fill="none" stroke="#bb8a5a" stroke-width="24" opacity="0.55"/>
+  <circle cx="256" cy="256" r="146" fill="none" stroke="#8c5f3b" stroke-width="18" opacity="0.5"/>
+  <circle cx="256" cy="256" r="112" fill="none" stroke="#c89a68" stroke-width="12" opacity="0.4"/>
+
+  <g clip-path="url(#bearCircle)">
+    <image href="feedbear.png" x="116" y="116" width="280" height="280" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+
+  <rect x="26" y="26" width="460" height="460" rx="108" ry="108" fill="none" stroke="#e8c69f" stroke-opacity="0.25" stroke-width="8"/>
+</svg>
