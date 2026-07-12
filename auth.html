@@ -207,6 +207,20 @@
     .reset-panel.show { display: block; }
     .main-panel { }
     .main-panel.hide { display: none; }
+
+    /* ── MOBILE ── */
+    @media (max-width: 480px) {
+      body {
+        align-items: flex-start;
+        padding: 64px 16px 24px;
+      }
+      .back-link { top: 16px; left: 16px; font-size: .8rem; }
+      .auth-card { padding: 28px 20px; }
+      .auth-brand { margin-bottom: 20px; }
+      .auth-tabs { margin-bottom: 20px; }
+      .auth-bear { width: 3rem; height: 3rem; }
+      .auth-benefits { margin-top: 22px; padding-top: 18px; }
+    }
   </style>
 </head>
 <body>

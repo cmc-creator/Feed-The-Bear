@@ -3181,6 +3181,8 @@ function parseMapsUrl (raw) {
 let _discAllResults  = [];   // full result set for client-side filtering
 let _discActiveCuisine = 'all';
 let _discSort = 'distance';
+let _discRenderLimit = 24;   // how many of the filtered results are currently shown ("Load More" bumps this)
+const DISC_PAGE_SIZE = 24;
 
 async function discoverNearby () {
   if (!(await ensureLocationForDiscovery())) return;
@@ -3206,9 +3208,13 @@ function _discWireControls () {
   if (overlay._wired) return;
   overlay._wired = true;
 
-  document.getElementById('disc-search')?.addEventListener('input', _discApplyFilters);
+  document.getElementById('disc-search')?.addEventListener('input', () => {
+    _discRenderLimit = DISC_PAGE_SIZE;
+    _discApplyFilters();
+  });
   document.getElementById('disc-sort')?.addEventListener('change', e => {
     _discSort = e.target.value;
+    _discRenderLimit = DISC_PAGE_SIZE;
     _discApplyFilters();
   });
   document.getElementById('disc-radius')?.addEventListener('change', () => _discFetch());
@@ -3221,6 +3227,14 @@ function _discWireControls () {
     _discActiveCuisine = chip.dataset.cuisine;
     document.querySelectorAll('#disc-cuisine-chips .disc-chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
+    _discRenderLimit = DISC_PAGE_SIZE;
+    _discApplyFilters();
+  });
+
+  // "Load More" (delegate since the button is re-rendered with the results list)
+  document.getElementById('nearby-results')?.addEventListener('click', e => {
+    if (!e.target.closest('[data-disc-load-more]')) return;
+    _discRenderLimit += DISC_PAGE_SIZE;
     _discApplyFilters();
   });
 }
@@ -3238,14 +3252,14 @@ async function _discFetch () {
   const radius = parseInt(document.getElementById('disc-radius')?.value) || 3219;
 
   try {
-    const q = `[out:json][timeout:20];(node["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${radius},${lat},${lng});way["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${radius},${lat},${lng}););out center 60;`;
+    const q = `[out:json][timeout:20];(node["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${radius},${lat},${lng});way["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${radius},${lat},${lng}););out center 250;`;
     const elementsRaw = await fetchOverpassElements(q, {
       timeoutMs: 18000,
       nominatimFallback: true,
       lat,
       lng,
       radiusMeters: radius,
-      limit: 60,
+      limit: 250,
     });
 
     const savedNames = new Set(state.restaurants.map(r => normalizeName(r.name)));
@@ -3315,6 +3329,7 @@ async function _discFetch () {
 
     _discActiveCuisine = 'all';
     _discSort = document.getElementById('disc-sort')?.value || 'distance';
+    _discRenderLimit = DISC_PAGE_SIZE;
     _discApplyFilters();
 
   } catch (err) {
@@ -3368,9 +3383,11 @@ function _discApplyFilters () {
     results = results.slice().sort((a, b) => a.amenity.localeCompare(b.amenity) || a.dist - b.dist);
   }
 
+  const shown = results.slice(0, Math.max(DISC_PAGE_SIZE, _discRenderLimit));
+
   if (metaEl) {
     metaEl.textContent = results.length
-      ? `${results.length} spot${results.length !== 1 ? 's' : ''} found`
+      ? `${shown.length} of ${results.length} spot${results.length !== 1 ? 's' : ''} shown`
       : '';
   }
 
@@ -3390,7 +3407,12 @@ function _discApplyFilters () {
   const amenityLabel = { restaurant:'Restaurant', cafe:'Café', fast_food:'Fast Food', bar:'Bar', pub:'Pub', food_court:'Food Court', ice_cream:'Ice Cream' };
   const amenityEmoji = { restaurant:'', cafe:'☕', fast_food:'', bar:'', pub:'', food_court:'', ice_cream:'' };
 
-  resultsEl.innerHTML = results.map(r => {
+  const remaining = results.length - shown.length;
+  const loadMoreHtml = remaining > 0
+    ? `<button type="button" class="disc-load-more-btn" data-disc-load-more="1">Load ${Math.min(DISC_PAGE_SIZE, remaining)} more (${remaining} left in this radius)</button>`
+    : '';
+
+  resultsEl.innerHTML = shown.map(r => {
     const emoji    = cuisineEmoji(r.cuisine) || amenityEmoji[r.amenity] || '';
     const typeLabel = r.cuisine
       ? (r.cuisine.charAt(0).toUpperCase() + r.cuisine.slice(1))
@@ -3427,7 +3449,7 @@ function _discApplyFilters () {
         }
       </div>
     </div>`;
-  }).join('');
+  }).join('') + loadMoreHtml;
 }
 
 // Simple open-now check using OpenStreetMap opening_hours string
@@ -9574,8 +9596,114 @@ function getMoodFoodImageCandidates (term = 'food', seed = '') {
   return [...BEAR_SWIPE_LOCAL_FALLBACKS];
 }
 
+// Real, varied food photos for the mood swipe deck (the 49 local assets are
+// 1-per-dish and repeat constantly with the deck's ~120 cards). Wikimedia
+// Commons has thousands of tagged food photos and is free/CORS-open like the
+// Wikipedia lookup already used for real venue photos, so each mood term gets
+// its own pool instead of reusing the same static jpg.
+const _moodPhotoCache = new Map();
+const _moodPhotoPending = new Map();
+
+function isLikelyRealFoodPhotoUrl (url = '') {
+  const u = String(url || '');
+  if (!/^https?:\/\//i.test(u)) return false;
+  if (/\.svg(?:\?|$)/i.test(u)) return false;
+  if (/(logo|icon|favicon|placeholder|map[_-]?pin|marker|flag_of|coat_of_arms|seal_of|diagram|map_of)/i.test(u)) return false;
+  return true;
+}
+
+async function fetchMoodFoodPhotosFromWiki (term = '') {
+  const q = String(term || '').trim();
+  if (!q) return [];
+  try {
+    const url = new URL('https://commons.wikimedia.org/w/api.php');
+    url.searchParams.set('action', 'query');
+    url.searchParams.set('format', 'json');
+    url.searchParams.set('formatversion', '2');
+    url.searchParams.set('generator', 'search');
+    url.searchParams.set('gsrnamespace', '6');
+    url.searchParams.set('gsrsearch', `filetype:bitmap ${q} food`);
+    url.searchParams.set('gsrlimit', '24');
+    url.searchParams.set('prop', 'imageinfo');
+    url.searchParams.set('iiprop', 'url');
+    url.searchParams.set('iiurlwidth', '900');
+    url.searchParams.set('origin', '*');
+
+    const resp = await fetch(url.toString());
+    if (!resp.ok) return [];
+    const json = await resp.json();
+    const pages = Object.values(json?.query?.pages || {});
+    const urls = pages
+      .map(p => safeUrl(p?.imageinfo?.[0]?.thumburl || p?.imageinfo?.[0]?.url || ''))
+      .filter(Boolean)
+      .filter(isLikelyRealFoodPhotoUrl);
+    return [...new Set(urls)];
+  } catch {
+    return [];
+  }
+}
+
+function getOrFetchMoodPhotos (term = '') {
+  const key = normalizeMoodTermKey(term);
+  if (!key) return Promise.resolve([]);
+  if (_moodPhotoCache.has(key)) return Promise.resolve(_moodPhotoCache.get(key) || []);
+  if (_moodPhotoPending.has(key)) return _moodPhotoPending.get(key);
+
+  const pending = fetchMoodFoodPhotosFromWiki(term)
+    .then(urls => {
+      _moodPhotoCache.set(key, urls);
+      return urls;
+    })
+    .catch(() => {
+      _moodPhotoCache.set(key, []);
+      return [];
+    })
+    .finally(() => {
+      _moodPhotoPending.delete(key);
+    });
+
+  _moodPhotoPending.set(key, pending);
+  return pending;
+}
+
+// Kicks off (uncached) fetches for the upcoming few mood cards, and if the
+// currently-visible card's term resolves, swaps its image in directly.
+function prefetchMoodSwipePhotos (fromIdx = 0) {
+  const deck = state.swipeDeck || [];
+  const terms = new Set();
+  for (let i = fromIdx; i < Math.min(deck.length, fromIdx + 4); i++) {
+    const it = deck[i];
+    if (it && it.source === 'mood' && it.cuisine) terms.add(it.cuisine);
+  }
+
+  terms.forEach(term => {
+    const key = normalizeMoodTermKey(term);
+    if (_moodPhotoCache.has(key) || _moodPhotoPending.has(key)) return;
+    getOrFetchMoodPhotos(term).then(urls => {
+      if (!urls.length) return;
+      const curIdx = state.swipeIndex || 0;
+      const curItem = (state.swipeDeck || [])[curIdx];
+      if (!curItem || normalizeMoodTermKey(curItem.cuisine) !== key) return;
+      const photoEl = document.getElementById('bear-swipe-card')?.querySelector('.bear-swipe-photo');
+      if (!photoEl) return;
+      const hash = Math.abs(miniHash(`${curItem.key || key}-${curIdx}`));
+      photoEl.src = urls[hash % urls.length];
+    });
+  });
+}
+
 function pickBearSwipePhotoUrl (item, idx = 0) {
   const isLocalFoodAsset = (u = '') => /assets\/food\/[a-z0-9_\-]+\.(?:jpg|jpeg|png|webp)$/i.test(String(u || ''));
+
+  if (item?.source === 'mood') {
+    const key = normalizeMoodTermKey(item.cuisine || item.name || 'food');
+    const realPhotos = _moodPhotoCache.get(key);
+    if (Array.isArray(realPhotos) && realPhotos.length) {
+      const hash = Math.abs(miniHash(`${item.key || key}-${idx}`));
+      return realPhotos[hash % realPhotos.length];
+    }
+  }
+
   const primary = safeUrl(item?.photoUrl || '');
   if (primary) {
     if (item?.source !== 'mood') return primary;
@@ -10138,6 +10266,8 @@ function renderBearSwipeCard () {
   });
 
   attachBearSwipeDragHandlers(cardEl);
+
+  if (isMoodDeck) prefetchMoodSwipePhotos(idx);
 }
 
 function nextBearSwipeCard (reaction = '') {

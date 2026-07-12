@@ -1694,6 +1694,9 @@ body.celebrate-glow::before {
   background: rgba(0,0,0,.4);
 }
 
+/* ── Mobile Bottom Nav (hidden by default; media query below shows it) ── */
+.mobile-bottom-nav { display: none; }
+
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 768px) {
   .app-header { padding: 0 12px; gap: 10px; }
@@ -2053,9 +2056,6 @@ body.celebrate-glow::before {
 }
 .photo-upload-label:hover { border-color: var(--primary); color: var(--primary); }
 
-/* ── Mobile Bottom Nav ───────────────────────────────────── */
-.mobile-bottom-nav { display: none; }
-
 /* ── Utilities ───────────────────────────────────────────── */
 .sr-only {
   position: absolute;
@@ -2156,48 +2156,9 @@ body.light-mode #theme-toggle-btn .icon-moon { display: none; }
 }
 .detail-tag:hover { background: rgba(var(--primary-rgb),.3); }
 
-/* ── Stats View ──────────────────────────────────────────── */
-.stats-view { padding: 24px 20px; overflow-y: auto; flex: 1; }
-.stats-view.hidden { display: none; }
-.stats-view-inner { max-width: 900px; margin: 0 auto; }
-.stats-view-title { font-size: 1.4rem; font-weight: 800; margin-bottom: 20px; color: var(--text); }
-.stats-kpi-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
-.kpi-card {
-  flex: 1; min-width: 100px; background: var(--surface);
-  border: 1px solid var(--border); border-radius: 14px;
-  padding: 16px; text-align: center; box-shadow: 0 2px 12px var(--shadow);
-  background-image: linear-gradient(165deg, rgba(255,255,255,.03), rgba(255,255,255,.00));
-}
-.kpi-value { font-size: 1.9rem; font-weight: 800; line-height: 1; margin-bottom: 4px; }
-.kpi-label { font-size: .74rem; color: color-mix(in srgb, var(--text) 82%, var(--text-dim)); font-weight: 700; }
-.stats-charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-.stats-chart-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 14px; padding: 20px; box-shadow: 0 2px 12px var(--shadow);
-  background-image: linear-gradient(165deg, rgba(255,255,255,.03), rgba(255,255,255,.00));
-}
-.stats-chart-card h3 {
-  font-size: .75rem; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .06em; color: color-mix(in srgb, var(--text) 76%, var(--text-dim)); margin-bottom: 14px;
-}
-.bar-chart { display: flex; flex-direction: column; gap: 8px; }
-.bar-row { display: flex; align-items: center; gap: 8px; }
-.bar-label { width: 100px; font-size: .77rem; color: color-mix(in srgb, var(--text) 88%, var(--text-dim)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; font-weight: 700; }
-.bar-track { flex: 1; height: 8px; background: color-mix(in srgb, var(--surface2) 86%, #000 14%); border-radius: 4px; overflow: hidden; }
-.bar-fill { height: 100%; border-radius: 4px; transition: width .6s cubic-bezier(.4,0,.2,1); min-width: 4px; }
-.bar-count { font-size: .74rem; color: color-mix(in srgb, var(--text) 84%, var(--text-dim)); font-weight: 700; min-width: 20px; text-align: right; }
-.chart-empty { color: color-mix(in srgb, var(--text) 74%, var(--text-dim)); font-size: .84rem; text-align: center; padding: 20px; }
-.top-list { display: flex; flex-direction: column; gap: 8px; }
-.top-list-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px; background: var(--surface2); border-radius: 10px;
-  cursor: pointer; transition: background .15s;
-}
-.top-list-item:hover { background: rgba(var(--primary-rgb),.1); }
-.top-rank { font-size: .73rem; font-weight: 700; color: var(--text-dim); min-width: 22px; }
-.top-emoji { font-size: 1rem; }
-.top-name { flex: 1; font-size: .84rem; font-weight: 600; color: var(--text); }
-.top-stars { color: var(--gold); font-size: .88rem; }
+/* ── Stats View (mobile-affecting rules only; the rest of this section's
+   selectors are redeclared and superseded by the "STATS / ANALYTICS VIEW"
+   block further down, which is the one that actually renders) ──────── */
 body.light-mode .kpi-card,
 body.light-mode .stats-chart-card {
   background-image: linear-gradient(165deg, rgba(32,48,40,.04), rgba(32,48,40,.01));
@@ -2205,10 +2166,6 @@ body.light-mode .stats-chart-card {
 }
 body.light-mode .bar-track {
   background: rgba(31,45,39,.12);
-}
-@media (max-width: 640px) {
-  .stats-charts-row { grid-template-columns: 1fr; }
-  .kpi-card { min-width: 80px; padding: 12px; } .kpi-value { font-size: 1.5rem; }
 }
 
 /* ── Visit Log ───────────────────────────────────────────── */
@@ -2439,6 +2396,22 @@ body.bulk-mode .card-checkbox { display: flex; }
   color: var(--green); font-size: 1rem; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
 }
+
+.disc-load-more-btn {
+  width: 100%;
+  margin-top: 4px;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  background: var(--surface2);
+  border: 1px dashed var(--border);
+  color: var(--text);
+  font-size: .85rem;
+  font-weight: 700;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.disc-load-more-btn:hover { background: var(--surface3); border-color: rgba(var(--primary-rgb),.4); }
 
 /* Loading state */
 .disc-loading {
@@ -2914,6 +2887,11 @@ body.bulk-mode .card-checkbox { display: flex; }
 .top-name { flex: 1; font-size: .85rem; font-weight: 600; }
 .top-stars { color: var(--gold); font-size: .8rem; letter-spacing: 1px; }
 
+@media (max-width: 640px) {
+  .stats-charts-row { grid-template-columns: 1fr; }
+  .kpi-card { padding: 12px; }
+  .kpi-value { font-size: 1.5rem; }
+}
 
 /* ----------------------------------------------------------
    Phase 5 � New Features CSS
@@ -3725,7 +3703,7 @@ body.light-mode #profile-btn {
 
 /* Better touch targets on mobile */
 @media (max-width: 768px) {
-  .icon-btn { min-width: 44px; min-height: 44px; padding: 10px; }
+  .icon-btn, .chat-toggle-btn { min-width: 44px; min-height: 44px; padding: 10px; }
   .btn-primary { padding: 10px 16px; font-size: .9rem; }
   .modal-card { border-radius: 20px 20px 0 0 !important; margin: auto 0 0; max-height: 92vh; overflow-y: auto; }
   .modal-overlay { align-items: flex-end; }
@@ -4787,8 +4765,10 @@ body.light-mode #profile-btn {
 }
 
 /* Restaurant grid  slightly wider min so photos look good */
-.restaurant-grid {
- grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+@media (min-width: 769px) {
+  .restaurant-grid {
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  }
 }
 
 /* Card body padding tweak */
@@ -4833,7 +4813,7 @@ body.light-mode #profile-btn {
 .bingo-sub { color: var(--text2); font-size: .85rem; margin: 0 0 8px; }
 .bingo-progress { font-size: .8rem; color: var(--text2); margin-bottom: 10px; }
 .bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 10px; }
-.bingo-cell { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 4px; text-align: center; font-size: .65rem; line-height: 1.3; cursor: default; transition: background .25s,transform .2s; min-height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.bingo-cell { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 4px; text-align: center; font-size: .65rem; line-height: 1.3; cursor: default; transition: background .25s,transform .2s; min-height: 54px; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; overflow-wrap: anywhere; }
 .bingo-cell .bingo-cell-emoji { font-size: 1.1rem; }
 .bingo-cell.filled { background: var(--primary); border-color: var(--primary); color: #fff; transform: scale(1.04); }
 .bingo-cell.bingo-line { background: var(--green); border-color: var(--green); color: #fff; box-shadow: 0 0 10px var(--green); }
@@ -6624,12 +6604,14 @@ body[data-ui-motion='playful'] .restaurant-grid.card-enter-run .restaurant-card:
 
 .nearby-home-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(220px, 1fr));
   gap: 12px;
   overflow: visible;
   padding-bottom: 4px;
 }
 .nearby-home-list::-webkit-scrollbar { display: none; }
+@media (min-width: 1181px) {
+  .nearby-home-list { grid-template-columns: repeat(3, minmax(220px, 1fr)); }
+}
 
 .nearby-home-loading {
   grid-column: 1 / -1;
@@ -6640,7 +6622,6 @@ body[data-ui-motion='playful'] .restaurant-grid.card-enter-run .restaurant-card:
 
 .nearby-home-card {
   width: 100%;
-  aspect-ratio: 1 / 1;
   background:
     radial-gradient(130% 120% at 0% 0%, rgba(121,160,91,.16), transparent 60%),
     linear-gradient(rgba(54,36,24,.84), rgba(38,25,18,.9)),
@@ -7580,6 +7561,13 @@ body.light-mode .aar-icon {
   max-width: 560px;
   padding: 0;
   border: 1px solid rgba(198,161,118,.36);
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(117,155,87,.2), transparent 52%),
+    linear-gradient(160deg, rgba(65,42,27,.97), rgba(31,20,14,.98));
+}
+/* Its cream/gold text is only readable on this dark gradient, so keep the
+   gradient even in Light Mode instead of letting .modal-card force it white. */
+body.light-mode .upgrade-card {
   background:
     radial-gradient(120% 90% at 100% 0%, rgba(117,155,87,.2), transparent 52%),
     linear-gradient(160deg, rgba(65,42,27,.97), rgba(31,20,14,.98));
