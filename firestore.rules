@@ -1,0 +1,73 @@
+rules_version = '2';
+
+// ════════════════════════════════════════════════════════════
+// Feed The Bear — Firestore Security Rules
+// ════════════════════════════════════════════════════════════
+// Deploy: Firebase Console → Firestore Database → Rules → paste → Publish
+//   (or `firebase deploy --only firestore:rules` if you use the CLI)
+//
+// Key protection: clients may edit their own profile, but the
+// billing fields (plan, stripe*) can ONLY be written by the
+// Admin SDK (api/verify-session.js), which bypasses these rules.
+// This closes the "self-grant Grizzly from DevTools" hole.
+// ════════════════════════════════════════════════════════════
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Billing fields only the server may set
+    function billingKeys() {
+      return ['plan', 'stripeCustomerId', 'stripeSessionId', 'upgradedAt'];
+    }
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+
+      // ── Personal restaurant list ──
+      match /restaurants/{restaurantId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // ── Profile (avatar, appearance, …) ──
+      match /meta/profile {
+        allow read: if isOwner(userId);
+
+        // Create: allowed, but must not include any billing field
+        allow create: if isOwner(userId)
+          && !request.resource.data.keys().hasAny(billingKeys());
+
+        // Update: allowed, but billing fields must be untouched
+        allow update: if isOwner(userId)
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(billingKeys());
+
+        allow delete: if false;
+      }
+
+      // NOTE: no catch-all here on purpose. A `match /{document=**}` inside
+      // /users would ALSO match meta/profile and re-allow billing writes
+      // (Firestore grants access if ANY rule matches). Add new subcollections
+      // explicitly instead.
+    }
+
+    // ── Shared collaborative lists ──
+    // Access model: the doc ID embeds a random secret token (capability
+    // URL). Anyone who has the share link/ID may read and update; writes
+    // must stamp the caller's uid in updatedBy (matches fbSharedListUpsert).
+    match /sharedLists/{listId} {
+      allow read: if request.auth != null;
+
+      allow create, update: if request.auth != null
+        && request.resource.data.updatedBy == request.auth.uid;
+
+      allow delete: if request.auth != null;
+    }
+
+    // Everything else: locked down
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

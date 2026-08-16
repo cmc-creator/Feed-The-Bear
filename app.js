@@ -181,11 +181,11 @@ function renderNearbyVisualCard ({
   const localFallbackPhoto = safeUrl(getMoodFoodImageCandidates(fallbackTerm, key || name || 'nearby')[0] || '');
   const photo = safeUrl(photoUrl) || localFallbackPhoto;
   const safeName = escHtml(name);
-  const safeNameForClick = String(name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-  const safeCuisine = String(cuisine || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const safeNameForClick = escJsArg(name || '');
+  const safeCuisine = escJsArg(cuisine || '');
   const websiteUrl = safeUrl(savedRestaurant?.website || website || '');
-  const safeAddressForClick = String(savedRestaurant?.address || address || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-  const safeWebsiteForClick = String(savedRestaurant?.website || websiteUrl || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const safeAddressForClick = escJsArg(savedRestaurant?.address || address || '');
+  const safeWebsiteForClick = escJsArg(savedRestaurant?.website || websiteUrl || '');
   const prefillLat = Number.isFinite(savedRestaurant?.lat) ? Number(savedRestaurant.lat) : (Number.isFinite(lat) ? Number(lat) : null);
   const prefillLon = Number.isFinite(savedRestaurant?.lng) ? Number(savedRestaurant.lng) : (Number.isFinite(lon) ? Number(lon) : null);
   const directionsUrl = buildGoogleDirectionsUrl({
@@ -475,6 +475,28 @@ function loadData () {
     saveData();
   }
 
+  // One-time migration: fold legacy r.visitLog entries into r.visits so
+  // streaks, stats, heatmaps and the spend tracker all read one dataset.
+  let _vlMigrated = false;
+  (state.restaurants || []).forEach(r => {
+    if (!r || typeof r !== 'object') return;
+    if (Array.isArray(r.visitLog) && r.visitLog.length) {
+      if (!Array.isArray(r.visits)) r.visits = [];
+      r.visitLog.forEach(v => r.visits.push({
+        date:   v.date || '',
+        note:   v.notes || v.note || '',
+        rating: v.rating || 0,
+        photo:  '',
+        spend:  (v.spend != null) ? v.spend : null,
+        dish:   v.dish || '',
+      }));
+      r.visits.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+      _vlMigrated = true;
+    }
+    if ('visitLog' in r) { delete r.visitLog; _vlMigrated = true; }
+  });
+  if (_vlMigrated) saveData();
+
   try {
     const s = localStorage.getItem(SETTINGS_KEY);
     state.settings = s ? JSON.parse(s) : {};
@@ -522,12 +544,62 @@ function pruneLegacyDemoRestaurants (list) {
 }
 
 function saveData () {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.restaurants));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.restaurants));
+  } catch (err) {
+    console.error('[FTB] saveData failed:', err);
+    showToast('Storage Full', 'Could not save — device storage is full. Try removing large photos from entries.', 'error');
+  }
   updateTagSuggestions();
   setTimeout(checkAchievements, 0);
   setTimeout(renderWeeklyGoal, 0);
   // Sync to Firestore if user is signed in (debounced)
   if (typeof fbDebouncedSync === 'function') fbDebouncedSync();
+}
+
+/* Read an image file as a data URL, downscaled/compressed so a single phone
+   photo can't blow past the ~5 MB localStorage quota. */
+function readImageFileCompressed (file, maxDim = 1280, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read file'));
+    reader.onload = ev => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Not a valid image'));
+      img.onload = () => {
+        try {
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const w = Math.max(1, Math.round(img.width * scale));
+          const h = Math.max(1, Math.round(img.height * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        } catch (e) { reject(e); }
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/* Tombstones for deleted restaurants so cloud sync can't resurrect them
+   and deletions propagate to Firestore. */
+const DELETED_IDS_KEY = 'ftb_deleted_v1';
+function getDeletedRestaurantIds () {
+  try { return JSON.parse(localStorage.getItem(DELETED_IDS_KEY) || '[]') || []; } catch { return []; }
+}
+function recordRestaurantDeletion (ids) {
+  const list = (Array.isArray(ids) ? ids : [ids]).filter(Boolean);
+  if (!list.length) return;
+  try {
+    const cur = new Set(getDeletedRestaurantIds());
+    list.forEach(id => cur.add(id));
+    localStorage.setItem(DELETED_IDS_KEY, JSON.stringify([...cur].slice(-500)));
+  } catch { /* non-fatal */ }
+  if (typeof fbDeleteRestaurantsCloud === 'function' && window._ftbUid) {
+    fbDeleteRestaurantsCloud(window._ftbUid, list);
+  }
 }
 
 function persistSettingsLocal () {
@@ -1851,6 +1923,7 @@ function openDetailModal (id) {
   document.getElementById('detail-delete-btn').onclick = () => {
     if (confirm(`Delete "${r.name}"? This cannot be undone.`)) {
       state.restaurants = state.restaurants.filter(x => x.id !== id);
+      recordRestaurantDeletion([id]);
       saveData();
       renderAll();
       closeDetailModal();
@@ -2206,6 +2279,7 @@ function handleFormSubmit (e) {
     priority:      document.getElementById('form-priority')?.value || '',
     status,
     dateAdded:     isNew ? now : (state.restaurants.find(r => r.id === state.editingId)?.dateAdded || now),
+    updatedAt:     Date.now(),
     dateVisited:   status === 'visited'
       ? (document.getElementById('form-date-visited').value ||
          state.restaurants.find(r => r.id === state.editingId)?.dateVisited || now)
@@ -2421,7 +2495,7 @@ function renderMap () {
       ${r.googleRating ? `<div style="font-size:.8rem;margin-bottom:6px">⭐ ${r.googleRating}/5</div>` : ''}
       <div style="display:flex;gap:6px;margin-top:8px">
         ${r._nearbyElement
-          ? `<button onclick="openAddModalPreFilled('${String(r.name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")}','${String(r.cuisine || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")}',{name:'${String(r.name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")}',address:'${String(r.address || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")}',website:'${String(r.website || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")}',lat:${Number.isFinite(r.lat) ? Number(r.lat) : 'null'},lon:${Number.isFinite(r.lng) ? Number(r.lng) : 'null'}})" style="flex:1;padding:5px 8px;background:#E8B15A;color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:600;cursor:pointer">Save</button>`
+          ? `<button onclick="openAddModalPreFilled('${escJsArg(r.name || '')}','${escJsArg(r.cuisine || '')}',{name:'${escJsArg(r.name || '')}',address:'${escJsArg(r.address || '')}',website:'${escJsArg(r.website || '')}',lat:${Number.isFinite(r.lat) ? Number(r.lat) : 'null'},lon:${Number.isFinite(r.lng) ? Number(r.lng) : 'null'}})" style="flex:1;padding:5px 8px;background:#E8B15A;color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:600;cursor:pointer">Save</button>`
           : `<button onclick="window.__ftbOpenDetail('${r.id}')" style="flex:1;padding:5px 8px;background:#E8B15A;color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:600;cursor:pointer">Details</button>`}
         ${(r.address || (Number.isFinite(r.lat) && Number.isFinite(r.lng))) ? `<button onclick="window.__ftbDirections('${r.id}')" style="flex:1;padding:5px 8px;background:#9B7BE0;color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:600;cursor:pointer">Directions</button>` : ''}
       </div>
@@ -3052,6 +3126,17 @@ function escHtml (s) {
     .replace(/'/g, '&#39;');
 }
 
+/* Escape a value for use inside a single-quoted JS string literal that lives
+   in an inline HTML event attribute (e.g. onclick="fn('HERE')").
+   Order matters: JS-escape first, then HTML-escape the result, because the
+   browser HTML-decodes the attribute before the JS parser sees it. */
+function escJsArg (s) {
+  return escHtml(String(s ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r?\n/g, '\\n'));
+}
+
 /* Allow safe photo URLs, including local app assets used by offline/PWA mode. */
 function safeUrl (url) {
   if (!url) return '';
@@ -3061,7 +3146,7 @@ function safeUrl (url) {
   if (/^(\.\/)?assets\//i.test(raw) || /^feedbear\.png$/i.test(raw)) return raw.replace(/["'()\\]/g, '');
   try {
     const parsed = new URL(raw, window.location.href);
-    if (!['https:', 'http:', 'file:'].includes(parsed.protocol)) return '';
+    if (!['https:', 'http:'].includes(parsed.protocol)) return '';
     return parsed.href.replace(/["'()\\]/g, '');
   } catch { return ''; }
 }
@@ -3386,11 +3471,11 @@ function _discBuildChips (results, wrap) {
     const distStr  = r.dist < Infinity ? fmtDist(r.dist) : '';
     const isMatch  = r.cuisine && myCuisines.has(r.cuisine.toLowerCase());
 
-    const safeName    = escHtml(r.name).replace(/'/g, "\\'");
-    const safeCuisine = escHtml(r.cuisine).replace(/'/g, "\\'");
+    const safeName    = escJsArg(r.name);
+    const safeCuisine = escJsArg(r.cuisine);
     const saveAddress = [String(r.street || '').trim(), String(r.city || '').trim()].filter(Boolean).join(', ');
-    const safeAddress = saveAddress.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    const safeWebsite = String(r.website || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const safeAddress = escJsArg(saveAddress);
+    const safeWebsite = escJsArg(r.website || '');
 
     return `<div class="disc-card${r.saved ? ' disc-card-saved' : ''}">
       <div class="disc-card-thumb" aria-hidden="true">${emoji}</div>
@@ -3536,6 +3621,7 @@ function updateBulkCount () {
 function bulkDelete () {
   const n = state.selectedIds.size;
   if (!n || !confirm(`Delete ${n} restaurant${n>1?'s':''}? This cannot be undone.`)) return;
+  recordRestaurantDeletion([...state.selectedIds]);
   state.restaurants = state.restaurants.filter(r => !state.selectedIds.has(r.id));
   saveData(); toggleBulkMode(); renderAll();
   showToast(' Deleted', `${n} restaurant${n>1?'s':''} removed.`, 'info');
@@ -4865,12 +4951,10 @@ function setupEvents () {
       showToast('Invalid File', 'Please select an image file.', 'error');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = ev => {
-      document.getElementById('form-photo').value = ev.target.result;
+    readImageFileCompressed(file).then(dataUrl => {
+      document.getElementById('form-photo').value = dataUrl;
       showToast('Photo Added ', 'Image loaded successfully.', 'success');
-    };
-    reader.readAsDataURL(file);
+    }).catch(() => showToast('Photo Error', 'Could not load that image.', 'error'));
   });
 
   // Export / Import
@@ -6061,7 +6145,7 @@ async function runTonightsPick () {
       + (reason ? '<div class="pick-address">' + escHtml(reason) + '</div>' : '')
       + '<div class="pick-address">Fresh find around you, cub boss. Tap save to add it to your list.</div>'
       + '<div class="pick-actions">'
-      + '<button class="btn-sm btn-orange" onclick="openAddModalPreFilled(\'' + String(p.name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\',\'' + String(p.cuisine || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\')">+ Save Spot</button>'
+      + '<button class="btn-sm btn-orange" onclick="openAddModalPreFilled(\'' + escJsArg(p.name || '') + '\',\'' + escJsArg(p.cuisine || '') + '\')">+ Save Spot</button>'
       + (mapsDest ? '<a class="btn-sm btn-secondary" style="text-decoration:none;display:inline-flex;align-items:center" href="https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(mapsDest) + '&travelmode=driving" target="_blank" rel="noopener"> Directions</a>' : '')
       + '</div>';
     res.classList.remove('hidden');
@@ -7853,7 +7937,7 @@ function runCravingEngine () {
     <div class="craving-match-why">${escHtml(why)}</div>
     <div class="craving-match-actions">
       <button class="btn-primary btn-sm" onclick="${winner._nearbyElement
-        ? `openAddModalPreFilled('${String(winner.name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")}','${String(winner.cuisine || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")}',{name:'${String(winner.name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")}',address:'${String(winner.address || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")}',website:'${String(winner.website || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")}',lat:${Number.isFinite(winner.lat) ? Number(winner.lat) : 'null'},lon:${Number.isFinite(winner.lng) ? Number(winner.lng) : 'null'}});closeCravingEngine()`
+        ? `openAddModalPreFilled('${escJsArg(winner.name || '')}','${escJsArg(winner.cuisine || '')}',{name:'${escJsArg(winner.name || '')}',address:'${escJsArg(winner.address || '')}',website:'${escJsArg(winner.website || '')}',lat:${Number.isFinite(winner.lat) ? Number(winner.lat) : 'null'},lon:${Number.isFinite(winner.lng) ? Number(winner.lng) : 'null'}});closeCravingEngine()`
         : `openDetailModal('${winner.id}');closeCravingEngine()`}">View</button>
       ${runner ? `<button class="btn-ghost btn-sm" onclick="runCravingEngine()"> Try Again</button>` : ''}
     </div>
@@ -8184,7 +8268,7 @@ function renderFriendComparison (friendData) {
         <span style="font-size:1.2rem">${cuisineEmoji(p.c)}</span>
         <div class="friends-pick-name">${escHtml(p.n)}<br><span style="font-size:.72rem;color:var(--text-dim)">${escHtml(p.c||'')}</span></div>
         <div class="friends-pick-stars">${'?'.repeat(p.r)}</div>
-        <button class="btn-sm btn-orange" onclick="openAddModalPreFilled('${escHtml(p.n).replace(/'/g,"\\'")}','${escHtml(p.c||'')}')">Add +</button>
+        <button class="btn-sm btn-orange" onclick="openAddModalPreFilled('${escJsArg(p.n)}','${escJsArg(p.c||'')}')">Add +</button>
       </div>`).join('');
   }
   html += '</div>';
@@ -10641,10 +10725,10 @@ async function runDiscover () {
       return;
     }
     resultsEl.innerHTML = cached.map(row => {
-      const safeName = String(row.name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-      const safeCuisine = String(row.cuisine || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-      const safeAddress = String(row.address || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-      const safeWebsite = String(row.website || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      const safeName = escJsArg(row.name || '');
+      const safeCuisine = escJsArg(row.cuisine || '');
+      const safeAddress = escJsArg(row.address || '');
+      const safeWebsite = escJsArg(row.website || '');
       return `<div class="discover-item">
         <div class="discover-item-emoji">${cuisineEmoji(row.cuisine) || ''}</div>
         <div class="discover-item-body">
@@ -10724,8 +10808,8 @@ async function runDiscover () {
       const address = [tags['addr:street'], tags['addr:housenumber']].filter(Boolean).join(' ');
       const matchCuisines = Object.keys(myCuisines).filter(c => (tags.cuisine||'').toLowerCase().includes(c));
       const matchTag = matchCuisines.length ? `Matches your love of ${matchCuisines[0]}` : '';
-      const safeName = name.replace(/'/g, "\\'");
-      const safeCuisine = cuisine.replace(/'/g, "\\'");
+      const safeName = escJsArg(tags.name || 'Unknown');
+      const safeCuisine = escJsArg(tags.cuisine ? tags.cuisine.replace(/_/g, ' ') : '');
 
       return `<div class="discover-item">
         <div class="discover-item-emoji">${emoji}</div>
@@ -11220,7 +11304,7 @@ async function sendAiMessage (userText) {
   _appendAiMsg('user', userText);
   document.getElementById('ai-chat-input').value = '';
 
-  if (!AI.hasKey()) {
+  if (!AI.hasAccess()) {
     const ruleResp = typeof chatResponse === 'function' ? chatResponse(userText) : "I need a Gemini API key to give smart answers!";
     _appendAiMsg('assistant', ruleResp);
     return;
@@ -11266,8 +11350,8 @@ async function getAiDetailSummary (restaurantId) {
   if (!el) return;
   el.classList.remove('hidden');
 
-  if (!AI.hasKey()) {
-    el.innerHTML = `<span class="ai-badge">\uD83D\uDC3B Byte Cub</span> Add a Gemini API key in the Byte Cub panel to get AI summaries. <em>${escHtml(r.name)}: ${escHtml(r.cuisine || 'restaurant')}, ${r.myRating ? r.myRating + '\u2605' : 'unrated'}.</em>`;
+  if (!AI.hasAccess()) {
+    el.innerHTML = `<span class="ai-badge">\uD83D\uDC3B Byte Cub</span> Sign in with a Grizzly plan (or add a Gemini API key in the Byte Cub panel) to get AI summaries. <em>${escHtml(r.name)}: ${escHtml(r.cuisine || 'restaurant')}, ${r.myRating ? r.myRating + '\u2605' : 'unrated'}.</em>`;
     return;
   }
 
@@ -11288,8 +11372,8 @@ async function getAiDishRecs (restaurantId) {
   if (!el) return;
   el.classList.remove('hidden');
 
-  if (!AI.hasKey()) {
-    el.innerHTML = `<span class="ai-badge">\uD83C\uDF7D\uFE0F Dish Picks</span> Add your Gemini key in the Byte Cub panel to get AI dish recommendations.`;
+  if (!AI.hasAccess()) {
+    el.innerHTML = `<span class="ai-badge">\uD83C\uDF7D\uFE0F Dish Picks</span> Sign in with a Grizzly plan (or add a Gemini key in the Byte Cub panel) to get AI dish recommendations.`;
     return;
   }
 
@@ -11315,7 +11399,7 @@ const _routeSelected = new Set();
 function openRoutePlanner () {
   _routeSelected.clear();
   const visited = state.restaurants.filter(r => r.status === 'visited' && r.lat && r.lng);
-  const wishlist = state.restaurants.filter(r => r.status === 'wishlist' && r.lat && r.lng);
+  const wishlist = state.restaurants.filter(r => r.status === 'want-to-try' && r.lat && r.lng);
   const all = [...visited, ...wishlist];
 
   const list = document.getElementById('route-pick-list');
@@ -11456,7 +11540,7 @@ function exportShareablePage () {
         ${r.myRating ? `<div style="color:#ff6b35;font-size:.82rem">${'?'.repeat(r.myRating)}</div>` : ''}
         ${r.notes ? `<div style="font-size:.75rem;color:#888;margin-top:4px">${escHtml(r.notes.slice(0,100))}</div>` : ''}
       </div>
-      <span style="font-size:.7rem;padding:3px 8px;border-radius:10px;background:${r.status==='visited'?'#1a3a2a':r.status==='wishlist'?'#1a1a3a':'#2a2a2a'};color:${r.status==='visited'?'#4caf50':r.status==='wishlist'?'#7c83fd':'#888'}">${r.status}</span>
+      <span style="font-size:.7rem;padding:3px 8px;border-radius:10px;background:${r.status==='visited'?'#1a3a2a':r.status==='want-to-try'?'#1a1a3a':'#2a2a2a'};color:${r.status==='visited'?'#4caf50':r.status==='want-to-try'?'#7c83fd':'#888'}">${r.status}</span>
     </div>`).join('');
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -11575,7 +11659,7 @@ function hideInstallBanner () {
 
 /* App Badging - show count of wishlist items as badge */
 function updateAppBadge () {
-  const wishlistCount = state.restaurants.filter(r => r.status === 'wishlist').length;
+  const wishlistCount = state.restaurants.filter(r => r.status === 'want-to-try').length;
   if ('setAppBadge' in navigator) {
     if (wishlistCount > 0) navigator.setAppBadge(wishlistCount).catch(() => {});
     else navigator.clearAppBadge().catch(() => {});
@@ -11656,7 +11740,7 @@ const BADGE_DEFS = [
   { id: 'visits_50',        icon: '',  name: 'Legend',            desc: '50 restaurants visited',             xp: 200, check: r => r.filter(x=>x.status==='visited').length >= 50 },
   { id: 'cuisines_5',       icon: '',  name: 'Globe Trotter',     desc: '5 different cuisines explored',      xp: 40,  check: r => new Set(r.filter(x=>x.status==='visited').map(x=>(x.cuisine||'').toLowerCase()).filter(Boolean)).size >= 5 },
   { id: 'cuisines_10',      icon: '', name: 'Culinary Tourist',  desc: '10 different cuisines explored',     xp: 80,  check: r => new Set(r.filter(x=>x.status==='visited').map(x=>(x.cuisine||'').toLowerCase()).filter(Boolean)).size >= 10 },
-  { id: 'wishlist_10',      icon: '',  name: 'Dream List',        desc: '10 places on your wishlist',         xp: 25,  check: r => r.filter(x=>x.status==='wishlist').length >= 10 },
+  { id: 'wishlist_10',      icon: '',  name: 'Dream List',        desc: '10 places on your wishlist',         xp: 25,  check: r => r.filter(x=>x.status==='want-to-try').length >= 10 },
   { id: 'first_5star',      icon: '⭐',  name: 'Perfection',        desc: 'Give a restaurant 5 stars',          xp: 30,  check: r => r.some(x=>x.myRating >= 5) },
   { id: 'photo_added',      icon: '',  name: 'Shutterbug',        desc: 'Add a photo to a restaurant',        xp: 15,  check: r => r.some(x=>x.photo) },
   { id: 'has_notes',        icon: '',  name: 'Critic',            desc: 'Write notes on 5 restaurants',       xp: 20,  check: r => r.filter(x=>x.notes&&x.notes.length>10).length >= 5 },
@@ -11773,7 +11857,7 @@ let _swipeCurrentCard = null;
 
 function openSwipeDeck () {
   _swipeDeck = [...state.restaurants]
-    .filter(r => r.status === 'wishlist')
+    .filter(r => r.status === 'want-to-try')
     .sort(() => Math.random() - .5);
   _swipeIdx = 0;
   _renderSwipeDeck();
@@ -11825,6 +11909,10 @@ function _renderSwipeDeck () {
 function _attachSwipeListeners (card, restaurant) {
   let startX = 0, currentX = 0, dragging = false;
 
+  // Tear down listeners left behind by the previous top card so window
+  // handlers don't accumulate on every deck re-render (memory/CPU leak).
+  if (window._ftbSwipeCleanup) { window._ftbSwipeCleanup(); window._ftbSwipeCleanup = null; }
+
   const onStart = e => {
     dragging = true;
     startX = (e.touches ? e.touches[0].clientX : e.clientX);
@@ -11857,6 +11945,13 @@ function _attachSwipeListeners (card, restaurant) {
   window.addEventListener('touchmove', onMove, { passive: true });
   window.addEventListener('mouseup', onEnd);
   window.addEventListener('touchend', onEnd);
+
+  window._ftbSwipeCleanup = () => {
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('touchmove', onMove);
+    window.removeEventListener('mouseup', onEnd);
+    window.removeEventListener('touchend', onEnd);
+  };
 }
 
 function _completeSwipe (card, restaurant, picked) {
@@ -11892,7 +11987,7 @@ let _spinning     = false;
 const WHEEL_COLORS = ['#E8B15A','#FF8C42','#FFA62B','#FFD166','#06D6A0','#118AB2','#7C83FD','#EF476F','#F78C6B','#C77DFF'];
 
 function openSpinWheel () {
-  _spinItems = state.restaurants.filter(r => r.status === 'wishlist' || r.status === 'visited');
+  _spinItems = state.restaurants.filter(r => r.status === 'want-to-try' || r.status === 'visited');
   if (_spinItems.length < 2) {
     showToast('Need more restaurants', 'Add at least 2 to your list first.', 'error');
     return;
@@ -12235,8 +12330,8 @@ async function runOpenNowSearch () {
       const type = tags.amenity || 'restaurant';
       const emoji = TYPE_EMOJI[type] || '';
       const badge = isOpen === true ? ' Open' : ' Maybe';
-      const safeName = tags.name.replace(/'/g, '\\\'').replace(/"/g, '&quot;');
-      const safeCuisine = (tags.cuisine || '').replace(/'/g, '\\\'');
+      const safeName = escJsArg(tags.name);
+      const safeCuisine = escJsArg(tags.cuisine || '');
       return `<div class="open-now-item">
         <div class="open-now-item-emoji">${emoji}</div>
         <div style="flex:1;min-width:0">
@@ -12489,16 +12584,14 @@ function openCheckinWithPhoto (id) {
     input.onchange = () => {
       const file = input.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = ev => {
+      readImageFileCompressed(file).then(dataUrl => {
         const vIdx = state.restaurants[idx].visits.length - 1;
-        state.restaurants[idx].visits[vIdx].photo = ev.target.result;
+        state.restaurants[idx].visits[vIdx].photo = dataUrl;
         saveData();
         renderAll();
         openDetailModal(id);
         showToast(' Photo Added!', 'Visit photo saved to gallery.', 'success');
-      };
-      reader.readAsDataURL(file);
+      }).catch(() => showToast('Photo Error', 'Could not load that image.', 'error'));
     };
     input.click();
   }
@@ -12634,7 +12727,7 @@ async function runDuel () {
   const idB = document.getElementById('duel-pick-b').value;
   if (!idA || !idB) { showToast('Pick two', 'Select both restaurants first.', 'info'); return; }
   if (idA === idB) { showToast('Same restaurant!', 'Pick two different spots.', 'info'); return; }
-  if (!AI.hasKey()) { showToast('AI key needed', 'Add your Gemini key in Settings → AI Key.', 'info'); return; }
+  if (!AI.hasAccess()) { showToast('AI unavailable', 'Sign in with a Grizzly plan (or add a Gemini key in Settings) to use AI features.', 'info'); return; }
   const rA = state.restaurants.find(r => r.id === idA);
   const rB = state.restaurants.find(r => r.id === idB);
   if (!rA || !rB) return;
@@ -12792,7 +12885,7 @@ async function crackFortuneCookie () {
   result.classList.remove('hidden');
   try {
     let fortune;
-    if (AI.hasKey() && state.restaurants.length > 0) {
+    if (AI.hasAccess() && state.restaurants.length > 0) {
       const top = state.restaurants
         .filter(r => r.myRating >= 4)
         .slice(0, 5)
@@ -13023,18 +13116,18 @@ function _loadVisitLogEntries () {
   _vlRestaurantId = id;
   const r = state.restaurants.find(x => x.id === id);
   if (!r) return;
-  if (!r.visitLog) r.visitLog = [];
+  if (!r.visits) r.visits = [];
   document.getElementById('visitlog-entries').classList.remove('hidden');
   _renderVisitLogList(r);
 }
 function _renderVisitLogList (r) {
   const listEl = document.getElementById('visitlog-list');
-  if (!r.visitLog || !r.visitLog.length) {
+  if (!r.visits || !r.visits.length) {
     listEl.innerHTML = '<div style="color:var(--text2);font-size:.82rem;padding:8px 0">No visits logged yet.</div>';
     return;
   }
-  listEl.innerHTML = r.visitLog.slice().reverse().map((v, i) => {
-    const realIdx = r.visitLog.length - 1 - i;
+  listEl.innerHTML = r.visits.slice().reverse().map((v, i) => {
+    const realIdx = r.visits.length - 1 - i;
     const stars = v.rating ? '⭐'.repeat(v.rating) : '';
     return `<div class="visitlog-entry">
       <div class="visitlog-entry-header">
@@ -13044,13 +13137,13 @@ function _renderVisitLogList (r) {
       </div>
       ${v.dish ? `<div class="visitlog-entry-dish"> ${escHtml(v.dish)}</div>` : ''}
       ${stars ? `<div class="visitlog-entry-stars">${stars}</div>` : ''}
-      ${v.notes ? `<div class="visitlog-entry-notes">${escHtml(v.notes)}</div>` : ''}
+      ${(v.note || v.notes) ? `<div class="visitlog-entry-notes">${escHtml(v.note || v.notes)}</div>` : ''}
     </div>`;
   }).join('');
   listEl.querySelectorAll('.visitlog-entry-del').forEach(btn => {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.dataset.idx);
-      r.visitLog.splice(idx, 1);
+      r.visits.splice(idx, 1);
       saveData();
       _renderVisitLogList(r);
       _invalidateSpendCache();
@@ -13072,8 +13165,11 @@ function _saveVisitLogEntry () {
   const dish  = document.getElementById('vl-dish').value.trim();
   const notes = document.getElementById('vl-notes').value.trim();
   if (!date) { showToast('Pick a date', '', 'info'); return; }
-  if (!r.visitLog) r.visitLog = [];
-  r.visitLog.push({ date, spend: spend ? parseFloat(spend) : null, dish, notes, rating: _vlStarVal || null });
+  if (!r.visits) r.visits = [];
+  r.visits.push({ date, spend: spend ? parseFloat(spend) : null, dish, note: notes, rating: _vlStarVal || null, photo: '' });
+  // A logged visit means the place was visited — keep status/stats coherent
+  r.status = 'visited';
+  if (!r.dateVisited || date > r.dateVisited) r.dateVisited = date;
   // Bump updatedAt so Mood Calendar picks it up
   r.updatedAt = new Date(date).toISOString();
   saveData();
@@ -13105,7 +13201,7 @@ function closeSpendTracker () {
 function _getAllVisits () {
   const visits = [];
   state.restaurants.forEach(r => {
-    (r.visitLog || []).forEach(v => {
+    (r.visits || []).forEach(v => {
       if (v.spend != null && v.spend > 0) {
         visits.push({ name: r.name, cuisine: r.cuisine, rating: r.myRating, visitRating: v.rating, spend: parseFloat(v.spend), date: v.date || '' });
       }
@@ -13177,10 +13273,10 @@ function _renderBeenaWhile () {
   const now = Date.now();
   const MS_90 = 90 * 24 * 60 * 60 * 1000;
   const candidates = state.restaurants
-    .filter(r => r.myRating >= 4 && (r.status === 'visited' || (r.visitLog && r.visitLog.length)))
+    .filter(r => r.myRating >= 4 && (r.status === 'visited' || (r.visits && r.visits.length)))
     .map(r => {
-      const lastLogDate = r.visitLog && r.visitLog.length
-        ? r.visitLog.reduce((best, v) => (!best || v.date > best) ? v.date : best, null)
+      const lastLogDate = r.visits && r.visits.length
+        ? r.visits.reduce((best, v) => (!best || v.date > best) ? v.date : best, null)
         : null;
       const dateStr = lastLogDate || r.dateVisited || r.visitedAt || r.updatedAt || null;
       const ms = dateStr ? now - new Date(dateStr).getTime() : Infinity;
@@ -13233,7 +13329,7 @@ function closeMealPlanner () {
   maybeHideOverlay();
 }
 async function generateMealPlan () {
-  if (!AI.hasKey()) { showToast('AI key needed', 'Add your Gemini key in Settings → AI Key.', 'info'); return; }
+  if (!AI.hasAccess()) { showToast('AI unavailable', 'Sign in with a Grizzly plan (or add a Gemini key in Settings) to use AI features.', 'info'); return; }
   const days   = document.getElementById('mp-days').value;
   const budget = document.getElementById('mp-budget').value;
   const vibe   = document.getElementById('mp-vibe').value.trim();

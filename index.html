@@ -9,7 +9,7 @@
   <meta property="og:description" content="Build your food den, track every great bite, and let Byte Cub help you stop overthinking dinner." />
   <meta property="og:type" content="website" />
   <meta name="theme-color" content="#FF6B35" />
-  <link rel="icon" type="image/png" href="feedbear.png?v=woods1" />
+  <link rel="icon" type="image/png" href="feedbear-icon.png?v=woods2" />
   <link rel="icon" type="image/svg+xml" href="icon.svg?v=woods1" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -775,7 +775,8 @@
       try {
         if (new URLSearchParams(window.location.search).has('landing')) return;
         const hasData = Object.keys(localStorage).some(k => k.startsWith('ftb_'));
-        if (hasData) { window.location.replace('app.html'); return; }
+        // Preserve query params (e.g. Stripe ?upgrade=success&session_id=…) so app.html can handle them
+        if (hasData) { window.location.replace('app.html' + window.location.search + window.location.hash); return; }
       } catch (e) {}
     })();
 

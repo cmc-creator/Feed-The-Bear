@@ -3,7 +3,7 @@
    Offline-first cache strategy
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-const CACHE  = 'ftb-v20';
+const CACHE  = 'ftb-v41';
 const ASSETS = [
   './',
   './index.html',
@@ -15,7 +15,8 @@ const ASSETS = [
   './style.css',
   './manifest.json',
   './icon.svg',
-  'https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap',
+  'https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap',
+  'https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
 ];
@@ -62,7 +63,13 @@ self.addEventListener('fetch', e => {
           caches.open(CACHE).then(c => c.put(e.request, clone));
         }
         return resp;
-      }).catch(() => caches.match(e.request).then(cached => cached || caches.match('./index.html')))
+      }).catch(() => caches.match(e.request).then(cached => {
+        if (cached) return cached;
+        // Only fall back to index.html for page navigations — serving HTML
+        // where JS/CSS is expected just causes confusing parse errors.
+        if (e.request.mode === 'navigate') return caches.match('./index.html');
+        return new Response('', { status: 503 });
+      }))
     );
     return;
   }

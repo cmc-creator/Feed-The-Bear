@@ -15,11 +15,15 @@ const Stripe  = require('stripe');
 const admin   = require('firebase-admin');
 
 // Initialize Firebase Admin once (Vercel may reuse the runtime)
-if (!admin.apps.length) {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
+function getAdmin () {
+  if (!admin.apps.length) {
+    const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (!raw) throw new Error('FIREBASE_SERVICE_ACCOUNT env var is not set');
+    admin.initializeApp({
+      credential: admin.credential.cert(JSON.parse(raw)),
+    });
+  }
+  return admin;
 }
 
 module.exports = async function handler (req, res) {
@@ -51,7 +55,7 @@ module.exports = async function handler (req, res) {
     }
 
     // Write Grizzly plan to Firestore
-    const db = admin.firestore();
+    const db = getAdmin().firestore();
     await db.doc(`users/${uid}/meta/profile`).set(
       {
         plan:              'grizzly',
@@ -65,6 +69,6 @@ module.exports = async function handler (req, res) {
     res.status(200).json({ plan: 'grizzly' });
   } catch (err) {
     console.error('[FTB] verify-session error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Verification failed. Please contact support.' });
   }
 };

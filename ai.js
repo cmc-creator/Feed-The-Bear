@@ -36,11 +36,41 @@ const AI = {
 
   hasKey () { return !!this.getKey(); },
 
+  /* Server proxy: signed-in Grizzly users get AI through /api/ai-gemini
+     (server-side GEMINI_API_KEY) — no personal key needed. */
+  canUseServer () {
+    try {
+      const signedIn = typeof firebase !== 'undefined' && !!firebase.auth?.().currentUser;
+      const premium  = (typeof isPremium === 'function') ? isPremium() : false;
+      return signedIn && premium;
+    } catch { return false; }
+  },
+
+  /* True when ANY path to AI exists (server proxy or personal key). */
+  hasAccess () { return this.canUseServer() || this.hasKey(); },
+
+  async _getIdToken () {
+    try { return await firebase.auth().currentUser?.getIdToken(); }
+    catch { return ''; }
+  },
+
+  async _proxyFetch (body, stream = false) {
+    const token = await this._getIdToken();
+    if (!token) throw new Error('NO_AUTH');
+    const resp = await fetch('/api/ai-gemini', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body:    JSON.stringify({ body, stream }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err?.error || `HTTP ${resp.status}`);
+    }
+    return resp;
+  },
+
   /* ── 2 · Low-level call ──────────────────────────────── */
   async _call (parts, systemText = '', opts = {}) {
-    const key = this.getKey();
-    if (!key) throw new Error('NO_KEY');
-
     const body = {
       contents: [{ role: 'user', parts }],
       generationConfig: {
@@ -53,9 +83,23 @@ const AI = {
       body.systemInstruction = { parts: [{ text: systemText }] };
     }
 
-    const resp = await fetch(`${GEMINI_GEN}?key=${encodeURIComponent(key)}`, {
+    // Prefer the server proxy (Grizzly perk — no personal key required)
+    if (this.canUseServer()) {
+      try {
+        const resp = await this._proxyFetch(body, false);
+        const data = await resp.json();
+        return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      } catch (err) {
+        if (!this.hasKey()) throw err; // no local fallback — surface the error
+      }
+    }
+
+    const key = this.getKey();
+    if (!key) throw new Error('NO_KEY');
+
+    const resp = await fetch(GEMINI_GEN, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body:    JSON.stringify(body),
     });
 
@@ -83,9 +127,6 @@ const AI = {
 
   /* ── 5 · Streaming call (yields text chunks) ─────────── */
   async *stream (prompt, systemText = '', opts = {}) {
-    const key = this.getKey();
-    if (!key) throw new Error('NO_KEY');
-
     const body = {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
@@ -95,13 +136,24 @@ const AI = {
     };
     if (systemText) body.systemInstruction = { parts: [{ text: systemText }] };
 
-    const resp = await fetch(`${GEMINI_STREAM}?key=${encodeURIComponent(key)}&alt=sse`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(body),
-    });
-
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    let resp = null;
+    if (this.canUseServer()) {
+      try {
+        resp = await this._proxyFetch(body, true);
+      } catch (err) {
+        if (!this.hasKey()) throw err;
+      }
+    }
+    if (!resp) {
+      const key = this.getKey();
+      if (!key) throw new Error('NO_KEY');
+      resp = await fetch(`${GEMINI_STREAM}?alt=sse`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+        body:    JSON.stringify(body),
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    }
 
     const reader  = resp.body.getReader();
     const decoder = new TextDecoder();

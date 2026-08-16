@@ -111,13 +111,32 @@ async function fbSaveRestaurants (uid, restaurants) {
 
 async function fbSaveProfileCloud (uid, profile) {
   if (!uid || !profile) return;
-  try { await _db.doc(`users/${uid}/meta/profile`).set(profile, { merge: true }); } catch {}
+  // Billing fields are server-owned (see firestore.rules) — never send them
+  // from the client or the whole write gets rejected.
+  const { plan, stripeCustomerId, stripeSessionId, upgradedAt, ...safe } = profile;
+  try { await _db.doc(`users/${uid}/meta/profile`).set(safe, { merge: true }); } catch {}
 }
 
+// Delete restaurant docs from Firestore so deletions propagate across devices
+async function fbDeleteRestaurantsCloud (uid, ids) {
+  if (!uid || !_db || !Array.isArray(ids) || !ids.length) return;
+  try {
+    for (let i = 0; i < ids.length; i += 400) {
+      const batch = _db.batch();
+      ids.slice(i, i + 400).forEach(id => batch.delete(_db.doc(`users/${uid}/restaurants/${id}`)));
+      await batch.commit();
+    }
+  } catch (err) {
+    console.warn('[FTB] Firestore delete failed:', err);
+  }
+}
+window.fbDeleteRestaurantsCloud = fbDeleteRestaurantsCloud;
+
 // Called after every saveData() in app.js - debounced to avoid write storms
+// Cloud sync of restaurants is a Grizzly feature (matches the pricing page).
 function fbDebouncedSync () {
   const uid = window._ftbUid;
-  if (!uid) return;
+  if (!uid || !isPremium()) return;
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(() => fbSaveRestaurants(uid, state.restaurants), 3000);
 }
@@ -169,16 +188,38 @@ function initFirebaseAuth () {
         localStorage.setItem('ftb_uid_v1',  user.uid);
       } catch { window._ftbPlan = 'free'; }
 
-      // Sync restaurants - cloud wins if it has more data
+      // Restore restaurants on sign-in for ALL users (never lock anyone out
+      // of data they previously synced). Ongoing background sync/uploads stay
+      // Grizzly-only via fbDebouncedSync.
+      // Merge by id (newest updatedAt wins) instead of the old "whichever
+      // side has more wins", which resurrected deleted spots and let a
+      // stale device overwrite newer edits.
       const { restaurants, cloudProfile } = await fbLoadUserData(user.uid);
-      const local = state.restaurants || [];
-      if (restaurants.length > local.length) {
-        state.restaurants = restaurants;
-        saveData();
+      {
+        let local = state.restaurants || [];
+        if (!local.length) {
+          // Auth state can resolve before app.js finishes loading local data —
+          // read localStorage directly so a slow start doesn't wipe local spots.
+          try { local = JSON.parse(localStorage.getItem('ftb_restaurants_v2') || '[]') || []; } catch { local = []; }
+        }
+        const deletedIds = new Set((typeof getDeletedRestaurantIds === 'function') ? getDeletedRestaurantIds() : []);
+        const ts = v => (typeof v === 'number' ? v : (Date.parse(v) || 0));
+        const byId = new Map();
+        restaurants.forEach(r => { if (r && r.id && !deletedIds.has(r.id)) byId.set(r.id, r); });
+        local.forEach(r => {
+          if (!r || !r.id || deletedIds.has(r.id)) return;
+          const cloud = byId.get(r.id);
+          if (!cloud || ts(r.updatedAt) >= ts(cloud.updatedAt)) byId.set(r.id, r);
+        });
+        const merged = [...byId.values()];
+        const gained = merged.length - local.length;
+        state.restaurants = merged;
+        saveData(); // persists locally + (Grizzly) debounced push of merged set
         renderAll();
-        showToast('☁️ Den synced!', `Loaded ${restaurants.length} spots from the cloud.`, 'success');
-      } else if (local.length > 0) {
-        fbSaveRestaurants(user.uid, local); // push local to cloud
+        if (deletedIds.size) fbDeleteRestaurantsCloud(user.uid, [...deletedIds]);
+        if (gained > 0) {
+          showToast('☁️ Den synced!', `Loaded ${gained} spot${gained === 1 ? '' : 's'} from the cloud.`, 'success');
+        }
       }
 
       // Merge profile (cloud wins for plan fields)
@@ -235,6 +276,8 @@ async function _verifyAndActivatePlan (sessionId, uid) {
     if (data.plan === 'grizzly') {
       window._ftbPlan = 'grizzly';
       localStorage.setItem('ftb_plan_v1', 'grizzly');
+      // First cloud push now that sync is unlocked
+      if (state?.restaurants?.length) fbSaveRestaurants(uid, state.restaurants);
     }
   } catch (err) {
     console.warn('[FTB] Plan verification failed:', err);
@@ -376,8 +419,9 @@ function updateAuthUI (user) {
   if (el('account-signout-row')) el('account-signout-row').classList.toggle('hidden', !user);
   if (el('account-upgrade-row')) el('account-upgrade-row').classList.toggle('hidden', isPremium());
   if (el('account-sync-badge')) {
-    el('account-sync-badge').textContent = user ? '☁️ Cloud synced' : '📱 Device only';
-    el('account-sync-badge').className   = 'account-sync-badge' + (user ? ' badge-synced' : '');
+    const synced = !!user && isPremium();
+    el('account-sync-badge').textContent = synced ? '☁️ Cloud synced' : '📱 Device only';
+    el('account-sync-badge').className   = 'account-sync-badge' + (synced ? ' badge-synced' : '');
   }
   if (el('account-plan-badge')) {
     const plan = window._ftbPlan || 'free';

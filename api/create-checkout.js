@@ -30,14 +30,14 @@ module.exports = async function handler (req, res) {
       customer_email:       email,
       line_items:           [{ price: priceId, quantity: 1 }],
       metadata:             { uid },
-      success_url:          `${appUrl}/?upgrade=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url:           `${appUrl}/?upgrade=cancel`,
+      success_url:          `${appUrl}/app.html?upgrade=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url:           `${appUrl}/app.html?upgrade=cancel`,
       allow_promotion_codes: true,
     });
 
     res.status(200).json({ url: session.url });
   } catch (err) {
     console.error('[FTB] Stripe checkout error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Could not start checkout. Please try again.' });
   }
 };
