@@ -7807,17 +7807,19 @@ body.light-mode .upgrade-card {
     linear-gradient(160deg, rgba(69,45,30,.96), rgba(34,22,16,.97));
 }
 
-.modal-card,
 .filter-bar,
 .app-header {
   background-blend-mode: overlay, normal, normal;
 }
 
 .modal-card {
+  /* Solid dark scrim ABOVE the bark texture (no blend) — the old overlay
+     blend turned modals glaring orange and made text unreadable. */
   background:
-    linear-gradient(rgba(36,24,17,.78), rgba(30,20,14,.84)),
+    linear-gradient(rgba(24,16,11,.92), rgba(20,13,9,.94)),
     url('assets/textures/bark2.jpg') center/cover no-repeat,
     linear-gradient(160deg, rgba(58,39,26,.95), rgba(31,21,15,.98));
+  background-blend-mode: normal;
 }
 
 /* ════════════════════════════════════════════════════════════
