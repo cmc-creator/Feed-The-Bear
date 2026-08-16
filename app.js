@@ -2376,7 +2376,6 @@ function openDirections (r) {
   } else {
     showToast('No Address', 'This restaurant has no address saved.', 'error');
   }
-  window.open(url, '_blank', 'noopener');
 }
 function openWebsite (r) {
   if (r.website) {
@@ -3374,26 +3373,74 @@ async function _discFetch () {
   const radius = parseInt(document.getElementById('disc-radius')?.value) || 3219;
 
   try {
-    const { userLat: lat, userLng: lng } = state;
-    const query = `[out:json][timeout:15];(node["amenity"="restaurant"](around:1000,${lat},${lng});way["amenity"="restaurant"](around:1000,${lat},${lng}););out center 20;`;
-    const res  = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:query, signal: AbortSignal.timeout(15000) });
-    const data = await res.json();
-    const els  = (data.elements || []).slice(0, 20);
-    if (!els.length) { document.getElementById('nearby-results').innerHTML = '<div class="nearby-empty">No restaurants found within 1 km. Try a different area!</div>'; return; }
-    const html = els.map(el => {
-      const tags = el.tags || {};
-      const elLat = el.lat ?? el.center?.lat, elLon = el.lon ?? el.center?.lon;
-      const name = tags.name || 'Unknown Restaurant';
-      const cuisine = (tags.cuisine || '').split(';')[0];
-      const dist = (elLat && elLon) ? haversine(lat, lng, elLat, elLon) : null;
-      const saved = state.restaurants.some(r => r.name.toLowerCase() === name.toLowerCase());
-      return `<div class="nearby-item">
-        <div class="nearby-item-info">
-          <div class="nearby-item-name">${escHtml(name)}</div>
-          <div class="nearby-item-meta">${cuisine ? `${cuisineEmoji(cuisine)} ${escHtml(cuisine)} · ` : ''}${dist ? fmtDist(dist)+' away' : ''}</div>
-        </div>
-        ${saved ? '<span class="nearby-saved-badge">✓ Saved</span>' :
-          `<button class="btn-sm btn-orange nearby-add-btn" data-name="${escHtml(name)}" data-cuisine="${escHtml(cuisine)}" data-lat="${elLat||''}" data-lng="${elLon||''}">+ Add</button>`}
+    const q = `[out:json][timeout:20];(node["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${radius},${lat},${lng});way["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${radius},${lat},${lng}););out center 250;`;
+    const elementsRaw = await fetchOverpassElements(q, {
+      timeoutMs: 18000,
+      nominatimFallback: true,
+      lat,
+      lng,
+      radiusMeters: radius,
+      limit: 250,
+    });
+
+    const savedNames = new Set(state.restaurants.map(r => normalizeName(r.name)));
+    const myCuisines = {};
+    state.restaurants.filter(r => r.myRating >= 4 && r.cuisine).forEach(r => {
+      const c = (r.cuisine || '').toLowerCase();
+      myCuisines[c] = (myCuisines[c] || 0) + (r.myRating || 3);
+    });
+
+    _discAllResults = (elementsRaw || [])
+      .filter(el => el.tags?.name)
+      .map(el => {
+        const tags   = el.tags || {};
+        const elLat  = el.lat ?? el.center?.lat;
+        const elLon  = el.lon ?? el.center?.lon;
+        const dist   = (elLat != null && elLon != null) ? haversine(lat, lng, elLat, elLon) : Infinity;
+        const rawCuisines = (tags.cuisine || '').split(';').map(s => s.trim().replace(/_/g, ' ')).filter(Boolean);
+        const cuisine = rawCuisines[0] || '';
+        const amenity = tags.amenity || 'restaurant';
+
+        // Taste-match score
+        let matchScore = 0;
+        Object.entries(myCuisines).forEach(([c, w]) => {
+          if (cuisine.toLowerCase().includes(c) || c.includes(cuisine.toLowerCase())) matchScore += w;
+        });
+        if (amenity === 'restaurant') matchScore += 5;
+        if (tags.opening_hours)       matchScore += 3;
+        if (tags.website)             matchScore += 2;
+        if (tags['addr:street'])      matchScore += 1;
+
+        // Check if open now (simple heuristic - mark unknown if no hours)
+        const openNow = _discIsOpenNow(tags.opening_hours);
+
+        const street = [tags['addr:housenumber'], tags['addr:street']].filter(Boolean).join(' ');
+        const city   = tags['addr:city'] || '';
+
+        return {
+          name: tags.name,
+          cuisine,
+          rawCuisines,
+          amenity,
+          dist,
+          lat: Number.isFinite(elLat) ? Number(elLat) : null,
+          lon: Number.isFinite(elLon) ? Number(elLon) : null,
+          matchScore,
+          openNow,
+          street,
+          city,
+          website: tags.website || '',
+          phone:   tags.phone || '',
+          saved:   savedNames.has(normalizeName(tags.name)),
+        };
+      })
+      .sort((a, b) => a.dist - b.dist);   // default: nearest first
+
+    if (!_discAllResults.length) {
+      resultsEl.innerHTML = `<div class="disc-empty">
+        <div class="disc-empty-icon">FTB</div>
+        <div class="disc-empty-title">No spots found nearby</div>
+        <div class="disc-empty-sub">Try increasing the radius above.</div>
       </div>`;
       return;
     }
@@ -3435,21 +3482,44 @@ function _discBuildChips (results, wrap) {
       const label = c.charAt(0).toUpperCase() + c.slice(1);
       return `<button class="disc-chip" data-cuisine="${escHtml(c)}">${emoji} ${escHtml(label)} <span class="disc-chip-count">${counts[c]}</span></button>`;
     }).join('');
-    document.getElementById('nearby-results').innerHTML = html;
-    document.querySelectorAll('.nearby-add-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        overlay.classList.add('hidden'); maybeHideOverlay();
-        openAddModal();
-        document.getElementById('form-name').value    = btn.dataset.name;
-        document.getElementById('form-cuisine').value = btn.dataset.cuisine;
-        showToast('Pre-filled!', 'Review the details and save.', 'info');
-      });
-    });
-  } catch (err) {
-    const msg = (err?.name === 'TimeoutError' || err?.name === 'AbortError')
-      ? 'Request timed out — check your connection and try again.'
-      : 'Could not fetch — check your connection.';
-    document.getElementById('nearby-results').innerHTML = `<div class="nearby-empty">${msg}</div>`;
+}
+
+function _discApplyFilters () {
+  const query   = (document.getElementById('disc-search')?.value || '').trim().toLowerCase();
+  const cuisine = _discActiveCuisine;
+  const sort    = document.getElementById('disc-sort')?.value || 'distance';
+  const metaEl  = document.getElementById('disc-result-meta');
+
+  let results = _discAllResults.filter(r => {
+    if (cuisine !== 'all' && r.cuisine !== cuisine && r.amenity !== cuisine) return false;
+    if (query && !r.name.toLowerCase().includes(query) && !r.cuisine.toLowerCase().includes(query)) return false;
+    return true;
+  });
+
+  if (sort === 'distance') {
+    results = results.slice().sort((a, b) => a.dist - b.dist);
+  } else if (sort === 'match') {
+    results = results.slice().sort((a, b) => b.matchScore - a.matchScore);
+  } else if (sort === 'type') {
+    results = results.slice().sort((a, b) => a.amenity.localeCompare(b.amenity) || a.dist - b.dist);
+  }
+
+  const shown = results.slice(0, Math.max(DISC_PAGE_SIZE, _discRenderLimit));
+
+  if (metaEl) {
+    metaEl.textContent = results.length
+      ? `${shown.length} of ${results.length} spot${results.length !== 1 ? 's' : ''} shown`
+      : '';
+  }
+
+  const resultsEl = document.getElementById('nearby-results');
+  if (!results.length) {
+    resultsEl.innerHTML = `<div class="disc-empty">
+      <div class="disc-empty-icon"></div>
+      <div class="disc-empty-title">No matches</div>
+      <div class="disc-empty-sub">Try a different filter or search term.</div>
+    </div>`;
+    return;
   }
 
   const myCuisines = new Set(

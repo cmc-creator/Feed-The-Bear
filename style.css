@@ -2685,6 +2685,18 @@ body.bulk-mode .card-checkbox { display: flex; }
   transition: color var(--transition), transform var(--transition);
 }
 .checkin-star.active, .checkin-star:hover { color: var(--gold); transform: scale(1.15); }
+.detail-checkin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin: 8px 0 12px;
+}
+.detail-checkin-form.hidden { display: none; }
+.checkin-stars { display: flex; gap: 6px; }
+.checkin-form-actions { display: flex; gap: 8px; }
 .checkin-note {
   width: 100%;
   resize: vertical;
