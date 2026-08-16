@@ -31,6 +31,16 @@
   --text-muted:  #b1bdce;
   --text-dim:    #7f8ea6;
 
+  /* Aliases for legacy/alternate names used across the sheet — without
+     these, 60+ declarations silently resolved to nothing. */
+  --text1:       var(--text);
+  --text2:       var(--text-dim);
+  --green:       var(--primary);
+  --danger:      var(--red);
+  --surface-2:   var(--surface2);
+  --shadow-lg:   0 16px 44px rgba(0,0,0,.45);
+  --btn-size:    56px;
+
   --radius-sm:   10px;
   --radius:      12px;
   --radius-lg:   20px;
@@ -231,16 +241,15 @@ img { display: block; }
 .app-header .header-actions .account-header-btn {
   position: relative;
   overflow: visible;
-  animation: stump-breathe 3.3s ease-in-out infinite;
+  /* No idle animation: constantly-moving tap targets cause missed taps,
+     burn battery, and break assistive tech. Breathe on hover instead. */
+  transition: transform var(--transition), box-shadow var(--transition);
 }
 
-.app-header .header-actions > button:nth-child(5),
-.app-header .header-actions .play-hub-btn {
-  animation-delay: .35s;
-}
-
-.app-header .header-actions .account-header-btn {
-  animation-delay: .7s;
+.app-header .header-actions > button:hover,
+.app-header .header-actions .play-hub-btn:hover,
+.app-header .header-actions .account-header-btn:hover {
+  transform: translateY(-1px) scale(1.05);
 }
 
 .app-header .header-actions > button::after,
@@ -2098,7 +2107,7 @@ body.light-mode {
   --primary:   #5f9362; --primary-rgb: 95,147,98; --primary-dk: #4b7650; --primary-lt: #7aaf7e;
   --rose:      #c17761; --rose-rgb: 193,119,97;
   --blue:      #5c8ea2; --blue-rgb: 92,142,162;
-  --shadow:    rgba(30,45,36,.08); --shadow-lg: rgba(30,45,36,.16);
+  --shadow:    0 8px 28px rgba(30,45,36,.14); --shadow-lg: 0 16px 44px rgba(30,45,36,.2);
 }
 body.light-mode .app-header { background: rgba(255,255,255,.98); box-shadow: 0 1px 0 rgba(17,24,39,.14); }
 body.light-mode .stats-bar  { background: #fff; border-bottom-color: rgba(17,24,39,.14); }
@@ -2125,6 +2134,44 @@ body.light-mode .today-vibe-pill {
 #theme-toggle-btn .icon-moon { display: block; }
 body.light-mode #theme-toggle-btn .icon-sun  { display: block; }
 body.light-mode #theme-toggle-btn .icon-moon { display: none; }
+
+/* ── Light mode: fix hardcoded dark-theme accent colors that became
+      invisible (white-on-white / cream-on-white) on light surfaces ── */
+body.light-mode .app-footer-item {
+  color: #6b5230;
+  border-color: rgba(122,89,44,.35);
+  background: rgba(122,89,44,.08);
+}
+body.light-mode .for-you-chip.alt,
+body.light-mode .mood-pick-fit,
+body.light-mode .card-highlight.good {
+  color: #1e7a44;
+  border-color: rgba(38,132,74,.45);
+  background: rgba(38,132,74,.1);
+}
+body.light-mode .card-highlight.mood {
+  color: #9a4f2e;
+  border-color: rgba(154,79,46,.4);
+  background: rgba(154,79,46,.09);
+}
+body.light-mode .for-you-card-meta { color: var(--text-muted); }
+body.light-mode .card-action-btn.edit-card {
+  background: rgba(31,45,39,.06);
+  color: var(--text);
+  border-color: rgba(31,45,39,.22);
+}
+body.light-mode .card-action-btn.edit-card:hover { color: var(--text); border-color: rgba(31,45,39,.45); }
+body.light-mode .card-action-btn.directions { color: var(--primary-dk); }
+body.light-mode .card-action-btn.website { color: var(--blue); }
+body.light-mode .aar-icon { color: var(--text); background: rgba(31,45,39,.07); }
+body.light-mode .account-header-btn,
+body.light-mode #header-avatar {
+  color: var(--text);
+}
+body.light-mode .account-header-btn {
+  background: var(--surface3);
+  border: 1px solid var(--border);
+}
 
 /* ── PWA Install Banner ──────────────────────────────────── */
 .pwa-banner {
