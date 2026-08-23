@@ -9582,6 +9582,28 @@ const BEAR_SWIPE_LOCAL_FOOD_IMAGES = {
   churros: 'assets/food/churros.jpg',
 };
 
+function resolveExactLocalDishKey (term = '') {
+  const raw = String(term || '').toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!raw) return '';
+
+  const keys = Object.keys(BEAR_SWIPE_LOCAL_FOOD_IMAGES)
+    .sort((a, b) => b.replace(/_/g, ' ').length - a.replace(/_/g, ' ').length);
+  for (const key of keys) {
+    const words = key.replace(/_/g, ' ');
+    if (raw === key || raw === words || raw.includes(words)) return key;
+  }
+
+  if (/\b(gelato|ice cream|sorbet)\b/.test(raw)) return 'gelato';
+  if (/\bcheesecake\b/.test(raw)) return 'cheesecake';
+  if (/\bchurros?\b/.test(raw)) return 'churros';
+  if (/\b(tiramisu|donuts?|pastry|cake slice|chocolate cake)\b/.test(raw)) return 'cheesecake';
+  if (/\b(cheeseburger|smash ?burger)\b/.test(raw)) return 'burger';
+  if (/\b(penne|vodka sauce|fettuccine|alfredo)\b/.test(raw)) return 'italian_pasta';
+  if (/\b(spaghetti|carbonara|bolognese|ravioli)\b/.test(raw)) return 'pasta';
+  if (/\b(brisket|ribs|pulled pork)\b/.test(raw)) return 'steak';
+  return '';
+}
+
 const BEAR_SWIPE_FOOD_BANK = {
   breakfast: [['pancakes', 'breakfast'], ['waffles', 'brunch'], ['omelette', 'breakfast']],
   burgers: [['burger', 'fries'], ['cheeseburger', 'food'], ['smashburger', 'burger']],
@@ -9734,11 +9756,13 @@ function getMoodFoodImageCandidates (term = 'food', seed = '') {
   const picks = variants[key] || variants.default;
   const hash = Math.abs(miniHash(`${key}|${seed || Date.now()}`));
   const phrase = picks[hash % picks.length];
+  const exactKey = resolveExactLocalDishKey(raw || phrase);
+  const exactUrl = exactKey ? BEAR_SWIPE_LOCAL_FOOD_IMAGES[exactKey] : '';
   const local = getLocalDishCandidates(raw || phrase, key);
   const cuisineFallback = (cuisineFallbackByKey[key] || cuisineFallbackByKey.default)
     .map(k => BEAR_SWIPE_LOCAL_FOOD_IMAGES[k])
     .filter(Boolean);
-  const base = [...local, ...cuisineFallback].filter(Boolean);
+  const base = [exactUrl, ...local, ...cuisineFallback].filter(Boolean);
   const unique = [...new Set(base)];
   if (unique.length) return unique;
   return [...BEAR_SWIPE_LOCAL_FALLBACKS];
@@ -9817,39 +9841,19 @@ function getOrFetchMoodPhotos (term = '') {
 // Kicks off (uncached) fetches for the upcoming few mood cards, and if the
 // currently-visible card's term resolves, swaps its image in directly.
 function prefetchMoodSwipePhotos (fromIdx = 0) {
-  const deck = state.swipeDeck || [];
-  const terms = new Set();
-  for (let i = fromIdx; i < Math.min(deck.length, fromIdx + 4); i++) {
-    const it = deck[i];
-    if (it && it.source === 'mood' && it.cuisine) terms.add(it.cuisine);
-  }
-
-  terms.forEach(term => {
-    const key = normalizeMoodTermKey(term);
-    if (_moodPhotoCache.has(key) || _moodPhotoPending.has(key)) return;
-    getOrFetchMoodPhotos(term).then(urls => {
-      if (!urls.length) return;
-      const curIdx = state.swipeIndex || 0;
-      const curItem = (state.swipeDeck || [])[curIdx];
-      if (!curItem || normalizeMoodTermKey(curItem.cuisine) !== key) return;
-      const photoEl = document.getElementById('bear-swipe-card')?.querySelector('.bear-swipe-photo');
-      if (!photoEl) return;
-      const hash = Math.abs(miniHash(`${curItem.key || key}-${curIdx}`));
-      photoEl.src = urls[hash % urls.length];
-    });
-  });
+  // Mood cards stay on curated local dish photos. Wikimedia Commons search
+  // was swapping in watermarked / wrong-subject images (e.g. cheesecake
+  // labeled Gelato) after the card rendered.
+  void fromIdx;
 }
 
 function pickBearSwipePhotoUrl (item, idx = 0) {
   const isLocalFoodAsset = (u = '') => /assets\/food\/[a-z0-9_\-]+\.(?:jpg|jpeg|png|webp)$/i.test(String(u || ''));
 
   if (item?.source === 'mood') {
-    const key = normalizeMoodTermKey(item.cuisine || item.name || 'food');
-    const realPhotos = _moodPhotoCache.get(key);
-    if (Array.isArray(realPhotos) && realPhotos.length) {
-      const hash = Math.abs(miniHash(`${item.key || key}-${idx}`));
-      return realPhotos[hash % realPhotos.length];
-    }
+    const exactKey = resolveExactLocalDishKey(item.cuisine || item.cuisineLabel || item.name || '');
+    const exactUrl = exactKey ? safeUrl(BEAR_SWIPE_LOCAL_FOOD_IMAGES[exactKey] || '') : '';
+    if (exactUrl) return exactUrl;
   }
 
   const primary = safeUrl(item?.photoUrl || '');
@@ -9980,9 +9984,10 @@ function buildMoodSwipeDeck (elements = [], savedRows = []) {
   const deck = [];
   shuffled.forEach((item, idx) => {
     const seed = `${item.term}-${roundSeed}-${idx}`;
+    const exactKey = resolveExactLocalDishKey(item.term);
     const candidates = getMoodFoodImageCandidates(item.term, seed);
-    const chosen = candidates[0] || 'assets/food/pizza.jpg';
-    const localKey = extractLocalFoodKeyFromUrl(chosen);
+    const chosen = (exactKey && BEAR_SWIPE_LOCAL_FOOD_IMAGES[exactKey]) || candidates[0] || 'assets/food/pizza.jpg';
+    const localKey = extractLocalFoodKeyFromUrl(chosen) || exactKey;
     const matchedLabel = formatLocalFoodKeyLabel(localKey) || formatCuisineLabel(item.term);
     const normalizedTerm = normalizeMoodTermKey(item.term);
     const dedupeKey = `${String(localKey || '').toLowerCase()}|${String(matchedLabel || '').toLowerCase()}`;
@@ -10001,8 +10006,9 @@ function buildMoodSwipeDeck (elements = [], savedRows = []) {
       cuisineLabel: matchedLabel,
       amenity: 'food',
       photoUrl: chosen,
-      photoFallbacks: candidates.slice(1),
+      photoFallbacks: [chosen],
       photoSource: 'local',
+      dishKey: localKey,
       isSaved: false,
       restaurantId: null,
       distMeters: Infinity,
@@ -10186,10 +10192,13 @@ function bindBearSwipePhotoFallbacks (photoEl, item = {}) {
     return safeUrl(raw);
   };
 
-  const queue = [
-    ...(Array.isArray(item.photoFallbacks) ? item.photoFallbacks : []),
-    ...BEAR_SWIPE_LOCAL_FALLBACKS,
-  ].map(normalizeFallbackUrl).filter(Boolean);
+  const sameDish = item?.source === 'mood'
+    ? [item.photoUrl, item.dishKey ? BEAR_SWIPE_LOCAL_FOOD_IMAGES[item.dishKey] : '']
+    : [
+      ...(Array.isArray(item.photoFallbacks) ? item.photoFallbacks : []),
+      ...BEAR_SWIPE_LOCAL_FALLBACKS,
+    ];
+  const queue = sameDish.map(normalizeFallbackUrl).filter(Boolean);
 
   let idx = 0;
   let settled = false;
