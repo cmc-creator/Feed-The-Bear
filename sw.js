@@ -3,7 +3,7 @@
    Offline-first cache strategy
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-const CACHE  = 'ftb-v41';
+const CACHE  = 'ftb-v42';
 const ASSETS = [
   './',
   './index.html',
@@ -47,6 +47,27 @@ self.addEventListener('fetch', e => {
   // Network-first for Overpass API — restaurant results must always be live, never cached
   if (new URL(e.request.url).hostname === 'overpass-api.de') {
     e.respondWith(fetch(e.request).catch(() => new Response('{"elements":[]}', { headers: { 'Content-Type': 'application/json' } })));
+    return;
+  }
+
+  const url = e.request.url;
+
+  // Stale-while-revalidate for our own images (assets/, icons): serve the
+  // cached copy instantly but ALWAYS refetch in the background so replaced
+  // images (same filename) show up on the next load instead of never.
+  const isOwnImage = url.includes(self.location.origin) &&
+    /\.(png|jpe?g|gif|webp|avif)(\?|$)/i.test(url);
+  if (isOwnImage && e.request.method === 'GET') {
+    e.respondWith(
+      caches.open(CACHE).then(async c => {
+        const cached = await c.match(e.request);
+        const refetch = fetch(e.request).then(resp => {
+          if (resp.ok) c.put(e.request, resp.clone());
+          return resp;
+        }).catch(() => null);
+        return cached || refetch.then(r => r || new Response('', { status: 503 }));
+      })
+    );
     return;
   }
 
