@@ -317,6 +317,10 @@ async function _handleAuthSubmit () {
   const password = document.getElementById('auth-password')?.value;
   const btn      = document.getElementById('auth-submit-btn');
   if (!email || !password) { showToast('Missing info', 'Enter your email and password.', 'error'); return; }
+  if (mode === 'signup' && password.length < 8) {
+    showToast('Password too short', 'Use at least 8 characters.', 'error');
+    return;
+  }
 
   btn.disabled    = true;
   btn.textContent = 'Signing you in...';
@@ -327,13 +331,19 @@ async function _handleAuthSubmit () {
       await fbSignInEmail(email, password);
     }
     closeAuthModal();
-    showToast('You are in', 'Your account is now synced across your devices.', 'success');
+    showToast(
+      'You are in',
+      isPremium()
+        ? 'Your den is synced across your devices.'
+        : 'Welcome back. Upgrade to Grizzly to keep new saves synced across devices.',
+      'success'
+    );
   } catch (err) {
     const msg =
       err.code === 'auth/wrong-password'        ? 'Wrong password. Please try again.'    :
       err.code === 'auth/user-not-found'        ? 'No account found with that email.'    :
       err.code === 'auth/email-already-in-use'  ? 'That email is already in use.'   :
-      err.code === 'auth/weak-password'         ? 'Password needs at least 6 characters.' :
+      err.code === 'auth/weak-password'         ? 'Password needs at least 8 characters.' :
       err.message;
     showToast('Auth error', msg, 'error');
   } finally {
