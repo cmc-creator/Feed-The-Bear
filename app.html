@@ -259,7 +259,7 @@
         <label class="form-label" for="auth-email">Email</label>
         <input id="auth-email" class="form-input" type="email" placeholder="bear@example.com" autocomplete="email" />
         <label class="form-label" for="auth-password" style="margin-top:12px">Password</label>
-        <input id="auth-password" class="form-input" type="password" placeholder="At least 6 characters" autocomplete="current-password" />
+        <input id="auth-password" class="form-input" type="password" placeholder="At least 8 characters" autocomplete="current-password" />
         <button id="auth-submit-btn" class="btn-primary" style="width:100%;margin-top:16px">Sign In</button>
         <p id="auth-toggle-text" class="auth-toggle-text">New here? <button class="auth-link-btn" id="auth-mode-toggle">Sign up, it's free</button></p>
       </div>
@@ -362,6 +362,10 @@
       <button id="settings-btn" class="icon-btn" title="Settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.36.14.76.22 1.17.22H21a2 2 0 1 1 0 4h-.43c-.41 0-.81.08-1.17.22z"/></svg>
       </button>
+      <button id="add-btn" class="header-add-btn" title="Add a restaurant" aria-label="Add a restaurant">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="16" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span>Add</span>
+      </button>
       <button id="chat-toggle-btn" class="chat-toggle-btn" title="Byte Cub Chat">
         <span class="nav-badge-text">Byte Cub</span><span>Ask Byte Cub</span>
       </button>
@@ -426,7 +430,6 @@
 
       <!-- Hidden but still in DOM for JS compatibility -->
       <button id="export-btn" style="display:none"></button>
-      <button id="add-btn" style="display:none"></button>
       <button id="import-bookmarks-btn" style="display:none"></button>
       <button id="location-toggle-btn" style="display:none"></button>
       <button id="bulk-select-btn" style="display:none"></button>
@@ -497,7 +500,8 @@
       <option value="date-asc">Oldest First</option>
       <option value="name-asc">Name A-Z</option>
       <option value="name-desc">Name Z-A</option>
-      <option value="rating-desc">Highest Rated</option>
+      <option value="rating-desc">Highest Rated (Google)</option>
+      <option value="my-rating-desc">Highest Rated (Mine)</option>
       <option value="distance-asc">Nearest</option>
     </select>
 
@@ -1247,6 +1251,7 @@
     <div class="modal-card detail-card">
       <div class="detail-hero" id="detail-hero">
         <button id="detail-close-btn" class="icon-btn detail-close" aria-label="Close">✕</button>
+        <img id="detail-photo-strip" class="detail-photo-strip" alt="" />
         <div class="detail-hero-content">
           <div class="detail-cuisine-badge" id="detail-cuisine-badge"></div>
           <h2 id="detail-name"></h2>

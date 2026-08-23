@@ -236,6 +236,33 @@ img { display: block; }
   color: #f6ead8;
 }
 
+.header-add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--primary-rgb), .55);
+  background: var(--primary);
+  color: #14110c;
+  font-family: inherit;
+  font-size: .82rem;
+  font-weight: 800;
+  letter-spacing: .01em;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0,0,0,.28);
+}
+.header-add-btn:hover {
+  background: var(--primary-dk, #4f7f50);
+  color: #fff;
+}
+.header-add-btn svg { flex-shrink: 0; }
+@media (max-width: 768px) {
+  .header-add-btn { display: none; }
+}
+
 .app-header .header-actions > button,
 .app-header .header-actions .play-hub-btn,
 .app-header .header-actions .account-header-btn {
@@ -452,7 +479,7 @@ button:focus-visible,
   padding: 0 24px;
 }
 
-#stats-bar {
+#stats-bar.hidden {
   display: none !important;
 }
 .stat-item {
@@ -4184,13 +4211,16 @@ body.light-mode #profile-btn {
 
 /* -- Detail photo strip ------------------------------------ */
 .detail-photo-strip {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: 160px;
+  height: 100%;
   object-fit: cover;
-  border-radius: 12px;
-  margin-bottom: 12px;
+  border-radius: 0;
+  margin: 0;
   background: var(--surface3);
-  display: block;
+  display: none;
+  z-index: 0;
 }
 
 /* -- AI summary inline in detail -------------------------- */

@@ -1531,6 +1531,7 @@ function renderStats () {
   document.getElementById('stat-want').textContent    = want.length;
   document.getElementById('stat-avg').textContent     = avg || '-';
   document.getElementById('stat-avg-stars').textContent = avg ? '★' : '';
+  document.getElementById('stats-bar')?.classList.toggle('hidden', all.length === 0);
 }
 
 function renderCuisineFilter () {
@@ -5271,10 +5272,8 @@ function setupEvents () {
     if (e.target === document.getElementById('profile-overlay')) closeFoodieProfile();
   });
 
-  // Phase 7 - Reservation Reminders
-  document.getElementById('detail-set-reminder-btn').addEventListener('click', () => {
-    if (state.detailId) setReminder(state.detailId);
-  });
+  // Reminders are scheduled from openDetailModal via scheduleReminder()
+  // (do not attach a second click handler here — it double-fires toasts).
 
   // Phase 7 - Auto-Tags (form field hooks)
   ['form-name','form-cuisine','form-notes'].forEach(id => {
@@ -5888,6 +5887,7 @@ document.addEventListener('DOMContentLoaded', () => {
   checkWeeklySuggestion();
   checkGuestProfile();
   handleWebShareTarget();
+  handleLaunchActions();
   const roomCodeFromUrl = new URLSearchParams(window.location.search).get('room');
   if (roomCodeFromUrl) {
     state.activeDinnerRoomCode = String(roomCodeFromUrl).toUpperCase();
@@ -5896,7 +5896,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Post-render: add compare checkboxes if mode was active
   if (_compareMode) addCompareCheckboxes();
   // Wire home discovery buttons
-  document.getElementById('nearby-home-more-btn')?.addEventListener('click', openDiscover);
+  document.getElementById('nearby-home-more-btn')?.addEventListener('click', discoverNearby);
   document.getElementById('nearby-lucky-btn')?.addEventListener('click', () => {
     hapticTap('medium');
     runNearbyLuckyBite();
@@ -5909,7 +5909,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('home-quick-decision-btn')?.addEventListener('click', () => { hapticTap('medium'); openDecisionMode(); });
   document.getElementById('home-quick-pick-btn')?.addEventListener('click', () => { hapticTap('medium'); showTonightsPick(); });
-  document.getElementById('home-quick-nearby-btn')?.addEventListener('click', () => { hapticTap('medium'); openDiscover(); });
+  document.getElementById('home-quick-nearby-btn')?.addEventListener('click', () => { hapticTap('medium'); discoverNearby(); });
   document.getElementById('home-quick-plan-btn')?.addEventListener('click', () => { hapticTap('medium'); openSmartPlanner(); });
   document.getElementById('home-quick-share-btn')?.addEventListener('click', () => { hapticTap('medium'); openShareHighlights(); });
   document.getElementById('home-quick-itinerary-btn')?.addEventListener('click', () => { hapticTap('medium'); openSmartItinerary(); });
@@ -7190,7 +7190,7 @@ function fireReminder (r) {
   if (Notification.permission === 'granted') {
     new Notification('Feed The Bear Reminder', {
       body: 'Time for your visit to ' + r.name + '!',
-      icon: './icon-192.png',
+      icon: './feedbear-icon.png',
     });
   }
   showToast(' Reminder!', 'Time for your visit to "' + r.name + '"!', 'success');
@@ -7584,28 +7584,46 @@ function renderGuestProfile (data) {
    PHASE 7 • WEB SHARE TARGET HANDLER
    ------------------------------------------------------------ */
 
+function looksLikeSharedUrl (value) {
+  return /https?:\/\//i.test(String(value || '')) || /(?:maps\.google|goo\.gl\/maps|maps\.app\.goo\.gl)/i.test(String(value || ''));
+}
+
 function handleWebShareTarget () {
   const params = new URLSearchParams(window.location.search);
-  if (!params.has('share-target')) return;
   const title = params.get('title') || '';
   const url   = params.get('url')   || '';
   const text  = params.get('text')  || '';
-  if (!title && !url) return;
-  // Clean up the URL
+  const reserved = params.has('action') || params.has('upgrade') || params.has('session_id') || params.has('room') || params.has('landing');
+  const isShare = params.has('share-target') || ((!reserved) && (title || url || looksLikeSharedUrl(text)));
+  if (!isShare) return;
+  const sharedUrl = url || (looksLikeSharedUrl(text) ? text.trim().split(/\s+/).find(looksLikeSharedUrl) || '' : '');
+  if (!title && !sharedUrl && !text) return;
   history.replaceState(null,'', window.location.pathname);
-  // Try to parse as restaurant
-  const name = title.replace(/\s*[-|].*$/, '').trim() || text.trim() || 'Shared Place';
+  const name = title.replace(/\s*[-|].*$/, '').trim() || (text && !looksLikeSharedUrl(text) ? text.trim() : '') || 'Shared Place';
   openAddModal();
   document.getElementById('form-name').value = name;
-  if (url) {
-    document.getElementById('form-website').value = url;
-    // Auto-parse if it looks like a Maps URL
-    if (url.includes('maps.google') || url.includes('goo.gl/maps') || url.includes('maps.app.goo.gl')) {
-      document.getElementById('form-maps-url').value = url;
-      parseMapsUrl(url);
+  if (sharedUrl) {
+    document.getElementById('form-website').value = sharedUrl;
+    if (looksLikeSharedUrl(sharedUrl)) {
+      document.getElementById('form-maps-url').value = sharedUrl;
+      if (/maps\.google|goo\.gl\/maps|maps\.app\.goo\.gl/i.test(sharedUrl)) parseMapsUrl(sharedUrl);
     }
   }
   showToast(' Shared!', '"' + name + '" opened for review · fill in details and save!', 'success');
+}
+
+function handleLaunchActions () {
+  const params = new URLSearchParams(window.location.search);
+  const action = (params.get('action') || '').toLowerCase();
+  if (!action) return;
+  history.replaceState(null, '', window.location.pathname + window.location.hash);
+  if (action === 'add') {
+    openAddModal();
+    return;
+  }
+  if (action === 'discover' || action === 'nearby') {
+    discoverNearby();
+  }
 }
 
 /* ------------------------------------------------------------
@@ -11528,17 +11546,20 @@ function launchRoute () {
   closeRoutePlanner();
 }
 
-/* Detail photo from Unsplash Source (no API key) */
 function loadDetailPhoto (restaurant) {
   const el = document.getElementById('detail-photo-strip');
   if (!el) return;
-  const query = encodeURIComponent((restaurant.cuisine || 'food') + ' restaurant');
-  // Use picsum as reliable no-key fallback; encode cuisine as seed for consistency
-  const seed = restaurant.id ? restaurant.id.slice(-6) : '1';
-  el.src = `https://picsum.photos/seed/${seed}/640/160`;
-  el.alt = restaurant.cuisine + ' restaurant photo';
+  const ownPhoto = String(restaurant?.photo || restaurant?.photoUrl || '').trim();
+  const term = `${restaurant?.name || ''} ${restaurant?.cuisine || 'food'}`.trim();
+  const seed = restaurant?.id || restaurant?.name || 'ftb';
+  const cuisinePool = (typeof getMoodFoodImageCandidates === 'function')
+    ? getMoodFoodImageCandidates(term, seed).filter(Boolean)
+    : [];
+  const src = ownPhoto || cuisinePool[0] || 'assets/food/pizza.jpg';
+  el.alt = `${restaurant?.name || restaurant?.cuisine || 'Restaurant'} photo`;
   el.style.display = 'block';
   el.onerror = () => { el.style.display = 'none'; };
+  el.src = src;
 }
 
 /* ------------------------------------------------------------
@@ -11774,8 +11795,8 @@ function schedulePushNudge () {
     // Fire a nudge now (in a real app this would use Push API via server)
     new Notification('Feed The Bear misses you!', {
       body: `It's been ${daysSince} days since your last visit. Time to try somewhere new!`,
-      icon: './icon-192.png',
-      badge: './icon-192.png',
+      icon: './feedbear-icon.png',
+      badge: './feedbear-icon.png',
       tag: 'ftb-nudge'
     });
   }
