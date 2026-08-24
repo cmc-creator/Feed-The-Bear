@@ -8789,6 +8789,7 @@ function setNearbyCards (cards = [], opts = {}) {
     if (/(thai|pad thai)/.test(raw)) return ['assets/food/pad_thai.jpg', 'assets/food/thai_curry.jpg'];
     if (/(seafood|fish|shrimp)/.test(raw)) return ['assets/food/seafood.jpg', 'assets/food/shrimp.jpg', 'assets/food/salmon.jpg'];
     if (/(burger|american|diner)/.test(raw)) return ['assets/food/burger.jpg', 'assets/food/fries.jpg', 'assets/food/fried_chicken.jpg'];
+    if (/(cafe|coffee|tea|bakery|breakfast)/.test(raw)) return ['assets/food/eggs_benedict.jpg', 'assets/food/french_toast.jpg', 'assets/food/pancakes.jpg'];
     return [];
   };
 
