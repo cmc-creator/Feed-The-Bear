@@ -78,7 +78,7 @@ const CUISINE_FAVORITE_DISHES = {
 
 const GENERIC_CUISINE_KEYS = new Set(['fast_food', 'fastfood', 'restaurant', 'default', 'food', 'amenity']);
 const PARKED_DOMAIN_RE = /expireddomains|hugedomains|sedo\.com|sedo\.net|afternic|dan\.com|parkingcrew|bodis\.com|parked\.com|domainmarket|undeveloped\.com|godaddy\.com\/domain|namecheap\.com\/market|premium[-_ ]?domain|domain[-_ ]?for[-_ ]?sale|buy[-_ ]?this[-_ ]?domain|this domain is for sale|this domain may be for sale/;
-const FOOD_VENUE_WORD_RE = /\b(cafe|café|coffee|restaurant|grill|kitchen|bar|pizza|taco|tacos|burger|bistro|diner|eatery|bakery|pub|brew|sushi|pho|noodle|bbq|steak|chicken|wings|donut|donuts|gelato|ice\s*cream|tea|cantina|taqueria|trattoria|ristorante|brasserie|gastropub|smokehouse|steakhouse|deli|sandwich|waffles|pancake|brunch|breakfast)\b/i;
+const FOOD_VENUE_WORD_RE = /\b(cafe|café|coffee|restaurant|grill|kitchen|bar|pizza|taco|tacos|burger|bistro|diner|eatery|bakery|pub|brew|sushi|pho|noodle|bbq|steak|chicken|wings|donut|donuts|gelato|ice\s*cream|tea|cantina|taqueria|trattoria|ristorante|brasserie|gastropub|smokehouse|steakhouse|deli|sandwich|waffles|pancake|brunch|breakfast|food\s*court|creamery|bagel|bagels|subs?)\b/i;
 const STREET_ONLY_NAME_RE = /^(n|s|e|w|north|south|east|west)?\s*[\w.'-]+(\s+[\w.'-]+)*\s+(road|rd|street|st|avenue|ave|boulevard|blvd|drive|dr|lane|ln|way|hwy|highway|pkwy|parkway|circle|cir|court|ct|terrace|ter|trail|trl|loop|place|pl)\.?$/i;
 
 function formatCuisineLabel (raw) {
