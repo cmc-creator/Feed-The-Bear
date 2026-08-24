@@ -253,31 +253,43 @@ module.exports = async function handler (req, res) {
   ];
 
   let websiteParked = website ? isJunkWebsiteUrl(website) : false;
+  const inspectWebsite = (website && !websiteParked)
+    ? scrapeWebsiteImage(website).catch(() => ({ parked: false, photoUrl: '' }))
+    : Promise.resolve(null);
 
-  for (const [source, fn] of providers) {
+  let photoUrl = '';
+  let source = 'none';
+  for (const [provider, fn] of providers) {
     try {
-      const photoUrl = await fn();
-      if (photoUrl && !looksLikeJunkImage(photoUrl)) {
-        // Found photos rarely change - cache at the edge for 7 days.
-        res.setHeader('Cache-Control', 'public, s-maxage=604800, stale-while-revalidate=86400');
-        return res.status(200).json({ found: true, photoUrl, source, websiteParked });
+      const next = await fn();
+      if (next && !looksLikeJunkImage(next)) {
+        photoUrl = next;
+        source = provider;
+        break;
       }
     } catch {
       /* try next provider */
     }
   }
 
-  if (website && !websiteParked) {
-    try {
-      const scraped = await scrapeWebsiteImage(website);
-      websiteParked = !!scraped?.parked;
-      if (scraped?.photoUrl && !looksLikeJunkImage(scraped.photoUrl)) {
-        res.setHeader('Cache-Control', 'public, s-maxage=604800, stale-while-revalidate=86400');
-        return res.status(200).json({ found: true, photoUrl: scraped.photoUrl, source: 'website', websiteParked });
+  let websiteInspected = false;
+  try {
+    const scraped = await inspectWebsite;
+    if (scraped) {
+      websiteInspected = true;
+      websiteParked = !!scraped.parked;
+      if (!photoUrl && scraped.photoUrl && !looksLikeJunkImage(scraped.photoUrl) && !websiteParked) {
+        photoUrl = scraped.photoUrl;
+        source = 'website';
       }
-    } catch {
-      /* fall through to miss */
     }
+  } catch {
+    /* ignore inspect failures */
+  }
+
+  if (photoUrl) {
+    res.setHeader('Cache-Control', 'public, s-maxage=604800, stale-while-revalidate=86400');
+    return res.status(200).json({ found: true, photoUrl, source, websiteParked, websiteInspected });
   }
 
   const keysConfigured = !!(process.env.GOOGLE_PLACES_API_KEY || process.env.FOURSQUARE_API_KEY || process.env.YELP_API_KEY);
@@ -288,6 +300,7 @@ module.exports = async function handler (req, res) {
     photoUrl: '',
     source: 'none',
     websiteParked,
+    websiteInspected,
     hint: keysConfigured ? undefined : 'No photo provider API key configured. Set FOURSQUARE_API_KEY, YELP_API_KEY, or GOOGLE_PLACES_API_KEY in Vercel env vars.',
   });
 };
