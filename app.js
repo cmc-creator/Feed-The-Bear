@@ -1246,7 +1246,7 @@ function openPersonalizeSettings () {
 
   document.getElementById('personalize-save-btn').onclick = () => {
     const choice = themeSel?.value || 'dark';
-    const nearbyRadius = Math.max(1, Math.min(5, Number(nearbyRadiusSel?.value) || 1));
+    const nearbyRadius = Math.max(1, Math.min(100, Number(nearbyRadiusSel?.value) || 25));
     state.settings.uiDensity = densitySel?.value || 'cozy';
     state.settings.uiCorners = cornersSel?.value || 'rounded';
     state.settings.uiMotion = motionSel?.value || 'playful';
@@ -3317,6 +3317,18 @@ async function discoverNearby () {
   const locLabel = document.getElementById('disc-location-label');
   if (locLabel) locLabel.textContent = ' Near your current location';
 
+  const discRadius = document.getElementById('disc-radius');
+  if (discRadius) {
+    const wanted = Math.round(getNearbyRadiusMeters());
+    const opts = [...discRadius.options].map(o => Number(o.value)).filter(n => Number.isFinite(n));
+    let best = opts[0], bestDiff = Infinity;
+    opts.forEach(v => {
+      const d = Math.abs(v - wanted);
+      if (d < bestDiff) { best = v; bestDiff = d; }
+    });
+    if (Number.isFinite(best)) discRadius.value = String(best);
+  }
+
   // Wire controls once
   _discWireControls();
 
@@ -3339,7 +3351,14 @@ function _discWireControls () {
     _discRenderLimit = DISC_PAGE_SIZE;
     _discApplyFilters();
   });
-  document.getElementById('disc-radius')?.addEventListener('change', () => _discFetch());
+  document.getElementById('disc-radius')?.addEventListener('change', () => {
+    const meters = Number(document.getElementById('disc-radius')?.value);
+    if (Number.isFinite(meters) && meters > 0) {
+      state.settings.nearbyRadiusMiles = Math.max(1, Math.min(100, Math.round((meters / 1609.34) * 10) / 10));
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+    }
+    _discFetch();
+  });
   document.getElementById('disc-refresh-btn')?.addEventListener('click', () => _discFetch());
 
   // Chip clicks (delegate since chips are dynamic)
@@ -3371,7 +3390,7 @@ async function _discFetch () {
   if (metaEl) metaEl.textContent = '';
 
   const { userLat: lat, userLng: lng } = state;
-  const radius = parseInt(document.getElementById('disc-radius')?.value) || 3219;
+  const radius = parseInt(document.getElementById('disc-radius')?.value) || 16093;
 
   try {
     const q = `[out:json][timeout:20];(node["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${radius},${lat},${lng});way["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${radius},${lat},${lng}););out center 250;`;
@@ -10631,14 +10650,14 @@ async function loadHomeDiscovery () {
   try {
     const { userLat: lat, userLng: lng } = state;
     const radiusMeters = Math.round(getNearbyRadiusMeters());
-    const q = `[out:json][timeout:15];(node["amenity"~"restaurant|cafe|fast_food|bar"](around:${radiusMeters},${lat},${lng}););out body 30;`;
+    const q = `[out:json][timeout:25];(node["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${radiusMeters},${lat},${lng});way["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${radiusMeters},${lat},${lng}););out center 80;`;
     const elementsRaw = await fetchOverpassElements(q, {
-      timeoutMs: 4500,
+      timeoutMs: 14000,
       nominatimFallback: true,
       lat,
       lng,
       radiusMeters,
-      limit: 30,
+      limit: 80,
     });
     const raw = (elementsRaw || []).filter(el => el.tags?.name);
     const withDist = raw.map(el => {
@@ -10646,7 +10665,9 @@ async function loadHomeDiscovery () {
       const elLon = el.lon ?? el.center?.lon;
       const d = (elLat != null && elLon != null) ? haversine(lat, lng, elLat, elLon) : Infinity;
       return { ...el, _dist: d };
-    }).sort((a, b) => a._dist - b._dist).slice(0, 12);
+    }).filter(el => Number.isFinite(el._dist) && el._dist <= radiusMeters)
+      .sort((a, b) => a._dist - b._dist)
+      .slice(0, 24);
 
     _homeDiscCache = { elements: withDist, lat, lng };
     _homeDiscCacheTime = Date.now();
