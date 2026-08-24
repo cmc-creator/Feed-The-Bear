@@ -196,6 +196,7 @@ function renderNearbyVisualCard ({
   isSaved = false,
   restaurantId = '',
   website = '',
+  websiteVerified = false,
   address = '',
   lat = null,
   lon = null,
@@ -216,7 +217,8 @@ function renderNearbyVisualCard ({
   const safeName = escHtml(name);
   const safeNameForClick = escJsArg(name || '');
   const safeCuisine = escJsArg(cuisine || '');
-  const websiteUrl = cleanVenueWebsite(savedRestaurant?.website || website || '');
+  const rawWebsiteUrl = cleanVenueWebsite(savedRestaurant?.website || website || '');
+  const websiteUrl = (isSaved || websiteVerified) ? rawWebsiteUrl : '';
   const safeAddressForClick = escJsArg(savedRestaurant?.address || address || '');
   const safeWebsiteForClick = escJsArg(websiteUrl || '');
   const prefillLat = Number.isFinite(savedRestaurant?.lat) ? Number(savedRestaurant.lat) : (Number.isFinite(lat) ? Number(lat) : null);
@@ -8449,6 +8451,7 @@ let _pendingAddPrefill = null;
 const _placePhotoCache = new Map();
 const _placePhotoPending = new Map();
 const _parkedWebsiteKeys = new Set();
+const _placePhotoMeta = new Map();
 
 function getPlacePhotoLookupKey (card = {}) {
   const name = normalizeName(card.name || '');
@@ -8474,18 +8477,20 @@ async function fetchPlacePhotoFromApi (card = {}) {
   if (website) params.set('website', website);
 
   let websiteParked = false;
+  let websiteChecked = false;
   let resp = await fetch(`/api/restaurant-image?${params.toString()}`);
-  if (resp.ok) {
-    const data = await resp.json();
-    websiteParked = !!data?.websiteParked;
-    const photoUrl = safeUrl(data?.photoUrl || '');
-    if (isLikelyRealPlacePhotoUrl(photoUrl)) return { photoUrl, websiteParked };
-  } else {
+  const restaurantImageIsJson = String(resp.headers.get('content-type') || '').includes('application/json');
+  if (restaurantImageIsJson) {
     try {
-      const miss = await resp.json();
-      websiteParked = !!miss?.websiteParked;
+      const data = await resp.json();
+      websiteChecked = true;
+      websiteParked = !!data?.websiteParked;
+      const photoUrl = safeUrl(data?.photoUrl || '');
+      if (resp.ok && isLikelyRealPlacePhotoUrl(photoUrl)) {
+        return { photoUrl, websiteParked, websiteChecked };
+      }
     } catch {
-      /* ignore non-JSON misses */
+      websiteChecked = false;
     }
   }
 
@@ -8493,9 +8498,9 @@ async function fetchPlacePhotoFromApi (card = {}) {
   if (resp.ok) {
     const data = await resp.json();
     const photoUrl = safeUrl(data?.photoUrl || '');
-    if (isLikelyRealPlacePhotoUrl(photoUrl)) return { photoUrl, websiteParked };
+    if (isLikelyRealPlacePhotoUrl(photoUrl)) return { photoUrl, websiteParked, websiteChecked };
   }
-  return { photoUrl: '', websiteParked };
+  return { photoUrl: '', websiteParked, websiteChecked };
 }
 
 function isLikelyRealPlacePhotoUrl (url = '') {
@@ -8612,6 +8617,10 @@ async function getOrFetchPlacePhoto (card = {}) {
         const api = await fetchPlacePhotoFromApi(card);
         url = api?.photoUrl || '';
         websiteParked = !!api?.websiteParked;
+        _placePhotoMeta.set(key, {
+          websiteParked,
+          websiteChecked: !!api?.websiteChecked,
+        });
       } catch {
         url = '';
       }
@@ -8683,8 +8692,14 @@ async function enrichNearbyCardsRealPhotos () {
     if (idx < 0) continue;
     const next = { ..._nearbyCards[idx] };
     let cardChanged = false;
-    if (_parkedWebsiteKeys.has(getPlacePhotoLookupKey(card))) {
+    const lookupKey = getPlacePhotoLookupKey(card);
+    const meta = _placePhotoMeta.get(lookupKey) || {};
+    if (_parkedWebsiteKeys.has(lookupKey) || meta.websiteParked) {
       next.website = '';
+      next.websiteVerified = false;
+      cardChanged = true;
+    } else if (meta.websiteChecked) {
+      next.websiteVerified = true;
       cardChanged = true;
     }
     if (url && isLikelyRealPlacePhotoUrl(url) && !hasReliableNearbyCardPhoto(_nearbyCards[idx])) {
