@@ -965,6 +965,7 @@
             <button class="decision-chip" data-group="miles" data-value="2" type="button">2 mi</button>
             <button class="decision-chip active" data-group="miles" data-value="5" type="button">5 mi</button>
             <button class="decision-chip" data-group="miles" data-value="10" type="button">10 mi</button>
+            <button class="decision-chip" data-group="miles" data-value="25" type="button">25 mi</button>
           </div>
         </div>
 
@@ -1511,9 +1512,11 @@
       </div>
       <select id="disc-radius" class="disc-radius-select" aria-label="Search radius">
         <option value="1609">1 mi</option>
-        <option value="3219" selected>2 mi</option>
+        <option value="3219">2 mi</option>
         <option value="8047">5 mi</option>
-        <option value="16093">10 mi</option>
+        <option value="16093" selected>10 mi</option>
+        <option value="40234">25 mi</option>
+        <option value="80467">50 mi</option>
       </select>
     </div>
 
@@ -1830,9 +1833,12 @@
           <select id="discover-radius" class="form-select" style="flex:1">
             <option value="402">Within 0.25 mi</option>
             <option value="805">Within 0.5 mi</option>
-            <option value="1609" selected>Within 1 mi</option>
+            <option value="1609">Within 1 mi</option>
             <option value="3219">Within 2 mi</option>
             <option value="8047">Within 5 mi</option>
+            <option value="16093" selected>Within 10 mi</option>
+            <option value="40234">Within 25 mi</option>
+            <option value="80467">Within 50 mi</option>
           </select>
           <button id="discover-search-btn" class="btn-sm btn-orange"> Search</button>
         </div>
@@ -2180,6 +2186,8 @@
             <option value="1609" selected>1 mi</option>
             <option value="3219">2 mi</option>
             <option value="8047">5 mi</option>
+            <option value="16093">10 mi</option>
+            <option value="40234">25 mi</option>
           </select>
           <button id="open-now-search-btn" class="btn-primary">Search</button>
         </div>
