@@ -73,11 +73,13 @@ const CUISINE_FAVORITE_DISHES = {
   desserts: ['Cheesecake', 'Molten Cake', 'Churros'],
   vegan: ['Cauliflower Wings', 'Falafel Wrap', 'Coconut Curry'],
   bar: ['Wings', 'Loaded Nachos', 'Craft Burger'],
-  pub: ['Fish and Chips', 'Shepherds Pie', 'Beer Battered Onion Rings'],
-  fast_food: ['Signature Combo', 'Crispy Fries', 'House Sauce'],
-  restaurant: ['Chef Special', 'House Favorite', 'Signature Dessert'],
-  default: ['House Favorite', 'Chef Special', 'Popular Plate'],
+  pub: ['Fish and Chips', 'Shepherds Pie', 'Beer Battered Onion Rings']
 };
+
+const GENERIC_CUISINE_KEYS = new Set(['fast_food', 'fastfood', 'restaurant', 'default', 'food', 'amenity']);
+const PARKED_DOMAIN_RE = /expireddomains|hugedomains|sedo\.com|sedo\.net|afternic|dan\.com|parkingcrew|bodis\.com|parked\.com|domainmarket|undeveloped\.com|godaddy\.com\/domain|namecheap\.com\/market|premium[-_ ]?domain|domain[-_ ]?for[-_ ]?sale|buy[-_ ]?this[-_ ]?domain|this domain is for sale|this domain may be for sale/;
+const FOOD_VENUE_WORD_RE = /\b(cafe|café|coffee|restaurant|grill|kitchen|bar|pizza|taco|tacos|burger|bistro|diner|eatery|bakery|pub|brew|sushi|pho|noodle|bbq|steak|chicken|wings|donut|donuts|gelato|ice\s*cream|tea|cantina|taqueria|trattoria|ristorante|brasserie|gastropub|smokehouse|steakhouse|deli|sandwich|waffles|pancake|brunch|breakfast)\b/i;
+const STREET_ONLY_NAME_RE = /^(n|s|e|w|north|south|east|west)?\s*[\w.'-]+(\s+[\w.'-]+)*\s+(road|rd|street|st|avenue|ave|boulevard|blvd|drive|dr|lane|ln|way|hwy|highway|pkwy|parkway|circle|cir|court|ct|terrace|ter|trail|trl|loop|place|pl)\.?$/i;
 
 function formatCuisineLabel (raw) {
   const s = String(raw || '').trim();
@@ -127,10 +129,38 @@ function nearbyPopularityLabel (distMeters, savedRestaurant = null) {
   const rating = Number(savedRestaurant?.myRating || savedRestaurant?.googleRating || 0);
   if (rating >= 4.6) return 'Very Popular';
   if (rating >= 4.2) return 'Trending';
-  if (Number.isFinite(distMeters) && distMeters <= 500) return 'Hot Nearby';
-  if (Number.isFinite(distMeters) && distMeters <= 1200) return 'Buzzing';
-  if (Number.isFinite(distMeters) && distMeters <= 2200) return 'Local Favorite';
-  return 'Neighborhood Pick';
+  return '';
+}
+
+function isJunkWebsiteUrl (url = '') {
+  const u = String(url || '').trim().toLowerCase();
+  if (!u) return true;
+  return PARKED_DOMAIN_RE.test(u);
+}
+
+function cleanVenueWebsite (url = '') {
+  const raw = String(url || '').trim();
+  if (!raw || isJunkWebsiteUrl(raw)) return '';
+  const safe = safeUrl(raw);
+  return safe && !isJunkWebsiteUrl(safe) ? safe : '';
+}
+
+function isCredibleVenueName (name = '', tags = {}) {
+  const n = String(name || '').trim();
+  if (n.length < 3) return false;
+  if (/^(unknown|unnamed|null|undefined|n\/a|none)$/i.test(n)) return false;
+  if (/^\d+$/.test(n)) return false;
+  const street = String(tags['addr:street'] || '').trim();
+  const houseStreet = [tags['addr:housenumber'], street].filter(Boolean).join(' ').trim();
+  if (street && normalizeName(n) === normalizeName(street)) return false;
+  if (houseStreet && normalizeName(n) === normalizeName(houseStreet)) return false;
+  if (STREET_ONLY_NAME_RE.test(n) && !FOOD_VENUE_WORD_RE.test(n)) return false;
+  return true;
+}
+
+function isCredibleFoodVenue (el = {}) {
+  const tags = el?.tags || {};
+  return isCredibleVenueName(tags.name, tags);
 }
 
 function favoriteDishesForSaved (restaurant) {
@@ -149,9 +179,10 @@ function favoriteDishesForSaved (restaurant) {
 }
 
 function favoriteDishesForNearby (cuisine = '', amenity = 'restaurant') {
-  const key = cuisineKey(cuisine || amenity || 'restaurant');
-  const list = CUISINE_FAVORITE_DISHES[key] || CUISINE_FAVORITE_DISHES.default;
-  return list.slice(0, 2);
+  const key = cuisineKey(cuisine || amenity || '');
+  if (!key || GENERIC_CUISINE_KEYS.has(key)) return [];
+  const list = CUISINE_FAVORITE_DISHES[key];
+  return list ? list.slice(0, 2) : [];
 }
 
 function renderNearbyVisualCard ({
@@ -176,16 +207,18 @@ function renderNearbyVisualCard ({
   const effectivePrice = Number(priceLevel) || estimatePriceLevel({ cuisine, amenity, savedRestaurant });
   const effectivePopularity = popularity || nearbyPopularityLabel(distMeters, savedRestaurant);
   const dishes = favoriteDishesForSaved(savedRestaurant) || favoriteDishesForNearby(cuisine, amenity);
-  const dishesLabel = dishes.length ? dishes.join(' • ') : 'House favorites';
+  const dishesHtml = dishes.length
+    ? `<div class="nearby-home-card-dishes">Favorite dishes: ${escHtml(dishes.join(' • '))}</div>`
+    : '';
   const fallbackTerm = `${name || ''} ${cuisineLabel || amenity || 'food'}`.trim();
   const localFallbackPhoto = safeUrl(getMoodFoodImageCandidates(fallbackTerm, key || name || 'nearby')[0] || '');
   const photo = safeUrl(photoUrl) || localFallbackPhoto;
   const safeName = escHtml(name);
   const safeNameForClick = escJsArg(name || '');
   const safeCuisine = escJsArg(cuisine || '');
-  const websiteUrl = safeUrl(savedRestaurant?.website || website || '');
+  const websiteUrl = cleanVenueWebsite(savedRestaurant?.website || website || '');
   const safeAddressForClick = escJsArg(savedRestaurant?.address || address || '');
-  const safeWebsiteForClick = escJsArg(savedRestaurant?.website || websiteUrl || '');
+  const safeWebsiteForClick = escJsArg(websiteUrl || '');
   const prefillLat = Number.isFinite(savedRestaurant?.lat) ? Number(savedRestaurant.lat) : (Number.isFinite(lat) ? Number(lat) : null);
   const prefillLon = Number.isFinite(savedRestaurant?.lng) ? Number(savedRestaurant.lng) : (Number.isFinite(lon) ? Number(lon) : null);
   const directionsUrl = buildGoogleDirectionsUrl({
@@ -198,27 +231,31 @@ function renderNearbyVisualCard ({
     name,
     address: savedRestaurant?.address || address || '',
   });
-  const popularityScore = Math.max(30, Math.min(98,
-    Math.round((effectivePopularity === 'Very Popular' ? 92
-      : effectivePopularity === 'Trending' ? 84
-        : effectivePopularity === 'Hot Nearby' ? 78
-          : effectivePopularity === 'Buzzing' ? 70
-            : effectivePopularity === 'Local Favorite' ? 62
-              : 54))));
+  const cardLink = menuUrl || directionsUrl || websiteUrl;
+  const popularityScore = effectivePopularity
+    ? Math.max(30, Math.min(98,
+      Math.round((effectivePopularity === 'Very Popular' ? 92 : 84))))
+    : 0;
+  const popBadgeHtml = effectivePopularity
+    ? `<span class="nearby-home-card-badge pop">${escHtml(effectivePopularity)}</span>`
+    : '';
+  const popMeterHtml = effectivePopularity
+    ? `<div class="nearby-home-card-pop-meter"><span style="width:${popularityScore}%"></span></div>`
+    : '';
 
-  return `<article class="nearby-home-card${isSaved ? ' saved' : ''}" data-nearby-key="${escHtml(key || `${name}-${distText}`)}" data-nearby-price="${effectivePrice}" data-nearby-popularity="${escHtml(effectivePopularity)}" data-card-link="${escHtml(websiteUrl || menuUrl || directionsUrl || '')}" role="link" tabindex="0" title="Open ${safeName}">
+  return `<article class="nearby-home-card${isSaved ? ' saved' : ''}" data-nearby-key="${escHtml(key || `${name}-${distText}`)}" data-nearby-price="${effectivePrice}" data-nearby-popularity="${escHtml(effectivePopularity)}" data-card-link="${escHtml(cardLink || '')}" role="link" tabindex="0" title="Open ${safeName}">
     <div class="nearby-home-card-media">
       <img class="nearby-home-card-photo" src="${photo}" alt="${escHtml(cuisineLabel)} food" loading="lazy" />
       <div class="nearby-home-card-badges">
         <span class="nearby-home-card-badge price">${'$'.repeat(Math.max(1, Math.min(4, effectivePrice)))}</span>
-        <span class="nearby-home-card-badge pop">${escHtml(effectivePopularity)}</span>
+        ${popBadgeHtml}
       </div>
     </div>
     <div class="nearby-home-card-body">
       <div class="nearby-home-card-name" title="${safeName}">${safeName}</div>
       <div class="nearby-home-card-meta">${escHtml(cuisineLabel)} • ${distText}</div>
-      <div class="nearby-home-card-pop-meter"><span style="width:${popularityScore}%"></span></div>
-      <div class="nearby-home-card-dishes">Favorite dishes: ${escHtml(dishesLabel)}</div>
+      ${popMeterHtml}
+      ${dishesHtml}
     </div>
     <div class="nearby-home-card-footer">
       ${isSaved
@@ -2796,7 +2833,7 @@ function chatResponse (userText) {
 }
 
 function getNearbyDiscoveryRows (limit = 12) {
-  const rows = Array.isArray(_homeDiscCache?.elements) ? _homeDiscCache.elements : [];
+  const rows = (Array.isArray(_homeDiscCache?.elements) ? _homeDiscCache.elements : []).filter(isCredibleFoodVenue);
   if (!rows.length) return [];
   return rows.slice(0, Math.max(1, Number(limit) || 12)).map((el, idx) => {
     const tags = el.tags || {};
@@ -2819,7 +2856,7 @@ function getNearbyDiscoveryRows (limit = 12) {
       amenity: tags.amenity || 'restaurant',
       status: 'want-to-try',
       priceRange: estimatePriceLevel({ tags, cuisine, amenity: tags.amenity || 'restaurant' }),
-      website: tags.website || tags['contact:website'] || tags.url || '',
+      website: cleanVenueWebsite(tags.website || tags['contact:website'] || tags.url || ''),
       address,
       lat,
       lng,
@@ -3411,7 +3448,7 @@ async function _discFetch () {
     });
 
     _discAllResults = (elementsRaw || [])
-      .filter(el => el.tags?.name)
+      .filter(isCredibleFoodVenue)
       .map(el => {
         const tags   = el.tags || {};
         const elLat  = el.lat ?? el.center?.lat;
@@ -3449,7 +3486,7 @@ async function _discFetch () {
           openNow,
           street,
           city,
-          website: tags.website || '',
+          website: cleanVenueWebsite(tags.website || ''),
           phone:   tags.phone || '',
           saved:   savedNames.has(normalizeName(tags.name)),
         };
@@ -8411,6 +8448,7 @@ let _nearbyBannerMsg = '';
 let _pendingAddPrefill = null;
 const _placePhotoCache = new Map();
 const _placePhotoPending = new Map();
+const _parkedWebsiteKeys = new Set();
 
 function getPlacePhotoLookupKey (card = {}) {
   const name = normalizeName(card.name || '');
@@ -8432,15 +8470,32 @@ async function fetchPlacePhotoFromApi (card = {}) {
     if (cityGuess) params.set('city', cityGuess);
   }
 
-  if (card.website) params.set('website', String(card.website));
+  const website = cleanVenueWebsite(card.website || '');
+  if (website) params.set('website', website);
 
+  let websiteParked = false;
   let resp = await fetch(`/api/restaurant-image?${params.toString()}`);
-  if (!resp.ok) {
-    resp = await fetch(`/api/place-photo?${params.toString()}`);
+  if (resp.ok) {
+    const data = await resp.json();
+    websiteParked = !!data?.websiteParked;
+    const photoUrl = safeUrl(data?.photoUrl || '');
+    if (isLikelyRealPlacePhotoUrl(photoUrl)) return { photoUrl, websiteParked };
+  } else {
+    try {
+      const miss = await resp.json();
+      websiteParked = !!miss?.websiteParked;
+    } catch {
+      /* ignore non-JSON misses */
+    }
   }
-  if (!resp.ok) return '';
-  const data = await resp.json();
-  return safeUrl(data?.photoUrl || '');
+
+  resp = await fetch(`/api/place-photo?${params.toString()}`);
+  if (resp.ok) {
+    const data = await resp.json();
+    const photoUrl = safeUrl(data?.photoUrl || '');
+    if (isLikelyRealPlacePhotoUrl(photoUrl)) return { photoUrl, websiteParked };
+  }
+  return { photoUrl: '', websiteParked };
 }
 
 function isLikelyRealPlacePhotoUrl (url = '') {
@@ -8452,6 +8507,7 @@ function isLikelyRealPlacePhotoUrl (url = '') {
   if (/(logo|icon|favicon|avatar|gravatar|sprite|placeholder|default[_-]?image|og-default|map[_-]?pin|marker)/i.test(raw)) {
     return false;
   }
+  if (PARKED_DOMAIN_RE.test(raw)) return false;
   return true;
 }
 
@@ -8551,8 +8607,11 @@ async function getOrFetchPlacePhoto (card = {}) {
   const pending = (async () => {
     try {
       let url = '';
+      let websiteParked = false;
       try {
-        url = await fetchPlacePhotoFromApi(card);
+        const api = await fetchPlacePhotoFromApi(card);
+        url = api?.photoUrl || '';
+        websiteParked = !!api?.websiteParked;
       } catch {
         url = '';
       }
@@ -8563,7 +8622,9 @@ async function getOrFetchPlacePhoto (card = {}) {
           url = '';
         }
       }
+      if (url && !isLikelyRealPlacePhotoUrl(url)) url = '';
       _placePhotoCache.set(key, url || '');
+      if (websiteParked) _parkedWebsiteKeys.add(key);
       return url || '';
     } catch {
       _placePhotoCache.set(key, '');
@@ -8618,12 +8679,23 @@ async function enrichNearbyCardsRealPhotos () {
   for (const r of results) {
     if (r.status !== 'fulfilled') continue;
     const { card, url } = r.value;
-    if (!url || !isLikelyRealPlacePhotoUrl(url)) continue;
     const idx = _nearbyCards.findIndex(c => String(c.key) === String(card.key));
     if (idx < 0) continue;
-    if (hasReliableNearbyCardPhoto(_nearbyCards[idx])) continue;
-    _nearbyCards[idx] = { ..._nearbyCards[idx], photoUrl: url, photoSource: 'place' };
-    changed = true;
+    const next = { ..._nearbyCards[idx] };
+    let cardChanged = false;
+    if (_parkedWebsiteKeys.has(getPlacePhotoLookupKey(card))) {
+      next.website = '';
+      cardChanged = true;
+    }
+    if (url && isLikelyRealPlacePhotoUrl(url) && !hasReliableNearbyCardPhoto(_nearbyCards[idx])) {
+      next.photoUrl = url;
+      next.photoSource = 'place';
+      cardChanged = true;
+    }
+    if (cardChanged) {
+      _nearbyCards[idx] = next;
+      changed = true;
+    }
   }
 
   if (changed) {
@@ -8643,7 +8715,11 @@ function getNearbyRadiusMeters () {
 function getFilteredNearbyCards (cards = _nearbyCards, mode = _nearbyFilterMode) {
   if (!Array.isArray(cards) || !cards.length) return [];
   if (mode === 'trending') {
-    return cards.filter(c => /Very Popular|Trending|Hot Nearby|Buzzing/i.test(String(c.popularity || '')));
+    return cards.filter(c => {
+      if (/Very Popular|Trending/i.test(String(c.popularity || ''))) return true;
+      const key = cuisineKey(c.cuisine || '');
+      return key && !GENERIC_CUISINE_KEYS.has(key) && !!CUISINE_FAVORITE_DISHES[key];
+    });
   }
   if (mode === 'budget') {
     return cards.filter(c => Number(c.priceLevel || 0) <= 2);
@@ -8731,7 +8807,9 @@ function setNearbyCards (cards = [], opts = {}) {
     });
   };
 
-  _nearbyCards = assignDiverseNearbyFallbackPhotos(Array.isArray(cards) ? cards : []);
+  _nearbyCards = assignDiverseNearbyFallbackPhotos(
+    (Array.isArray(cards) ? cards : []).filter(card => isCredibleVenueName(card?.name))
+  );
   _nearbyBannerMsg = String(opts.banner || '');
   renderNearbyCardsFromState();
   enrichNearbyCardsRealPhotos();
@@ -8801,7 +8879,7 @@ async function fetchOverpassElements (query, opts = {}) {
         clearTimeout(t);
         if (!resp.ok) throw new Error(`Overpass ${resp.status}`);
         const json = await resp.json();
-        const elements = json.elements || [];
+        const elements = (json.elements || []).filter(isCredibleFoodVenue);
         if (elements.length) return elements;
       } catch (err) {
         lastErr = err;
@@ -8868,21 +8946,25 @@ async function fetchNominatimNearbyElements (lat, lng, radiusMeters = 1609, limi
 
     const key = `${normalizeName(name)}|${nLat.toFixed(5)}|${nLng.toFixed(5)}`;
     if (seen.has(key)) return;
+
+    const tags = {
+      name,
+      amenity: String(item.type || 'restaurant').replace(/_/g, ' '),
+      cuisine: item.extratags?.cuisine || '',
+      opening_hours: item.extratags?.opening_hours || '',
+      website: cleanVenueWebsite(item.extratags?.website || ''),
+      phone: item.extratags?.phone || '',
+      'addr:street': item.address?.road || item.address?.pedestrian || item.address?.suburb || '',
+      'addr:housenumber': item.address?.house_number || '',
+      'addr:city': item.address?.city || item.address?.town || item.address?.village || item.address?.county || '',
+    };
+    if (!isCredibleVenueName(name, tags)) return;
     seen.add(key);
 
     merged.push({
       lat: nLat,
       lon: nLng,
-      tags: {
-        name,
-        amenity: String(item.type || 'restaurant').replace(/_/g, ' '),
-        cuisine: item.extratags?.cuisine || '',
-        opening_hours: item.extratags?.opening_hours || '',
-        website: item.extratags?.website || '',
-        phone: item.extratags?.phone || '',
-        'addr:street': item.address?.road || item.address?.pedestrian || item.address?.suburb || '',
-        'addr:city': item.address?.city || item.address?.town || item.address?.village || item.address?.county || '',
-      },
+      tags,
     });
   });
 
@@ -10659,7 +10741,7 @@ async function loadHomeDiscovery () {
       radiusMeters,
       limit: 80,
     });
-    const raw = (elementsRaw || []).filter(el => el.tags?.name);
+    const raw = (elementsRaw || []).filter(isCredibleFoodVenue);
     const withDist = raw.map(el => {
       const elLat = el.lat ?? el.center?.lat;
       const elLon = el.lon ?? el.center?.lon;
@@ -10735,6 +10817,7 @@ function renderNearbyHomeFallback (err = null) {
 
 function renderHomeDiscovery ({ elements }) {
   const list = document.getElementById('nearby-home-list');
+  elements = (elements || []).filter(isCredibleFoodVenue);
   if (!list || !elements.length) {
     hideBearSwipeHome();
     if (list) {
@@ -10767,7 +10850,7 @@ function renderHomeDiscovery ({ elements }) {
       lat: Number.isFinite(el.lat ?? el.center?.lat) ? Number(el.lat ?? el.center?.lat) : null,
       lon: Number.isFinite(el.lon ?? el.center?.lon) ? Number(el.lon ?? el.center?.lon) : null,
       address: [tags['addr:housenumber'], tags['addr:street'], tags['addr:city']].filter(Boolean).join(' '),
-      website: tags.website || tags['contact:website'] || tags.url || '',
+      website: cleanVenueWebsite(tags.website || tags['contact:website'] || tags.url || ''),
       priceLevel,
       popularity,
       isSaved,
@@ -10775,7 +10858,7 @@ function renderHomeDiscovery ({ elements }) {
       savedRestaurant,
     };
   });
-  setNearbyCards(cards);
+  setNearbyCards(cards.filter(card => isCredibleVenueName(card.name)));
 }
 
 async function loadAiRec (discData) {
@@ -10876,7 +10959,7 @@ async function runDiscover () {
       radiusMeters: radius,
       limit: 30,
     });
-    const elements = (elementsRaw || []).filter(el => el.tags?.name);
+    const elements = (elementsRaw || []).filter(isCredibleFoodVenue);
 
     if (!elements.length) {
       resultsEl.innerHTML = '<div class="discover-empty">No places found nearby. Try a larger radius.</div>';
@@ -12393,7 +12476,7 @@ async function runOpenNowSearch () {
 
   try {
     const elementsRaw = await fetchOverpassElements(query, { timeoutMs: 18000 });
-    const elements = (elementsRaw || []).filter(el => el.tags?.name);
+    const elements = (elementsRaw || []).filter(isCredibleFoodVenue);
 
     if (!elements.length) {
       resultsEl.innerHTML = '<div class="open-now-loading">No places found nearby. Try increasing the radius.</div>';

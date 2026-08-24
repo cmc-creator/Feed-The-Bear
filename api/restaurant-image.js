@@ -34,7 +34,18 @@ function safeHttpUrl (value = '') {
 }
 
 function looksLikeJunkImage (url = '') {
-  return /(logo|icon|favicon|avatar|sprite|placeholder|default[_-]?image|og-default|map[_-]?pin|marker)/i.test(url);
+  return /(logo|icon|favicon|avatar|sprite|placeholder|default[_-]?image|og-default|map[_-]?pin|marker|expireddomains|hugedomains|sedo\.|afternic|dan\.com\/|parkingcrew|bodis\.|parked\.com|domainmarket|undeveloped\.com|godaddy\.com\/domain|premium[-_ ]?domain|domain[-_ ]?for[-_ ]?sale|buy[-_ ]?this[-_ ]?domain)/i.test(url);
+}
+
+function isJunkWebsiteUrl (url = '') {
+  const u = String(url || '').toLowerCase();
+  if (!u) return true;
+  return /expireddomains|hugedomains|sedo\.com|sedo\.net|afternic|dan\.com|parkingcrew|bodis\.com|parked\.com|domainmarket|undeveloped\.com|godaddy\.com\/domain|namecheap\.com\/market|premium[-_ ]?domain|domain[-_ ]?for[-_ ]?sale|buy[-_ ]?this[-_ ]?domain/i.test(u);
+}
+
+function looksLikeParkedDomainPage (html = '') {
+  const h = String(html || '').toLowerCase();
+  return /premium domain|domain for sale|this domain is for sale|this domain may be for sale|expireddomains|hugedomains|afternic|parkingcrew|buy this domain|undeveloped\.com|godaddy domain broker/.test(h);
 }
 
 async function fetchWithTimeout (url, opts = {}, timeoutMs = 5000) {
@@ -165,19 +176,21 @@ function extractMetaImage (html = '', baseUrl = '') {
 }
 
 async function scrapeWebsiteImage (website = '') {
+  if (isJunkWebsiteUrl(website)) return { parked: true, photoUrl: '' };
   const url = safeHttpUrl(website);
-  if (!url) return '';
+  if (!url) return { parked: false, photoUrl: '' };
   const resp = await fetchWithTimeout(url, {
     headers: {
       'user-agent': 'FeedTheBearBot/1.0 (+https://github.com/cmc-creator/Feed-The-Bear)',
       accept: 'text/html,application/xhtml+xml'
     }
   });
-  if (!resp.ok) return '';
+  if (!resp.ok) return { parked: false, photoUrl: '' };
   const type = String(resp.headers.get('content-type') || '').toLowerCase();
-  if (!type.includes('text/html') && !type.includes('application/xhtml+xml')) return '';
+  if (!type.includes('text/html') && !type.includes('application/xhtml+xml')) return { parked: false, photoUrl: '' };
   const html = await resp.text();
-  return extractMetaImage(html, url);
+  if (looksLikeParkedDomainPage(html)) return { parked: true, photoUrl: '' };
+  return { parked: false, photoUrl: extractMetaImage(html, url) };
 }
 
 /* ── 5. Wikipedia (landmarks only) ──────────────────────────── */
@@ -236,9 +249,10 @@ module.exports = async function handler (req, res) {
     ['google',    () => googlePlacesPhoto({ name, lat, lon })],
     ['foursquare', () => foursquarePhoto({ name, lat, lon })],
     ['yelp',      () => yelpPhoto({ name, lat, lon })],
-    ['website',   () => scrapeWebsiteImage(website)],
     ['wikipedia', () => wikiGeoImage({ name, lat, lon })],
   ];
+
+  let websiteParked = website ? isJunkWebsiteUrl(website) : false;
 
   for (const [source, fn] of providers) {
     try {
@@ -246,10 +260,23 @@ module.exports = async function handler (req, res) {
       if (photoUrl && !looksLikeJunkImage(photoUrl)) {
         // Found photos rarely change - cache at the edge for 7 days.
         res.setHeader('Cache-Control', 'public, s-maxage=604800, stale-while-revalidate=86400');
-        return res.status(200).json({ found: true, photoUrl, source });
+        return res.status(200).json({ found: true, photoUrl, source, websiteParked });
       }
     } catch {
       /* try next provider */
+    }
+  }
+
+  if (website && !websiteParked) {
+    try {
+      const scraped = await scrapeWebsiteImage(website);
+      websiteParked = !!scraped?.parked;
+      if (scraped?.photoUrl && !looksLikeJunkImage(scraped.photoUrl)) {
+        res.setHeader('Cache-Control', 'public, s-maxage=604800, stale-while-revalidate=86400');
+        return res.status(200).json({ found: true, photoUrl: scraped.photoUrl, source: 'website', websiteParked });
+      }
+    } catch {
+      /* fall through to miss */
     }
   }
 
@@ -260,6 +287,7 @@ module.exports = async function handler (req, res) {
     found: false,
     photoUrl: '',
     source: 'none',
+    websiteParked,
     hint: keysConfigured ? undefined : 'No photo provider API key configured. Set FOURSQUARE_API_KEY, YELP_API_KEY, or GOOGLE_PLACES_API_KEY in Vercel env vars.',
   });
 };
