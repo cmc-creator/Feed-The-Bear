@@ -1355,6 +1355,9 @@ function enableLocation () {
       updateLocationBtn();
       hideBanner('location-banner');
       renderCards();
+      renderTodayStatusRow();
+      // Decision Mode ignores distance without location, so refresh an open shortlist.
+      if (!document.getElementById('decision-mode-overlay')?.classList.contains('hidden')) runDecisionMode();
       showToast(' Location enabled', 'You\'ll get a nudge when you\'re near spots on your list!', 'success');
       // Request notification permission
       if ('Notification' in window && Notification.permission === 'default') {
@@ -2732,7 +2735,7 @@ function renderAll () {
   updateLocationBanner();
   // Home sections are isolated: a failure in one must never cascade and
   // abort renderAll (which would leave later init wiring unattached).
-  [renderWeeklyGoal, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
+  [renderTodayStatusRow, renderWeeklyGoal, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
     .forEach(fn => { try { fn(); } catch (err) { console.error(`${fn.name} failed:`, err); } });
 }
 
@@ -4423,7 +4426,14 @@ function renderDecisionModeResults (shortlist = []) {
     return;
   }
 
-  out.innerHTML = shortlist.map((item, idx) => {
+  // Without location the distance chips do nothing, so say so instead of
+  // quietly ranking a far-away spot as the winner.
+  const locationNotice = state.locationEnabled ? '' : `<div class="decision-location-notice">
+      <span>Distance isn't counted yet. Turn on location so your ${Number(_decisionModeState.miles || 5)} mi limit applies.</span>
+      <button class="btn-secondary btn-sm decision-location-btn" type="button">Use My Location</button>
+    </div>`;
+
+  out.innerHTML = locationNotice + shortlist.map((item, idx) => {
     const r = item.r;
     const rankLabel = idx === 0 ? 'Winner' : `Option ${idx + 1}`;
     const distText = Number.isFinite(item.distance) ? fmtDist(item.distance) : 'distance n/a';
@@ -6074,6 +6084,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('decision-mode-run-btn')?.addEventListener('click', runDecisionMode);
   document.getElementById('decision-mode-results')?.addEventListener('click', e => {
+    if (e.target.closest('.decision-location-btn')) { enableLocation(); return; }
     const btn = e.target.closest('.decision-result-action[data-action][data-id]');
     if (!btn) return;
     handleDecisionModeActionClick(btn);

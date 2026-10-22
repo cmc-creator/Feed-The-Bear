@@ -1181,6 +1181,30 @@ button:focus-visible,
 }
 .modal-header h2 { font-size: 1.2rem; font-weight: 700; }
 
+/* These modals place their content directly in the card with no padded
+   wrapper, so it ran edge to edge. Pad the card and pull the header back
+   out to full width so it matches the wrapped modals. */
+:is(#tonight-overlay, #challenge-overlay, #dish-board-overlay, #shared-manage-overlay,
+    #smart-planner-overlay, #decision-mode-overlay, #share-highlights-overlay,
+    #smart-itinerary-overlay, #dinner-rooms-overlay, #command-palette-overlay,
+    #compare-overlay, #budget-overlay, #profile-overlay, #wrap-overlay, #import-overlay,
+    #craving-overlay, #dish-overlay, #review-overlay, #friends-overlay, #challenges-overlay,
+    #debrief-overlay, #ai-panel-overlay, #export2-overlay, #route-overlay,
+    #achievements-overlay, #swipe-overlay, #spin-overlay, #travel-overlay, #digest-overlay,
+    #open-now-overlay, #duel-overlay, #bingo-overlay, #fortune-overlay, #moodcal-overlay) .modal-card {
+  padding: 0 24px 24px;
+}
+:is(#tonight-overlay, #challenge-overlay, #dish-board-overlay, #shared-manage-overlay,
+    #smart-planner-overlay, #decision-mode-overlay, #share-highlights-overlay,
+    #smart-itinerary-overlay, #dinner-rooms-overlay, #command-palette-overlay,
+    #compare-overlay, #budget-overlay, #profile-overlay, #wrap-overlay, #import-overlay,
+    #craving-overlay, #dish-overlay, #review-overlay, #friends-overlay, #challenges-overlay,
+    #debrief-overlay, #ai-panel-overlay, #export2-overlay, #route-overlay,
+    #achievements-overlay, #swipe-overlay, #spin-overlay, #travel-overlay, #digest-overlay,
+    #open-now-overlay, #duel-overlay, #bingo-overlay, #fortune-overlay, #moodcal-overlay) .modal-card > .modal-header {
+  margin: 0 -24px 16px;
+}
+
 /* ── Form ────────────────────────────────────────────────── */
 #restaurant-form { padding: 20px 24px 24px; }
 .form-grid {
@@ -2147,6 +2171,20 @@ body.light-mode .mobile-bottom-nav { background: rgba(255,255,255,.98); }
 body.light-mode .bulk-bar { background: #fff; }
 body.light-mode input, body.light-mode select, body.light-mode textarea { background: var(--surface2); color: var(--text); }
 body.light-mode .modal-card { background: var(--surface); }
+/* The wood-gradient header kept its dark fill on the white light-mode card,
+   leaving the dark title text unreadable. Match the card instead. */
+body.light-mode .modal-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 14px;
+}
+/* The upgrade and auth cards stay dark in light mode, so their headers do too. */
+body.light-mode :is(.upgrade-card, .auth-card) .modal-header {
+  background: linear-gradient(180deg, rgba(71,48,31,.95), rgba(51,34,24,.95));
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+body.light-mode .upgrade-card .modal-header h2 { color: #ffe9cd; }
 body.light-mode .today-status-pill {
   background: rgba(20,13,9,.82);
   border-color: rgba(255,226,188,.3);
@@ -6420,6 +6458,18 @@ body.light-mode .today-vibe-pill {
   display: grid;
   gap: 8px;
 }
+.decision-location-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  font-size: .82rem;
+  color: var(--text-dim);
+}
 .decision-result-card {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -7610,6 +7660,14 @@ body.light-mode .aar-icon {
     linear-gradient(165deg, rgba(69,45,30,.96), rgba(34,22,16,.97));
   box-shadow: 0 18px 40px rgba(0,0,0,.5);
 }
+/* Cream text needs the wood card, so keep it in Light Mode too. */
+body.light-mode .auth-card {
+  background:
+    linear-gradient(rgba(50,34,24,.78), rgba(40,27,20,.84)),
+    url('assets/textures/wood.jpg') center/cover no-repeat,
+    linear-gradient(165deg, rgba(69,45,30,.96), rgba(34,22,16,.97));
+}
+body.light-mode .auth-card .form-label { color: #e3d1b6; }
 .auth-body { padding: 8px 24px 28px; }
 .auth-title {
   font-size: 1.28rem;
