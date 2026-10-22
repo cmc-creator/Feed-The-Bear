@@ -48,6 +48,15 @@ function looksLikeParkedDomainPage (html = '') {
   return /premium domain|domain for sale|this domain is for sale|this domain may be for sale|expireddomains|hugedomains|afternic|parkingcrew|buy this domain|undeveloped\.com|godaddy domain broker/.test(h);
 }
 
+// Providers fail quietly so the next one can try, but a bad key or a retired
+// endpoint should still be visible in the Vercel logs.
+async function providerFail (provider, step, resp) {
+  let detail = '';
+  try { detail = (await resp.text()).slice(0, 200); } catch { /* ignore */ }
+  console.warn(`[FTB] restaurant-image ${provider} ${step} HTTP ${resp.status}: ${detail}`);
+  return '';
+}
+
 async function fetchWithTimeout (url, opts = {}, timeoutMs = 5000) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -80,7 +89,7 @@ async function googlePlacesPhoto ({ name, lat, lon }) {
     },
     body: JSON.stringify(body),
   });
-  if (!searchResp.ok) return '';
+  if (!searchResp.ok) return providerFail('google', 'search', searchResp);
   const searchJson = await searchResp.json();
   const photoName = searchJson?.places?.[0]?.photos?.[0]?.name || '';
   if (!photoName) return '';
@@ -88,7 +97,7 @@ async function googlePlacesPhoto ({ name, lat, lon }) {
   // Resolve the media redirect server-side so the returned URL has no API key in it.
   const mediaUrl = `https://places.googleapis.com/v1/${photoName}/media?key=${key}&maxWidthPx=900&skipHttpRedirect=true`;
   const mediaResp = await fetchWithTimeout(mediaUrl);
-  if (!mediaResp.ok) return '';
+  if (!mediaResp.ok) return providerFail('google', 'media', mediaResp);
   const mediaJson = await mediaResp.json();
   return safeHttpUrl(mediaJson?.photoUri || '');
 }
@@ -109,7 +118,7 @@ async function foursquarePhoto ({ name, lat, lon }) {
 
   const headers = { Accept: 'application/json', Authorization: key };
   const searchResp = await fetchWithTimeout(search.toString(), { headers });
-  if (!searchResp.ok) return '';
+  if (!searchResp.ok) return providerFail('foursquare', 'search', searchResp);
   const searchJson = await searchResp.json();
   const fsqId = searchJson?.results?.[0]?.fsq_id || '';
   if (!fsqId) return '';
@@ -118,7 +127,7 @@ async function foursquarePhoto ({ name, lat, lon }) {
     `https://api.foursquare.com/v3/places/${fsqId}/photos?limit=1&sort=POPULAR`,
     { headers }
   );
-  if (!photosResp.ok) return '';
+  if (!photosResp.ok) return providerFail('foursquare', 'photos', photosResp);
   const photos = await photosResp.json();
   const p = Array.isArray(photos) ? photos[0] : null;
   if (!p?.prefix || !p?.suffix) return '';
@@ -140,7 +149,7 @@ async function yelpPhoto ({ name, lat, lon }) {
   const resp = await fetchWithTimeout(search.toString(), {
     headers: { Accept: 'application/json', Authorization: `Bearer ${key}` },
   });
-  if (!resp.ok) return '';
+  if (!resp.ok) return providerFail('yelp', 'search', resp);
   const json = await resp.json();
   return safeHttpUrl(json?.businesses?.[0]?.image_url || '');
 }
@@ -267,8 +276,8 @@ module.exports = async function handler (req, res) {
         source = provider;
         break;
       }
-    } catch {
-      /* try next provider */
+    } catch (err) {
+      console.warn(`[FTB] restaurant-image ${provider} error: ${err?.message || err}`);
     }
   }
 
