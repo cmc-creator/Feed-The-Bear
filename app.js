@@ -235,7 +235,7 @@ function renderNearbyVisualCard ({
   const dishesHtml = dishes.length
     ? `<div class="nearby-home-card-dishes">Favorite dishes: ${escHtml(dishes.join(' • '))}</div>`
     : '';
-  const photo = safeUrl(photoUrl) || localNearbyFoodPhoto(cuisine, amenity, key || name || 'nearby');
+  const photo = hasReliableNearbyCardPhoto({ photoUrl }) ? safeUrl(photoUrl) : '';
   const safeName = escHtml(name);
   const safeNameForClick = escJsArg(name || '');
   const safeCuisine = escJsArg(cuisine || '');
@@ -267,7 +267,8 @@ function renderNearbyVisualCard ({
 
   return `<article class="nearby-home-card${isSaved ? ' saved' : ''}" data-nearby-key="${escHtml(key || `${name}-${distText}`)}" data-nearby-price="${effectivePrice}" data-nearby-popularity="${escHtml(effectivePopularity)}" data-card-link="${escHtml(cardLink || '')}" role="link" tabindex="0" title="Open ${safeName}">
     <div class="nearby-home-card-media">
-      <img class="nearby-home-card-photo" src="${photo}" alt="${escHtml(cuisineLabel)} food" loading="lazy" />
+      <div class="nearby-home-card-photo-empty"${photo ? ' style="display:none"' : ''}>Restaurant photo unavailable</div>
+      ${photo ? `<img class="nearby-home-card-photo" src="${escHtml(photo)}" alt="Photo of ${safeName}" loading="lazy" onerror="this.previousElementSibling.style.display='grid';this.remove()" />` : ''}
       <div class="nearby-home-card-badges">
         ${effectivePrice ? `<span class="nearby-home-card-badge price">${'$'.repeat(effectivePrice)}</span>` : ''}
         ${popBadgeHtml}
@@ -8549,6 +8550,7 @@ function hasReliableNearbyCardPhoto (card = {}) {
 
   // Local food assets are acceptable placeholders, but not "proper place" photos.
   if (/^(\.\/)?assets\/food\//i.test(raw)) return false;
+  if (/unsplash\.com|loremflickr\.com|picsum\.photos/i.test(safe)) return false;
 
   if (/^https?:\/\//i.test(safe)) return isLikelyRealPlacePhotoUrl(safe);
   return true;
@@ -8695,21 +8697,22 @@ function syncSwipeDeckPhotosFromNearby () {
 async function enrichNearbyCardsRealPhotos () {
   const candidates = (_nearbyCards || [])
     .filter(c => !hasReliableNearbyCardPhoto(c))
-    .filter(c => !c.isSaved)
     .slice(0, 24);
 
   if (!candidates.length) return;
 
-  // Small batches so we do not trip provider rate limits (Yelp ~5 QPS).
-  const results = [];
+  // Render each small batch immediately; slow later lookups must not hide
+  // photos already found for the first visible restaurants.
   for (let i = 0; i < candidates.length; i += 3) {
     const batch = candidates.slice(i, i + 3);
-    const settled = await Promise.allSettled(
+    const results = await Promise.allSettled(
       batch.map(async card => ({ card, url: await getOrFetchPlacePhoto(card) }))
     );
-    results.push(...settled);
+    applyNearbyPhotoResults(results);
   }
+}
 
+function applyNearbyPhotoResults (results) {
   let changed = false;
   for (const r of results) {
     if (r.status !== 'fulfilled') continue;
