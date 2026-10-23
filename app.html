@@ -347,6 +347,7 @@
 
     <div class="header-actions">
       <!-- Always-visible: theme, voice, add, chat -->
+      <button id="grizzly-pill" class="grizzly-pill hidden" type="button" data-upsell="general">Go Grizzly</button>
       <button id="theme-toggle-btn" class="icon-btn" title="Toggle light/dark theme">
         <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
@@ -658,6 +659,19 @@
           <div id="ai-rec-text" class="ai-rec-text">Thinking…</div>
         </div>
         <button id="ai-rec-refresh-btn" class="ai-rec-refresh" title="Refresh recommendation">↻</button>
+      </div>
+      <!-- Go Grizzly: free users only -->
+      <div id="grizzly-home" class="grizzly-home home-module hidden" aria-label="Go Grizzly">
+        <div class="gz-top"><span class="gz-badge">GRIZZLY</span><button type="button" class="gz-snooze" aria-label="Not now">✕</button></div>
+        <div class="gz-title">Feed the bear without limits</div>
+        <div class="gz-meter" aria-hidden="true"><span></span></div>
+        <div class="gz-meter-label"></div>
+        <ul class="gz-perks">
+          <li>Unlimited spots, synced on every device</li>
+          <li>Byte Cub AI: picks, summaries, and what to order</li>
+          <li>Restaurant Duel verdicts and your Year in Review</li>
+        </ul>
+        <button type="button" class="btn-primary gz-cta" data-upsell="home">Go Grizzly · about $4.49/mo</button>
       </div>
       <div class="home-quick-actions home-module" id="home-quick-actions" aria-label="Quick actions">
         <button class="home-quick-btn" id="home-quick-justate-btn" type="button">

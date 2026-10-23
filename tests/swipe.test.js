@@ -13,11 +13,24 @@ const { BASE, SHOTS, check, launch, newPage, finish } = require('./lib');
   check(await mod.isVisible(), 'Bear Swipe shows on home');
   check(/Right.*if you'd eat it.*left.*if not/i.test(await mod.locator('.bs-sub').innerText()), 'explains what swiping does');
 
+  // Wikimedia sometimes throttles data-centre traffic (CI); the app swaps in
+  // another photo when one fails, so allow time for that.
   const loaded = await p.waitForFunction(() => {
     const img = document.querySelector('#bear-swipe-home .bs-top .bs-photo');
     return img && img.complete && img.naturalWidth > 0;
-  }, null, { timeout: 15000 }).then(() => true).catch(() => false);
-  check(loaded, 'first dish photo loads from Wikimedia');
+  }, null, { timeout: 30000 }).then(() => true).catch(() => false);
+  check(loaded, `a dish photo loads from Wikimedia (swapped ${await p.evaluate(() => BearSwipe._state().failed)} broken)`);
+
+  // A photo that fails to load is replaced rather than shown broken.
+  const swapped = await p.evaluate(async () => {
+    const before = BearSwipe._state().deck[BearSwipe._state().index];
+    const img = document.querySelector('.bs-top .bs-photo');
+    img.dispatchEvent(new Event('error'));
+    await new Promise(r => setTimeout(r, 400));
+    const after = BearSwipe._state().deck[BearSwipe._state().index];
+    return before.url !== after.url && document.querySelector('.bs-top .bs-photo')?.getAttribute('src') === after.url;
+  });
+  check(swapped, 'a broken photo is swapped for another');
   const first = await p.evaluate(() => { const d = BearSwipe._state().deck; return { n: d.length, dishes: new Set(d.map(x => x.dish)).size, credit: document.querySelector('.bs-top .bs-credit')?.textContent }; });
   check(first.n === 10 && first.dishes === 10, `a round is 10 different dishes (${first.n}, ${first.dishes} unique)`);
   check(/^Photo: .+ · .+/.test(first.credit || ''), `each card credits the photo ("${first.credit}")`);

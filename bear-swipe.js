@@ -112,8 +112,31 @@ window.BearSwipe = (() => {
     els.stage.classList.remove('hidden');
     els.actions.classList.remove('hidden');
     renderProgress();
-    bindDrag(els.stage.querySelector('.bs-top'));
+    const top = els.stage.querySelector('.bs-top');
+    bindDrag(top);
+    top?.querySelector('.bs-photo')?.addEventListener('error', () => replaceBrokenPhoto(d), { once: true });
     preload(index + 1);
+  }
+
+  // A photo that fails to load (Wikimedia can throttle) is swapped for another
+  // photo of the same dish, or another dish, instead of showing a broken card.
+  const failedUrls = new Set();
+  let swapsThisRound = 0;
+  async function replaceBrokenPhoto (broken) {
+    if (deck[index] !== broken) return;
+    failedUrls.add(broken.url);
+    if (++swapsThisRound > 8) {
+      els.stage.innerHTML = '<div class="bs-loading">Dish photos are having trouble loading. Tap ↻ to try again.</div>';
+      return;
+    }
+    const photos = await loadPhotos();
+    const inDeck = new Set(deck.map(x => x.dish));
+    const sameDish = photos.find(p => p.dish === broken.dish && !failedUrls.has(p.url));
+    const otherDish = photos.find(p => !inDeck.has(p.dish) && !failedUrls.has(p.url));
+    const swap = sameDish || otherDish;
+    if (swap) deck[index] = { ...swap };
+    else deck.splice(index, 1);
+    render();
   }
 
   /* ── Effects ─────────────────────────────────────────────── */
@@ -309,8 +332,9 @@ window.BearSwipe = (() => {
       els.stage.innerHTML = '<div class="bs-loading">Couldn\'t load dishes. Check your connection and tap ↻.</div>';
       return;
     }
-    deck = buildDeck(photos);
+    deck = buildDeck(photos.filter(p => !failedUrls.has(p.url)));
     index = 0;
+    swapsThisRound = 0;
     round = { yes: [], no: [] };
     render();
   }
@@ -358,5 +382,5 @@ window.BearSwipe = (() => {
     start();
   }
 
-  return { init, start, choose, loadPhotos, _state: () => ({ deck, index, round }) };
+  return { init, start, choose, loadPhotos, _state: () => ({ deck, index, round, failed: failedUrls.size }) };
 })();
