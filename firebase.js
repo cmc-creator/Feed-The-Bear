@@ -235,6 +235,15 @@ function initFirebaseAuth () {
         localStorage.setItem('ftb_plan_v1', window._ftbPlan);
         localStorage.setItem('ftb_uid_v1',  user.uid);
       } catch { window._ftbPlan = 'free'; }
+      if (typeof renderGrizzlyUi === 'function') renderGrizzlyUi();
+
+      // They tapped Upgrade before signing in: bring them straight back.
+      let pendingUpgrade = null;
+      try { pendingUpgrade = sessionStorage.getItem('ftb_pending_upgrade'); sessionStorage.removeItem('ftb_pending_upgrade'); } catch { /* private mode */ }
+      if (pendingUpgrade && window._ftbPlan !== 'grizzly') {
+        setTimeout(() => openUpgradeModal({ key: 'resume', period: pendingUpgrade, title: "You're in! One tap to Grizzly",
+          body: 'Unlimited spots, Byte Cub AI, Year in Review, and your food life synced on every device.' }), 700);
+      }
 
       // Restore restaurants on sign-in for ALL users (never lock anyone out
       // of data they previously synced). Ongoing background sync/uploads stay
@@ -418,17 +427,24 @@ async function _handleGoogleAuth () {
 }
 
 // ─── UPGRADE MODAL ────────────────────────────────────────────
+// Accepts a feature name, or a pitch { title, body, period } so each locked
+// feature can sell what you'd get instead of a generic "Upgrade" screen.
 function openUpgradeModal (highlightFeature) {
   const overlay = document.getElementById('upgrade-overlay');
   if (!overlay) return;
+  const pitch = highlightFeature && typeof highlightFeature === 'object' ? highlightFeature : null;
+  const title = document.getElementById('upgrade-title');
+  if (title) title.textContent = pitch?.title || 'Upgrade to Grizzly';
   const hl = document.getElementById('upgrade-feature-highlight');
+  const text = pitch ? pitch.body : (typeof highlightFeature === 'string' && highlightFeature ? `Unlock: ${highlightFeature}` : '');
   if (hl) {
-    hl.textContent = highlightFeature ? `Unlock: ${highlightFeature}` : '';
-    hl.classList.toggle('hidden', !highlightFeature);
+    hl.textContent = text || '';
+    hl.classList.toggle('hidden', !text);
   }
   overlay.classList.remove('hidden');
   document.body.classList.add('overlay-open');
-  _setUpgradePlan('yearly'); // default to yearly (best value)
+  _setUpgradePlan(pitch?.period || 'yearly'); // default to yearly (best value)
+  if (typeof trackProductEvent === 'function') trackProductEvent('upgrade_modal_opened', { feature: pitch?.key || String(highlightFeature || 'general').slice(0, 40) });
 }
 
 function closeUpgradeModal () {
@@ -449,11 +465,14 @@ function _setUpgradePlan (period) {
 async function _handleUpgradeClick () {
   const user = _auth?.currentUser;
   if (!user) {
+    // Remember the intent so signing in brings them straight back here.
+    try { sessionStorage.setItem('ftb_pending_upgrade', document.getElementById('upgrade-cta-btn')?.dataset.period || 'yearly'); } catch { /* private mode */ }
     closeUpgradeModal();
     setTimeout(openAuthModal, 200);
-    showToast('Sign in first', 'Create a free account, then upgrade to Grizzly.', 'info');
+    showToast('One quick step', "Create a free account and you'll come right back to upgrade.", 'info');
     return;
   }
+  if (typeof trackProductEvent === 'function') trackProductEvent('upgrade_cta_clicked', { period: document.getElementById('upgrade-cta-btn')?.dataset.period || 'yearly' });
   const btn    = document.getElementById('upgrade-cta-btn');
   const period = btn?.dataset.period || 'yearly';
   const priceId = period === 'yearly' ? _PRICES.yearly : _PRICES.monthly;
@@ -489,6 +508,7 @@ function updateAuthUI (user) {
     el('account-plan-badge').textContent = plan === 'grizzly' ? 'Grizzly' : 'Cub - Complimentary';
     el('account-plan-badge').className   = 'account-plan-badge' + (plan === 'grizzly' ? ' badge-grizzly' : ' badge-cub');
   }
+  if (typeof renderGrizzlyUi === 'function') renderGrizzlyUi();
 }
 
 // ─── WIRE UP LISTENERS ────────────────────────────────────────

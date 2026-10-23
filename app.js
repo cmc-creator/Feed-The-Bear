@@ -1787,9 +1787,8 @@ function getFiltered () {
   }
   // Cuisine
   if (state.filter.cuisine) {
-    list = list.filter(r =>
-      (r.cuisine||'').toLowerCase() === state.filter.cuisine.toLowerCase()
-    );
+    const want = cuisineFilterKey(state.filter.cuisine);
+    list = list.filter(r => cuisineFilterKey(r.cuisine) === want);
   }
   // Price
   if (state.filter.price) {
@@ -1856,21 +1855,43 @@ function renderStats () {
   document.getElementById('stats-bar')?.classList.toggle('hidden', all.length === 0);
 }
 
+// "ice_cream;coffee_shop" (OpenStreetMap) and "Ice Cream" (saved) compare equal.
+function cuisineFilterKey (raw) {
+  return String(raw || '').split(';')[0].replace(/_/g, ' ').trim().toLowerCase();
+}
+function cuisineFilterLabel (key) {
+  return String(key || '').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// The filter used to list only cuisines from your saved spots, so with one
+// American spot it offered only "American". List what's near you too, with
+// counts, and filter both your list and Near You Now.
 function renderCuisineFilter () {
   const sel = document.getElementById('filter-cuisine');
-  const current = sel.value;
-  const cuisines = [...new Set(
-    state.restaurants.map(r => r.cuisine).filter(Boolean)
-  )].sort();
+  const current = state.filter.cuisine || sel.value;
+  const count = list => list.reduce((m, k) => { if (k) m[k] = (m[k] || 0) + 1; return m; }, {});
+  const saved = count(state.restaurants.map(r => cuisineFilterKey(r.cuisine)));
+  const nearby = count((_homeDiscCache?.elements || []).map(el => cuisineFilterKey(el.tags?.cuisine)));
+  const sorted = obj => Object.entries(obj).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
-  // rebuild options
   while (sel.options.length > 1) sel.remove(1);
-  cuisines.forEach(c => {
-    const o = document.createElement('option');
-    o.value = c; o.textContent = `${cuisineEmoji(c)} ${c}`;
-    sel.appendChild(o);
-  });
-  sel.value = current;
+  sel.querySelectorAll('optgroup').forEach(g => g.remove());
+  const group = (label, entries) => {
+    if (!entries.length) return;
+    const g = document.createElement('optgroup');
+    g.label = label;
+    entries.forEach(([key, n]) => {
+      const o = document.createElement('option');
+      o.value = key;
+      o.textContent = `${cuisineFilterLabel(key)} (${n})`;
+      g.appendChild(o);
+    });
+    sel.appendChild(g);
+  };
+  group('Your spots', sorted(saved));
+  group('Near you', sorted(nearby).filter(([key]) => !saved[key]));
+  sel.value = [...sel.options].some(o => o.value === current) ? current : '';
+  if (sel.value !== current) state.filter.cuisine = sel.value;
 }
 
 function renderCards () {
@@ -2590,7 +2611,7 @@ function handleFormSubmit (e) {
   // Free plan: cap at 15 restaurants
   if (isNew && typeof isPremium === 'function' && !isPremium() && state.restaurants.length >= FREE_RESTAURANT_LIMIT) {
     showToast('Cub limit reached', `Cub includes up to ${FREE_RESTAURANT_LIMIT} spots. Upgrade to Grizzly for unlimited saves.`, 'info');
-    if (typeof openUpgradeModal === 'function') openUpgradeModal('Unlimited restaurants');
+    showGrizzlyUpsell('limit');
     return;
   }
 
@@ -3010,7 +3031,7 @@ function renderAll () {
   updateLocationBanner();
   // Home sections are isolated: a failure in one must never cascade and
   // abort renderAll (which would leave later init wiring unattached).
-  [renderTodayStatusRow, renderWeeklyGoal, renderCraveHome, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
+  [renderGrizzlyUi, renderTodayStatusRow, renderWeeklyGoal, renderCraveHome, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
     .forEach(fn => { try { fn(); } catch (err) { console.error(`${fn.name} failed:`, err); } });
 }
 
@@ -5328,6 +5349,7 @@ function setupEvents () {
     state.filter.cuisine = e.target.value;
     updateClearBtn();
     renderCards();
+    if (_homeDiscCache) renderHomeDiscovery(_homeDiscCache);
   });
   document.getElementById('filter-price').addEventListener('change', e => {
     state.filter.price = e.target.value;
@@ -6201,6 +6223,7 @@ function clearFilters () {
   if (fc) fc.value = '';
   updateClearBtn();
   renderCards();
+  if (_homeDiscCache) renderHomeDiscovery(_homeDiscCache);
 }
 
 let _bearRoarAudioCtx = null;
@@ -8381,7 +8404,7 @@ const TOOL_ACTIONS = {
   'compare':          toggleCompareMode,
   'budget':           openBudget,
   'dishes':           () => { if (state.detailId) openDishTracker(state.detailId); else showToast('Open a restaurant first', 'View a restaurant then tap Dishes.', 'error'); },
-  'review':           openYearReview,
+  'review':           () => (hasGrizzly() ? openYearReview() : showGrizzlyUpsell('review')),
   'profile':          openFoodieProfile,
   'friends':          openFoodieFriends,
   'stats2':           openStats2,
@@ -8479,6 +8502,7 @@ function renderMobileHub (filter = '') {
       <div class="hub-section-title">${sec.title}</div>
       <div class="hub-grid">
         ${items.map(([action, emoji, label]) => `<button class="hub-tile" data-tool="${action}">
+          ${GRIZZLY_TOOLS.has(action) && !hasGrizzly() ? '<span class="hub-lock">GRIZZLY</span>' : ''}
           <span class="hub-tile-emoji">${emoji}</span>
           <span class="hub-tile-label">${label}</span>
         </button>`).join('')}
@@ -8916,7 +8940,7 @@ function saveJustAte () {
     if (!placeName) return;
     if (typeof isPremium === 'function' && !isPremium() && state.restaurants.length >= FREE_RESTAURANT_LIMIT) {
       showToast('Cub limit reached', `Cub includes up to ${FREE_RESTAURANT_LIMIT} spots. Upgrade to Grizzly for unlimited saves.`, 'info');
-      if (typeof openUpgradeModal === 'function') openUpgradeModal('Unlimited restaurants');
+      showGrizzlyUpsell('limit');
       return;
     }
     const today = iso();
@@ -11699,6 +11723,7 @@ async function loadHomeDiscovery () {
 
     _homeDiscCache = { elements: withDist, lat, lng };
     _homeDiscCacheTime = Date.now();
+    renderCuisineFilter(); // nearby cuisines join the filter
     renderTodayStatusRow();
     renderTodayVibeRow();
     renderHomeDiscovery(_homeDiscCache);
@@ -11764,6 +11789,15 @@ function renderNearbyHomeFallback (err = null) {
 function renderHomeDiscovery ({ elements }) {
   const list = document.getElementById('nearby-home-list');
   elements = (elements || []).filter(isCredibleFoodVenue);
+  const cuisineWanted = cuisineFilterKey(state.filter?.cuisine);
+  if (cuisineWanted && elements.length) {
+    const matching = elements.filter(el => cuisineFilterKey(el.tags?.cuisine) === cuisineWanted);
+    if (!matching.length) {
+      if (list) list.innerHTML = `<div class="nearby-home-loading">No ${escHtml(cuisineFilterLabel(cuisineWanted))} spots nearby yet. <button type="button" class="btn-ghost btn-sm" onclick="clearFilters()">Show all</button></div>`;
+      return;
+    }
+    elements = matching;
+  }
   if (!list || !elements.length) {
     hideBearSwipeHome();
     if (list) {
@@ -12385,6 +12419,95 @@ function renderVisitHeatmap (visited) {
   el.innerHTML = html;
 }
 
+/* ── Grizzly upsells ─────────────────────────────────────────
+   Locked features used to answer "AI unavailable" and stop. Each one now
+   pitches what you'd get and opens the upgrade screen, and free users see
+   where Grizzly lives (header pill, home card, badges on locked tools). */
+const GRIZZLY_PITCH = {
+  general:     { title: 'Go Grizzly', body: 'Unlimited spots, Byte Cub AI, Year in Review, and your food life synced on every device.' },
+  home:        { title: 'Feed the bear without limits', body: 'Unlimited spots, Byte Cub AI picks and dish tips, Duel verdicts, Year in Review, and sync on every device.' },
+  duel:        { title: 'Let Byte Cub judge the showdown', body: 'A dramatic AI fight card that weighs vibe, value, and your notes, then crowns a winner you can share.' },
+  mealplanner: { title: 'Plan your week of eating out', body: 'Byte Cub builds a day-by-day dining plan around your budget, cravings, and wish list.' },
+  'byte-cub':  { title: 'Your personal food concierge', body: 'Ask Byte Cub anything: where to go tonight, what to order, date-night ideas, all from your own list.' },
+  summary:     { title: 'Byte Cub sums up every spot', body: 'One tap for the vibe, what to order, and the best time to go.' },
+  dishes:      { title: 'Know what to order before you go', body: 'Byte Cub picks the dishes worth ordering at each spot, tuned to your taste.' },
+  review:      { title: 'Your foodie Year in Review', body: 'Your top spots, cuisines, and streaks, wrapped up and ready to share.' },
+  // FREE_RESTAURANT_LIMIT lives in firebase.js, which loads after this file,
+  // so read it when the pitch is shown, not while app.js is starting up.
+  get limit () { return { title: 'Save every spot you love', body: `Cub holds ${FREE_RESTAURANT_LIMIT} spots. Grizzly is unlimited and synced across your devices.` }; },
+};
+const GRIZZLY_TOOLS = new Set(['ai-panel', 'mealplanner', 'review']);
+const GRIZZLY_SNOOZE_KEY = 'ftb_grizzly_card_snooze';
+
+function hasGrizzly () { return typeof isPremium === 'function' && isPremium(); }
+
+function showGrizzlyUpsell (key = 'general') {
+  const pitch = GRIZZLY_PITCH[key] || GRIZZLY_PITCH.general;
+  if (typeof openUpgradeModal === 'function') openUpgradeModal({ key, ...pitch });
+}
+
+// The inline "unlock" card used where an AI result would appear.
+function grizzlyUnlockHtml (key) {
+  const pitch = GRIZZLY_PITCH[key] || GRIZZLY_PITCH.general;
+  return `<div class="grizzly-unlock"><span class="gz-badge">GRIZZLY</span><strong>${escHtml(pitch.title)}</strong>
+    <span>${escHtml(pitch.body)}</span><button type="button" class="btn-primary btn-sm" data-upsell="${escHtml(key)}">Unlock with Grizzly</button></div>`;
+}
+
+function renderGrizzlyUi () {
+  const free = !hasGrizzly();
+  document.getElementById('grizzly-pill')?.classList.toggle('hidden', !free);
+  const card = document.getElementById('grizzly-home');
+  if (card) {
+    const count = (state.restaurants || []).length;
+    let snoozedUntil = 0;
+    try { snoozedUntil = Number(localStorage.getItem(GRIZZLY_SNOOZE_KEY)) || 0; } catch { /* storage blocked */ }
+    // Near the limit it always shows; otherwise it respects "Not now".
+    const nearLimit = count >= FREE_RESTAURANT_LIMIT - 3;
+    card.classList.toggle('hidden', !free || (!nearLimit && Date.now() < snoozedUntil));
+    const pct = Math.min(100, Math.round((count / FREE_RESTAURANT_LIMIT) * 100));
+    const meter = card.querySelector('.gz-meter span');
+    if (meter) meter.style.width = `${pct}%`;
+    card.classList.toggle('near-limit', nearLimit);
+    const label = card.querySelector('.gz-meter-label');
+    if (label) label.textContent = count >= FREE_RESTAURANT_LIMIT
+      ? `You've used all ${FREE_RESTAURANT_LIMIT} free spots. Grizzly keeps the den growing.`
+      : `${count} of ${FREE_RESTAURANT_LIMIT} free spots used`;
+  }
+}
+
+// A basic Duel verdict for everyone; Byte Cub's full fight card is the upsell.
+function freeDuelVerdict (rA, rB) {
+  const score = r => (r.myRating || 0) * 2 + (r.googleRating || 0) + dishesOf(r).filter(d => d.verdict === 'again').length * 1.5
+    - dishesOf(r).filter(d => d.verdict === 'skip').length * 0.5 + Math.min(3, (r.visits || []).length) * 0.7 + (r.isFavorite ? 1.5 : 0);
+  const [a, b] = [score(rA), score(rB)];
+  const winner = a === b ? null : (a > b ? rA : rB);
+  const why = r => {
+    const goTo = goToDishOf(r);
+    const bits = [];
+    if (r.myRating) bits.push(`you rated it ${'★'.repeat(r.myRating)}`);
+    if (goTo) bits.push(`your go-to is the ${goTo.name}`);
+    if ((r.visits || []).length) bits.push(`${r.visits.length} visit${r.visits.length === 1 ? '' : 's'}`);
+    return bits.join(', ') || 'no history yet';
+  };
+  return `<div class="duel-free"><div><strong>${escHtml(rA.name)}</strong>: ${escHtml(why(rA))}</div>
+    <div><strong>${escHtml(rB.name)}</strong>: ${escHtml(why(rB))}</div>
+    <div class="duel-winner">${winner ? `WINNER: ${escHtml(winner.name)}` : "It's a tie. Flip a fork."}</div></div>
+    ${grizzlyUnlockHtml('duel')}`;
+}
+
+document.addEventListener('click', e => {
+  if (e.target.closest('#grizzly-home .gz-snooze')) {
+    try { localStorage.setItem(GRIZZLY_SNOOZE_KEY, String(Date.now() + 3 * 864e5)); } catch { /* storage blocked */ }
+    trackProductEvent('grizzly_card_snoozed', {});
+    renderGrizzlyUi();
+    return;
+  }
+  const btn = e.target.closest('[data-upsell]');
+  if (!btn) return;
+  e.preventDefault();
+  showGrizzlyUpsell(btn.dataset.upsell);
+});
+
 /* ------------------------------------------------------------
    PHASE 9 •  AI ASSISTANT (Gemini-powered Byte Cub)
    ------------------------------------------------------------ */
@@ -12392,15 +12515,9 @@ function renderVisitHeatmap (visited) {
 const _aiHistory = [];
 
 function ensureAiUpgradeAccess (featureName = 'Byte Cub AI') {
-  if (typeof isPremium === 'function' && !isPremium()) {
-    if (typeof requiresPremium === 'function') {
-      requiresPremium(featureName, () => {});
-    } else if (typeof openUpgradeModal === 'function') {
-      openUpgradeModal(featureName);
-    }
-    return false;
-  }
-  return true;
+  if (hasGrizzly()) return true;
+  showGrizzlyUpsell(featureName === 'Byte Cub AI' ? 'byte-cub' : 'general');
+  return false;
 }
 
 function openAiPanel () {
@@ -12494,7 +12611,7 @@ function handleAiQuickBtn (prompt) {
 }
 
 async function getAiDetailSummary (restaurantId) {
-  if (!ensureAiUpgradeAccess('Byte Cub AI')) return;
+  if (!hasGrizzly()) { showGrizzlyUpsell('summary'); return; }
   const r  = state.restaurants.find(x => x.id === restaurantId);
   if (!r) return;
   const el = document.getElementById('detail-ai-summary');
@@ -12502,7 +12619,7 @@ async function getAiDetailSummary (restaurantId) {
   el.classList.remove('hidden');
 
   if (!AI.hasAccess()) {
-    el.innerHTML = `<span class="ai-badge">\uD83D\uDC3B Byte Cub</span> Sign in with a Grizzly plan (or add a Gemini API key in the Byte Cub panel) to get AI summaries. <em>${escHtml(r.name)}: ${escHtml(r.cuisine || 'restaurant')}, ${r.myRating ? r.myRating + '\u2605' : 'unrated'}.</em>`;
+    el.innerHTML = grizzlyUnlockHtml('summary');
     return;
   }
 
@@ -12516,7 +12633,7 @@ async function getAiDetailSummary (restaurantId) {
 }
 
 async function getAiDishRecs (restaurantId) {
-  if (!ensureAiUpgradeAccess('Byte Cub AI')) return;
+  if (!hasGrizzly()) { showGrizzlyUpsell('dishes'); return; }
   const r = state.restaurants.find(x => x.id === restaurantId);
   if (!r) return;
   const el = document.getElementById('detail-ai-summary');
@@ -12524,7 +12641,7 @@ async function getAiDishRecs (restaurantId) {
   el.classList.remove('hidden');
 
   if (!AI.hasAccess()) {
-    el.innerHTML = `<span class="ai-badge">\uD83C\uDF7D\uFE0F Dish Picks</span> Sign in with a Grizzly plan (or add a Gemini key in the Byte Cub panel) to get AI dish recommendations.`;
+    el.innerHTML = grizzlyUnlockHtml('dishes');
     return;
   }
 
@@ -13830,10 +13947,16 @@ async function runDuel () {
   const idB = document.getElementById('duel-pick-b').value;
   if (!idA || !idB) { showToast('Pick two', 'Select both restaurants first.', 'info'); return; }
   if (idA === idB) { showToast('Same restaurant!', 'Pick two different spots.', 'info'); return; }
-  if (!AI.hasAccess()) { showToast('AI unavailable', 'Sign in with a Grizzly plan (or add a Gemini key in Settings) to use AI features.', 'info'); return; }
   const rA = state.restaurants.find(r => r.id === idA);
   const rB = state.restaurants.find(r => r.id === idB);
   if (!rA || !rB) return;
+  if (!AI.hasAccess()) {
+    const out = document.getElementById('duel-result');
+    out.classList.remove('hidden');
+    out.innerHTML = freeDuelVerdict(rA, rB);
+    trackProductEvent('duel_free_verdict', {});
+    return;
+  }
   const resultEl = document.getElementById('duel-result');
   const goBtn = document.getElementById('duel-go-btn');
   resultEl.classList.remove('hidden');
@@ -14432,7 +14555,12 @@ function closeMealPlanner () {
   maybeHideOverlay();
 }
 async function generateMealPlan () {
-  if (!AI.hasAccess()) { showToast('AI unavailable', 'Sign in with a Grizzly plan (or add a Gemini key in Settings) to use AI features.', 'info'); return; }
+  if (!AI.hasAccess()) {
+    const out = document.getElementById('mp-result');
+    out.classList.remove('hidden');
+    out.innerHTML = grizzlyUnlockHtml('mealplanner');
+    return;
+  }
   const days   = document.getElementById('mp-days').value;
   const budget = document.getElementById('mp-budget').value;
   const vibe   = document.getElementById('mp-vibe').value.trim();

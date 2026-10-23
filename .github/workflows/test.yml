@@ -53,3 +53,7 @@ jobs:
       - name: Bear Swipe
         working-directory: tests
         run: node swipe.test.js
+
+      - name: Upgrade paths
+        working-directory: tests
+        run: node money.test.js

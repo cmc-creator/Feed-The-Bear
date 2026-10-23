@@ -8310,3 +8310,52 @@ body[data-ui-motion='playful'] .btn-primary:hover { box-shadow: 0 6px 20px rgba(
   background: var(--surface2);
   color: var(--text-dim);
 }
+
+/* ════════════════════════════════════════════════════════════
+   Grizzly upsells (free users only)
+   ════════════════════════════════════════════════════════════ */
+.grizzly-pill {
+  flex: 0 0 auto; cursor: pointer; font: inherit; font-size: .72rem; font-weight: 900; letter-spacing: .04em;
+  padding: 7px 12px; border-radius: 999px; border: 0; color: #2a1a0e;
+  background: linear-gradient(135deg, #f3d39b, #e0a85a); box-shadow: 0 2px 10px rgba(224, 168, 90, .45);
+  white-space: nowrap;
+}
+.grizzly-pill.hidden { display: none; }
+@media (max-width: 420px) { .grizzly-pill { padding: 6px 9px; font-size: .66rem; } }
+
+.gz-badge {
+  display: inline-block; font-size: .62rem; font-weight: 900; letter-spacing: .1em; color: #2a1a0e;
+  background: linear-gradient(135deg, #f3d39b, #e0a85a); padding: 3px 8px; border-radius: 999px;
+}
+.grizzly-home {
+  color: #f6ecdc; border: 1px solid rgba(231, 196, 138, .5);
+  background: radial-gradient(120% 100% at 100% 0%, rgba(231, 196, 138, .22), transparent 60%), rgba(30, 18, 10, .55);
+}
+.grizzly-home.hidden { display: none; }
+.gz-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.gz-snooze { background: none; border: 0; color: #d8c4a7; font-size: 1rem; cursor: pointer; padding: 4px 6px; }
+.gz-title { font-size: 1.1rem; font-weight: 900; color: #fff3e0; margin-bottom: 8px; }
+.gz-meter { height: 8px; border-radius: 99px; background: rgba(255, 236, 205, .15); overflow: hidden; }
+.gz-meter span { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, #a8d5a2, #e7c48a); transition: width .4s ease; }
+.grizzly-home.near-limit .gz-meter span { background: linear-gradient(90deg, #e7c48a, #ff8a7a); }
+.gz-meter-label { font-size: .74rem; color: #e3d1b6; margin: 5px 0 8px; }
+.gz-perks { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 4px; font-size: .82rem; color: #f6ecdc; }
+.gz-perks li::before { content: '✓'; color: #a8d5a2; font-weight: 900; margin-right: 8px; }
+.gz-cta { width: 100%; }
+
+.grizzly-unlock {
+  display: grid; gap: 6px; justify-items: start; padding: 12px 14px; margin-top: 8px; border-radius: var(--radius);
+  border: 1px solid rgba(224, 168, 90, .55); background: rgba(224, 168, 90, .1); font-size: .84rem; color: var(--text);
+}
+.grizzly-unlock strong { font-size: .95rem; }
+.grizzly-unlock span:not(.gz-badge) { color: var(--text-muted); line-height: 1.45; }
+
+.hub-tile { position: relative; }
+.hub-lock {
+  position: absolute; top: 6px; right: 6px; font-size: .52rem; font-weight: 900; letter-spacing: .08em;
+  color: #2a1a0e; background: linear-gradient(135deg, #f3d39b, #e0a85a); padding: 2px 5px; border-radius: 6px;
+}
+.duel-free { display: grid; gap: 6px; font-size: .86rem; }
+/* Phones: the Go Grizzly pill takes the Craving Engine icon's place in the
+   header (Craving Engine is still in Discover & Play). */
+@media (max-width: 420px) { .header-actions #craving-btn { display: none; } }
