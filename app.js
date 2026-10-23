@@ -187,10 +187,18 @@ function favoriteDishesForNearby (cuisine = '', amenity = 'restaurant') {
   return [];
 }
 
-function localNearbyFoodPhoto (cuisine = '', amenity = '', seed = '') {
-  const raw = `${String(cuisine || '').toLowerCase()} ${String(amenity || '').toLowerCase()}`;
+// Stock dish photos that actually match a cuisine; empty when we don't know.
+function cuisineFoodPhotoPool (raw = '') {
   const pool = [];
   if (/(mexican|taco|birria|burrito|quesadilla|enchilada)/.test(raw)) pool.push('assets/food/tacos.jpg', 'assets/food/burrito.jpg', 'assets/food/quesadilla.jpg');
+  else if (/(mediterranean|greek|middle eastern|lebanese|turkish|falafel|shawarma|kebab|gyro)/.test(raw)) pool.push('assets/food/falafel.jpg', 'assets/food/shawarma.jpg', 'assets/food/kebab.jpg');
+  else if (/(vietnamese|pho|banh mi)/.test(raw)) pool.push('assets/food/pho.jpg', 'assets/food/banh_mi.jpg');
+  else if (/(spanish|paella|tapas)/.test(raw)) pool.push('assets/food/paella.jpg');
+  else if (/(steak|chophouse)/.test(raw)) pool.push('assets/food/steak.jpg');
+  else if (/(poke|hawaiian)/.test(raw)) pool.push('assets/food/poke_bowl.jpg');
+  else if (/(dessert|ice cream|gelato|cheesecake|churro)/.test(raw)) pool.push('assets/food/gelato.jpg', 'assets/food/cheesecake.jpg', 'assets/food/churros.jpg');
+  else if (/(salad|healthy)/.test(raw)) pool.push('assets/food/caesar_salad.jpg');
+  else if (/(dosa|south indian)/.test(raw)) pool.push('assets/food/dosa.jpg');
   else if (/(italian|pasta|pizza|ristorante)/.test(raw)) pool.push('assets/food/italian_pasta.jpg', 'assets/food/pasta.jpg', 'assets/food/pizza.jpg');
   else if (/(japanese|sushi|ramen)/.test(raw)) pool.push('assets/food/sushi.jpg', 'assets/food/ramen.jpg', 'assets/food/udon.jpg');
   else if (/(korean)/.test(raw)) pool.push('assets/food/korean_bbq.jpg', 'assets/food/bibimbap.jpg');
@@ -199,8 +207,15 @@ function localNearbyFoodPhoto (cuisine = '', amenity = '', seed = '') {
   else if (/(thai|pad thai)/.test(raw)) pool.push('assets/food/pad_thai.jpg', 'assets/food/thai_curry.jpg');
   else if (/(seafood|fish|shrimp)/.test(raw)) pool.push('assets/food/seafood.jpg', 'assets/food/shrimp.jpg', 'assets/food/salmon.jpg');
   else if (/(burger|american|diner)/.test(raw)) pool.push('assets/food/burger.jpg', 'assets/food/fries.jpg', 'assets/food/fried_chicken.jpg');
-  else if (/(cafe|coffee|tea|bakery|breakfast)/.test(raw)) pool.push('assets/food/eggs_benedict.jpg', 'assets/food/french_toast.jpg', 'assets/food/pancakes.jpg');
-  else pool.push('assets/food/pizza.jpg', 'assets/food/burger.jpg', 'assets/food/tacos.jpg');
+  else if (/(cafe|coffee|tea|bakery|breakfast|brunch)/.test(raw)) pool.push('assets/food/eggs_benedict.jpg', 'assets/food/french_toast.jpg', 'assets/food/pancakes.jpg');
+  return pool;
+}
+
+function localNearbyFoodPhoto (cuisine = '', amenity = '', seed = '') {
+  const raw = `${String(cuisine || '').toLowerCase()} ${String(amenity || '').toLowerCase()}`;
+  const pool = cuisineFoodPhotoPool(raw);
+  // Nearby cards always need some image; unknown cuisines get a generic mix.
+  if (!pool.length) pool.push('assets/food/pizza.jpg', 'assets/food/burger.jpg', 'assets/food/tacos.jpg');
   const idx = pool.length ? (miniHash(String(seed || raw)) % pool.length) : 0;
   return safeUrl(pool[idx] || 'assets/food/pizza.jpg');
 }
@@ -11833,12 +11848,12 @@ function loadDetailPhoto (restaurant) {
   const el = document.getElementById('detail-photo-strip');
   if (!el) return;
   const ownPhoto = String(restaurant?.photo || restaurant?.photoUrl || '').trim();
-  const term = `${restaurant?.name || ''} ${restaurant?.cuisine || 'food'}`.trim();
-  const seed = restaurant?.id || restaurant?.name || 'ftb';
-  const cuisinePool = (typeof getMoodFoodImageCandidates === 'function')
-    ? getMoodFoodImageCandidates(term, seed).filter(Boolean)
-    : [];
-  const src = ownPhoto || cuisinePool[0] || 'assets/food/pizza.jpg';
+  const seed = String(restaurant?.id || restaurant?.name || 'ftb');
+  // Mood-term matching sent "Mexican" to a burger and "Japanese" to biryani.
+  // Only show a stock dish when it matches the cuisine; otherwise show none.
+  const cuisinePool = cuisineFoodPhotoPool(String(restaurant?.cuisine || '').toLowerCase());
+  const src = ownPhoto || cuisinePool[miniHash(seed) % (cuisinePool.length || 1)] || '';
+  if (!src) { el.style.display = 'none'; el.removeAttribute('src'); return; }
   el.alt = `${restaurant?.name || restaurant?.cuisine || 'Restaurant'} photo`;
   el.style.display = 'block';
   el.onerror = () => { el.style.display = 'none'; };
