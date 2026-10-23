@@ -45,3 +45,7 @@ jobs:
       - name: Friends
         working-directory: tests
         run: node friends.test.js
+
+      - name: Photo storage
+        working-directory: tests
+        run: node photos.test.js

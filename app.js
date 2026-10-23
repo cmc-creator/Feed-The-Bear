@@ -568,6 +568,8 @@ function loadData () {
   });
   if (_vlMigrated) saveData();
   if (mergeLegacyDishStores()) saveData();
+  // Restore photos kept in IndexedDB, then move any still stored inline there.
+  hydrateStoredPhotos().then(() => { if (_photoDbReady && localStorage.getItem(STORAGE_KEY)?.includes('"data:image/')) saveData(); });
 
   try {
     const s = localStorage.getItem(SETTINGS_KEY);
@@ -615,12 +617,151 @@ function pruneLegacyDemoRestaurants (list) {
   return cleaned;
 }
 
-function saveData () {
+/* ── Photo store ────────────────────────────────────────────────
+   localStorage holds ~5 MB, so a few dozen food photos filled it and every
+   save failed. Photos now live in IndexedDB (hundreds of MB). In memory the
+   restaurants still carry data URLs, so nothing else changes; only the
+   saved copy swaps each photo for an "idb:<hash>" reference.
+   A photo is written to IndexedDB before the list that references it, so
+   closing the app mid-save can't leave a dangling reference. */
+const PHOTO_DB = 'ftb-photos';
+const PHOTO_STORE = 'photos';
+const PHOTO_REF = 'idb:';
+let _photoDb = null;            // Promise<IDBDatabase|null>
+let _photosHydrated = false;    // in-memory photos restored from IndexedDB
+const _photoRefCache = new Map(); // data URL -> ref
+const _storedPhotoRefs = new Set();
+let _saveChain = Promise.resolve();
+
+function openPhotoDb () {
+  if (_photoDb) return _photoDb;
+  _photoDb = new Promise(resolve => {
+    try {
+      const req = indexedDB.open(PHOTO_DB, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(PHOTO_STORE);
+      req.onsuccess = () => { _photoDbReady = true; resolve(req.result); };
+      req.onerror = () => resolve(null);
+      req.onblocked = () => resolve(null);
+    } catch { resolve(null); }
+  });
+  return _photoDb;
+}
+
+function photoDbOp (mode, fn) {
+  return openPhotoDb().then(db => db && new Promise((resolve, reject) => {
+    const tx = db.transaction(PHOTO_STORE, mode);
+    const out = fn(tx.objectStore(PHOTO_STORE));
+    tx.oncomplete = () => resolve(out?.result ?? true);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  }));
+}
+
+// Two 32-bit FNV-1a passes with different seeds: a 64-bit content key.
+function photoRefFor (dataUrl) {
+  let ref = _photoRefCache.get(dataUrl);
+  if (ref) return ref;
+  let h1 = 0x811c9dc5, h2 = 0x01000193 ^ dataUrl.length;
+  for (let i = 0; i < dataUrl.length; i++) {
+    const c = dataUrl.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 16777619);
+    h2 = Math.imul(h2 ^ c, 2246822519);
+  }
+  ref = `${PHOTO_REF}${(h1 >>> 0).toString(36)}${(h2 >>> 0).toString(36)}`;
+  _photoRefCache.set(dataUrl, ref);
+  return ref;
+}
+
+// The saved copy of the list, plus any photos that still need writing.
+function serializeRestaurants (offload) {
+  const pending = new Map();
+  const json = JSON.stringify(state.restaurants, (key, value) => {
+    if (offload && key === 'photo' && typeof value === 'string' && value.startsWith('data:image/')) {
+      const ref = photoRefFor(value);
+      if (!_storedPhotoRefs.has(ref)) pending.set(ref, value);
+      return ref;
+    }
+    return value;
+  });
+  return { json, pending };
+}
+
+function writeRestaurantsToLocalStorage (json) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.restaurants));
+    localStorage.setItem(STORAGE_KEY, json);
   } catch (err) {
     console.error('[FTB] saveData failed:', err);
     showToast('Storage Full', 'Could not save — device storage is full. Try removing large photos from entries.', 'error');
+  }
+}
+
+async function persistRestaurants () {
+  const db = await openPhotoDb();
+  // Until stored photos are back in memory, the list still holds references;
+  // saving them as-is is fine, but new data URLs must be offloaded too.
+  const { json, pending } = serializeRestaurants(!!db);
+  if (db && pending.size) {
+    try {
+      await photoDbOp('readwrite', store => pending.forEach((v, k) => store.put(v, k)));
+      pending.forEach((_, k) => _storedPhotoRefs.add(k));
+    } catch (err) {
+      console.warn('[FTB] photo store write failed, keeping photos inline:', err);
+      writeRestaurantsToLocalStorage(serializeRestaurants(false).json);
+      return;
+    }
+  }
+  writeRestaurantsToLocalStorage(json);
+}
+
+// Put stored photos back into the in-memory restaurants.
+async function hydrateStoredPhotos () {
+  const db = await openPhotoDb(); // also lets later saves offload photos
+  const holders = [];
+  const visit = obj => { if (obj && typeof obj.photo === 'string' && obj.photo.startsWith(PHOTO_REF)) holders.push(obj); };
+  (state.restaurants || []).forEach(r => {
+    visit(r);
+    (r.visits || []).forEach(visit);
+    (r.dishes || []).forEach(visit);
+  });
+  if (!holders.length || !db) { _photosHydrated = true; return; }
+  _photosHydrated = false; // e.g. a sign-in merge brought references back; hold sync
+  const refs = [...new Set(holders.map(h => h.photo))];
+  const found = new Map();
+  try {
+    await photoDbOp('readonly', store => refs.forEach(ref => {
+      const req = store.get(ref);
+      req.onsuccess = () => { if (typeof req.result === 'string') found.set(ref, req.result); };
+    }));
+  } catch (err) {
+    console.warn('[FTB] photo store read failed:', err);
+  }
+  holders.forEach(h => {
+    const data = found.get(h.photo);
+    if (data) {
+      _storedPhotoRefs.add(h.photo);
+      _photoRefCache.set(data, h.photo);
+      h.photo = data;
+    }
+  });
+  _photosHydrated = true;
+  renderAll();
+}
+
+function photosReadyForSync () { return _photosHydrated; }
+
+let _photoDbReady = false;
+let _queuedSaves = 0;
+
+function saveData () {
+  // Most saves have no new photo: write now, as before. A save with a new
+  // photo, or any save while one is queued, goes through the chain in order
+  // (each run re-reads the latest state).
+  const { json, pending } = serializeRestaurants(_photoDbReady);
+  if (!pending.size && !_queuedSaves) {
+    writeRestaurantsToLocalStorage(json);
+  } else {
+    _queuedSaves++;
+    _saveChain = _saveChain.then(persistRestaurants, persistRestaurants).finally(() => { _queuedSaves--; });
   }
   updateTagSuggestions();
   setTimeout(checkAchievements, 0);
