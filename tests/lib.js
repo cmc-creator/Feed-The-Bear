@@ -12,7 +12,11 @@ const SHOTS = path.join(__dirname, 'screenshots');
 const results = [];
 function check (ok, msg) {
   results.push({ ok: !!ok, msg });
-  if (!ok) console.log(`  FAIL ${msg}`);
+  if (!ok) {
+    console.log(`  FAIL ${msg}`);
+    // In GitHub Actions this becomes an annotation, readable without the logs.
+    if (process.env.GITHUB_ACTIONS) console.log(`::error title=${path.basename(process.argv[1] || 'test')}::${String(msg).replace(/[\r\n]+/g, ' ').slice(0, 400)}`);
+  }
 }
 
 function launch () {
