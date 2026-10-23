@@ -335,7 +335,7 @@ function addSwipeActions(element, onSwipeLeft, onSwipeRight) {
 /**
  * Add pull-to-refresh gesture
  */
-function initPullToRefresh(container, onRefresh) {
+function initPullToRefreshFor(container, onRefresh) {
   if (!container) return;
 
   let startY = 0;

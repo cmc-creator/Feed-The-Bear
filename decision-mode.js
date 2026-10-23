@@ -225,17 +225,17 @@ function selectDecisionWinner(restaurant) {
  */
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 3959; // Earth radius in miles
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
+  const dLat = dmToRad(lat2 - lat1);
+  const dLon = dmToRad(lon2 - lon1);
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.cos(dmToRad(lat1)) * Math.cos(dmToRad(lat2)) *
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
 
-function toRad(deg) {
+function dmToRad(deg) {
   return deg * (Math.PI / 180);
 }
 
@@ -367,7 +367,7 @@ function createDecisionCard(restaurant, position) {
         Choose This
       </button>
       ${restaurant.menuUrl ? `<button class="btn-decision-menu" onclick="window.open('${escapeHtml(restaurant.menuUrl)}', '_blank')">Menu</button>` : ''}
-      ${restaurant.lat && restaurant.lng ? `<button class="btn-decision-directions" onclick="openDirections(${restaurant.lat}, ${restaurant.lng}, '${escapeHtml(restaurant.name)}')">Directions</button>` : ''}
+      ${restaurant.lat && restaurant.lng ? `<button class="btn-decision-directions" onclick="openDecisionDirections(${restaurant.lat}, ${restaurant.lng}, '${escapeHtml(restaurant.name)}')">Directions</button>` : ''}
     </div>
   `;
 
@@ -395,7 +395,7 @@ function renderDecisionWinner(restaurant) {
       ${restaurant.address ? `<div class="decision-winner-address">📍 ${escapeHtml(restaurant.address)}</div>` : ''}
       <div class="decision-winner-actions">
         ${restaurant.lat && restaurant.lng ? `
-          <button class="btn btn-primary" onclick="openDirections(${restaurant.lat}, ${restaurant.lng}, '${escapeHtml(restaurant.name)}')">
+          <button class="btn btn-primary" onclick="openDecisionDirections(${restaurant.lat}, ${restaurant.lng}, '${escapeHtml(restaurant.name)}')">
             Get Directions
           </button>
         ` : ''}
@@ -423,7 +423,7 @@ function renderDecisionWinner(restaurant) {
   showDecisionView('winner');
 }
 
-function openDirections(lat, lng, name) {
+function openDecisionDirections(lat, lng, name) {
   const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&destination_place_id=${encodeURIComponent(name)}`;
   window.open(url, '_blank');
 
