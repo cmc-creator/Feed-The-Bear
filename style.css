@@ -65,6 +65,18 @@
   --moss-2: #3f5a37;
 }
 
+/* A custom property that references another resolves where it is declared.
+   Declared only on :root, these aliases kept the dark values after light
+   mode and the accent themes override the base tokens on body (dark input
+   boxes, near-white text on white). Re-declare them where themes apply. */
+body {
+  --text1:     var(--text);
+  --text2:     var(--text-dim);
+  --green:     var(--primary);
+  --danger:    var(--red);
+  --surface-2: var(--surface2);
+}
+
 /* ── Reset ───────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
@@ -1346,7 +1358,12 @@ button:focus-visible,
 }
 .your-order-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .your-order-head h4 { font-size: 1rem; font-weight: 800; color: var(--text); }
-.your-order-sub { font-size: .75rem; color: var(--text-dim); }
+.your-order-sub { font-size: .75rem; color: var(--text-dim); margin-left: auto; }
+.yo-share {
+  font: inherit; font-size: .74rem; font-weight: 700; cursor: pointer;
+  padding: 4px 12px; border-radius: 999px;
+  border: 1px solid rgba(var(--primary-rgb), .5); background: rgba(var(--primary-rgb), .14); color: var(--text);
+}
 .your-order-empty { font-size: .85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 10px; }
 .your-order-list { display: grid; gap: 10px; margin-bottom: 12px; }
 .your-order-list:empty { display: none; }
@@ -1373,6 +1390,8 @@ button:focus-visible,
   color: #a8d5a2; margin-right: 4px;
 }
 .card-order.want .card-order-label { color: #e7c48a; }
+.card-order.skip .card-order-label { color: #f0a497; }
+.card-order.skip { color: #d8c4a7; text-decoration: line-through; text-decoration-color: rgba(240,164,151,.6); }
 .yo-dish-note { font-size: .78rem; color: var(--text-muted); font-style: italic; margin: -2px 0 4px; }
 .yo-dish-actions { display: none; flex-wrap: wrap; gap: 6px; padding: 2px 0 8px; }
 .yo-dish.open .yo-dish-actions { display: flex; }
@@ -5652,6 +5671,27 @@ body.light-mode .today-vibe-pill {
 .for-you-home {
   margin-bottom: 14px;
 }
+
+/* Just Ate */
+.just-ate-card { max-width: 480px; }
+.just-ate-body { padding: 16px 24px 24px; display: grid; gap: 8px; }
+.ja-label { font-size: .78rem; font-weight: 700; color: var(--text-muted); margin-top: 6px; }
+.ja-optional { font-weight: 500; color: var(--text-dim); }
+.ja-places { display: flex; flex-wrap: wrap; gap: 6px; }
+.ja-places:empty { display: none; }
+.ja-place {
+  display: inline-flex; align-items: baseline; gap: 6px; max-width: 100%; cursor: pointer;
+  font: inherit; font-size: .8rem; font-weight: 600; color: var(--text);
+  padding: 7px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface2);
+}
+.ja-place-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ja-place-dist { font-size: .7rem; font-weight: 500; color: var(--text-dim); }
+.ja-place.active { border-color: var(--primary); background: rgba(var(--primary-rgb), .18); }
+.ja-place-new { border-style: dashed; }
+.ja-verdicts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.ja-verdicts .yo-btn.active { outline: 2px solid var(--primary); outline-offset: 1px; }
+.ja-save { margin-top: 10px; width: 100%; }
+.ja-save:disabled { opacity: .5; cursor: not-allowed; }
 
 /* Crave List */
 .crave-home { margin-bottom: 14px; }

@@ -480,7 +480,7 @@
       <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/>
       </svg>
-      <input type="text" id="search-input" placeholder="Search restaurants, cuisine, notes" autocomplete="off" />
+      <input type="text" id="search-input" placeholder="Search spots or dishes, like ramen" autocomplete="off" />
       <button id="search-voice-btn" class="search-voice-btn" type="button" title="Voice search or add" aria-label="Voice search or add">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/></svg>
       </button>
@@ -668,6 +668,15 @@
         <button id="ai-rec-refresh-btn" class="ai-rec-refresh" title="Refresh recommendation">↻</button>
       </div>
       <div class="home-quick-actions home-module" id="home-quick-actions" aria-label="Quick actions">
+        <button class="home-quick-btn" id="home-quick-justate-btn" type="button">
+          <span class="home-quick-emoji" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v8a2 2 0 0 0 2 2v8"/><path d="M11 3v8a2 2 0 0 1-2 2"/><path d="M17 21V3c-2.2 1.3-3 4-3 7v4h3"/></svg>
+          </span>
+          <span class="home-quick-copy">
+            <span class="home-quick-label">Just Ate</span>
+            <span class="home-quick-sub">Log it in 10 seconds</span>
+          </span>
+        </button>
         <button class="home-quick-btn" id="home-quick-decision-btn" type="button">
           <span class="home-quick-emoji" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M9 12h6"/></svg>
@@ -1290,6 +1299,7 @@
           <div class="your-order-head">
             <h4 id="your-order-title">Your Order</h4>
             <span class="your-order-sub" id="your-order-sub"></span>
+            <button type="button" id="your-order-share" class="yo-share hidden">Share</button>
           </div>
           <div id="your-order-list" class="your-order-list"></div>
           <div class="your-order-add">
@@ -2456,6 +2466,35 @@
       </div>
       <div class="feedbear-hint">
         <span>← → / A D keys &nbsp;•&nbsp; Touch or click to move</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Just Ate: log a meal in about ten seconds -->
+  <div id="just-ate-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="just-ate-title">
+    <div class="modal-card just-ate-card">
+      <div class="modal-header">
+        <h2 id="just-ate-title">Just Ate</h2>
+        <button id="just-ate-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="just-ate-body">
+        <label class="ja-label" for="just-ate-place">Where?</label>
+        <input id="just-ate-place" class="form-input" type="text" maxlength="80"
+          placeholder="Search your spots or type a new one" autocomplete="off" />
+        <div id="just-ate-places" class="ja-places" aria-label="Your spots"></div>
+
+        <label class="ja-label" for="just-ate-dish">What did you have? <span class="ja-optional">optional</span></label>
+        <input id="just-ate-dish" class="form-input" type="text" maxlength="80"
+          placeholder="e.g. Spicy miso ramen" autocomplete="off" enterkeyhint="done" />
+
+        <div class="ja-label" id="just-ate-verdict-label">How was it?</div>
+        <div class="ja-verdicts" id="just-ate-verdicts" role="radiogroup" aria-labelledby="just-ate-verdict-label">
+          <button type="button" class="yo-btn yo-again" data-verdict="again" role="radio" aria-checked="false">Order again</button>
+          <button type="button" class="yo-btn yo-ok" data-verdict="ok" role="radio" aria-checked="false">Fine</button>
+          <button type="button" class="yo-btn yo-skip" data-verdict="skip" role="radio" aria-checked="false">Skip</button>
+        </div>
+
+        <button id="just-ate-save" class="btn-primary ja-save" type="button" disabled>Log it</button>
       </div>
     </div>
   </div>

@@ -908,10 +908,12 @@ function seedData () {
 function uid () {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
+// Local calendar date (YYYY-MM-DD). toISOString() is UTC, which in the US
+// stamped evening dinners with tomorrow's date.
 function iso (offsetDays = 0) {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().split('T')[0];
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function hapticTap (strength = 'light') {
@@ -1535,7 +1537,9 @@ function getFiltered () {
       (r.name||'').toLowerCase().includes(q) ||
       (r.cuisine||'').toLowerCase().includes(q) ||
       (r.notes||'').toLowerCase().includes(q) ||
-      (r.address||'').toLowerCase().includes(q)
+      (r.address||'').toLowerCase().includes(q) ||
+      (r.tags||[]).some(t => String(t).toLowerCase().includes(q)) ||
+      dishesOf(r).some(d => dishKey(d.name).includes(q))
     );
   }
   // Cuisine
@@ -1844,6 +1848,18 @@ function googleStarsLgHtml (rating, reviews) {
   `;
 }
 
+function visitsTileHtml (r) {
+  const visits = Array.isArray(r?.visits) ? r.visits : [];
+  const last = visits.map(v => v.date).filter(Boolean).sort().pop() || r?.dateVisited || '';
+  if (!last) {
+    return `<label>Your Visits</label><div style="color:var(--text-dim);font-size:.85rem">Not yet</div>`;
+  }
+  const count = Math.max(visits.length, 1);
+  return `<label>Your Visits</label>
+    <div style="font-size:1.2rem;font-weight:800;color:var(--text)">${count}×</div>
+    <div style="color:var(--text-dim);font-size:.75rem">Last ${escHtml(fmtDate(last))}</div>`;
+}
+
 function myRatingHtml (rating) {
   if (!rating) {
     return `<label>My Rating</label><div style="color:var(--text-dim);font-size:.85rem">Not rated yet</div>`;
@@ -1887,7 +1903,8 @@ function openDetailModal (id) {
     r.googleRating ? googleStarsLgHtml(r.googleRating, r.googleReviews)
     : `<label>Google Rating</label><div style="color:var(--text-dim);font-size:.85rem">Not available</div>`;
 
-  document.getElementById('detail-my-rating').innerHTML = myRatingHtml(r.myRating);
+  // The star row below already shows your rating; this tile shows your history.
+  document.getElementById('detail-my-rating').innerHTML = visitsTileHtml(r);
   document.getElementById('detail-price').innerHTML =
     `<label>Price Range</label><div style="font-size:1.2rem;color:var(--gold);font-weight:700">${priceDollars(r.priceRange)||'<span style="color:var(--text-dim);font-size:.85rem">Unknown</span>'}</div>`;
 
@@ -2065,7 +2082,6 @@ function initDetailQuickCapture () {
       if (!r) return;
       hapticTap('medium');
       renderDetailQuickCapture(r);
-      document.getElementById('detail-my-rating').innerHTML = myRatingHtml(r.myRating);
       stars.classList.remove('just-set'); void stars.offsetWidth; stars.classList.add('just-set');
       if (val === 5) launchConfetti(1200);
       renderStats();
@@ -2383,7 +2399,8 @@ function handleFormSubmit (e) {
     entry.lat = orig?.lat || null;
     entry.lng = orig?.lng || null;
     entry.visits = orig?.visits || [];
-    state.restaurants = state.restaurants.map(r => r.id === state.editingId ? entry : r);
+    // Keep everything the form doesn't edit (dishes, favorite, photos, ...).
+    state.restaurants = state.restaurants.map(r => r.id === state.editingId ? { ...orig, ...entry } : r);
     showToast('Updated', `"${name}" was refreshed in your list.`, 'success');
   } else {
     entry.visits = [];
@@ -3237,7 +3254,11 @@ function safeUrl (url) {
 function fmtDate (str) {
   if (!str) return '';
   try {
-    return new Date(str).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    // A bare YYYY-MM-DD parses as UTC midnight, which shows the previous day
+    // west of UTC. Read it as a local date instead.
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(str));
+    const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(str);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   } catch { return str; }
 }
 
@@ -5247,6 +5268,7 @@ function setupEvents () {
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       closeMobileHub();
+      closeJustAte();
       closeModal();
       closeDetailModal();
       closeChat();
@@ -5446,6 +5468,36 @@ function setupEvents () {
     const btn = e.target.closest('.yo-btn[data-verdict]');
     if (btn) logYourOrder(btn.dataset.verdict);
   });
+  document.getElementById('your-order-share')?.addEventListener('click', shareYourOrder);
+
+  // Just Ate
+  document.getElementById('home-quick-justate-btn')?.addEventListener('click', () => { hapticTap('medium'); openJustAte(); });
+  document.getElementById('just-ate-close-btn')?.addEventListener('click', closeJustAte);
+  document.getElementById('just-ate-overlay')?.addEventListener('click', e => { if (e.target.id === 'just-ate-overlay') closeJustAte(); });
+  document.getElementById('just-ate-place')?.addEventListener('input', () => { _justAte.placeId = null; renderJustAtePlaces(); });
+  document.getElementById('just-ate-places')?.addEventListener('click', e => {
+    const btn = e.target.closest('.ja-place');
+    if (!btn) return;
+    const r = btn.dataset.id ? state.restaurants.find(x => x.id === btn.dataset.id) : null;
+    _justAte.placeId = r?.id || null;
+    if (r) document.getElementById('just-ate-place').value = r.name;
+    renderJustAtePlaces();
+    document.getElementById('just-ate-dish')?.focus();
+  });
+  document.getElementById('just-ate-verdicts')?.addEventListener('click', e => {
+    const btn = e.target.closest('.yo-btn[data-verdict]');
+    if (!btn) return;
+    _justAte.verdict = btn.dataset.verdict;
+    document.querySelectorAll('#just-ate-verdicts .yo-btn').forEach(b => {
+      const on = b === btn;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-checked', String(on));
+    });
+  });
+  document.getElementById('just-ate-dish')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); if (!document.getElementById('just-ate-save').disabled) saveJustAte(); }
+  });
+  document.getElementById('just-ate-save')?.addEventListener('click', saveJustAte);
   document.getElementById('your-order-input')?.addEventListener('keydown', e => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
@@ -6178,8 +6230,8 @@ function calcStreaks () {
     const consec = (ny === py && nw === pw + 1) || (ny === py + 1 && pw >= 52 && nw === 1);
     if (consec) { current++; if (current > longest) longest = current; } else { current = 1; }
   }
-  const nowWeek  = isoWeek(new Date().toISOString().slice(0,10));
-  const lastWeek = (() => { const d = new Date(); d.setDate(d.getDate()-7); return isoWeek(d.toISOString().slice(0,10)); })();
+  const nowWeek  = isoWeek(iso());
+  const lastWeek = isoWeek(iso(-7));
   const lastVisitWeek = sorted[sorted.length-1];
   const active = lastVisitWeek === nowWeek || lastVisitWeek === lastWeek;
   return { currentStreak: active ? current : 0, longestStreak: longest };
@@ -7784,6 +7836,7 @@ const COMMAND_PALETTE_ACTIONS = [
   { label: 'View: Map', hint: 'Switch to map view', keys: 'view map', run: () => setView('map') },
   { label: 'View: Stats', hint: 'Switch to stats view', keys: 'view stats analytics', run: () => setView('stats') },
   { label: 'Action: Add Restaurant', hint: 'Open add modal', keys: 'add new create restaurant', run: openAddModal },
+  { label: 'Action: Just Ate', hint: 'Log a meal in 10 seconds', keys: 'just ate log meal dish check in visit', run: () => openJustAte() },
   { label: 'Action: Decision Mode', hint: 'Top 3 in under a minute', keys: 'decision mode winner shortlist quick', run: openDecisionMode },
   { label: 'Action: Smart Planner', hint: 'Build tonight plan', keys: 'planner plan tonight', run: openSmartPlanner },
   { label: 'Action: Smart Itinerary', hint: 'Generate multi-stop route', keys: 'itinerary route crawl', run: openSmartItinerary },
@@ -8215,6 +8268,13 @@ function upsertDish (r, { name, verdict, rating, note } = {}) {
 
 // One line on a list card: what to get here, or what you came to try.
 function cardOrderLine (r) {
+  // Searching for a dish shows that dish and your verdict on it.
+  const q = dishKey(state.filter?.search);
+  const hit = q ? dishesOf(r).find(d => dishKey(d.name).includes(q)) : null;
+  if (hit) {
+    const label = { again: 'Get', ok: 'Had', skip: 'Skip', want: 'Try' }[hit.verdict] || 'Had';
+    return `<div class="card-order ${hit.verdict}"><span class="card-order-label">${label}</span> ${escHtml(hit.name)}</div>`;
+  }
   const goTo = goToDishOf(r);
   if (goTo) return `<div class="card-order"><span class="card-order-label">Get</span> ${escHtml(goTo.name)}</div>`;
   const crave = dishesOf(r).find(d => d.verdict === 'want');
@@ -8272,6 +8332,7 @@ function renderYourOrder (restaurantId) {
   dishes.forEach(d => { counts[d.verdict] = (counts[d.verdict] || 0) + 1; });
   const sub = document.getElementById('your-order-sub');
   if (sub) sub.textContent = [counts.again && `${counts.again} to get again`, counts.want && `${counts.want} to try`].filter(Boolean).join(' · ');
+  document.getElementById('your-order-share')?.classList.toggle('hidden', !dishes.length);
 
   if (!dishes.length) {
     listEl.innerHTML = `<div class="your-order-empty">${r?.status === 'want-to-try'
@@ -8292,6 +8353,139 @@ function renderYourOrder (restaurantId) {
           </span>
         </div>`).join('')}
     </div>`).join('');
+}
+
+/* ── Just Ate: log a meal in about ten seconds ──────────────── */
+let _justAte = { placeId: null, verdict: null };
+
+function justAteSuggestions (query = '') {
+  const q = dishKey(query);
+  const list = state.restaurants || [];
+  if (q) return list.filter(r => dishKey(r.name).includes(q)).slice(0, 6);
+  // Nothing typed: nearest spots first, then the ones you touched most recently.
+  return [...list]
+    .sort((a, b) => (distOf(a) - distOf(b)) || (b.updatedAt || 0) - (a.updatedAt || 0))
+    .slice(0, 6);
+}
+
+function renderJustAtePlaces () {
+  const box = document.getElementById('just-ate-places');
+  const input = document.getElementById('just-ate-place');
+  if (!box || !input) return;
+  const typed = input.value.trim();
+  const picks = justAteSuggestions(typed);
+  const exact = picks.some(r => dishKey(r.name) === dishKey(typed));
+  box.innerHTML = picks.map(r => {
+    const dist = distOf(r);
+    return `<button type="button" class="ja-place${r.id === _justAte.placeId ? ' active' : ''}" data-id="${escHtml(r.id)}" aria-pressed="${r.id === _justAte.placeId}">
+      <span class="ja-place-name">${escHtml(r.name)}</span>${Number.isFinite(dist) ? `<span class="ja-place-dist">${fmtDist(dist)}</span>` : ''}
+    </button>`;
+  }).join('') + (typed && !exact
+    ? `<button type="button" class="ja-place ja-place-new${_justAte.placeId === null ? ' active' : ''}" data-new="1">+ New spot: ${escHtml(typed)}</button>`
+    : '');
+  syncJustAteSave();
+}
+
+function syncJustAteSave () {
+  const btn = document.getElementById('just-ate-save');
+  const typed = (document.getElementById('just-ate-place')?.value || '').trim();
+  if (btn) btn.disabled = !(_justAte.placeId || typed);
+}
+
+function openJustAte (restaurantId = null) {
+  const overlay = document.getElementById('just-ate-overlay');
+  if (!overlay) return;
+  const preset = restaurantId ? state.restaurants.find(r => r.id === restaurantId) : null;
+  _justAte = { placeId: preset?.id || null, verdict: null };
+  document.getElementById('just-ate-place').value = preset?.name || '';
+  document.getElementById('just-ate-dish').value = '';
+  document.querySelectorAll('#just-ate-verdicts .yo-btn').forEach(b => {
+    b.classList.remove('active'); b.setAttribute('aria-checked', 'false');
+  });
+  renderJustAtePlaces();
+  overlay.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  trackProductEvent('just_ate_opened', { hasPreset: !!preset });
+  setTimeout(() => document.getElementById(preset ? 'just-ate-dish' : 'just-ate-place')?.focus(), 60);
+}
+
+function closeJustAte () {
+  document.getElementById('just-ate-overlay')?.classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function saveJustAte () {
+  const placeName = (document.getElementById('just-ate-place')?.value || '').trim();
+  const dishName = (document.getElementById('just-ate-dish')?.value || '').trim();
+  let r = state.restaurants.find(x => x.id === _justAte.placeId);
+  // A typed name that matches a saved spot exactly counts as that spot.
+  if (!r && placeName) r = state.restaurants.find(x => dishKey(x.name) === dishKey(placeName));
+  const isNew = !r;
+  if (isNew) {
+    if (!placeName) return;
+    if (typeof isPremium === 'function' && !isPremium() && state.restaurants.length >= FREE_RESTAURANT_LIMIT) {
+      showToast('Cub limit reached', `Cub includes up to ${FREE_RESTAURANT_LIMIT} spots. Upgrade to Grizzly for unlimited saves.`, 'info');
+      if (typeof openUpgradeModal === 'function') openUpgradeModal('Unlimited restaurants');
+      return;
+    }
+    const today = iso();
+    r = {
+      id: uid(), name: placeName.slice(0, 80), cuisine: '', priceRange: 0, address: '', lat: null, lng: null,
+      website: '', photo: '', googleRating: 0, googleReviews: 0, myRating: 0, notes: '', tags: [],
+      collectionId: null, priority: '', status: 'visited', dateAdded: today, dateVisited: today,
+      updatedAt: Date.now(), visits: [],
+    };
+    state.restaurants.unshift(r);
+  }
+
+  if (!Array.isArray(r.visits)) r.visits = [];
+  r.visits.push({ date: iso(), note: '', rating: 0, dish: dishName });
+  r.status = 'visited';
+  r.dateVisited = r.dateVisited || iso();
+  r.updatedAt = Date.now();
+  const verdict = _justAte.verdict || 'ok';
+  if (dishName) upsertDish(r, { name: dishName, verdict });
+  else saveData();
+
+  closeJustAte();
+  renderAll();
+  trackProductEvent('just_ate_logged', { restaurantId: r.id, isNew, hasDish: !!dishName, verdict: dishName ? verdict : null });
+  showToast(`Logged ${r.name}`,
+    dishName ? `${DISH_VERDICT_LABEL[verdict]}: ${dishName}` : (isNew ? 'New spot added to your den.' : 'Visit added to your history.'),
+    'success');
+  if (typeof celebrateMilestones === 'function') celebrateMilestones();
+}
+
+// "At The Mission get the guacamole, skip the churros" — the text a friend
+// actually wants before they go.
+function buildOrderShareText (r) {
+  const names = v => dishesOf(r).filter(d => d.verdict === v).map(d => d.name);
+  const lines = [`What to order at ${r.name}${r.cuisine ? ` (${r.cuisine})` : ''}:`];
+  // Recommend only real winners; fall back to "fine" dishes when there are none.
+  const get = names('again').length ? names('again') : names('ok').slice(0, 2);
+  if (get.length) lines.push(`Get: ${get.join(', ')}`);
+  if (names('want').length) lines.push(`On my list: ${names('want').join(', ')}`);
+  if (names('skip').length) lines.push(`Skip: ${names('skip').join(', ')}`);
+  if (r.address) lines.push(r.address);
+  lines.push('', `Saved with Feed The Bear ${location.origin}/`);
+  return lines.join('\n');
+}
+
+async function shareYourOrder () {
+  const r = state.restaurants.find(x => x.id === state.detailId);
+  if (!r || !dishesOf(r).length) return;
+  const text = buildOrderShareText(r);
+  trackProductEvent('share_order_clicked', { restaurantId: r.id, dishes: dishesOf(r).length });
+  if (navigator.share) {
+    try { await navigator.share({ title: `What to order at ${r.name}`, text }); return; }
+    catch (err) { if (err?.name === 'AbortError') return; }
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('Copied!', 'Paste it to a friend who is going.', 'success');
+  } catch {
+    showToast('Could not share', 'Your browser blocked sharing here.', 'error');
+  }
 }
 
 function logYourOrder (verdict) {
@@ -13462,7 +13656,7 @@ function openVisitLog () {
   document.body.classList.add('overlay-open');
   _populateVisitLogSelect();
   document.getElementById('visitlog-entries').classList.add('hidden');
-  document.getElementById('vl-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('vl-date').value = iso();
   document.getElementById('vl-spend').value = '';
   document.getElementById('vl-dish').value = '';
   document.getElementById('vl-notes').value = '';
