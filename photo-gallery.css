@@ -1,0 +1,353 @@
+/* ═══════════════════════════════════════════════════════════════
+   PHOTO GALLERY - Instagram-Worthy Photo Experience
+   ═══════════════════════════════════════════════════════════════ */
+
+.photo-gallery-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.98);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.photo-gallery-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.photo-gallery-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+}
+
+/* ── Header ──────────────────────────────────────────────────── */
+
+.photo-gallery-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.5) 0%, transparent 100%);
+  position: relative;
+  z-index: 10;
+}
+
+.photo-gallery-close,
+.photo-gallery-share {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.photo-gallery-close:hover,
+.photo-gallery-share:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+
+.photo-gallery-counter {
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  border-radius: 100px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ── Main Photo Area ──────────────────────────────────────────────────── */
+
+.photo-gallery-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  padding: 0 60px;
+}
+
+.photo-gallery-photo-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.photo-gallery-photo {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── Navigation Arrows ──────────────────────────────────────────────────── */
+
+.photo-gallery-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  color: white;
+  font-size: 2rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.photo-gallery-nav:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.photo-gallery-prev {
+  left: 20px;
+}
+
+.photo-gallery-next {
+  right: 20px;
+}
+
+@media (max-width: 768px) {
+  .photo-gallery-main {
+    padding: 0 20px;
+  }
+
+  .photo-gallery-nav {
+    width: 40px;
+    height: 40px;
+    font-size: 1.5rem;
+  }
+
+  .photo-gallery-prev {
+    left: 10px;
+  }
+
+  .photo-gallery-next {
+    right: 10px;
+  }
+}
+
+/* ── Thumbnails Strip ──────────────────────────────────────────────────── */
+
+.photo-gallery-thumbnails {
+  display: flex;
+  gap: 8px;
+  padding: 16px 24px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.photo-gallery-thumbnails::-webkit-scrollbar {
+  display: none;
+}
+
+.photo-gallery-thumb {
+  flex-shrink: 0;
+  width: 80px;
+  height: 80px;
+  background-size: cover;
+  background-position: center;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  opacity: 0.6;
+}
+
+.photo-gallery-thumb:hover {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.photo-gallery-thumb.active {
+  border-color: var(--primary);
+  opacity: 1;
+  box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.3);
+}
+
+@media (max-width: 768px) {
+  .photo-gallery-thumb {
+    width: 60px;
+    height: 60px;
+  }
+}
+
+/* ── Actions Bar ──────────────────────────────────────────────────── */
+
+.photo-gallery-actions {
+  display: flex;
+  gap: 12px;
+  padding: 20px 24px;
+  background: linear-gradient(0deg, rgba(0,0,0,0.5) 0%, transparent 100%);
+  justify-content: center;
+}
+
+.photo-gallery-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 12px 20px;
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.photo-gallery-action-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.photo-gallery-action-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
+@media (max-width: 768px) {
+  .photo-gallery-actions {
+    gap: 8px;
+    padding: 16px;
+  }
+
+  .photo-gallery-action-btn {
+    padding: 10px 16px;
+    font-size: 0.75rem;
+  }
+
+  .photo-gallery-action-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* ── Loading State ──────────────────────────────────────────────────── */
+
+.photo-gallery-photo.loading {
+  opacity: 0.5;
+}
+
+.photo-gallery-photo.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* ── Zoom Indicator ──────────────────────────────────────────────────── */
+
+.zoom-indicator {
+  position: absolute;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 100px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.zoom-indicator.visible {
+  opacity: 1;
+}
+
+/* ── Enhanced Photo Cards (for opening gallery) ──────────────────────────────────────────────────── */
+
+[data-photo-gallery] {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+[data-photo-gallery]::after {
+  content: '📸';
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+[data-photo-gallery]:hover::after {
+  opacity: 1;
+}
+
+[data-photo-gallery]:hover img {
+  transform: scale(1.05);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── Pinch Zoom Visual Feedback ──────────────────────────────────────────────────── */
+
+.pinch-zoom-active .photo-gallery-photo {
+  cursor: grab;
+}
+
+.pinch-zoom-active .photo-gallery-photo:active {
+  cursor: grabbing;
+}
