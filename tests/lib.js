@@ -40,7 +40,11 @@ async function newPage (browser, { seed = null, settings = {}, viewport = { widt
   page.on('pageerror', e => page.errors.push(e.message));
   page.on('console', m => {
     // Missing /api functions and blocked third-party assets are expected on a static server.
-    if (m.type() === 'error' && !/Failed to load resource|ERR_|navigator\.vibrate/.test(m.text())) page.errors.push('[console] ' + m.text().slice(0, 160));
+    // Public map servers (Overpass, Nominatim) reject busy requests without CORS
+    // headers; the app falls back to another source, so that isn't a failure here.
+    const text = m.text();
+    if (m.type() === 'error' && !/Failed to load resource|ERR_|navigator\.vibrate/.test(text)
+        && !/CORS policy/.test(text) && !/overpass|nominatim|maps\.mail\.ru/.test(text)) page.errors.push('[console] ' + text.slice(0, 160));
   });
   return page;
 }
