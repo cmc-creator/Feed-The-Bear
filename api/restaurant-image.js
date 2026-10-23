@@ -48,6 +48,15 @@ function looksLikeParkedDomainPage (html = '') {
   return /premium domain|domain for sale|this domain is for sale|this domain may be for sale|expireddomains|hugedomains|afternic|parkingcrew|buy this domain|undeveloped\.com|godaddy domain broker/.test(h);
 }
 
+// Providers fail quietly so the next one can try, but a bad key or a retired
+// endpoint should still be visible in the Vercel logs.
+async function providerFail (provider, step, resp) {
+  let detail = '';
+  try { detail = (await resp.text()).slice(0, 200); } catch { /* ignore */ }
+  console.warn(`[FTB] restaurant-image ${provider} ${step} HTTP ${resp.status}: ${detail}`);
+  return '';
+}
+
 async function fetchWithTimeout (url, opts = {}, timeoutMs = 5000) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -80,7 +89,7 @@ async function googlePlacesPhoto ({ name, lat, lon }) {
     },
     body: JSON.stringify(body),
   });
-  if (!searchResp.ok) return '';
+  if (!searchResp.ok) return providerFail('google', 'search', searchResp);
   const searchJson = await searchResp.json();
   const photoName = searchJson?.places?.[0]?.photos?.[0]?.name || '';
   if (!photoName) return '';
@@ -88,41 +97,62 @@ async function googlePlacesPhoto ({ name, lat, lon }) {
   // Resolve the media redirect server-side so the returned URL has no API key in it.
   const mediaUrl = `https://places.googleapis.com/v1/${photoName}/media?key=${key}&maxWidthPx=900&skipHttpRedirect=true`;
   const mediaResp = await fetchWithTimeout(mediaUrl);
-  if (!mediaResp.ok) return '';
+  if (!mediaResp.ok) return providerFail('google', 'media', mediaResp);
   const mediaJson = await mediaResp.json();
   return safeHttpUrl(mediaJson?.photoUri || '');
 }
 
 /* ── 2. Foursquare Places API ───────────────────────────────── */
+// Foursquare moved to places-api.foursquare.com (Bearer service key + version
+// header) and new keys are rejected by the old v3 host with a 401. Try the
+// current API first, then the legacy one for older keys.
+const FSQ_APIS = [
+  {
+    label: 'foursquare',
+    base: 'https://places-api.foursquare.com/places',
+    headers: key => ({ Accept: 'application/json', Authorization: `Bearer ${key}`, 'X-Places-Api-Version': '2025-06-17' }),
+    idOf: place => place?.fsq_place_id || '',
+  },
+  {
+    label: 'foursquare-v3',
+    base: 'https://api.foursquare.com/v3/places',
+    headers: key => ({ Accept: 'application/json', Authorization: key }),
+    idOf: place => place?.fsq_id || '',
+    extra: { categories: '13000' }, // Dining & Drinking (legacy category id)
+  },
+];
+
 async function foursquarePhoto ({ name, lat, lon }) {
   const key = process.env.FOURSQUARE_API_KEY;
   if (!key || !name) return '';
 
-  const search = new URL('https://api.foursquare.com/v3/places/search');
-  search.searchParams.set('query', name);
-  search.searchParams.set('limit', '1');
-  search.searchParams.set('categories', '13000'); // Dining & Drinking
-  if (Number.isFinite(lat) && Number.isFinite(lon)) {
-    search.searchParams.set('ll', `${lat},${lon}`);
-    search.searchParams.set('radius', '2000');
+  for (const api of FSQ_APIS) {
+    const search = new URL(`${api.base}/search`);
+    search.searchParams.set('query', name);
+    search.searchParams.set('limit', '1');
+    Object.entries(api.extra || {}).forEach(([k, v]) => search.searchParams.set(k, v));
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      search.searchParams.set('ll', `${lat},${lon}`);
+      search.searchParams.set('radius', '2000');
+    }
+
+    const headers = api.headers(key);
+    const searchResp = await fetchWithTimeout(search.toString(), { headers });
+    // An auth failure means this key belongs to the other API generation.
+    if (searchResp.status === 401 || searchResp.status === 403) { await providerFail(api.label, 'search', searchResp); continue; }
+    if (!searchResp.ok) return providerFail(api.label, 'search', searchResp);
+    const searchJson = await searchResp.json();
+    const fsqId = api.idOf(searchJson?.results?.[0]);
+    if (!fsqId) return '';
+
+    const photosResp = await fetchWithTimeout(`${api.base}/${fsqId}/photos?limit=1&sort=POPULAR`, { headers });
+    if (!photosResp.ok) return providerFail(api.label, 'photos', photosResp);
+    const photos = await photosResp.json();
+    const p = Array.isArray(photos) ? photos[0] : null;
+    if (!p?.prefix || !p?.suffix) return '';
+    return safeHttpUrl(`${p.prefix}900x600${p.suffix}`);
   }
-
-  const headers = { Accept: 'application/json', Authorization: key };
-  const searchResp = await fetchWithTimeout(search.toString(), { headers });
-  if (!searchResp.ok) return '';
-  const searchJson = await searchResp.json();
-  const fsqId = searchJson?.results?.[0]?.fsq_id || '';
-  if (!fsqId) return '';
-
-  const photosResp = await fetchWithTimeout(
-    `https://api.foursquare.com/v3/places/${fsqId}/photos?limit=1&sort=POPULAR`,
-    { headers }
-  );
-  if (!photosResp.ok) return '';
-  const photos = await photosResp.json();
-  const p = Array.isArray(photos) ? photos[0] : null;
-  if (!p?.prefix || !p?.suffix) return '';
-  return safeHttpUrl(`${p.prefix}900x600${p.suffix}`);
+  return '';
 }
 
 /* ── 3. Yelp Fusion API ─────────────────────────────────────── */
@@ -140,7 +170,7 @@ async function yelpPhoto ({ name, lat, lon }) {
   const resp = await fetchWithTimeout(search.toString(), {
     headers: { Accept: 'application/json', Authorization: `Bearer ${key}` },
   });
-  if (!resp.ok) return '';
+  if (!resp.ok) return providerFail('yelp', 'search', resp);
   const json = await resp.json();
   return safeHttpUrl(json?.businesses?.[0]?.image_url || '');
 }
@@ -267,8 +297,8 @@ module.exports = async function handler (req, res) {
         source = provider;
         break;
       }
-    } catch {
-      /* try next provider */
+    } catch (err) {
+      console.warn(`[FTB] restaurant-image ${provider} error: ${err?.message || err}`);
     }
   }
 

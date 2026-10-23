@@ -14,7 +14,9 @@
 
 const admin = require('firebase-admin');
 
-const GEMINI_MODEL = 'gemini-2.0-flash';
+// Pinned model versions get retired; the -latest alias tracks the current
+// Flash model. Set GEMINI_MODEL in Vercel to pin a specific version.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
 const GEMINI_BASE  = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}`;
 
 function getAdmin () {
@@ -120,7 +122,12 @@ module.exports = async function handler (req, res) {
     if (!upstream.ok) {
       const errText = await upstream.text().catch(() => '');
       console.error('[FTB] ai-gemini upstream error:', upstream.status, errText.slice(0, 300));
-      res.status(upstream.status >= 500 ? 502 : 429).json({ error: 'AI is busy right now. Try again in a moment.' });
+      // Only a real rate limit is "busy"; a retired model or bad key won't fix itself.
+      if (upstream.status === 429) {
+        res.status(429).json({ error: 'AI is busy right now. Try again in a moment.' });
+      } else {
+        res.status(502).json({ error: 'Byte Cub AI is unavailable right now. We are on it.' });
+      }
       return;
     }
 
