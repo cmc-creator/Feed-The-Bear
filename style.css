@@ -5726,6 +5726,22 @@ body.light-mode .today-vibe-pill {
   margin-bottom: 14px;
 }
 
+/* Friends */
+.yo-friends { margin-top: 4px; padding-top: 8px; border-top: 1px dashed var(--border); }
+.yo-friends .yo-group-label { color: var(--blue-lt, var(--blue)); }
+.yo-friend { font-size: .84rem; color: var(--text); line-height: 1.45; margin: 3px 0; }
+.yo-friend strong { font-weight: 800; }
+.friends-list { margin-top: 14px; display: grid; gap: 6px; }
+.friend-row {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface2);
+}
+.friend-info { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.friend-info span { font-size: .74rem; color: var(--text-dim); }
+.friends-empty { font-size: .82rem; color: var(--text-muted); line-height: 1.5; }
+.friend-follow-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 1rem; }
+.guest-item-order { font-size: .78rem; color: var(--text-muted); margin-top: 2px; }
+
 /* Just Ate */
 .just-ate-card { max-width: 480px; }
 .just-ate-body { padding: 16px 24px 24px; display: grid; gap: 8px; }
