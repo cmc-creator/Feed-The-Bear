@@ -1,0 +1,43 @@
+name: Browser tests
+
+on:
+  push:
+    branches-ignore:
+      - main   # main runs these through deploy.yml before deploying
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install test dependencies
+        working-directory: tests
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: tests
+        run: npx playwright-core install --with-deps chromium
+
+      - name: Serve the site
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8765/app.html >/dev/null && break; sleep 1; done
+
+      - name: Smoke test (every page and feature opens cleanly)
+        working-directory: tests
+        run: node smoke.test.js
+
+      - name: Foodie flows
+        working-directory: tests
+        run: node flows.test.js

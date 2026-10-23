@@ -1,0 +1,11 @@
+{
+  "name": "feed-the-bear-tests",
+  "private": true,
+  "description": "Browser tests. Serve the repo root on :8765 first (python -m http.server 8765).",
+  "scripts": {
+    "test": "node smoke.test.js && node flows.test.js"
+  },
+  "devDependencies": {
+    "playwright-core": "1.56.1"
+  }
+}
