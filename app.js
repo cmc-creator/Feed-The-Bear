@@ -3526,28 +3526,14 @@ function hasActiveFilters () {
 /* ════════════════════════════════════════════════════════════
    PWA INSTALL PROMPT
    ════════════════════════════════════════════════════════════ */
+// Captured early so initInstallPrompt can use it even if the event fires
+// before init runs. The bottom #install-banner is the only install UI; an
+// older top banner used to show at the same time.
 let _pwaPromptEvent = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   _pwaPromptEvent = e;
-  if (!state.settings.pwaDismissed) {
-    document.getElementById('pwa-banner').classList.remove('hidden');
-  }
 });
-function initPwa () {
-  document.getElementById('pwa-install-btn').addEventListener('click', async () => {
-    if (!_pwaPromptEvent) return;
-    _pwaPromptEvent.prompt();
-    const { outcome } = await _pwaPromptEvent.userChoice;
-    if (outcome === 'accepted') document.getElementById('pwa-banner').classList.add('hidden');
-    _pwaPromptEvent = null;
-  });
-  document.getElementById('pwa-dismiss-btn').addEventListener('click', () => {
-    document.getElementById('pwa-banner').classList.add('hidden');
-    state.settings.pwaDismissed = true;
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
-  });
-}
 
 /* ════════════════════════════════════════════════════════════
    LIGHT / DARK THEME TOGGLE
@@ -6300,7 +6286,6 @@ function initBearRoarInteractions () {
 document.addEventListener('DOMContentLoaded', () => {
   loadData();
   setupEvents();
-  initPwa();
   initTheme();
   initAutoTheme();
   initHomeVibeTicker();
@@ -11520,6 +11505,8 @@ function revealBearSwipeCard () {
 }
 
 function renderBearSwipeHomeFromElements (elements = []) {
+  // Bear Swipe v2 (bear-swipe.js) owns the home card now.
+  if (window.BearSwipe) { window.BearSwipe.init(); return; }
   const mod = document.getElementById('bear-swipe-home');
   if (!mod) return;
   const savedRows = (state.restaurants || []).slice(0, 24);
@@ -11537,6 +11524,8 @@ function renderBearSwipeHomeFromElements (elements = []) {
 }
 
 function renderBearSwipeHomeFromSaved (savedRows = []) {
+  // Bear Swipe v2 (bear-swipe.js) owns the home card now.
+  if (window.BearSwipe) { window.BearSwipe.init(); return; }
   const mod = document.getElementById('bear-swipe-home');
   if (!mod) return;
   const deck = buildMoodSwipeDeck([], savedRows);
@@ -11553,6 +11542,8 @@ function renderBearSwipeHomeFromSaved (savedRows = []) {
 }
 
 function initBearSwipeHome () {
+  // Bear Swipe v2 (bear-swipe.js) owns the home card now.
+  if (window.BearSwipe) { window.BearSwipe.init(); return; }
   const mod = document.getElementById('bear-swipe-home');
   const card = document.getElementById('bear-swipe-card');
   const noBtn = document.getElementById('bear-swipe-no-btn');
@@ -12759,6 +12750,10 @@ function _isInStandaloneMode () {
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 }
 
+function installDismissed () {
+  return !!localStorage.getItem('ftb_install_dismissed') || !!state.settings.pwaDismissed;
+}
+
 function initInstallPrompt () {
   // If already installed, do nothing
   if (_isInStandaloneMode()) return;
@@ -12766,14 +12761,14 @@ function initInstallPrompt () {
   // If beforeinstallprompt already fired before this function ran, use it now
   if (_pwaPromptEvent && !_deferredInstallPrompt) {
     _deferredInstallPrompt = _pwaPromptEvent;
-    if (!localStorage.getItem('ftb_install_dismissed')) {
+    if (!installDismissed()) {
       setTimeout(showInstallBanner, 2000);
     }
   }
 
   // iOS: show manual instructions after 5s on first visit
   if (_isIos()) {
-    if (!localStorage.getItem('ftb_install_dismissed')) {
+    if (!installDismissed()) {
       setTimeout(() => {
         const banner = document.getElementById('install-banner');
         document.getElementById('install-android-content').style.display = 'none';
@@ -12788,7 +12783,7 @@ function initInstallPrompt () {
   window.addEventListener('beforeinstallprompt', e => {
     e.preventDefault();
     _deferredInstallPrompt = e;
-    if (!localStorage.getItem('ftb_install_dismissed')) {
+    if (!installDismissed()) {
       setTimeout(showInstallBanner, 6000);
     }
   });

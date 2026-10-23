@@ -49,3 +49,7 @@ jobs:
       - name: Photo storage
         working-directory: tests
         run: node photos.test.js
+
+      - name: Bear Swipe
+        working-directory: tests
+        run: node swipe.test.js
