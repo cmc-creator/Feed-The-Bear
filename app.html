@@ -762,6 +762,15 @@
         <div class="nearby-home-loading">Finding restaurants near you…</div>
       </div>
 
+      <!-- Crave List: every dish you've been meaning to try, nearest first -->
+      <div id="crave-home" class="crave-home home-module hidden">
+        <div class="crave-home-header">
+          <span class="crave-home-title">Your Crave List</span>
+          <span class="crave-home-count" id="crave-home-count"></span>
+        </div>
+        <div id="crave-home-list" class="crave-home-list"></div>
+      </div>
+
       <!-- Personal recommendation strip (below nearby) -->
       <div id="for-you-home" class="for-you-home home-module hidden">
         <div class="for-you-home-header">
@@ -1276,6 +1285,25 @@
           </div>
         </div>
 
+        <!-- Your Order: what to get again, what to skip, what to try next -->
+        <section class="your-order" id="your-order" aria-labelledby="your-order-title">
+          <div class="your-order-head">
+            <h4 id="your-order-title">Your Order</h4>
+            <span class="your-order-sub" id="your-order-sub"></span>
+          </div>
+          <div id="your-order-list" class="your-order-list"></div>
+          <div class="your-order-add">
+            <input id="your-order-input" class="form-input" type="text" maxlength="80"
+              placeholder="What did you have? e.g. Birria tacos" aria-label="Dish name" enterkeyhint="done" />
+            <div class="your-order-verdicts" role="group" aria-label="How was it?">
+              <button type="button" class="yo-btn yo-again" data-verdict="again">Order again</button>
+              <button type="button" class="yo-btn yo-ok" data-verdict="ok">Fine</button>
+              <button type="button" class="yo-btn yo-skip" data-verdict="skip">Skip</button>
+              <button type="button" class="yo-btn yo-want" data-verdict="want">Want to try</button>
+            </div>
+          </div>
+        </section>
+
         <!-- Quick Capture: set rating / status / price inline -->
         <div class="detail-quick" id="detail-quick">
           <div class="dq-group">
@@ -1316,31 +1344,6 @@
           </div>
           <textarea id="detail-notes-edit" class="detail-notes-edit" rows="3"
             placeholder="Jot the vibe, what to order, and who joined you" maxlength="2000"></textarea>
-        </div>
-
-        <div class="detail-menu-notes" id="detail-menu-notes-wrap">
-          <div class="detail-menu-head">
-            <h4>Menu Notes</h4>
-            <button id="detail-menu-add-btn" class="btn-sm btn-orange" type="button">+ Add Item</button>
-          </div>
-          <div class="detail-menu-form hidden" id="detail-menu-form">
-            <input id="detail-menu-item-input" class="form-input" type="text" placeholder="Menu item (e.g. Truffle Pasta)" />
-            <div class="detail-menu-reaction-row" id="detail-menu-reaction-row">
-              <button class="detail-menu-react-btn" data-reaction="liked" type="button"> Liked</button>
-              <button class="detail-menu-react-btn" data-reaction="disliked" type="button"> Didn’t Like</button>
-              <button class="detail-menu-react-btn active" data-reaction="neutral" type="button"> Neutral</button>
-            </div>
-            <input id="detail-menu-note-input" class="form-input" type="text" placeholder="Quick note (optional)" />
-            <label class="detail-menu-fav-check">
-              <input id="detail-menu-fav-input" type="checkbox" />
-              Mark as favorite dish ⭐
-            </label>
-            <div class="detail-menu-form-actions">
-              <button id="detail-menu-save-btn" class="btn-primary" type="button">Save Item</button>
-              <button id="detail-menu-cancel-btn" class="btn-ghost" type="button">Cancel</button>
-            </div>
-          </div>
-          <div id="detail-menu-list" class="detail-menu-list"></div>
         </div>
 
         <div class="detail-visit-log" id="detail-visit-log-wrap">

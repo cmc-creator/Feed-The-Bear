@@ -1336,6 +1336,66 @@ button:focus-visible,
 .g-star-lg.half { position: relative; color: var(--text-dim); }
 .g-star-lg.half::before { content: '★'; position: absolute; left: 0; width: 50%; overflow: hidden; color: var(--gold); }
 
+/* ── Your Order ─────────────────────────────────────────────── */
+.your-order {
+  background: var(--surface2);
+  border: 1px solid rgba(var(--primary-rgb), .28);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.your-order-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.your-order-head h4 { font-size: 1rem; font-weight: 800; color: var(--text); }
+.your-order-sub { font-size: .75rem; color: var(--text-dim); }
+.your-order-empty { font-size: .85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 10px; }
+.your-order-list { display: grid; gap: 10px; margin-bottom: 12px; }
+.your-order-list:empty { display: none; }
+.yo-group-label {
+  font-size: .68rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-dim); margin-bottom: 4px;
+}
+.yo-group-again .yo-group-label { color: var(--primary); }
+.yo-group-want .yo-group-label { color: var(--gold); }
+.yo-group-skip .yo-group-label { color: var(--red); }
+.yo-dish { border-radius: var(--radius-sm); }
+.yo-dish-name {
+  display: block; width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
+  font: inherit; font-size: .95rem; font-weight: 600; color: var(--text); padding: 6px 0;
+}
+.yo-group-skip .yo-dish-name { color: var(--text-dim); text-decoration: line-through; text-decoration-color: rgba(var(--rose-rgb), .6); }
+.yo-dish-stars { color: var(--gold); font-size: .78rem; letter-spacing: 1px; }
+.card-order {
+  font-size: .82rem; font-weight: 600; color: #f6ecdc; margin: 4px 0 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.card-order-label {
+  font-size: .64rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: #a8d5a2; margin-right: 4px;
+}
+.card-order.want .card-order-label { color: #e7c48a; }
+.yo-dish-note { font-size: .78rem; color: var(--text-muted); font-style: italic; margin: -2px 0 4px; }
+.yo-dish-actions { display: none; flex-wrap: wrap; gap: 6px; padding: 2px 0 8px; }
+.yo-dish.open .yo-dish-actions { display: flex; }
+.yo-move, .yo-remove {
+  font: inherit; font-size: .75rem; font-weight: 600; cursor: pointer;
+  padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface3); color: var(--text-muted);
+}
+.yo-remove { padding: 5px 9px; }
+.your-order-add { display: grid; gap: 8px; }
+.your-order-verdicts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.yo-btn {
+  font: inherit; font-size: .76rem; font-weight: 700; cursor: pointer; line-height: 1.2;
+  padding: 9px 4px; min-height: 40px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--surface3); color: var(--text);
+  transition: transform var(--transition), background var(--transition);
+}
+.yo-btn:active { transform: scale(.96); }
+.yo-again { background: rgba(var(--primary-rgb), .2); border-color: rgba(var(--primary-rgb), .5); }
+.yo-want  { background: rgba(200,162,106,.16); border-color: rgba(200,162,106,.45); }
+.yo-skip  { color: var(--text-muted); }
+@media (max-width: 360px) { .your-order-verdicts { grid-template-columns: repeat(2, 1fr); } }
+
 .detail-notes { background: var(--surface2); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; }
 .detail-notes h4 { font-size: .82rem; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
 .detail-notes p { font-size: .88rem; color: var(--text); line-height: 1.6; font-style: italic; }
@@ -5591,6 +5651,29 @@ body.light-mode .today-vibe-pill {
 /* For You strip */
 .for-you-home {
   margin-bottom: 14px;
+}
+
+/* Crave List */
+.crave-home { margin-bottom: 14px; }
+.crave-home-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+/* Home modules sit on dark wood in both themes, so text uses fixed cream tones. */
+.crave-home-title { font-size: .9rem; font-weight: 700; color: #f6ecdc; }
+.crave-home-count { font-size: .74rem; color: #d8c4a7; }
+.crave-home-list {
+  display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory;
+  padding-bottom: 4px; -webkit-overflow-scrolling: touch;
+}
+.crave-card {
+  flex: 0 0 auto; max-width: 220px; scroll-snap-align: start; text-align: left; cursor: pointer;
+  display: grid; gap: 2px; padding: 10px 14px; border-radius: var(--radius);
+  font: inherit; color: #f6ecdc;
+  background: rgba(200,162,106,.18); border: 1px solid rgba(231,196,138,.45);
+}
+.crave-dish { font-size: .9rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crave-where { font-size: .74rem; color: #e3d1b6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crave-empty {
+  font-size: .82rem; color: #e3d1b6; line-height: 1.5;
+  padding: 10px 14px; border-radius: var(--radius); border: 1px dashed rgba(255,226,188,.3);
 }
 
 .for-you-home-header {

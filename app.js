@@ -173,16 +173,12 @@ function isCredibleFoodVenue (el = {}) {
 }
 
 function favoriteDishesForSaved (restaurant) {
-  const rows = Array.isArray(restaurant?.dishes) ? restaurant.dishes : [];
-  const normalized = rows
-    .map(d => ({
-      name: String(d?.name || d?.dish || '').trim(),
-      score: Number(d?.rating || d?.stars || d?.score || 0),
-    }))
-    .filter(d => d.name)
-    .sort((a, b) => b.score - a.score)
+  const rank = { again: 2, ok: 1 };
+  const normalized = dishesOf(restaurant)
+    .filter(d => String(d?.name || '').trim() && rank[d.verdict])
+    .sort((a, b) => rank[b.verdict] - rank[a.verdict] || (b.rating || 0) - (a.rating || 0))
     .slice(0, 3)
-    .map(d => d.name);
+    .map(d => String(d.name).trim());
   if (normalized.length) return normalized;
   return null;
 }
@@ -556,6 +552,7 @@ function loadData () {
     if ('visitLog' in r) { delete r.visitLog; _vlMigrated = true; }
   });
   if (_vlMigrated) saveData();
+  if (mergeLegacyDishStores()) saveData();
 
   try {
     const s = localStorage.getItem(SETTINGS_KEY);
@@ -1711,6 +1708,7 @@ function buildCard (r) {
         ${r.googleRating ? googleStarsHtml(r.googleRating, r.googleReviews) : ''}
         ${r.myRating ? `<span class="my-rating-row"><span class="my-stars">${'★'.repeat(r.myRating)}${'☆'.repeat(5-r.myRating)}</span> My Rating</span>` : ''}
       </div>
+      ${cardOrderLine(r)}
       <div class="card-highlights">
         <span class="card-highlight good"> ${matchScore}% match</span>
         <span class="card-highlight mood"> ${escHtml(moodLabel)}</span>
@@ -1995,8 +1993,9 @@ function openDetailModal (id) {
     }
   };
 
-  resetDetailMenuForm();
-  renderDetailMenuList(id);
+  const yoInput = document.getElementById('your-order-input');
+  if (yoInput) yoInput.value = '';
+  renderYourOrder(id);
 
   document.getElementById('detail-overlay').classList.remove('hidden');
   document.getElementById('ui-overlay').classList.remove('hidden');
@@ -2735,7 +2734,7 @@ function renderAll () {
   updateLocationBanner();
   // Home sections are isolated: a failure in one must never cascade and
   // abort renderAll (which would leave later init wiring unattached).
-  [renderTodayStatusRow, renderWeeklyGoal, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
+  [renderTodayStatusRow, renderWeeklyGoal, renderCraveHome, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
     .forEach(fn => { try { fn(); } catch (err) { console.error(`${fn.name} failed:`, err); } });
 }
 
@@ -4375,6 +4374,12 @@ function buildDecisionModeShortlist () {
       else score -= Math.min(2.4, (distance - maxMeters) / 2200);
     }
 
+    // A dish you've been craving, or a proven go-to, is the best tie-breaker.
+    const crave = dishesOf(r).find(d => d.verdict === 'want');
+    const goTo = goToDishOf(r);
+    if (crave) score += 1.4;
+    else if (goTo && goTo.verdict === 'again') score += 0.7;
+
     const cuisine = String(r.cuisine || '').toLowerCase();
     if (party >= 4) {
       if ((r.priceRange || 0) <= 2) score += 0.8;
@@ -4390,6 +4395,8 @@ function buildDecisionModeShortlist () {
       : 0.42;
 
     const reasons = [];
+    if (crave) reasons.push(`you've been wanting the ${crave.name}`);
+    else if (goTo && goTo.verdict === 'again') reasons.push(`your go-to: ${goTo.name}`);
     reasons.push(mood === 'date' ? 'date-night fit' : mood === 'comfort' ? 'comfort match' : mood === 'healthy' ? 'lighter option' : 'fast decision pick');
     if (budget > 0 && (r.priceRange || 0) > 0 && (r.priceRange || 0) <= budget) reasons.push('inside budget');
     if (Number.isFinite(distance) && distance <= maxMeters) reasons.push('close enough now');
@@ -5418,30 +5425,36 @@ function setupEvents () {
     renderCards();
     openDetailModal(state.detailId);
   });
-  document.getElementById('detail-menu-add-btn').addEventListener('click', () => {
-    const formEl = document.getElementById('detail-menu-form');
-    if (!formEl) return;
-    formEl.classList.remove('hidden');
-    document.getElementById('detail-menu-item-input')?.focus();
+  // Your Order: log a dish with one tap, or press Enter for the default
+  // (want to try for a place you haven't been, fine otherwise).
+  document.querySelector('#your-order .your-order-verdicts')?.addEventListener('click', e => {
+    const btn = e.target.closest('.yo-btn[data-verdict]');
+    if (btn) logYourOrder(btn.dataset.verdict);
   });
-  document.getElementById('detail-menu-cancel-btn').addEventListener('click', resetDetailMenuForm);
-  document.getElementById('detail-menu-save-btn').addEventListener('click', saveDetailMenuItem);
-  document.getElementById('detail-menu-item-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      saveDetailMenuItem();
+  document.getElementById('your-order-input')?.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const r = state.restaurants.find(x => x.id === state.detailId);
+    logYourOrder(r?.status === 'want-to-try' ? 'want' : 'ok');
+  });
+  document.getElementById('your-order-list')?.addEventListener('click', e => {
+    const r = state.restaurants.find(x => x.id === state.detailId);
+    if (!r) return;
+    const move = e.target.closest('.yo-move');
+    const remove = e.target.closest('.yo-remove');
+    if (move) {
+      const d = dishesOf(r).find(x => x.id === move.dataset.id);
+      if (d) upsertDish(r, { name: d.name, verdict: move.dataset.move });
+    } else if (remove) {
+      removeDish(r, remove.dataset.remove);
+    } else {
+      const nameBtn = e.target.closest('.yo-dish-name');
+      const row = nameBtn?.closest('.yo-dish');
+      if (row) nameBtn.setAttribute('aria-expanded', String(row.classList.toggle('open')));
+      return;
     }
-  });
-  document.getElementById('detail-menu-note-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      saveDetailMenuItem();
-    }
-  });
-  document.getElementById('detail-menu-reaction-row').addEventListener('click', e => {
-    const btn = e.target.closest('.detail-menu-react-btn');
-    if (!btn) return;
-    setDetailMenuReaction(btn.dataset.reaction || 'neutral');
+    renderYourOrder(r.id);
+    renderAll();
   });
 
   // Phase 8 - Visit Debrief
@@ -8136,7 +8149,7 @@ function runCravingEngine () {
 let _dishRating = 0;
 const DISHES_KEY = 'ftb_dishes_v1';
 const MENU_NOTES_KEY = 'ftb_menu_notes_v1';
-let _detailMenuReaction = 'neutral';
+
 
 function getDishes () {
   try { return JSON.parse(localStorage.getItem(DISHES_KEY)) || {}; } catch(_) { return {}; }
@@ -8148,72 +8161,143 @@ function getMenuNotes () {
 }
 function saveMenuNotes (data) { localStorage.setItem(MENU_NOTES_KEY, JSON.stringify(data)); }
 
-function setDetailMenuReaction (reaction = 'neutral') {
-  _detailMenuReaction = reaction;
-  document.querySelectorAll('.detail-menu-react-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.reaction === reaction);
-  });
+/* ── Your Order: one dish memory per restaurant ─────────────────
+   Dishes live on the restaurant (r.dishes) so they sync with it.
+   verdict: 'again' | 'ok' | 'skip' | 'want'                        */
+const DISHES_MERGED_KEY = 'ftb_dishes_merged_v1';
+const DISH_VERDICTS = ['again', 'ok', 'skip', 'want'];
+const DISH_VERDICT_LABEL = { again: 'Order again', ok: 'Fine', skip: 'Skip', want: 'Want to try' };
+
+function dishesOf (r) { return Array.isArray(r?.dishes) ? r.dishes : []; }
+function dishKey (name) { return String(name || '').trim().toLowerCase(); }
+
+function verdictFromRating (rating = 0) {
+  if (rating >= 4) return 'again';
+  if (rating > 0 && rating <= 2) return 'skip';
+  return 'ok';
 }
 
-function resetDetailMenuForm () {
-  const formEl = document.getElementById('detail-menu-form');
-  if (formEl) formEl.classList.add('hidden');
-  const itemEl = document.getElementById('detail-menu-item-input');
-  const noteEl = document.getElementById('detail-menu-note-input');
-  const favEl = document.getElementById('detail-menu-fav-input');
-  if (itemEl) itemEl.value = '';
-  if (noteEl) noteEl.value = '';
-  if (favEl) favEl.checked = false;
-  setDetailMenuReaction('neutral');
-}
-
-function saveDetailMenuItem () {
-  if (!state.detailId) return;
-  const name = (document.getElementById('detail-menu-item-input')?.value || '').trim();
-  if (!name) {
-    showToast('Item name required', 'Add a menu item name first.', 'error');
-    return;
+// Adds a dish or updates the one with the same name, so re-logging a dish
+// changes its verdict instead of creating duplicates.
+function upsertDish (r, { name, verdict, rating, note } = {}) {
+  const clean = String(name || '').trim().slice(0, 80);
+  if (!r || !clean) return null;
+  if (!Array.isArray(r.dishes)) r.dishes = [];
+  let dish = r.dishes.find(d => dishKey(d.name) === dishKey(clean));
+  if (!dish) {
+    dish = { id: uid(), name: clean, verdict: 'ok', rating: 0, note: '', date: iso() };
+    r.dishes.push(dish);
   }
-  const note = (document.getElementById('detail-menu-note-input')?.value || '').trim();
-  const favorite = !!document.getElementById('detail-menu-fav-input')?.checked;
-  const notes = getMenuNotes();
-  if (!Array.isArray(notes[state.detailId])) notes[state.detailId] = [];
-  notes[state.detailId].push({
-    id: uid(),
-    name,
-    note,
-    reaction: _detailMenuReaction,
-    favorite,
-    date: iso(),
-  });
-  saveMenuNotes(notes);
-  resetDetailMenuForm();
-  renderDetailMenuList(state.detailId);
-  showToast('Saved', `${name} added to menu notes.`, 'success');
+  if (Number.isFinite(rating) && rating > 0) dish.rating = Math.min(5, Math.round(rating));
+  if (DISH_VERDICTS.includes(verdict)) dish.verdict = verdict;
+  else if (Number.isFinite(rating) && rating > 0) dish.verdict = verdictFromRating(rating);
+  if (note != null) dish.note = String(note).slice(0, 200);
+  if (dish.verdict !== 'want') dish.date = iso();
+  r.updatedAt = Date.now();
+  saveData();
+  return dish;
 }
 
-function renderDetailMenuList (restaurantId) {
-  const listEl = document.getElementById('detail-menu-list');
+// One line on a list card: what to get here, or what you came to try.
+function cardOrderLine (r) {
+  const goTo = goToDishOf(r);
+  if (goTo) return `<div class="card-order"><span class="card-order-label">Get</span> ${escHtml(goTo.name)}</div>`;
+  const crave = dishesOf(r).find(d => d.verdict === 'want');
+  if (crave) return `<div class="card-order want"><span class="card-order-label">Try</span> ${escHtml(crave.name)}</div>`;
+  return '';
+}
+
+function removeDish (r, dishId) {
+  if (!r || !Array.isArray(r.dishes)) return;
+  r.dishes = r.dishes.filter(d => d.id !== dishId);
+  r.updatedAt = Date.now();
+  saveData();
+}
+
+// Best dish to recommend at a spot: an "order again" first, then the
+// highest-rated one you didn't dislike.
+function goToDishOf (r) {
+  const rank = { again: 2, ok: 1 };
+  return dishesOf(r)
+    .filter(d => rank[d.verdict])
+    .sort((a, b) => rank[b.verdict] - rank[a.verdict] || (b.rating || 0) - (a.rating || 0))[0] || null;
+}
+
+// Dish Tracker and Menu Notes each kept dishes in a device-only store.
+// Fold both into r.dishes once, keeping the legacy stores untouched.
+function mergeLegacyDishStores () {
+  if (localStorage.getItem(DISHES_MERGED_KEY) === '1') return false;
+  const byId = new Map((state.restaurants || []).map(r => [String(r.id), r]));
+  const toItems = v => Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.values(v) : []);
+  let changed = false;
+  const take = (restaurantId, item, verdict, rating) => {
+    const r = byId.get(String(restaurantId));
+    const name = String(item?.name || '').trim().slice(0, 80);
+    if (!r || !name) return;
+    if (!Array.isArray(r.dishes)) r.dishes = [];
+    if (r.dishes.some(d => dishKey(d.name) === dishKey(name))) return;
+    r.dishes.push({ id: item.id || uid(), name, verdict, rating: rating || 0, note: String(item.note || '').slice(0, 200), date: item.date || iso() });
+    r.updatedAt = Date.now();
+    changed = true;
+  };
+  Object.entries(getDishes()).forEach(([rid, items]) =>
+    toItems(items).forEach(d => take(rid, d, verdictFromRating(d.rating), d.rating)));
+  Object.entries(getMenuNotes()).forEach(([rid, items]) =>
+    toItems(items).forEach(n => take(rid, n, (n.reaction === 'liked' || n.favorite) ? 'again' : n.reaction === 'disliked' ? 'skip' : 'ok', 0)));
+  localStorage.setItem(DISHES_MERGED_KEY, '1');
+  return changed;
+}
+
+function renderYourOrder (restaurantId) {
+  const listEl = document.getElementById('your-order-list');
   if (!listEl) return;
-  const notes = getMenuNotes();
-  const list = (notes[restaurantId] || []).slice().reverse();
-  if (!list.length) {
-    listEl.innerHTML = '<div class="dish-empty">No menu notes yet. Add your first dish above.</div>';
+  const r = state.restaurants.find(x => x.id === restaurantId);
+  const dishes = dishesOf(r);
+  const counts = {};
+  dishes.forEach(d => { counts[d.verdict] = (counts[d.verdict] || 0) + 1; });
+  const sub = document.getElementById('your-order-sub');
+  if (sub) sub.textContent = [counts.again && `${counts.again} to get again`, counts.want && `${counts.want} to try`].filter(Boolean).join(' · ');
+
+  if (!dishes.length) {
+    listEl.innerHTML = `<div class="your-order-empty">${r?.status === 'want-to-try'
+      ? 'Heard about a must-order dish here? Save it so you remember when you go.'
+      : 'What did you order? Log it so next time you know exactly what to get.'}</div>`;
     return;
   }
-  listEl.innerHTML = list.map(item => {
-    const reaction = item.reaction === 'liked' ? '' : item.reaction === 'disliked' ? '' : '';
-    const fav = item.favorite ? '⭐ ' : '';
-    const note = item.note ? `<div class="detail-menu-item-note">${escHtml(item.note)}</div>` : '';
-    const cls = item.reaction === 'liked' ? 'liked' : item.reaction === 'disliked' ? 'disliked' : 'neutral';
-    return `<div class="detail-menu-item ${cls}">
-      <div class="detail-menu-item-top">
-        <div class="detail-menu-item-name">${fav}${escHtml(item.name)}</div>
-        <div class="detail-menu-item-reaction">${reaction}</div>
-      </div>
-      ${note}
-    </div>`;
-  }).join('');
+  listEl.innerHTML = ['again', 'want', 'ok', 'skip'].filter(g => counts[g]).map(g => `
+    <div class="yo-group yo-group-${g}">
+      <div class="yo-group-label">${DISH_VERDICT_LABEL[g]}</div>
+      ${dishes.filter(d => d.verdict === g).map(d => `
+        <div class="yo-dish">
+          <button type="button" class="yo-dish-name" aria-expanded="false">${escHtml(d.name)}${d.rating ? ` <span class="yo-dish-stars" aria-label="${d.rating} stars">${'★'.repeat(d.rating)}</span>` : ''}</button>
+          ${d.note ? `<div class="yo-dish-note">${escHtml(d.note)}</div>` : ''}
+          <span class="yo-dish-actions">
+            ${DISH_VERDICTS.filter(v => v !== g).map(v => `<button type="button" class="yo-move" data-move="${v}" data-id="${escHtml(d.id)}">${DISH_VERDICT_LABEL[v]}</button>`).join('')}
+            <button type="button" class="yo-remove" data-remove="${escHtml(d.id)}" aria-label="Remove ${escHtml(d.name)}">✕</button>
+          </span>
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+function logYourOrder (verdict) {
+  const input = document.getElementById('your-order-input');
+  const name = (input?.value || '').trim();
+  if (!name) {
+    input?.focus();
+    showToast('What did you have?', 'Type the dish name first.', 'info');
+    return;
+  }
+  const r = state.restaurants.find(x => x.id === state.detailId);
+  const dish = upsertDish(r, { name, verdict });
+  if (!dish) return;
+  input.value = '';
+  renderYourOrder(r.id);
+  renderAll();
+  const msg = verdict === 'want' ? `${dish.name} is on your Crave List.`
+    : verdict === 'again' ? `Next time here: ${dish.name}.`
+    : verdict === 'skip' ? `Noted. You'll pass on the ${dish.name}.`
+    : `${dish.name} logged.`;
+  showToast(DISH_VERDICT_LABEL[verdict], msg, 'success');
 }
 
 function openDishTracker (restaurantId) {
@@ -8242,24 +8326,23 @@ function _renderDishRatingPicker (val) {
 function addDish () {
   const name = document.getElementById('dish-name-input').value.trim();
   if (!name) { showToast('Name required', 'Enter a dish name.', 'error'); return; }
-  const dishes = getDishes();
-  if (!dishes[state.detailId]) dishes[state.detailId] = [];
-  dishes[state.detailId].push({ id: uid(), name, rating: _dishRating, date: iso() });
-  saveDishes(dishes);
+  const r = state.restaurants.find(x => x.id === state.detailId);
+  if (!upsertDish(r, { name, rating: _dishRating })) return;
   document.getElementById('dish-name-input').value = '';
   _renderDishRatingPicker(0);
   renderDishList(state.detailId);
-  showToast('✅ Dish saved!', name + ' added to your dish log.', 'success');
+  renderYourOrder(state.detailId);
+  showToast('✓ Dish saved!', name + ' added to your dish log.', 'success');
 }
 function deleteDish (restaurantId, dishId) {
-  const dishes = getDishes();
-  if (dishes[restaurantId]) dishes[restaurantId] = dishes[restaurantId].filter(d => d.id !== dishId);
-  saveDishes(dishes);
+  removeDish(state.restaurants.find(x => x.id === restaurantId), dishId);
   renderDishList(restaurantId);
+  renderYourOrder(restaurantId);
 }
 function renderDishList (restaurantId) {
-  const dishes = getDishes();
-  const list = (dishes[restaurantId] || []).sort((a,b) => b.rating - a.rating || b.date.localeCompare(a.date));
+  const r = state.restaurants.find(x => x.id === restaurantId);
+  const list = dishesOf(r).filter(d => d.verdict !== 'want')
+    .sort((a, b) => (b.rating || 0) - (a.rating || 0) || String(b.date || '').localeCompare(String(a.date || '')));
   const el = document.getElementById('dish-list');
   if (!list.length) {
     el.innerHTML = '<div class="dish-empty">No dishes logged yet. Add your first one above!</div>';
@@ -9238,31 +9321,16 @@ function stageHomeModules () {
 
 function getDishLeaderboardData () {
   const map = {};
-  const toItems = (val) => Array.isArray(val) ? val : (val && typeof val === 'object' ? Object.values(val) : []);
-  const notes = getMenuNotes();
-  Object.entries(notes).forEach(([restaurantId, items]) => {
-    toItems(items).forEach(item => {
-      const key = String(item.name || '').trim().toLowerCase();
-      if (!key) return;
-      if (!map[key]) map[key] = { key, name: item.name, score: 0, count: 0, restaurants: new Set(), topRestaurantId: restaurantId };
+  const verdictScore = { again: 3, ok: 1, skip: -2 };
+  (state.restaurants || []).forEach(r => {
+    dishesOf(r).forEach(item => {
+      const key = dishKey(item.name);
+      if (!key || item.verdict === 'want' || item.verdict === 'skip') return;
+      if (!map[key]) map[key] = { key, name: item.name, score: 0, count: 0, restaurants: new Set(), topRestaurantId: r.id };
       const row = map[key];
       row.count += 1;
-      row.restaurants.add(restaurantId);
-      row.score += item.reaction === 'liked' ? 3 : item.reaction === 'disliked' ? -2 : 1;
-      if (item.favorite) row.score += 2;
-    });
-  });
-
-  const dishes = getDishes();
-  Object.entries(dishes).forEach(([restaurantId, items]) => {
-    toItems(items).forEach(item => {
-      const key = String(item.name || '').trim().toLowerCase();
-      if (!key) return;
-      if (!map[key]) map[key] = { key, name: item.name, score: 0, count: 0, restaurants: new Set(), topRestaurantId: restaurantId };
-      const row = map[key];
-      row.count += 1;
-      row.restaurants.add(restaurantId);
-      row.score += Math.max(1, item.rating || 0);
+      row.restaurants.add(r.id);
+      row.score += (verdictScore[item.verdict] || 0) + (item.rating || 0);
     });
   });
 
@@ -9315,7 +9383,40 @@ function miniHash (str) {
   return Math.abs(h);
 }
 
+// Dishes marked "Want to try" across every saved spot, nearest first.
+function renderCraveHome () {
+  const section = document.getElementById('crave-home');
+  const list = document.getElementById('crave-home-list');
+  if (!section || !list) return;
+  const all = state.restaurants || [];
+  if (!all.length) { section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+
+  const craves = [];
+  all.forEach(r => dishesOf(r).forEach(d => {
+    if (d.verdict === 'want') craves.push({ r, d, dist: distOf(r) });
+  }));
+  craves.sort((a, b) => (a.dist - b.dist) || String(a.d.name).localeCompare(String(b.d.name)));
+
+  const count = document.getElementById('crave-home-count');
+  if (count) count.textContent = craves.length ? `${craves.length} dish${craves.length === 1 ? '' : 'es'}` : '';
+  if (!craves.length) {
+    list.innerHTML = '<div class="crave-empty">Saw a dish you have to try? Open any spot and tap <strong>Want to try</strong> under Your Order.</div>';
+    return;
+  }
+  list.innerHTML = craves.slice(0, 8).map(({ r, d, dist }) => `
+    <button class="crave-card" type="button" data-id="${escHtml(r.id)}">
+      <span class="crave-dish">${escHtml(d.name)}</span>
+      <span class="crave-where">${escHtml(r.name)}${Number.isFinite(dist) ? ` · ${fmtDist(dist)}` : ''}</span>
+    </button>`).join('');
+  list.querySelectorAll('.crave-card[data-id]').forEach(el => {
+    el.addEventListener('click', () => openDetailModal(el.dataset.id));
+  });
+}
+
 function forYouReason (item) {
+  const crave = dishesOf(item).find(d => d.verdict === 'want');
+  if (crave) return `Craving: ${crave.name}`;
   if (item.isFavorite) return 'Favorite';
   if (item._distMeters < 1300) return 'Near you';
   if ((item.myRating || 0) >= 4) return 'Highly rated';
@@ -9514,14 +9615,12 @@ function renderForYouHome () {
     return;
   }
 
-  // getMenuNotes() is already a map keyed by restaurant id ({ id: [notes] })
-  const notesByRestaurant = getMenuNotes() || {};
-
   const scored = all.map(r => {
-    const notes = notesByRestaurant[String(r.id)] || [];
-    const likedCount = notes.filter(n => n.reaction === 'liked').length;
-    const dislikedCount = notes.filter(n => n.reaction === 'disliked').length;
-    const favDishCount = notes.filter(n => n.favorite).length;
+    const dishes = dishesOf(r);
+    const likedCount = dishes.filter(d => d.verdict === 'again').length;
+    const dislikedCount = dishes.filter(d => d.verdict === 'skip').length;
+    // A dish you've been meaning to try is a strong reason to go back.
+    const favDishCount = dishes.filter(d => d.verdict === 'want').length;
     const dist = distOf(r);
     const nearbyBonus = Number.isFinite(dist) ? Math.max(0, 7 - dist / 850) : 0;
     const ratingScore = (r.myRating || 0) * 7 + (r.googleRating || 0) * 2;
