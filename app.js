@@ -631,6 +631,30 @@ function saveData () {
 
 /* Read an image file as a data URL, downscaled/compressed so a single phone
    photo can't blow past the ~5 MB localStorage quota. */
+// Food photos are stored as data URLs on the restaurant, so keep them light
+// (about 60-90 KB): browser storage is ~5 MB and a synced doc caps at 1 MB.
+const FOOD_PHOTO_MAX_DIM = 800;
+const FOOD_PHOTO_QUALITY = 0.7;
+
+// Opens the camera/library picker and resolves with a compressed data URL,
+// or '' if nothing was picked. No `capture` attribute, so phones offer both
+// "Take Photo" and "Photo Library".
+function pickFoodPhoto () {
+  return new Promise(resolve => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) { resolve(''); return; }
+      readImageFileCompressed(file, FOOD_PHOTO_MAX_DIM, FOOD_PHOTO_QUALITY)
+        .then(resolve)
+        .catch(() => { showToast('Photo Error', 'Could not load that image.', 'error'); resolve(''); });
+    };
+    input.click();
+  });
+}
+
 function readImageFileCompressed (file, maxDim = 1280, quality = 0.8) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1421,8 +1445,17 @@ function startWatching () {
   if (state.watchId !== null) return;
   state.watchId = navigator.geolocation.watchPosition(
     pos => {
+      // A fix can arrive after the first request timed out; finish turning
+      // location on and load nearby places when it does.
+      const firstFix = !state.locationEnabled;
       state.userLat = pos.coords.latitude;
       state.userLng = pos.coords.longitude;
+      if (firstFix) {
+        state.locationEnabled = true;
+        updateLocationBtn();
+        hideBanner('location-banner');
+        loadHomeDiscovery();
+      }
       checkProximity();
       renderCards(); // refresh distances
     },
@@ -1476,11 +1509,42 @@ function fmtDist (m) {
   return `${Math.round(miles)} mi`;
 }
 
+// Craving alerts fire at most once a day per spot, remembered across reloads.
+const CRAVE_ALERTS_KEY = 'ftb_crave_alerts_v1';
+function getCraveAlertLog () {
+  try { return JSON.parse(localStorage.getItem(CRAVE_ALERTS_KEY)) || {}; } catch { return {}; }
+}
+
+// The closest spot within range that has a dish you've been wanting.
+function findNearbyCraving () {
+  const today = iso();
+  const log = getCraveAlertLog();
+  let best = null;
+  state.restaurants.forEach(r => {
+    if (!r.lat || !r.lng || log[r.id] === today) return;
+    const crave = dishesOf(r).find(d => d.verdict === 'want');
+    if (!crave) return;
+    const d = haversine(state.userLat, state.userLng, r.lat, r.lng);
+    if (d <= NOTIFY_RADIUS && (!best || d < best.d)) best = { r, crave, d };
+  });
+  return best;
+}
+
 function checkProximity () {
   if (!state.locationEnabled) return;
   const now = Date.now();
+  const craving = findNearbyCraving();
+  if (craving) {
+    const log = getCraveAlertLog();
+    log[craving.r.id] = iso();
+    try { localStorage.setItem(CRAVE_ALERTS_KEY, JSON.stringify(log)); } catch { /* storage full */ }
+    state.notifiedAt[craving.r.id] = now;
+    showProximityAlert(craving.r, craving.d, craving.crave);
+    sendBrowserNotification(craving.r, craving.d, craving.crave);
+    trackProductEvent('craving_alert_shown', { restaurantId: craving.r.id, meters: Math.round(craving.d) });
+  }
   state.restaurants.forEach(r => {
-    if (!r.lat || !r.lng) return;
+    if (!r.lat || !r.lng || r.id === craving?.r.id) return;
     const d = haversine(state.userLat, state.userLng, r.lat, r.lng);
     if (d <= NOTIFY_RADIUS) {
       const last = state.notifiedAt[r.id] || 0;
@@ -1493,31 +1557,40 @@ function checkProximity () {
   });
 }
 
-function showProximityAlert (r, distM) {
+function showProximityAlert (r, distM, crave = null) {
   const alert = document.getElementById('proximity-alert');
-  document.getElementById('proximity-icon').textContent = cuisineEmoji(r.cuisine);
-  document.getElementById('proximity-name').textContent = r.name;
-  document.getElementById('proximity-msg').textContent =
-    `${r.status === 'want-to-try' ? 'Saved for later.' : 'Previously visited.'} ${fmtDist(distM)} away`;
+  alert.classList.toggle('craving', !!crave);
+  document.getElementById('proximity-icon').textContent = crave ? 'CRAVE' : cuisineEmoji(r.cuisine);
+  document.getElementById('proximity-name').textContent = crave ? `${crave.name} is ${fmtDist(distM)} away` : r.name;
+  document.getElementById('proximity-msg').textContent = crave
+    ? `At ${r.name}. It's on your Crave List.`
+    : `${r.status === 'want-to-try' ? 'Saved for later.' : 'Previously visited.'} ${fmtDist(distM)} away`;
 
   const dirBtn = document.getElementById('proximity-directions');
   dirBtn.onclick = () => openDirections(r);
+  const content = document.getElementById('proximity-content');
+  content.style.cursor = 'pointer';
+  content.onclick = () => { alert.classList.add('hidden'); openDetailModal(r.id); };
 
   alert.classList.remove('hidden');
   clearTimeout(alert._timeout);
   alert._timeout = setTimeout(() => alert.classList.add('hidden'), 15000);
 }
 
-function sendBrowserNotification (r, distM) {
+function sendBrowserNotification (r, distM, crave = null) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   const tag = `ftb-${r.id}`;
-  const n = new Notification(`Feed The Bear: ${r.name}`, {
-    body: `${r.status === 'want-to-try' ? 'Saved on your list.' : 'Previously visited.'} ${fmtDist(distM)} away`,
+  // The old GitHub bear-icon.png doesn't exist; use the bundled icon.
+  const icon = new URL('icon-192.png', location.href).href;
+  const n = new Notification(crave ? 'Your craving is nearby' : `Feed The Bear: ${r.name}`, {
+    body: crave
+      ? `${crave.name} at ${r.name} · ${fmtDist(distM)} away`
+      : `${r.status === 'want-to-try' ? 'Saved on your list.' : 'Previously visited.'} ${fmtDist(distM)} away`,
     tag,
-    icon: 'https://raw.githubusercontent.com/cmc-creator/Feed-The-Bear/main/bear-icon.png',
-    badge: 'https://raw.githubusercontent.com/cmc-creator/Feed-The-Bear/main/bear-icon.png'
+    icon,
+    badge: icon,
   });
-  n.onclick = () => { window.focus(); n.close(); };
+  n.onclick = () => { window.focus(); openDetailModal(r.id); n.close(); };
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -2027,6 +2100,7 @@ function openDetailModal (id) {
 
   const yoInput = document.getElementById('your-order-input');
   if (yoInput) yoInput.value = '';
+  setYourOrderPendingPhoto('');
   renderYourOrder(id);
 
   document.getElementById('detail-overlay').classList.remove('hidden');
@@ -5160,7 +5234,7 @@ function setupEvents () {
       showToast('Invalid File', 'Please select an image file.', 'error');
       return;
     }
-    readImageFileCompressed(file).then(dataUrl => {
+    readImageFileCompressed(file, FOOD_PHOTO_MAX_DIM, FOOD_PHOTO_QUALITY).then(dataUrl => {
       document.getElementById('form-photo').value = dataUrl;
       showToast('Photo Added ', 'Image loaded successfully.', 'success');
     }).catch(() => showToast('Photo Error', 'Could not load that image.', 'error'));
@@ -5498,15 +5572,50 @@ function setupEvents () {
     if (e.key === 'Enter') { e.preventDefault(); if (!document.getElementById('just-ate-save').disabled) saveJustAte(); }
   });
   document.getElementById('just-ate-save')?.addEventListener('click', saveJustAte);
+  document.getElementById('just-ate-photo')?.addEventListener('click', async () => {
+    const photo = await pickFoodPhoto();
+    if (photo) setJustAtePhoto(photo);
+  });
+  document.getElementById('just-ate-photo-preview')?.addEventListener('click', e => {
+    if (e.target.closest('.ja-photo-clear')) setJustAtePhoto('');
+  });
+  document.getElementById('just-ate-tags')?.addEventListener('click', e => toggleJustAteTag(e.target.closest('.ja-tag')));
   document.getElementById('your-order-input')?.addEventListener('keydown', e => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
     const r = state.restaurants.find(x => x.id === state.detailId);
     logYourOrder(r?.status === 'want-to-try' ? 'want' : 'ok');
   });
-  document.getElementById('your-order-list')?.addEventListener('click', e => {
+  document.getElementById('your-order-photo')?.addEventListener('click', async () => {
+    const photo = await pickFoodPhoto();
+    if (!photo) return;
+    setYourOrderPendingPhoto(photo);
+    document.getElementById('your-order-input')?.focus();
+  });
+  document.getElementById('your-order-pending')?.addEventListener('click', e => {
+    if (e.target.closest('.yo-pending-clear')) setYourOrderPendingPhoto('');
+  });
+  document.getElementById('your-order-list')?.addEventListener('click', async e => {
     const r = state.restaurants.find(x => x.id === state.detailId);
     if (!r) return;
+    const view = e.target.closest('.yo-dish-photo[data-view]');
+    if (view) {
+      const photos = dishPhotosOf(r);
+      if (typeof openPhotoGallery === 'function') openPhotoGallery(photos, Math.max(0, photos.findIndex(p => p.id === view.dataset.view)));
+      return;
+    }
+    const photoFor = e.target.closest('.yo-photo-btn[data-photo-for]');
+    if (photoFor) {
+      const d = dishesOf(r).find(x => x.id === photoFor.dataset.photoFor);
+      const photo = d && await pickFoodPhoto();
+      if (!photo) return;
+      d.photo = photo;
+      r.updatedAt = Date.now();
+      saveData();
+      renderYourOrder(r.id);
+      photoReveal(photo, d.name);
+      return;
+    }
     const move = e.target.closest('.yo-move');
     const remove = e.target.closest('.yo-remove');
     if (move) {
@@ -6042,14 +6151,21 @@ document.addEventListener('DOMContentLoaded', () => {
         loadHomeDiscovery();
       },
       err => {
-        // Permission revoked or unavailable - clear persisted flag so banner shows again
-        state.settings.locationEnabled = false;
         state.locationEnabled = false;
-        if (err?.code === 1) setLocationBannerCooldown();
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+        if (err?.code === 1) {
+          // Permission revoked: clear the saved flag so the banner offers it again.
+          state.settings.locationEnabled = false;
+          setLocationBannerCooldown();
+          localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+        }
+        // A slow GPS fix (common indoors) used to switch location off for good
+        // and leave "Finding restaurants near you" up forever. Keep the setting,
+        // show the saved-spots fallback, and keep watching for a fix.
         updateLocationBanner();
+        renderNearbyHomeFallback(err);
+        if (err?.code !== 1) startWatching();
       },
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
     );
   }
   updateTagSuggestions();
@@ -7366,7 +7482,7 @@ function fireReminder (r) {
   if (Notification.permission === 'granted') {
     new Notification('Feed The Bear Reminder', {
       body: 'Time for your visit to ' + r.name + '!',
-      icon: './feedbear-icon.png',
+      icon: './icon-192.png',
     });
   }
   showToast(' Reminder!', 'Time for your visit to "' + r.name + '"!', 'success');
@@ -7406,17 +7522,36 @@ function setReminder (restaurantId) {
 let _galleryPhotos = []; // [{src, name, id}]
 let _lightboxIdx   = 0;
 
+// Every food photo: dish, visit, and cover shots, newest first. A photo
+// shared by a dish and its visit (Just Ate) shows once, as the dish.
+function collectFoodPhotos () {
+  const seen = new Set();
+  const out = [];
+  const add = (src, name, id, date, type) => {
+    const safe = safeUrl(src || '');
+    if (!safe || seen.has(safe)) return;
+    seen.add(safe);
+    out.push({ src: safe, name, id, date: date || '', type });
+  };
+  (state.restaurants || []).forEach(r => {
+    dishesOf(r).forEach(d => add(d.photo, `${d.name} · ${r.name}`, r.id, d.date, 'dish'));
+    (r.visits || []).forEach(v => add(v.photo, `${v.dish || r.name}${v.dish ? ` · ${r.name}` : ''} - ${fmtDate(v.date)}`, r.id, v.date, 'visit'));
+    add(r.photo, r.name, r.id, r.dateVisited || r.dateAdded, 'cover');
+  });
+  return out.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+}
+
 function openGallery () {
-  const withPhotos = state.restaurants.filter(r => r.photo);
-  _galleryPhotos = withPhotos.map(r => ({ src: r.photo, name: r.name, id: r.id }));
+  _galleryPhotos = collectFoodPhotos();
   const grid = document.getElementById('gallery-grid');
   if (!_galleryPhotos.length) {
-    grid.innerHTML = '<div class="gallery-empty">No photos yet! Add photos when saving restaurants.</div>';
+    grid.innerHTML = '<div class="gallery-empty">No photos yet. Tap <strong>Just Ate</strong> and snap your next plate.</div>';
   } else {
     grid.innerHTML = _galleryPhotos.map((p,i) =>
       '<div class="gallery-item" data-idx="' + i + '">'
       + '<img src="' + escHtml(p.src) + '" alt="' + escHtml(p.name) + '" loading="lazy" />'
       + '<div class="gallery-item-name">' + escHtml(p.name) + '</div>'
+      + (p.type === 'visit' ? '<div class="gallery-type-badge">Visit</div>' : '')
       + '</div>'
     ).join('');
     grid.querySelectorAll('.gallery-item[data-idx]').forEach(el => {
@@ -8247,7 +8382,7 @@ function verdictFromRating (rating = 0) {
 
 // Adds a dish or updates the one with the same name, so re-logging a dish
 // changes its verdict instead of creating duplicates.
-function upsertDish (r, { name, verdict, rating, note } = {}) {
+function upsertDish (r, { name, verdict, rating, note, photo } = {}) {
   const clean = String(name || '').trim().slice(0, 80);
   if (!r || !clean) return null;
   if (!Array.isArray(r.dishes)) r.dishes = [];
@@ -8260,6 +8395,7 @@ function upsertDish (r, { name, verdict, rating, note } = {}) {
   if (DISH_VERDICTS.includes(verdict)) dish.verdict = verdict;
   else if (Number.isFinite(rating) && rating > 0) dish.verdict = verdictFromRating(rating);
   if (note != null) dish.note = String(note).slice(0, 200);
+  if (photo) dish.photo = photo;
   if (dish.verdict !== 'want') dish.date = iso();
   r.updatedAt = Date.now();
   saveData();
@@ -8344,10 +8480,14 @@ function renderYourOrder (restaurantId) {
     <div class="yo-group yo-group-${g}">
       <div class="yo-group-label">${DISH_VERDICT_LABEL[g]}</div>
       ${dishes.filter(d => d.verdict === g).map(d => `
-        <div class="yo-dish">
-          <button type="button" class="yo-dish-name" aria-expanded="false">${escHtml(d.name)}${d.rating ? ` <span class="yo-dish-stars" aria-label="${d.rating} stars">${'★'.repeat(d.rating)}</span>` : ''}</button>
+        <div class="yo-dish${d.photo ? ' has-photo' : ''}">
+          <div class="yo-dish-row">
+            ${safeUrl(d.photo || '') ? `<button type="button" class="yo-dish-photo" data-view="${escHtml(d.id)}" aria-label="View photo of ${escHtml(d.name)}"><img src="${escHtml(safeUrl(d.photo))}" alt="" loading="lazy" /></button>` : ''}
+            <button type="button" class="yo-dish-name" aria-expanded="false">${escHtml(d.name)}${d.rating ? ` <span class="yo-dish-stars" aria-label="${d.rating} stars">${'★'.repeat(d.rating)}</span>` : ''}</button>
+          </div>
           ${d.note ? `<div class="yo-dish-note">${escHtml(d.note)}</div>` : ''}
           <span class="yo-dish-actions">
+            <button type="button" class="yo-move yo-photo-btn" data-photo-for="${escHtml(d.id)}">${d.photo ? 'New photo' : 'Add photo'}</button>
             ${DISH_VERDICTS.filter(v => v !== g).map(v => `<button type="button" class="yo-move" data-move="${v}" data-id="${escHtml(d.id)}">${DISH_VERDICT_LABEL[v]}</button>`).join('')}
             <button type="button" class="yo-remove" data-remove="${escHtml(d.id)}" aria-label="Remove ${escHtml(d.name)}">✕</button>
           </span>
@@ -8355,8 +8495,40 @@ function renderYourOrder (restaurantId) {
     </div>`).join('');
 }
 
+/* ── Food photos: snap first, name it, done ─────────────────── */
+let _yoPendingPhoto = '';
+
+function setYourOrderPendingPhoto (dataUrl = '') {
+  _yoPendingPhoto = dataUrl;
+  const box = document.getElementById('your-order-pending');
+  if (!box) return;
+  box.classList.toggle('hidden', !dataUrl);
+  box.innerHTML = dataUrl
+    ? `<img src="${escHtml(safeUrl(dataUrl))}" alt="" /><span>Now name the dish and tap how it was.</span><button type="button" class="yo-pending-clear" aria-label="Remove photo">✕</button>`
+    : '';
+}
+
+// All dish photos at a spot, in Your Order order, for the swipeable viewer.
+function dishPhotosOf (r) {
+  return dishesOf(r).filter(d => safeUrl(d.photo || '')).map(d => ({ id: d.id, url: d.photo, alt: `${d.name} at ${r.name}` }));
+}
+
+// A quick Polaroid that drops in when a photo is saved.
+function photoReveal (dataUrl, caption = '') {
+  const src = safeUrl(dataUrl);
+  if (!src) return;
+  document.querySelector('.photo-reveal')?.remove();
+  const el = document.createElement('div');
+  el.className = 'photo-reveal';
+  el.setAttribute('aria-hidden', 'true');
+  el.innerHTML = `<div class="photo-reveal-card"><img src="${escHtml(src)}" alt="" /><div class="photo-reveal-caption">${escHtml(caption)}</div></div>`;
+  document.body.appendChild(el);
+  setTimeout(() => el.classList.add('out'), 1600);
+  setTimeout(() => el.remove(), 2100);
+}
+
 /* ── Just Ate: log a meal in about ten seconds ──────────────── */
-let _justAte = { placeId: null, verdict: null };
+let _justAte = { placeId: null, verdict: null, photo: '' };
 
 function justAteSuggestions (query = '') {
   const q = dishKey(query);
@@ -8396,9 +8568,12 @@ function openJustAte (restaurantId = null) {
   const overlay = document.getElementById('just-ate-overlay');
   if (!overlay) return;
   const preset = restaurantId ? state.restaurants.find(r => r.id === restaurantId) : null;
-  _justAte = { placeId: preset?.id || null, verdict: null };
+  _justAte = { placeId: preset?.id || null, verdict: null, photo: '' };
   document.getElementById('just-ate-place').value = preset?.name || '';
   document.getElementById('just-ate-dish').value = '';
+  document.getElementById('just-ate-note').value = '';
+  document.querySelectorAll('#just-ate-tags .ja-tag').forEach(t => t.classList.remove('active'));
+  setJustAtePhoto('');
   document.querySelectorAll('#just-ate-verdicts .yo-btn').forEach(b => {
     b.classList.remove('active'); b.setAttribute('aria-checked', 'false');
   });
@@ -8409,6 +8584,30 @@ function openJustAte (restaurantId = null) {
   setTimeout(() => document.getElementById(preset ? 'just-ate-dish' : 'just-ate-place')?.focus(), 60);
 }
 
+function setJustAtePhoto (dataUrl = '') {
+  _justAte.photo = dataUrl;
+  const preview = document.getElementById('just-ate-photo-preview');
+  const label = document.getElementById('just-ate-photo-label');
+  if (label) label.textContent = dataUrl ? 'Retake photo' : 'Snap a photo';
+  if (!preview) return;
+  preview.classList.toggle('hidden', !dataUrl);
+  preview.innerHTML = dataUrl
+    ? `<img src="${escHtml(safeUrl(dataUrl))}" alt="Your photo" /><button type="button" class="ja-photo-clear" aria-label="Remove photo">✕</button>`
+    : '';
+}
+
+// Tapping a tag adds it to the note, tapping again takes it out.
+function toggleJustAteTag (btn) {
+  const noteEl = document.getElementById('just-ate-note');
+  if (!noteEl || !btn) return;
+  const tag = btn.textContent.trim();
+  const parts = noteEl.value.split(/\s*·\s*/).map(s => s.trim()).filter(Boolean);
+  const i = parts.indexOf(tag);
+  if (i === -1) parts.push(tag); else parts.splice(i, 1);
+  noteEl.value = parts.join(' · ');
+  btn.classList.toggle('active', i === -1);
+}
+
 function closeJustAte () {
   document.getElementById('just-ate-overlay')?.classList.add('hidden');
   maybeHideOverlay();
@@ -8417,6 +8616,8 @@ function closeJustAte () {
 function saveJustAte () {
   const placeName = (document.getElementById('just-ate-place')?.value || '').trim();
   const dishName = (document.getElementById('just-ate-dish')?.value || '').trim();
+  const note = (document.getElementById('just-ate-note')?.value || '').trim().slice(0, 300);
+  const photo = _justAte.photo;
   let r = state.restaurants.find(x => x.id === _justAte.placeId);
   // A typed name that matches a saved spot exactly counts as that spot.
   if (!r && placeName) r = state.restaurants.find(x => dishKey(x.name) === dishKey(placeName));
@@ -8439,17 +8640,20 @@ function saveJustAte () {
   }
 
   if (!Array.isArray(r.visits)) r.visits = [];
-  r.visits.push({ date: iso(), note: '', rating: 0, dish: dishName });
+  r.visits.push({ date: iso(), note, rating: 0, dish: dishName, photo });
   r.status = 'visited';
   r.dateVisited = r.dateVisited || iso();
+  // First photo of a spot becomes its cover so the list stops showing placeholders.
+  if (photo && !r.photo) r.photo = photo;
   r.updatedAt = Date.now();
   const verdict = _justAte.verdict || 'ok';
-  if (dishName) upsertDish(r, { name: dishName, verdict });
+  if (dishName) upsertDish(r, { name: dishName, verdict, photo, note: note || null });
   else saveData();
 
   closeJustAte();
   renderAll();
-  trackProductEvent('just_ate_logged', { restaurantId: r.id, isNew, hasDish: !!dishName, verdict: dishName ? verdict : null });
+  if (photo) photoReveal(photo, dishName || r.name);
+  trackProductEvent('just_ate_logged', { restaurantId: r.id, isNew, hasDish: !!dishName, hasPhoto: !!photo, hasNote: !!note, verdict: dishName ? verdict : null });
   showToast(`Logged ${r.name}`,
     dishName ? `${DISH_VERDICT_LABEL[verdict]}: ${dishName}` : (isNew ? 'New spot added to your den.' : 'Visit added to your history.'),
     'success');
@@ -8497,9 +8701,11 @@ function logYourOrder (verdict) {
     return;
   }
   const r = state.restaurants.find(x => x.id === state.detailId);
-  const dish = upsertDish(r, { name, verdict });
+  const dish = upsertDish(r, { name, verdict, photo: _yoPendingPhoto });
   if (!dish) return;
   input.value = '';
+  if (_yoPendingPhoto) photoReveal(_yoPendingPhoto, dish.name);
+  setYourOrderPendingPhoto('');
   renderYourOrder(r.id);
   renderAll();
   const msg = verdict === 'want' ? `${dish.name} is on your Crave List.`
@@ -9201,67 +9407,100 @@ function applyNearbyFilterMode (mode = 'all') {
   renderNearbyCardsFromState();
 }
 
-async function fetchOverpassElements (query, opts = {}) {
-  const timeoutMs = Number(opts.timeoutMs) || 6000;
-  const endpoints = opts.endpoints || [
-    'https://overpass-api.de/api/interpreter',
-    'https://overpass.kumi.systems/api/interpreter',
-    'https://overpass.private.coffee/api/interpreter'
-  ];
+// Public Overpass servers come and go: in Oct 2026 overpass-api.de answered
+// "at capacity" and kumi/private.coffee hung, and trying them one after
+// another with long timeouts left "Finding restaurants" up for ~30s. Race
+// them instead, bring in Nominatim early, and skip servers that just failed.
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+];
+const NEARBY_HEDGE_MS = 2500;            // start the next source if no answer by then
+const OVERPASS_DOWN_MS = 10 * 60 * 1000; // skip a failed server for 10 minutes
+const _overpassDownUntil = {};
 
-  const overpassAttempt = async () => {
+// Starts task i at i * hedgeMs, or as soon as a running one fails; resolves
+// with the first success and aborts the rest.
+function firstSuccess (tasks, hedgeMs) {
+  return new Promise((resolve, reject) => {
+    const ctrls = [];
+    const timers = [];
+    let next = 0;
+    let running = 0;
+    let done = false;
     let lastErr = null;
-    for (const endpoint of endpoints) {
-      try {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), timeoutMs);
-        const body = new URLSearchParams({ data: query });
-        const resp = await fetch(endpoint, {
-          method: 'POST',
-          body,
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-          signal: ctrl.signal,
+    const stop = () => { done = true; timers.forEach(clearTimeout); ctrls.forEach(c => c.abort()); };
+    const start = () => {
+      if (done || next >= tasks.length) return;
+      const ctrl = new AbortController();
+      ctrls.push(ctrl);
+      const task = tasks[next++];
+      running++;
+      task(ctrl.signal)
+        .then(value => { if (!done) { stop(); resolve(value); } })
+        .catch(err => {
+          running--;
+          if (done) return;
+          lastErr = err;
+          if (next < tasks.length) start();
+          else if (running === 0) { stop(); reject(lastErr || new Error('Nearby lookup unavailable')); }
         });
-        clearTimeout(t);
-        if (!resp.ok) throw new Error(`Overpass ${resp.status}`);
-        const json = await resp.json();
-        const elements = (json.elements || []).filter(isCredibleFoodVenue);
-        if (elements.length) return elements;
-      } catch (err) {
-        lastErr = err;
-      }
-    }
-    throw lastErr || new Error('Nearby lookup unavailable');
-  };
-
-  const useNominatim = opts.nominatimFallback && Number.isFinite(opts.lat) && Number.isFinite(opts.lng);
-  if (!useNominatim) {
-    return overpassAttempt();
-  }
-
-  const nominatimAttempt = async () => {
-    const fallback = await fetchNominatimNearbyElements(
-      opts.lat,
-      opts.lng,
-      Number(opts.radiusMeters) || 1609,
-      Number(opts.limit) || 30
-    );
-    if (!fallback.length) throw new Error('Nominatim empty');
-    return fallback;
-  };
-
-  try {
-    return await overpassAttempt();
-  } catch (overpassErr) {
-    try {
-      return await nominatimAttempt();
-    } catch {
-      throw overpassErr || new Error('Nearby lookup unavailable');
-    }
-  }
+    };
+    start();
+    for (let i = 1; i < tasks.length; i++) timers.push(setTimeout(start, i * hedgeMs));
+  });
 }
 
-async function fetchNominatimNearbyElements (lat, lng, radiusMeters = 1609, limit = 30) {
+async function fetchOverpassElements (query, opts = {}) {
+  const timeoutMs = Number(opts.timeoutMs) || 6000;
+  const healthy = (opts.endpoints || OVERPASS_ENDPOINTS).filter(u => !(_overpassDownUntil[u] > Date.now()));
+  const endpoints = healthy.length ? healthy : (opts.endpoints || OVERPASS_ENDPOINTS);
+
+  const overpassTask = endpoint => async signal => {
+    const ctrl = new AbortController();
+    let timedOut = false;
+    const t = setTimeout(() => { timedOut = true; ctrl.abort(); }, timeoutMs);
+    signal.addEventListener('abort', () => ctrl.abort());
+    try {
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        body: new URLSearchParams({ data: query }),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        signal: ctrl.signal,
+      });
+      if (!resp.ok) {
+        if (resp.status === 429 || resp.status >= 500) _overpassDownUntil[endpoint] = Date.now() + OVERPASS_DOWN_MS;
+        throw new Error(`Overpass ${resp.status}`);
+      }
+      const json = await resp.json();
+      const elements = (json.elements || []).filter(isCredibleFoodVenue);
+      if (!elements.length) throw new Error('Overpass empty');
+      return elements;
+    } catch (err) {
+      if (timedOut) _overpassDownUntil[endpoint] = Date.now() + OVERPASS_DOWN_MS;
+      throw err;
+    } finally {
+      clearTimeout(t);
+    }
+  };
+
+  const tasks = endpoints.map(overpassTask);
+  const useNominatim = opts.nominatimFallback && Number.isFinite(opts.lat) && Number.isFinite(opts.lng);
+  if (useNominatim) {
+    // Second in line: it answers in about a second when Overpass is struggling.
+    tasks.splice(1, 0, async signal => {
+      const fallback = await fetchNominatimNearbyElements(
+        opts.lat, opts.lng, Number(opts.radiusMeters) || 1609, Number(opts.limit) || 30, signal);
+      if (!fallback.length) throw new Error('Nominatim empty');
+      return fallback;
+    });
+  }
+  return firstSuccess(tasks, NEARBY_HEDGE_MS);
+}
+
+async function fetchNominatimNearbyElements (lat, lng, radiusMeters = 1609, limit = 30, signal = undefined) {
   const safeLat = Number(lat);
   const safeLng = Number(lng);
   if (!Number.isFinite(safeLat) || !Number.isFinite(safeLng)) return [];
@@ -9275,10 +9514,13 @@ async function fetchNominatimNearbyElements (lat, lng, radiusMeters = 1609, limi
   const viewbox = `${left},${top},${right},${bottom}`;
   const terms = ['restaurant', 'cafe', 'fast food', 'bar'];
 
-  const responses = await Promise.all(terms.map(async term => {
+  // Nominatim's usage policy allows one request per second, so space them out.
+  const responses = await Promise.all(terms.map(async (term, i) => {
+    if (i) await new Promise(r => setTimeout(r, i * 1000));
+    if (signal?.aborted) return [];
     const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&bounded=1&extratags=1&addressdetails=1&limit=${Math.max(6, Math.ceil(limit / terms.length))}&viewbox=${encodeURIComponent(viewbox)}&q=${encodeURIComponent(term)}`;
-    const resp = await fetch(url, { headers: { 'Accept-Language': 'en' } });
-    if (!resp.ok) return [];
+    const resp = await fetch(url, { headers: { 'Accept-Language': 'en' }, signal }).catch(() => null);
+    if (!resp || !resp.ok) return [];
     const json = await resp.json();
     return Array.isArray(json) ? json : [];
   }));
@@ -11107,15 +11349,17 @@ async function loadHomeDiscovery () {
   try {
     const { userLat: lat, userLng: lng } = state;
     const radiusMeters = Math.round(getNearbyRadiusMeters());
-    const q = `[out:json][timeout:25];(node["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${radiusMeters},${lat},${lng});way["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${radiusMeters},${lat},${lng}););out center 80;`;
-    const elementsRaw = await fetchOverpassElements(q, {
-      timeoutMs: 14000,
-      nominatimFallback: true,
-      lat,
-      lng,
-      radiusMeters,
-      limit: 80,
-    });
+    // The strip keeps the 24 closest spots, which in a city are a mile or two
+    // away. Querying the full 25-mile radius first was slow and is what busy
+    // servers drop, so start close and widen only when that comes up short.
+    const fetchWithin = r => fetchOverpassElements(
+      `[out:json][timeout:20];(node["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${r},${lat},${lng});way["amenity"~"^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$"](around:${r},${lat},${lng}););out center 80;`,
+      { timeoutMs: 9000, nominatimFallback: true, lat, lng, radiusMeters: r, limit: 80 });
+    const nearRadius = Math.min(radiusMeters, 4828);
+    let elementsRaw = await fetchWithin(nearRadius).catch(err => { if (nearRadius >= radiusMeters) throw err; return []; });
+    if (nearRadius < radiusMeters && (elementsRaw || []).filter(isCredibleFoodVenue).length < 8) {
+      elementsRaw = await fetchWithin(radiusMeters).catch(err => { if (elementsRaw?.length) return elementsRaw; throw err; });
+    }
     const raw = (elementsRaw || []).filter(isCredibleFoodVenue);
     const withDist = raw.map(el => {
       const elLat = el.lat ?? el.center?.lat;
@@ -12287,8 +12531,8 @@ function schedulePushNudge () {
     // Fire a nudge now (in a real app this would use Push API via server)
     new Notification('Feed The Bear misses you!', {
       body: `It's been ${daysSince} days since your last visit. Time to try somewhere new!`,
-      icon: './feedbear-icon.png',
-      badge: './feedbear-icon.png',
+      icon: './icon-192.png',
+      badge: './icon-192.png',
       tag: 'ftb-nudge'
     });
   }
@@ -13084,40 +13328,6 @@ function setWeeklyGoal () {
   }
 }
 
-/* ── Gallery with Visit Photos ─────────────────────────── */
-// Override the original openGallery to include visit photos
-(function _patchGallery () {
-  const _origOpenGallery = openGallery;
-  window.openGallery = function () {
-    const allPhotos = [];
-    state.restaurants.forEach(r => {
-      if (r.photo) allPhotos.push({ src: r.photo, name: r.name, id: r.id, type: 'cover' });
-      (r.visits || []).forEach(v => {
-        if (v.photo) allPhotos.push({ src: v.photo, name: r.name + ' - ' + fmtDate(v.date), id: r.id, type: 'visit' });
-      });
-    });
-    _galleryPhotos = allPhotos;
-
-    const grid = document.getElementById('gallery-grid');
-    if (!allPhotos.length) {
-      grid.innerHTML = '<div class="gallery-empty">No photos yet! Add a photo when saving a restaurant or logging a visit.</div>';
-    } else {
-      grid.innerHTML = allPhotos.map((p, i) =>
-        '<div class="gallery-item" data-idx="' + i + '">'
-        + '<img src="' + escHtml(p.src) + '" alt="' + escHtml(p.name) + '" loading="lazy" />'
-        + '<div class="gallery-item-name">' + escHtml(p.name) + '</div>'
-        + (p.type === 'visit' ? '<div class="gallery-type-badge">Visit</div>' : '')
-        + '</div>'
-      ).join('');
-      grid.querySelectorAll('.gallery-item[data-idx]').forEach(el => {
-        el.addEventListener('click', () => openLightbox(parseInt(el.dataset.idx)));
-      });
-    }
-    document.getElementById('gallery-overlay').classList.remove('hidden');
-    document.body.classList.add('overlay-open');
-  };
-})();
-
 /* ── Visit Photo Support in Check-In ───────────────────── */
 // Enhance detail modal checkin to support photos
 function openCheckinWithPhoto (id) {
@@ -13146,7 +13356,7 @@ function openCheckinWithPhoto (id) {
     input.onchange = () => {
       const file = input.files[0];
       if (!file) return;
-      readImageFileCompressed(file).then(dataUrl => {
+      readImageFileCompressed(file, FOOD_PHOTO_MAX_DIM, FOOD_PHOTO_QUALITY).then(dataUrl => {
         const vIdx = state.restaurants[idx].visits.length - 1;
         state.restaurants[idx].visits[vIdx].photo = dataUrl;
         saveData();

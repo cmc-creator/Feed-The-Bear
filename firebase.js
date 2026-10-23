@@ -93,6 +93,39 @@ async function fbLoadUserData (uid) {
   }
 }
 
+// Firestore rejects documents over 1 MiB, and one oversized doc fails the
+// whole batch, silently stopping sync. Photos are data URLs, so trim the
+// largest ones from the cloud copy until it fits; they stay on the device.
+const FB_DOC_BUDGET = 900 * 1024;
+function cloudSafeRestaurant (r) {
+  if (JSON.stringify(r).length <= FB_DOC_BUDGET) return r;
+  const copy = JSON.parse(JSON.stringify(r));
+  const slots = [];
+  const add = (obj, key) => { if (typeof obj?.[key] === 'string' && obj[key].startsWith('data:')) slots.push({ obj, key, size: obj[key].length }); };
+  add(copy, 'photo');
+  (copy.visits || []).forEach(v => add(v, 'photo'));
+  (copy.dishes || []).forEach(d => add(d, 'photo'));
+  slots.sort((a, b) => b.size - a.size);
+  for (const s of slots) {
+    if (JSON.stringify(copy).length <= FB_DOC_BUDGET) break;
+    s.obj[s.key] = '';
+  }
+  return copy;
+}
+
+// When a newer cloud copy wins a merge, put back photos that
+// cloudSafeRestaurant trimmed but this device still has.
+function restoreTrimmedPhotos (cloud, local) {
+  if (!cloud.photo && local.photo) cloud.photo = local.photo;
+  const fill = (cloudList, localList, keyOf) => {
+    if (!Array.isArray(cloudList) || !Array.isArray(localList)) return;
+    const byKey = new Map(localList.map(x => [keyOf(x), x]));
+    cloudList.forEach(x => { const l = byKey.get(keyOf(x)); if (l && !x.photo && l.photo) x.photo = l.photo; });
+  };
+  fill(cloud.visits, local.visits, v => `${v.date}|${v.dish || ''}|${v.note || ''}`);
+  fill(cloud.dishes, local.dishes, d => d.id);
+}
+
 async function fbSaveRestaurants (uid, restaurants) {
   if (!uid || !restaurants || !restaurants.length) return;
   try {
@@ -100,7 +133,7 @@ async function fbSaveRestaurants (uid, restaurants) {
     for (let i = 0; i < restaurants.length; i += 400) {
       const batch = _db.batch();
       restaurants.slice(i, i + 400).forEach(r => {
-        batch.set(_db.doc(`users/${uid}/restaurants/${r.id}`), r);
+        batch.set(_db.doc(`users/${uid}/restaurants/${r.id}`), cloudSafeRestaurant(r));
       });
       await batch.commit();
     }
@@ -210,6 +243,7 @@ function initFirebaseAuth () {
           if (!r || !r.id || deletedIds.has(r.id)) return;
           const cloud = byId.get(r.id);
           if (!cloud || ts(r.updatedAt) >= ts(cloud.updatedAt)) byId.set(r.id, r);
+          else restoreTrimmedPhotos(cloud, r);
         });
         const merged = [...byId.values()];
         const gained = merged.length - local.length;

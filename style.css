@@ -1402,6 +1402,47 @@ button:focus-visible,
 }
 .yo-remove { padding: 5px 9px; }
 .your-order-add { display: grid; gap: 8px; }
+.yo-input-row { display: flex; gap: 8px; }
+.yo-input-row .form-input { flex: 1; min-width: 0; }
+.yo-cam {
+  flex: 0 0 auto; width: 44px; height: 44px; display: grid; place-items: center; cursor: pointer;
+  border-radius: var(--radius-sm); border: 1px solid rgba(200,162,106,.5);
+  background: rgba(200,162,106,.16); color: var(--text);
+}
+.yo-cam:active { transform: scale(.94); }
+.yo-pending {
+  display: flex; align-items: center; gap: 10px; padding: 6px; font-size: .78rem; color: var(--text-muted);
+  border-radius: var(--radius-sm); background: var(--surface3);
+}
+.yo-pending.hidden { display: none; }
+.yo-pending img { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; transform: rotate(-3deg); box-shadow: 0 3px 8px rgba(0,0,0,.25); }
+.yo-pending span { flex: 1; }
+.yo-pending-clear { background: none; border: 0; color: var(--text-dim); cursor: pointer; font-size: .9rem; padding: 6px; }
+.yo-dish-row { display: flex; align-items: center; gap: 10px; }
+.yo-dish-photo { flex: 0 0 auto; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.yo-dish-photo img {
+  display: block; width: 44px; height: 44px; object-fit: cover; border-radius: 8px;
+  border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.25); transform: rotate(-2deg);
+}
+
+/* Polaroid that drops in when a food photo is saved */
+.photo-reveal { position: fixed; inset: 0; z-index: 9000; display: grid; place-items: center; pointer-events: none; }
+.photo-reveal-card {
+  width: min(62vw, 240px); padding: 10px 10px 14px; background: #fffdf8; border-radius: 4px;
+  box-shadow: 0 18px 40px rgba(0,0,0,.45); transform: rotate(-4deg);
+  animation: photo-drop .55s cubic-bezier(.34,1.56,.64,1);
+}
+.photo-reveal-card img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 2px; }
+.photo-reveal-caption { margin-top: 8px; text-align: center; font-weight: 700; font-size: .9rem; color: #3a2a1c; }
+.photo-reveal.out .photo-reveal-card { transition: transform .45s ease, opacity .45s ease; transform: rotate(6deg) translateY(30px) scale(.9); opacity: 0; }
+@keyframes photo-drop {
+  from { transform: rotate(-14deg) translateY(-60px) scale(.7); opacity: 0; }
+  to   { transform: rotate(-4deg) translateY(0) scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .photo-reveal-card { animation: none; }
+  .photo-reveal.out .photo-reveal-card { transition: opacity .3s ease; transform: rotate(-4deg); }
+}
 .your-order-verdicts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .yo-btn {
   font: inherit; font-size: .76rem; font-weight: 700; cursor: pointer; line-height: 1.2;
@@ -1549,6 +1590,19 @@ button:focus-visible,
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 #proximity-icon { font-size: 1.6rem; flex-shrink: 0; }
+/* Craving alert: warmer, and the badge is a word rather than an icon. */
+.proximity-alert.craving,
+body.light-mode .proximity-alert.craving {
+  background: linear-gradient(135deg, #3a2716, #241812);
+  border-color: rgba(231,196,138,.6);
+  box-shadow: 0 8px 32px rgba(0,0,0,.6), 0 0 0 1px rgba(231,196,138,.3), 0 0 28px rgba(231,196,138,.18);
+}
+.proximity-alert.craving #proximity-icon {
+  font-size: .66rem; font-weight: 800; letter-spacing: .1em;
+  padding: 6px 8px; border-radius: 8px; color: #2a1a0e; background: #e7c48a;
+}
+.proximity-alert.craving #proximity-name { color: #f6ecdc; }
+.proximity-alert.craving #proximity-msg { color: #e3d1b6; }
 #proximity-content { flex: 1; }
 #proximity-content strong { display: block; font-size: .9rem; color: var(--text); }
 #proximity-content span  { font-size: .78rem; color: var(--text-muted); }
@@ -5690,6 +5744,32 @@ body.light-mode .today-vibe-pill {
 .ja-place-new { border-style: dashed; }
 .ja-verdicts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .ja-verdicts .yo-btn.active { outline: 2px solid var(--primary); outline-offset: 1px; }
+.ja-photo-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; cursor: pointer;
+  font: inherit; font-size: .86rem; font-weight: 700; color: var(--text);
+  padding: 12px; border-radius: var(--radius); border: 1.5px dashed rgba(200,162,106,.6);
+  background: rgba(200,162,106,.1);
+}
+.ja-photo-btn:active { transform: scale(.98); }
+.ja-photo-preview { position: relative; justify-self: center; }
+.ja-photo-preview.hidden { display: none; }
+.ja-photo-preview img {
+  display: block; width: 150px; height: 150px; object-fit: cover; border-radius: 3px;
+  border: 7px solid #fffdf8; border-bottom-width: 22px; box-shadow: 0 8px 20px rgba(0,0,0,.3);
+  transform: rotate(-3deg); animation: photo-drop .45s cubic-bezier(.34,1.56,.64,1);
+}
+.ja-photo-clear {
+  position: absolute; top: -8px; right: -10px; width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+  border: 0; background: var(--surface3); color: var(--text); box-shadow: 0 2px 6px rgba(0,0,0,.3);
+}
+.ja-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.ja-tag {
+  font: inherit; font-size: .74rem; font-weight: 600; cursor: pointer; color: var(--text-muted);
+  padding: 6px 11px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface2);
+  transition: transform var(--transition), background var(--transition);
+}
+.ja-tag.active { color: var(--text); border-color: var(--primary); background: rgba(var(--primary-rgb), .18); transform: scale(1.04); }
+.ja-note { resize: vertical; min-height: 52px; }
 .ja-save { margin-top: 10px; width: 100%; }
 .ja-save:disabled { opacity: .5; cursor: not-allowed; }
 

@@ -12,11 +12,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Feed The Bear" />
-  <link rel="apple-touch-icon" href="feedbear-icon.png?v=woods2" />
-  <link rel="apple-touch-icon" sizes="180x180" href="feedbear-icon.png?v=woods2" />
-  <link rel="icon" type="image/png" href="feedbear-icon.png?v=woods2" />
-  <link rel="icon" type="image/svg+xml" href="icon.svg?v=woods1" />
-  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=bear3" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=bear3" />
+  <link rel="icon" type="image/png" sizes="48x48" href="favicon-48.png?v=bear3" />
+  <link rel="manifest" href="manifest.json?v=bear3" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -1303,8 +1302,14 @@
           </div>
           <div id="your-order-list" class="your-order-list"></div>
           <div class="your-order-add">
-            <input id="your-order-input" class="form-input" type="text" maxlength="80"
-              placeholder="What did you have? e.g. Birria tacos" aria-label="Dish name" enterkeyhint="done" />
+            <div class="yo-input-row">
+              <input id="your-order-input" class="form-input" type="text" maxlength="80"
+                placeholder="What did you have? e.g. Birria tacos" aria-label="Dish name" enterkeyhint="done" />
+              <button type="button" id="your-order-photo" class="yo-cam" aria-label="Add a photo of the dish" title="Add a photo">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+              </button>
+            </div>
+            <div id="your-order-pending" class="yo-pending hidden"></div>
             <div class="your-order-verdicts" role="group" aria-label="How was it?">
               <button type="button" class="yo-btn yo-again" data-verdict="again">Order again</button>
               <button type="button" class="yo-btn yo-ok" data-verdict="ok">Fine</button>
@@ -2487,12 +2492,32 @@
         <input id="just-ate-dish" class="form-input" type="text" maxlength="80"
           placeholder="e.g. Spicy miso ramen" autocomplete="off" enterkeyhint="done" />
 
+        <button type="button" id="just-ate-photo" class="ja-photo-btn">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+          <span id="just-ate-photo-label">Snap a photo</span>
+        </button>
+        <div id="just-ate-photo-preview" class="ja-photo-preview hidden"></div>
+
         <div class="ja-label" id="just-ate-verdict-label">How was it?</div>
         <div class="ja-verdicts" id="just-ate-verdicts" role="radiogroup" aria-labelledby="just-ate-verdict-label">
           <button type="button" class="yo-btn yo-again" data-verdict="again" role="radio" aria-checked="false">Order again</button>
           <button type="button" class="yo-btn yo-ok" data-verdict="ok" role="radio" aria-checked="false">Fine</button>
           <button type="button" class="yo-btn yo-skip" data-verdict="skip" role="radio" aria-checked="false">Skip</button>
         </div>
+
+        <label class="ja-label" for="just-ate-note">Quick note <span class="ja-optional">optional</span></label>
+        <div class="ja-tags" id="just-ate-tags" aria-label="Tap to add to your note">
+          <button type="button" class="ja-tag">Worth the wait</button>
+          <button type="button" class="ja-tag">Huge portions</button>
+          <button type="button" class="ja-tag">Ask for extra sauce</button>
+          <button type="button" class="ja-tag">Save room for dessert</button>
+          <button type="button" class="ja-tag">Great for groups</button>
+          <button type="button" class="ja-tag">Date-night worthy</button>
+          <button type="button" class="ja-tag">Go early</button>
+          <button type="button" class="ja-tag">Pricey but worth it</button>
+        </div>
+        <textarea id="just-ate-note" class="form-input ja-note" rows="2" maxlength="300"
+          placeholder="Anything future-you should know?"></textarea>
 
         <button id="just-ate-save" class="btn-primary ja-save" type="button" disabled>Log it</button>
       </div>
