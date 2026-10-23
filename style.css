@@ -7999,3 +7999,37 @@ body[data-ui-motion='playful'] .btn-ghost:active,
 body[data-ui-motion='playful'] .btn-sm:active,
 body[data-ui-motion='playful'] .icon-btn:active { transform: scale(.94); }
 body[data-ui-motion='playful'] .btn-primary:hover { box-shadow: 0 6px 20px rgba(var(--primary-rgb),.4); }
+
+/* ═══════════════════════════════════════════════════════════════
+   TRUST BADGES - Phase 2 Data Quality Indicators
+   ═══════════════════════════════════════════════════════════════ */
+
+.trust-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 100px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.trust-high {
+  background: rgba(76, 195, 138, 0.15);
+  color: var(--green);
+}
+
+.trust-medium {
+  background: rgba(var(--primary-rgb), 0.15);
+  color: var(--primary);
+}
+
+.trust-low {
+  background: rgba(155, 123, 224, 0.15);
+  color: var(--blue);
+}
+
+.trust-very-low {
+  background: var(--surface2);
+  color: var(--text-dim);
+}
