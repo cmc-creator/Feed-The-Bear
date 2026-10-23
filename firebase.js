@@ -98,8 +98,18 @@ async function fbLoadUserData (uid) {
 // largest ones from the cloud copy until it fits; they stay on the device.
 const FB_DOC_BUDGET = 900 * 1024;
 function cloudSafeRestaurant (r) {
-  if (JSON.stringify(r).length <= FB_DOC_BUDGET) return r;
-  const copy = JSON.parse(JSON.stringify(r));
+  // "idb:" photo references point into this device's IndexedDB and mean
+  // nothing elsewhere; never upload them.
+  const json = JSON.stringify(r);
+  const hasLocalRefs = json.includes('"idb:');
+  if (json.length <= FB_DOC_BUDGET && !hasLocalRefs) return r;
+  const copy = JSON.parse(json);
+  if (hasLocalRefs) {
+    const clear = o => { if (typeof o?.photo === 'string' && o.photo.startsWith('idb:')) o.photo = ''; };
+    clear(copy);
+    (copy.visits || []).forEach(clear);
+    (copy.dishes || []).forEach(clear);
+  }
   const slots = [];
   const add = (obj, key) => { if (typeof obj?.[key] === 'string' && obj[key].startsWith('data:')) slots.push({ obj, key, size: obj[key].length }); };
   add(copy, 'photo');
@@ -128,6 +138,11 @@ function restoreTrimmedPhotos (cloud, local) {
 
 async function fbSaveRestaurants (uid, restaurants) {
   if (!uid || !restaurants || !restaurants.length) return;
+  // Wait until stored photos are back in memory so the cloud gets photos, not references.
+  if (typeof photosReadyForSync === 'function' && !photosReadyForSync()) {
+    setTimeout(() => fbSaveRestaurants(uid, state.restaurants), 2000);
+    return;
+  }
   try {
     // Batch in chunks of 400 (Firestore limit is 500 per batch)
     for (let i = 0; i < restaurants.length; i += 400) {
@@ -248,6 +263,8 @@ function initFirebaseAuth () {
         const merged = [...byId.values()];
         const gained = merged.length - local.length;
         state.restaurants = merged;
+        // A list read straight from localStorage carries photo references; restore them.
+        if (typeof hydrateStoredPhotos === 'function') hydrateStoredPhotos();
         saveData(); // persists locally + (Grizzly) debounced push of merged set
         renderAll();
         if (deletedIds.size) fbDeleteRestaurantsCloud(user.uid, [...deletedIds]);
