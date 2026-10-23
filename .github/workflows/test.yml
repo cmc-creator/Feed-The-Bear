@@ -41,3 +41,7 @@ jobs:
       - name: Foodie flows
         working-directory: tests
         run: node flows.test.js
+
+      - name: Friends
+        working-directory: tests
+        run: node friends.test.js

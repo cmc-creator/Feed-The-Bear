@@ -21,7 +21,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="decision-mode.css" />
   <link rel="stylesheet" href="micro-interactions.css" />
   <link rel="stylesheet" href="photo-gallery.css" />
 </head>
@@ -1703,7 +1702,8 @@
         <p id="guest-profile-sub" class="guest-sub">Top picks shared via Feed The Bear</p>
       </div>
       <div id="guest-profile-list" class="guest-profile-list"></div>
-      <a href="./" class="btn-primary" style="display:block;text-align:center;margin-top:20px;text-decoration:none">Build My Own List</a>
+      <button id="guest-profile-follow" type="button" class="btn-primary" style="width:100%;margin-top:20px">Follow</button>
+      <a href="./" class="btn-ghost" style="display:block;text-align:center;margin-top:20px;text-decoration:none">Build My Own List</a>
       <button id="guest-profile-close" class="btn-ghost" style="width:100%;margin-top:8px">Close Preview</button>
     </div>
   </div>
@@ -1825,12 +1825,13 @@
         <h2 id="friends-title">Foodie Friends</h2>
         <button id="friends-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
-      <p class="friends-subtitle">Paste a friend profile link to compare overlap and top picks.</p>
+      <p class="friends-subtitle">Follow friends to see what they order, what they skip, and what they're craving. Paste their link to follow.</p>
       <div style="display:flex;gap:8px">
         <input id="friends-link-input" class="form-input" placeholder="Paste friend profile link here" style="flex:1" />
         <button id="friends-load-btn" class="btn-sm btn-orange">Load</button>
       </div>
       <div id="friends-result" class="friends-result hidden"></div>
+      <div id="friends-list" class="friends-list"></div>
       <div class="friends-my-link" style="margin-top:16px">
         <span style="font-size:.78rem;color:var(--text-dim)">Your shareable link:</span>
         <div style="display:flex;gap:6px;margin-top:4px">
@@ -2524,95 +2525,6 @@
     </div>
   </div>
 
-  <!-- Decision Mode (Phase 1 - 60-Second Decision Flow) -->
-  <div id="decision-mode-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="decision-modal-title">
-    <div class="modal-card decision-mode-card">
-      <div class="modal-header">
-        <h2 id="decision-modal-title">🎯 Decision Mode</h2>
-        <button id="decision-modal-close-btn" class="icon-btn" aria-label="Close" onclick="closeDecisionModeModal()">✕</button>
-      </div>
-
-      <!-- View 1: Constraints -->
-      <div id="decision-view-constraints" class="decision-view">
-        <p class="decision-subtitle">Tell us what you're craving, and we'll pick your perfect match in under 60 seconds.</p>
-
-        <div class="decision-section">
-          <label class="decision-label">What's the vibe?</label>
-          <div class="decision-chips">
-            <button class="decision-chip" data-constraint="mood" data-value="quick_bite" onclick="setDecisionConstraint('mood', 'quick_bite')">
-              ⚡ Quick Bite
-            </button>
-            <button class="decision-chip" data-constraint="mood" data-value="sit_down" onclick="setDecisionConstraint('mood', 'sit_down')">
-              🪑 Sit Down
-            </button>
-            <button class="decision-chip" data-constraint="mood" data-value="fancy" onclick="setDecisionConstraint('mood', 'fancy')">
-              ✨ Fancy
-            </button>
-            <button class="decision-chip" data-constraint="mood" data-value="comfort" onclick="setDecisionConstraint('mood', 'comfort')">
-              🛋️ Comfort Food
-            </button>
-          </div>
-        </div>
-
-        <div class="decision-section">
-          <label class="decision-label">What's your budget?</label>
-          <div class="decision-chips">
-            <button class="decision-chip" data-constraint="budget" data-value="1" onclick="setDecisionConstraint('budget', 1)">
-              $ Cheap
-            </button>
-            <button class="decision-chip" data-constraint="budget" data-value="2" onclick="setDecisionConstraint('budget', 2)">
-              $$ Moderate
-            </button>
-            <button class="decision-chip" data-constraint="budget" data-value="3" onclick="setDecisionConstraint('budget', 3)">
-              $$$ Pricey
-            </button>
-            <button class="decision-chip" data-constraint="budget" data-value="4" onclick="setDecisionConstraint('budget', 4)">
-              $$$$ Splurge
-            </button>
-          </div>
-        </div>
-
-        <div class="decision-section">
-          <label class="decision-label">How far will you go?</label>
-          <div class="decision-chips">
-            <button class="decision-chip" data-constraint="distance" data-value="walking" onclick="setDecisionConstraint('distance', 'walking')">
-              🚶 Walking
-            </button>
-            <button class="decision-chip" data-constraint="distance" data-value="short_drive" onclick="setDecisionConstraint('distance', 'short_drive')">
-              🚗 Short Drive
-            </button>
-            <button class="decision-chip" data-constraint="distance" data-value="any" onclick="setDecisionConstraint('distance', 'any')">
-              🌎 Anywhere
-            </button>
-          </div>
-        </div>
-
-        <div class="decision-section">
-          <label class="decision-label">Party size</label>
-          <input type="number" id="decision-party-size" class="form-input" min="1" max="20" value="1"
-                 onchange="setDecisionConstraint('partySize', parseInt(this.value))" />
-        </div>
-
-        <button id="decision-find-btn" class="btn-primary decision-find-btn" onclick="generateShortlist()" disabled>
-          Find My Match 🎯
-        </button>
-      </div>
-
-      <!-- View 2: Shortlist -->
-      <div id="decision-view-shortlist" class="decision-view hidden">
-        <p class="decision-subtitle">Here are your top 3 matches. Choose one!</p>
-        <div id="decision-shortlist-container" class="decision-shortlist"></div>
-        <button class="btn-secondary" onclick="showDecisionView('constraints')" style="width:100%;margin-top:16px">
-          ← Change Preferences
-        </button>
-      </div>
-
-      <!-- View 3: Winner -->
-      <div id="decision-view-winner" class="decision-view hidden">
-        <div id="decision-winner-container"></div>
-      </div>
-    </div>
-  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="analytics.js"></script>
@@ -2620,7 +2532,6 @@
   <script src="micro-interactions.js"></script>
   <script src="photo-gallery.js"></script>
   <script src="ai.js"></script>
-  <script src="decision-mode.js"></script>
   <script src="app.js"></script>
   <!-- Firebase SDK (compat layer - no build step required) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>

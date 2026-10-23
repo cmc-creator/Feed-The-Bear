@@ -731,7 +731,36 @@ function trackProductEvent (eventName, payload = {}) {
   } catch {
     // Best-effort analytics.
   }
+  queueUsageCount(name);
 }
+
+// Event counts (names only, no payloads) go to /api/track so usage is
+// visible somewhere other than each phone. Batched, and flushed with
+// sendBeacon when the page is hidden so closing the app doesn't lose them.
+let _usageCounts = {};
+let _usageFlushTimer = null;
+const USAGE_REPORTING = !/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && location.protocol === 'https:';
+
+function queueUsageCount (name) {
+  if (!USAGE_REPORTING || !/^[a-z][a-z0-9_]{2,47}$/.test(name)) return;
+  _usageCounts[name] = (_usageCounts[name] || 0) + 1;
+  clearTimeout(_usageFlushTimer);
+  _usageFlushTimer = setTimeout(flushUsageCounts, 20000);
+}
+
+function flushUsageCounts () {
+  clearTimeout(_usageFlushTimer);
+  if (!Object.keys(_usageCounts).length) return;
+  const body = JSON.stringify({ counts: _usageCounts });
+  _usageCounts = {};
+  try {
+    if (!navigator.sendBeacon?.('/api/track', body)) {
+      fetch('/api/track', { method: 'POST', body, headers: { 'Content-Type': 'application/json' }, keepalive: true }).catch(() => {});
+    }
+  } catch { /* best effort */ }
+}
+
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushUsageCounts(); });
 
 function loadSwipePrefs () {
   try {
@@ -4489,6 +4518,8 @@ function buildDecisionModeShortlist () {
     const goTo = goToDishOf(r);
     if (crave) score += 1.4;
     else if (goTo && goTo.verdict === 'again') score += 0.7;
+    const friendTip = friendTipsFor(r).find(t => t.get.length);
+    if (friendTip) score += 0.5;
 
     const cuisine = String(r.cuisine || '').toLowerCase();
     if (party >= 4) {
@@ -4507,6 +4538,7 @@ function buildDecisionModeShortlist () {
     const reasons = [];
     if (crave) reasons.push(`you've been wanting the ${crave.name}`);
     else if (goTo && goTo.verdict === 'again') reasons.push(`your go-to: ${goTo.name}`);
+    else if (friendTip) reasons.push(`${friendTip.name} says get the ${friendTip.get[0]}`);
     reasons.push(mood === 'date' ? 'date-night fit' : mood === 'comfort' ? 'comfort match' : mood === 'healthy' ? 'lighter option' : 'fast decision pick');
     if (budget > 0 && (r.priceRange || 0) > 0 && (r.priceRange || 0) <= budget) reasons.push('inside budget');
     if (Number.isFinite(distance) && distance <= maxMeters) reasons.push('close enough now');
@@ -5651,6 +5683,12 @@ function setupEvents () {
   document.getElementById('friends-close-btn').addEventListener('click', closeFoodieFriends);
   document.getElementById('friends-overlay').addEventListener('click', e => { if (e.target === document.getElementById('friends-overlay')) closeFoodieFriends(); });
   document.getElementById('friends-load-btn').addEventListener('click', loadFriendProfile);
+  document.getElementById('friends-list')?.addEventListener('click', e => {
+    const btn = e.target.closest('.friend-remove[data-key]');
+    if (!btn) return;
+    unfollowFriend(btn.dataset.key);
+    renderFriendsList();
+  });
   document.getElementById('friends-link-input').addEventListener('keydown', e => { if (e.key === 'Enter') loadFriendProfile(); });
   document.getElementById('friends-copy-btn').addEventListener('click', () => { navigator.clipboard?.writeText(document.getElementById('friends-my-link-input').value); showToast('Copied!', 'Profile link copied.', 'success'); });
 
@@ -7790,25 +7828,139 @@ function renderVisitCalendar () {
    PHASE 7 • PUBLIC FOODIE PROFILE + QR CODE
    ------------------------------------------------------------ */
 
+// The shareable profile: your top spots with what to order and what to skip,
+// plus your Crave List, all inside the link (no account or server needed).
 function buildProfileData () {
-  const top = [...state.restaurants]
-    .filter(r => r.myRating > 0)
-    .sort((a,b) => b.myRating - a.myRating)
-    .slice(0, 10)
-    .map(r => ({
-      n: r.name, c: r.cuisine||'', r: r.myRating,
-      a: (r.address||'').slice(0,60), p: (r.photo||'').slice(0,300),
-    }));
-  return { picks: top, ts: Date.now() };
+  const dishNames = (r, verdict, n) => dishesOf(r).filter(d => d.verdict === verdict).slice(0, n).map(d => String(d.name).slice(0, 40));
+  const picks = [...state.restaurants]
+    .filter(r => r.myRating > 0 || dishesOf(r).some(d => d.verdict === 'again'))
+    .sort((a, b) => (b.myRating || 0) - (a.myRating || 0))
+    .slice(0, 15)
+    .map(r => {
+      const pick = { n: r.name, c: r.cuisine || '', r: r.myRating || 0, a: (r.address || '').slice(0, 60) };
+      // Data-URL photos are far too big for a link, and cutting one breaks it.
+      const photo = safeUrl(r.photo || '');
+      if (/^https?:/i.test(photo) && photo.length <= 300) pick.p = photo;
+      const get = dishNames(r, 'again', 3);
+      const skip = dishNames(r, 'skip', 2);
+      if (get.length) pick.g = get;
+      if (skip.length) pick.s = skip;
+      return pick;
+    });
+  const craves = [];
+  state.restaurants.forEach(r => dishesOf(r).forEach(d => {
+    if (d.verdict === 'want' && craves.length < 10) craves.push({ d: String(d.name).slice(0, 40), at: String(r.name).slice(0, 60) });
+  }));
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
+  return { v: 2, id: getProfileShareId(), u: String(profile.name || '').slice(0, 30), picks, w: craves, ts: Date.now() };
+}
+
+function getProfileShareId () {
+  if (!state.settings.profileShareId) {
+    state.settings.profileShareId = uid();
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); } catch { /* storage full */ }
+  }
+  return state.settings.profileShareId;
+}
+
+function profileHasContent (data) {
+  return !!(data?.picks?.length || data?.w?.length);
+}
+
+function encodeProfileLink (data) {
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  return window.location.href.split('?')[0].split('#')[0] + '#profile=' + encoded;
+}
+
+/* ── Friends: follow someone's profile link, see their orders ──
+   Profile links come from anyone, so everything is re-shaped and clipped
+   here and escaped wherever it's shown. */
+const FRIENDS_KEY = 'ftb_friends_v1';
+
+function sanitizeFriendData (raw) {
+  const str = (v, n) => String(v ?? '').slice(0, n);
+  const list = (v, n, len) => (Array.isArray(v) ? v : []).slice(0, n).map(x => str(x, len)).filter(Boolean);
+  const picks = (Array.isArray(raw?.picks) ? raw.picks : []).slice(0, 20).map(p => ({
+    n: str(p?.n, 80), c: str(p?.c, 40), a: str(p?.a, 60),
+    r: Math.max(0, Math.min(5, Math.round(Number(p?.r) || 0))),
+    p: /^https?:/i.test(safeUrl(p?.p || '')) ? safeUrl(p.p).slice(0, 300) : '',
+    g: list(p?.g, 3, 40), s: list(p?.s, 2, 40),
+  })).filter(p => p.n);
+  const w = (Array.isArray(raw?.w) ? raw.w : []).slice(0, 10).map(x => ({ d: str(x?.d, 40), at: str(x?.at, 60) })).filter(x => x.d);
+  return { id: str(raw?.id, 40), u: str(raw?.u, 30), picks, w, ts: Number(raw?.ts) || 0 };
+}
+
+function decodeProfileLink (input = '') {
+  let encoded = String(input).trim();
+  const m = encoded.match(/#profile=(.+)$/);
+  if (m) encoded = m[1];
+  const data = sanitizeFriendData(JSON.parse(decodeURIComponent(escape(atob(encoded)))));
+  if (!profileHasContent(data)) throw new Error('empty');
+  return data;
+}
+
+function getFriends () {
+  try { const list = JSON.parse(localStorage.getItem(FRIENDS_KEY)); return Array.isArray(list) ? list : []; } catch { return []; }
+}
+function saveFriends (list) {
+  try { localStorage.setItem(FRIENDS_KEY, JSON.stringify(list.slice(0, 50))); } catch { /* storage full */ }
+}
+function friendKey (data) { return data.id ? `id:${data.id}` : `name:${String(data.u || '').toLowerCase()}`; }
+function isFollowing (data) { return getFriends().some(f => f.key === friendKey(data)); }
+
+// Following again with a newer link updates that friend's profile.
+function followFriend (data) {
+  if (data.id && data.id === state.settings.profileShareId) {
+    showToast("That's your link", 'Send it to a friend so they can follow you.', 'info');
+    return null;
+  }
+  const list = getFriends();
+  const entry = { key: friendKey(data), name: data.u || 'Friend', data, savedAt: Date.now() };
+  const i = list.findIndex(f => f.key === entry.key);
+  if (i >= 0) list[i] = entry; else list.unshift(entry);
+  saveFriends(list);
+  trackProductEvent('friend_followed', { updated: i >= 0 });
+  showToast(i >= 0 ? `Updated ${entry.name}` : `Following ${entry.name}`, 'Their go-to orders now show on matching restaurants.', 'success');
+  renderAll();
+  return entry;
+}
+
+function unfollowFriend (key) {
+  saveFriends(getFriends().filter(f => f.key !== key));
+  renderAll();
+}
+
+// What your friends say about one spot: their rating, orders, and cravings.
+function friendTipsFor (r) {
+  const key = normalizeName(r?.name || '');
+  if (!key) return [];
+  return getFriends().map(f => {
+    const pick = (f.data?.picks || []).find(p => normalizeName(p.n) === key);
+    const wants = (f.data?.w || []).filter(x => normalizeName(x.at) === key).map(x => x.d);
+    if (!pick && !wants.length) return null;
+    return { name: f.name, rating: pick?.r || 0, get: pick?.g || [], skip: pick?.s || [], wants };
+  }).filter(Boolean);
+}
+
+function friendTipsHtml (r) {
+  const tips = friendTipsFor(r);
+  if (!tips.length) return '';
+  return `<div class="yo-friends"><div class="yo-group-label">Friends say</div>${tips.map(t => {
+    const bits = [];
+    if (t.get.length) bits.push(`get the ${t.get.map(escHtml).join(', ')}`);
+    if (t.skip.length) bits.push(`skip the ${t.skip.map(escHtml).join(', ')}`);
+    if (t.wants.length) bits.push(`wants to try the ${t.wants.map(escHtml).join(', ')}`);
+    if (!bits.length && t.rating) bits.push('loves it here');
+    return `<div class="yo-friend"><strong>${escHtml(t.name)}</strong>${t.rating ? ` <span class="yo-dish-stars">${'★'.repeat(t.rating)}</span>` : ''}: ${bits.join(' · ')}</div>`;
+  }).join('')}</div>`;
 }
 function openFoodieProfile () {
   const data = buildProfileData();
-  if (!data.picks.length) {
-    showToast('No ratings yet', 'Rate some restaurants first to generate your profile.', 'error');
+  if (!profileHasContent(data)) {
+    showToast('Nothing to share yet', 'Rate a spot or log a dish first to build your profile.', 'error');
     return;
   }
-  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
-  const url = window.location.href.split('?')[0].split('#')[0] + '#profile=' + encoded;
+  const url = encodeProfileLink(data);
   document.getElementById('profile-link').value = url;
 
   // Generate QR code
@@ -7863,10 +8015,7 @@ function checkGuestProfile () {
   const hash = window.location.hash;
   if (!hash.startsWith('#profile=')) return;
   try {
-    const encoded = hash.slice('#profile='.length);
-    const data = JSON.parse(decodeURIComponent(escape(atob(encoded))));
-    if (!data.picks?.length) return;
-    renderGuestProfile(data);
+    renderGuestProfile(decodeProfileLink(hash));
   } catch(_) { /* invalid hash - ignore */ }
 }
 function renderGuestProfile (data) {
@@ -7874,13 +8023,22 @@ function renderGuestProfile (data) {
   const list    = document.getElementById('guest-profile-list');
   const medals  = ['','',''];
   const priceMap = ['','$','$$','$$$','$$$$'];
+  const nameEl = document.getElementById('guest-profile-name');
+  if (nameEl) nameEl.textContent = data.u ? `${data.u}'s food picks` : 'Foodie Profile';
+  const followBtn = document.getElementById('guest-profile-follow');
+  if (followBtn) {
+    followBtn.textContent = isFollowing(data) ? `Update ${data.u || 'friend'}` : `Follow ${data.u || 'this foodie'}`;
+    followBtn.disabled = false;
+    followBtn.onclick = () => { if (followFriend(data)) { followBtn.textContent = 'Following'; followBtn.disabled = true; } };
+  }
   list.innerHTML = data.picks.map((p,i) =>
     '<div class="guest-item">'
-    + '<div class="guest-item-photo">' + (p.p ? `<img src="${escHtml(p.p)}" alt="${escHtml(p.n)}" style="width:100%;height:100%;object-fit:cover;border-radius:10px" />` : (CUISINE_EMOJI[(p.c||'').toLowerCase()] || '')) + '</div>'
+    + '<div class="guest-item-photo">' + (safeUrl(p.p) ? `<img src="${escHtml(safeUrl(p.p))}" alt="${escHtml(p.n)}" style="width:100%;height:100%;object-fit:cover;border-radius:10px" />` : (CUISINE_EMOJI[(p.c||'').toLowerCase()] || '')) + '</div>'
     + '<div class="guest-item-body">'
     + '<div class="guest-item-name">' + (medals[i]||'') + ' ' + escHtml(p.n) + '</div>'
     + '<div class="guest-item-meta">' + escHtml(p.c||'Restaurant') + (p.a ? ' · ' + escHtml(p.a.slice(0,40)) : '') + '</div>'
     + '<div class="guest-item-stars">' + '★'.repeat(p.r) + '</div>'
+    + (p.g?.length ? '<div class="guest-item-order">Get: ' + p.g.map(escHtml).join(', ') + '</div>' : '')
     + '</div>'
     + '</div>'
   ).join('');
@@ -8084,6 +8242,8 @@ function initMoreMenu () {
 /* Single source of truth for every secondary tool / game.
    Shared by the desktop ⋯ menu and the mobile Discover & Play hub. */
 const TOOL_ACTIONS = {
+  'just-ate':         () => openJustAte(),
+  'decision':         openDecisionMode,
   'tonight':          () => document.getElementById('tonight-btn').click(),
   'command':          openCommandPalette,
   'craving':          openCravingEngine,
@@ -8139,38 +8299,42 @@ function runToolAction (action) {
 /* ── Mobile Discover & Play hub ─────────────────────────────
    Replaces the unscrollable 40-item ⋯ menu on phones with a
    thumb-friendly, searchable grid of tiles, grouped by intent. */
+// Grouped by what you're trying to do, most common first. The two everyday
+// actions lead; the many "pick for me" games sit together under one heading.
 const HUB_SECTIONS = [
-  { title: ' Decide tonight', items: [
-    ['tonight','',"Tonight's Pick"], ['craving','','Craving Engine'],
-    ['command','⌘','Command Palette'], ['itinerary','','Smart Itinerary'],
-    ['rooms','','Dinner Rooms'],
-    ['spin','','Spin the Wheel'], ['swipe','','Swipe to Decide'],
-    ['duel','','Restaurant Duel'], ['fortune','','Fortune Cookie'],
+  { title: 'Eat now', items: [
+    ['just-ate','','Just Ate'], ['decision','','Decision Mode'],
+    ['open-now','','Open Now'], ['discover','','Smart Discovery'],
   ]},
-  { title: ' Discover', items: [
-    ['discover','','Smart Discovery'], ['open-now','','Open Now'],
-    ['travel','✈','Travel Mode'], ['route','','Route Planner'],
-    ['mealplanner','','Meal Planner'], ['worldmap','','Cuisine Map'],
+  { title: "Can't decide? Play it out", items: [
+    ['swipe','','Swipe to Decide'], ['spin','','Spin the Wheel'],
+    ['duel','','Restaurant Duel'], ['craving','','Craving Engine'],
+    ['tonight','',"Tonight's Pick"], ['fortune','','Fortune Cookie'],
   ]},
-  { title: ' Play & earn', items: [
+  { title: 'With friends', items: [
+    ['friends','','Friends'], ['groupvote','','Group Vote'],
+    ['rooms','','Dinner Rooms'], ['profile','','My Profile'],
+  ]},
+  { title: 'Plan a food day', items: [
+    ['itinerary','','Smart Itinerary'], ['route','','Route Planner'],
+    ['mealplanner','','Meal Planner'], ['travel','✈','Travel Mode'],
+  ]},
+  { title: 'Your food life', items: [
+    ['gallery','','Photo Gallery'], ['visitlog','','Visit Log'],
+    ['passport','','Passport'], ['worldmap','','Cuisine Map'],
+    ['moodcal','','Mood Calendar'], ['beenawhile','⏰','Been a While'],
+    ['review','','Year in Review'], ['wrap','','Monthly Wrap'],
+    ['digest','','Monthly Digest'], ['stats2','','Deep Stats'],
+  ]},
+  { title: 'Games & rewards', items: [
     ['challenge','','Challenges'], ['achievements','','Achievements'],
-    ['bingo','','Cuisine Bingo'],
-    ['feedbear','','Feed the Bear'], ['passport','','Passport'],
-    ['moodcal','','Mood Calendar'],
+    ['bingo','','Cuisine Bingo'], ['feedbear','','Feed the Bear'],
   ]},
-  { title: ' Track', items: [
-    ['gallery','','Photo Gallery'], ['dishes','','Dish Tracker'],
-    ['visitlog','','Visit Log'], ['budget','','Budget'],
-    ['spend','','Spend Tracker'], ['compare','⚖','Compare'],
-    ['beenawhile','⏰','Been a While'],
+  { title: 'Money', items: [
+    ['budget','','Budget'], ['spend','','Spend Tracker'], ['compare','⚖','Compare'],
   ]},
-  { title: ' Social & stats', items: [
-    ['profile','','My Profile'], ['friends','','Friends'],
-    ['groupvote','','Group Vote'], ['stats2','','Deep Stats'],
-    ['ai-panel','','Byte Cub'], ['review','','Year in Review'],
-    ['wrap','','Monthly Wrap'], ['digest','','Monthly Digest'],
-  ]},
-  { title: ' Data & tools', items: [
+  { title: 'Data & tools', items: [
+    ['ai-panel','','Byte Cub'], ['command','⌘','Command Palette'],
     ['collections','','My Lists'], ['bulk','☑','Bulk Select'],
     ['location','','Location'], ['export2','','Export Passport'],
     ['export','','Export JSON'], ['import','','Import JSON'],
@@ -8471,7 +8635,7 @@ function renderYourOrder (restaurantId) {
   document.getElementById('your-order-share')?.classList.toggle('hidden', !dishes.length);
 
   if (!dishes.length) {
-    listEl.innerHTML = `<div class="your-order-empty">${r?.status === 'want-to-try'
+    listEl.innerHTML = friendTipsHtml(r) + `<div class="your-order-empty">${r?.status === 'want-to-try'
       ? 'Heard about a must-order dish here? Save it so you remember when you go.'
       : 'What did you order? Log it so next time you know exactly what to get.'}</div>`;
     return;
@@ -8492,7 +8656,7 @@ function renderYourOrder (restaurantId) {
             <button type="button" class="yo-remove" data-remove="${escHtml(d.id)}" aria-label="Remove ${escHtml(d.name)}">✕</button>
           </span>
         </div>`).join('')}
-    </div>`).join('');
+    </div>`).join('') + friendTipsHtml(r);
 }
 
 /* ── Food photos: snap first, name it, done ─────────────────── */
@@ -8872,15 +9036,31 @@ function shareYearReview () {
 
 function _buildFriendsMyLink () {
   const data = buildProfileData();
-  if (!data.picks.length) return;
-  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
-  const url = window.location.href.split('?')[0].split('#')[0] + '#profile=' + encoded;
   const el = document.getElementById('friends-my-link-input');
-  if (el) el.value = url;
+  if (!el) return;
+  el.value = profileHasContent(data) ? encodeProfileLink(data) : '';
+  el.placeholder = 'Rate a spot or log a dish to get your link';
+}
+
+function renderFriendsList () {
+  const el = document.getElementById('friends-list');
+  if (!el) return;
+  const friends = getFriends();
+  el.innerHTML = friends.length
+    ? `<div class="friends-section-title">Following (${friends.length})</div>` + friends.map(f => {
+        const orders = (f.data?.picks || []).reduce((n, p) => n + (p.g?.length || 0), 0);
+        return `<div class="friend-row">
+          <span class="friend-info"><strong>${escHtml(f.name)}</strong>
+            <span>${(f.data?.picks || []).length} spots · ${orders} go-to orders · ${(f.data?.w || []).length} cravings</span></span>
+          <button type="button" class="friend-remove icon-btn" data-key="${escHtml(f.key)}" aria-label="Unfollow ${escHtml(f.name)}">✕</button>
+        </div>`;
+      }).join('')
+    : '<div class="friends-empty">Follow friends to see what they order. Send them your link below, and paste theirs above.</div>';
 }
 
 function openFoodieFriends () {
   _buildFriendsMyLink();
+  renderFriendsList();
   document.getElementById('friends-link-input').value = '';
   document.getElementById('friends-result').classList.add('hidden');
   document.getElementById('friends-result').innerHTML = '';
@@ -8896,15 +9076,8 @@ function loadFriendProfile () {
   const rawInput = document.getElementById('friends-link-input').value.trim();
   if (!rawInput) { showToast('Paste a link', 'Paste your friend\'s profile link first.', 'error'); return; }
   
-  // Extract the hash from a full URL or bare encoded string
-  let encoded = rawInput;
-  const hashMatch = rawInput.match(/#profile=(.+)$/);
-  if (hashMatch) encoded = hashMatch[1];
-
   try {
-    const data = JSON.parse(decodeURIComponent(escape(atob(encoded))));
-    if (!data.picks?.length) throw new Error('empty');
-    renderFriendComparison(data);
+    renderFriendComparison(decodeProfileLink(rawInput));
   } catch(_) {
     showToast('Invalid link', 'Could not read that profile link. Ask your friend to reshare.', 'error');
   }
@@ -8924,7 +9097,26 @@ function renderFriendComparison (friendData) {
   const friendCuisines = new Set(friendData.picks.map(p => (p.c||'').toLowerCase()));
   const sharedCuisines = [...myCuisines].filter(c => c && friendCuisines.has(c));
 
-  let html = '<div class="friends-result">';
+  const who = friendData.u || 'Your friend';
+  let html = `<div class="friends-result">
+    <div class="friend-follow-row"><strong>${escHtml(who)}</strong>
+      <button type="button" class="btn-sm btn-orange friend-follow-btn">${isFollowing(friendData) ? 'Update' : 'Follow'}</button></div>`;
+
+  const orders = friendData.picks.filter(p => p.g?.length);
+  if (orders.length) {
+    html += `<div class="friends-section-title">Their go-to orders</div>`;
+    html += orders.slice(0, 6).map(p => `<div class="friends-overlap-item"><strong>${escHtml(p.n)}</strong>: get the ${p.g.map(escHtml).join(', ')}${p.s?.length ? ` · skip the ${p.s.map(escHtml).join(', ')}` : ''}</div>`).join('');
+  }
+  const myCraves = new Set();
+  state.restaurants.forEach(r => dishesOf(r).forEach(d => { if (d.verdict === 'want') myCraves.add(dishKey(d.name)); }));
+  const bothCrave = (friendData.w || []).filter(x => myCraves.has(dishKey(x.d)));
+  if (bothCrave.length) {
+    html += `<div class="friends-section-title">You both want to try</div>`;
+    html += bothCrave.map(x => `<div class="friends-overlap-item">${escHtml(x.d)}${x.at ? ` · ${escHtml(x.at)}` : ''}</div>`).join('');
+  } else if ((friendData.w || []).length) {
+    html += `<div class="friends-section-title">On their Crave List</div>`;
+    html += friendData.w.slice(0, 5).map(x => `<div class="friends-overlap-item">${escHtml(x.d)}${x.at ? ` · ${escHtml(x.at)}` : ''}</div>`).join('');
+  }
 
   // Overlap section
   if (overlap.length) {
@@ -8958,6 +9150,9 @@ function renderFriendComparison (friendData) {
   const resultEl = document.getElementById('friends-result');
   resultEl.innerHTML = html;
   resultEl.classList.remove('hidden');
+  resultEl.querySelector('.friend-follow-btn')?.addEventListener('click', e => {
+    if (followFriend(friendData)) { e.target.textContent = 'Following'; e.target.disabled = true; renderFriendsList(); }
+  });
 }
 
 function openAddModalPreFilled (name, cuisine, prefill = null) {
