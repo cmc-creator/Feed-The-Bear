@@ -6342,7 +6342,7 @@ async function runTonightsPick () {
   });
   scored.sort((a,b) => b.s - a.s);
   const p = scored[0].r;
-  const stars = p.myRating > 0 ? '?'.repeat(p.myRating) : '';
+  const stars = p.myRating > 0 ? '★'.repeat(p.myRating) : '';
   const price = p.priceRange ? '$'.repeat(p.priceRange) : '';
   const status = p.status === 'visited' ? '✅ Visited' : ' Want to Try';
   const vc = (p.visits||[]).length;
@@ -6395,12 +6395,12 @@ function exportFoodieReport () {
     + '<div class="pr-stat"><div class="val">'+visited.length+'</div><div class="lbl">Visited</div></div>'
     + '<div class="pr-stat"><div class="val">'+want.length+'</div><div class="lbl">Want to Try</div></div>'
     + '<div class="pr-stat"><div class="val">'+allVisits.length+'</div><div class="lbl">Check-ins</div></div>'
-    + '<div class="pr-stat"><div class="val">'+avgRating+(avgRating!=='-'?' ?':'')+'</div><div class="lbl">Avg Rating</div></div>'
+    + '<div class="pr-stat"><div class="val">'+avgRating+(avgRating!=='-'?' ★':'')+'</div><div class="lbl">Avg Rating</div></div>'
     + '<div class="pr-stat"><div class="val">'+currentStreak+' wk</div><div class="lbl">Current Streak</div></div>'
     + '<div class="pr-stat"><div class="val">'+longestStreak+' wk</div><div class="lbl">Best Streak</div></div>'
     + '</div></div>'
     + (topPicks.length ? '<div class="pr-section"><h2>Top Rated Visits</h2>'
-      + topPicks.map((r,i) => '<div class="pr-pick"><div class="rank">#'+(i+1)+'</div><div><div class="name">'+escHtml(r.name)+'</div>'+(r.address?'<div class="addr">'+escHtml(r.address)+'</div>':'')+'</div><div class="stars">'+'?'.repeat(r.myRating)+'</div></div>').join('')
+      + topPicks.map((r,i) => '<div class="pr-pick"><div class="rank">#'+(i+1)+'</div><div><div class="name">'+escHtml(r.name)+'</div>'+(r.address?'<div class="addr">'+escHtml(r.address)+'</div>':'')+'</div><div class="stars">'+'★'.repeat(r.myRating)+'</div></div>').join('')
       + '</div>' : '')
     + (wantTop.length ? '<div class="pr-section"><h2>Restaurants to Try</h2>'
       + wantTop.map((r,i) => '<div class="pr-pick"><div class="rank">'+(i+1)+'.</div><div><div class="name">'+escHtml(r.name)+'</div>'+(r.address?'<div class="addr">'+escHtml(r.address)+'</div>':'')+'</div><div class="stars">'+(r.priceRange?'$'.repeat(r.priceRange):'')+'</div></div>').join('')
@@ -6419,7 +6419,7 @@ function openChallengeModal () {
     preview.innerHTML = '<p style="text-align:center;color:var(--text-dim);padding:16px">Rate some restaurants first!</p>';
   } else {
     preview.innerHTML = top5.map((r,i) =>
-      '<div class="challenge-pick-item"><span class="cp-rank">#'+(i+1)+'</span><span class="cp-emoji">'+cuisineEmoji(r.cuisine)+'</span><span class="cp-name">'+escHtml(r.name)+'</span><span class="cp-stars">'+'?'.repeat(r.myRating)+'</span></div>'
+      '<div class="challenge-pick-item"><span class="cp-rank">#'+(i+1)+'</span><span class="cp-emoji">'+cuisineEmoji(r.cuisine)+'</span><span class="cp-name">'+escHtml(r.name)+'</span><span class="cp-stars">'+'★'.repeat(r.myRating)+'</span></div>'
     ).join('');
   }
   const baseUrl = window.location.origin + window.location.pathname.replace(/\/$/, '');
@@ -6438,7 +6438,7 @@ function copyChallengeLink () {
   input.select();
   try { navigator.clipboard.writeText(input.value).catch(()=>document.execCommand('copy')); } catch(_) { document.execCommand('copy'); }
   const btn = document.getElementById('challenge-copy-btn');
-  btn.textContent = '? Copied!';
+  btn.textContent = '✓ Copied!';
   setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
 }
 function shareChallengeLink () {
@@ -6455,7 +6455,7 @@ function checkIncomingChallenge () {
     if (!Array.isArray(picks) || !picks.length) return;
     const preview = document.getElementById('challenge-preview');
     preview.innerHTML = '<div class="challenge-incoming"><h3>A friend challenged you!</h3><p>Here are their top ' + picks.length + ' restaurants:</p></div>'
-      + picks.map((p,i) => '<div class="challenge-pick-item"><span class="cp-rank">#'+(i+1)+'</span><span class="cp-name">'+escHtml(p.n)+'</span><span class="cp-stars">'+'?'.repeat(p.s)+'</span></div>').join('')
+      + picks.map((p,i) => '<div class="challenge-pick-item"><span class="cp-rank">#'+(i+1)+'</span><span class="cp-name">'+escHtml(p.n)+'</span><span class="cp-stars">'+'★'.repeat(p.s)+'</span></div>').join('')
       + '<div class="challenge-reaction-row" id="cr-row"></div>';
     const row = document.getElementById('cr-row');
     [['Been there','✅','var(--green)'],['Want to try','','var(--blue)'],['Never heard of it','','var(--text-dim)']].forEach(([lbl,em,col]) => {
@@ -6761,7 +6761,7 @@ function renderLeaderboard () {
     return '<div class="lb-item" data-id="' + r.id + '">'
       + '<span class="lb-medal">' + (medals[i]||'') + '</span>'
       + '<span class="lb-name">' + escHtml(r.name) + '</span>'
-      + '<div><div class="lb-stars">' + '?'.repeat(r.myRating) + '</div>'
+      + '<div><div class="lb-stars">' + '★'.repeat(r.myRating) + '</div>'
       + '<div class="lb-meta">' + escHtml(r.cuisine||'') + (visits ? ' · ' + visits + ' visit' + (visits>1?'s':'') : '') + '</div></div>'
       + '</div>';
   }).join('');
@@ -7053,7 +7053,7 @@ function confirmImport () {
   });
   saveData(); renderAll();
   closeImportBookmarks();
-  showToast('? Imported!', added + ' restaurant' + (added!==1?'s':'') + ' added to Want to Try.', 'success');
+  showToast('✓ Imported!', added + ' restaurant' + (added!==1?'s':'') + ' added to Want to Try.', 'success');
   if (added > 0) launchConfetti(2000);
 }
 
@@ -7099,7 +7099,7 @@ function checkWeeklySuggestion () {
     + (favCuisine ? ' · you love ' + escHtml(favCuisine) + '!' : '') + '</div>'
     + '</div>'
     + '<button class="btn-sm btn-orange" onclick="openDetailModal(\'' + suggestion.id + '\');this.closest(\'.weekly-suggest-banner\').remove()">View</button>'
-    + '<button class="wsb-dismiss" onclick="this.closest(\'.weekly-suggest-banner\').remove()" aria-label="Dismiss">?</button>';
+    + '<button class="wsb-dismiss" onclick="this.closest(\'.weekly-suggest-banner\').remove()" aria-label="Dismiss">✕</button>';
   main.prepend(banner);
 }
 
@@ -7309,9 +7309,9 @@ function setReminder (restaurantId) {
     // In-tab setTimeout for same session
     setTimeout(() => fireReminder({ name: r.name }), Math.max(diff, 0));
     const status = document.getElementById('detail-reminder-status');
-    if (status) status.innerHTML = '<span style="color:var(--green)">? Reminder set for '
+    if (status) status.innerHTML = '<span style="color:var(--green)">✓ Reminder set for '
       + new Date(ts).toLocaleString() + '</span>';
-    showToast('? Reminder Set!', '"' + r.name + '" on ' + new Date(ts).toLocaleDateString(), 'success');
+    showToast('✓ Reminder Set!', '"' + r.name + '" on ' + new Date(ts).toLocaleDateString(), 'success');
   };
   if (Notification.permission === 'default') {
     Notification.requestPermission().then(save);
@@ -7413,8 +7413,8 @@ function showCompare () {
   const FIELDS = [
     { label: 'Cuisine',   fn: r => escHtml(r.cuisine||'-') },
     { label: 'Price',     fn: r => ['Free','$','$$','$$$','$$$$'][r.priceRange||0] },
-    { label: 'My Rating', fn: r => r.myRating ? '?'.repeat(r.myRating) : '-', num: r => r.myRating||0 },
-    { label: 'Google ?',  fn: r => r.googleRating ? r.googleRating + ' / 5' : '-', num: r => r.googleRating||0 },
+    { label: 'My Rating', fn: r => r.myRating ? '★'.repeat(r.myRating) : '-', num: r => r.myRating||0 },
+    { label: 'Google ★',  fn: r => r.googleRating ? r.googleRating + ' / 5' : '-', num: r => r.googleRating||0 },
     { label: 'Visits',    fn: r => String((r.visits||[]).length || (r.dateVisited?1:0)), num: r => (r.visits||[]).length||(r.dateVisited?1:0) },
     { label: 'Status',    fn: r => r.status === 'visited' ? '✅ Visited' : ' Want to Try' },
     { label: 'Address',   fn: r => escHtml((r.address||'-').slice(0,40)) },
@@ -7480,7 +7480,7 @@ function renderBudgetChart () {
   if (!el) return;
   const { monthlyBudget = 0, avgSpend = 35 } = state.settings;
   if (!monthlyBudget) {
-    el.innerHTML = '<div class="budget-setup">No budget set. <a onclick="openBudget()">Set your monthly budget ?</a></div>';
+    el.innerHTML = '<div class="budget-setup">No budget set. <a onclick="openBudget()">Set your monthly budget →</a></div>';
     return;
   }
   const now = new Date();
@@ -7505,7 +7505,7 @@ function renderBudgetChart () {
     + '<div class="budget-insight">'
     + visitsThisMonth + ' visit' + (visitsThisMonth!==1?'s':'') + ' · $' + avgSpend + '/avg = ~$' + estimated.toFixed(0)
     + (over ? ' · <span style="color:#e74c3c">$' + (estimated-monthlyBudget).toFixed(0) + ' over budget ❌</span>'
-             : ' · <span style="color:var(--green)">$' + remaining.toFixed(0) + ' remaining ?</span>')
+             : ' · <span style="color:var(--green)">$' + remaining.toFixed(0) + ' remaining ✓</span>')
     + '</div>';
 }
 
@@ -7538,9 +7538,9 @@ function renderVisitCalendar () {
   const DAY_LABELS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
 
   let html = '<div class="cal-header">'
-    + '<button class="cal-nav" id="cal-prev">?</button>'
+    + '<button class="cal-nav" id="cal-prev">‹</button>'
     + '<span class="cal-month-label">' + monthName + '</span>'
-    + '<button class="cal-nav" id="cal-next">?</button>'
+    + '<button class="cal-nav" id="cal-next">›</button>'
     + '</div>'
     + '<div class="cal-grid">'
     + DAY_LABELS.map(l=>'<div class="cal-day-header">'+l+'</div>').join('');
@@ -7621,7 +7621,7 @@ function openFoodieProfile () {
     + '<span class="pp-rank">' + (medals[i]||'') + '</span>'
     + '<span class="pp-name">' + escHtml(p.n) + '</span>'
     + (p.c ? '<span style="font-size:.72rem;color:var(--text-dim)">' + escHtml(p.c) + '</span>' : '')
-    + '<span class="pp-stars">' + '?'.repeat(p.r) + '</span>'
+    + '<span class="pp-stars">' + '★'.repeat(p.r) + '</span>'
     + '</div>'
   ).join('');
 
@@ -7665,7 +7665,7 @@ function renderGuestProfile (data) {
     + '<div class="guest-item-body">'
     + '<div class="guest-item-name">' + (medals[i]||'') + ' ' + escHtml(p.n) + '</div>'
     + '<div class="guest-item-meta">' + escHtml(p.c||'Restaurant') + (p.a ? ' · ' + escHtml(p.a.slice(0,40)) : '') + '</div>'
-    + '<div class="guest-item-stars">' + '?'.repeat(p.r) + '</div>'
+    + '<div class="guest-item-stars">' + '★'.repeat(p.r) + '</div>'
     + '</div>'
     + '</div>'
   ).join('');
@@ -7738,7 +7738,7 @@ function addCompareCheckboxes () {
     cb.className = 'compare-check icon-btn';
     cb.title = 'Add to compare';
     cb.style.cssText = 'position:absolute;top:8px;left:8px;width:28px;height:28px;border-radius:50%;background:rgba(37,99,235,.8);color:#fff;font-size:.8rem;z-index:10';
-    cb.textContent = _compareIds.has(id) ? '?' : '+';
+    cb.textContent = _compareIds.has(id) ? '✓' : '+';
     cb.addEventListener('click', e => { e.stopPropagation(); toggleCompareCard(id); });
     card.style.position = 'relative';
     card.prepend(cb);
@@ -8099,7 +8099,7 @@ function runCravingEngine () {
   const priceMap = ['','$','$$','$$$','$$$$'];
   const cuisine = winner.cuisine || 'Restaurant';
   const price   = priceMap[winner.priceRange||0] || '';
-  const rating  = winner.myRating ? '?'.repeat(winner.myRating) : (winner.status === 'want-to-try' ? ' Want to Try' : '');
+  const rating  = winner.myRating ? '★'.repeat(winner.myRating) : (winner.status === 'want-to-try' ? ' Want to Try' : '');
 
   // Build why string
   const whyParts = [];
@@ -8268,9 +8268,9 @@ function renderDishList (restaurantId) {
   el.innerHTML = list.map(d => `
     <div class="dish-item">
       <div class="dish-item-name">${escHtml(d.name)}</div>
-      <div class="dish-item-stars">${d.rating ? '?'.repeat(d.rating) + '?'.repeat(5-d.rating) : '☆'}</div>
+      <div class="dish-item-stars">${d.rating ? '★'.repeat(d.rating) + '☆'.repeat(5-d.rating) : '☆'}</div>
       <div class="dish-item-date" style="font-size:.72rem;color:var(--text-dim)">${d.date||''}</div>
-      <button class="dish-item-delete icon-btn" onclick="deleteDish('${restaurantId}','${d.id}')" title="Remove">?</button>
+      <button class="dish-item-delete icon-btn" onclick="deleteDish('${restaurantId}','${d.id}')" title="Remove">✕</button>
     </div>
   `).join('');
 }
@@ -8343,11 +8343,11 @@ function renderYearReview () {
     if (topCuisine) slides.push(`<div class="review-slide"><div class="review-slide-emoji">${cuisineEmoji(topCuisine[0])}</div><div class="review-slide-title">Your #1 Cuisine</div><div class="review-slide-value">${escHtml(topCuisine[0])}</div><div class="review-slide-sub">${topCuisine[1]} visit${topCuisine[1]!==1?'s':''} · you really love it</div></div>`);
     if (totalCuisines > 1) slides.push(`<div class="review-slide"><div class="review-slide-emoji"></div><div class="review-slide-title">Cuisines Explored</div><div class="review-slide-value">${totalCuisines}</div><div class="review-slide-sub">You ate: ${Object.keys(cuisineMap).slice(0,5).join(', ')}</div></div>`);
     if (mostVisited) slides.push(`<div class="review-slide"><div class="review-slide-emoji"></div><div class="review-slide-title">Your Go-To Spot</div><div class="review-slide-value" style="font-size:1.3rem">${escHtml(mostVisited.name)}</div><div class="review-slide-sub">${cuisineEmoji(mostVisited.cuisine)} ${mostVisited.cuisine||''}</div></div>`);
-    if (avgRating) slides.push(`<div class="review-slide"><div class="review-slide-emoji">?</div><div class="review-slide-title">Your Average Rating</div><div class="review-slide-value">${avgRating} / 5</div><div class="review-slide-sub">${avgRating>=4.5?'You have high standards!':avgRating>=3.5?'You eat well ?':'Room to discover better spots'}</div></div>`);
+    if (avgRating) slides.push(`<div class="review-slide"><div class="review-slide-emoji">⭐</div><div class="review-slide-title">Your Average Rating</div><div class="review-slide-value">${avgRating} / 5</div><div class="review-slide-sub">${avgRating>=4.5?'You have high standards!':avgRating>=3.5?'You eat well!':'Room to discover better spots'}</div></div>`);
     if (months[peakMonthIdx] > 0) slides.push(`<div class="review-slide"><div class="review-slide-emoji"></div><div class="review-slide-title">Most Active Month</div><div class="review-slide-value">${MONTH_NAMES[peakMonthIdx]}</div><div class="review-slide-sub">${months[peakMonthIdx]} meal${months[peakMonthIdx]!==1?'s':''} out that month</div></div>`);
     slides.push(`<div class="review-slide"><div class="review-slide-emoji"></div><div class="review-slide-title">Estimated Dining Spend</div><div class="review-slide-value">~$${estimatedSpend.toLocaleString()}</div><div class="review-slide-sub">Based on ${totalVisits} visits · $${state.settings.avgSpend||35}/avg</div></div>`);
     if (topRated.length) {
-      const topRatedHtml = topRated.map(r=>`<li><span>${escHtml(r.name)}</span><span>${'?'.repeat(r.myRating)}</span></li>`).join('');
+      const topRatedHtml = topRated.map(r=>`<li><span>${escHtml(r.name)}</span><span>${'★'.repeat(r.myRating)}</span></li>`).join('');
       slides.push(`<div class="review-slide" style="text-align:left"><div class="review-slide-emoji" style="text-align:center">⭐</div><div class="review-slide-title" style="text-align:center">Your Top Rated</div><ul class="review-top-list">${topRatedHtml}</ul></div>`);
     }
   }
@@ -8432,7 +8432,7 @@ function renderFriendComparison (friendData) {
   if (overlap.length) {
     html += `<div class="friends-overlap">
       <div class="friends-overlap-title">❤ You both love these (${overlap.length})</div>
-      ${overlap.map(p => `<div class="friends-overlap-item">${cuisineEmoji(p.c)} ${escHtml(p.n)} · you: ${'?'.repeat(p.r)}</div>`).join('')}
+      ${overlap.map(p => `<div class="friends-overlap-item">${cuisineEmoji(p.c)} ${escHtml(p.n)} · you: ${'★'.repeat(p.r)}</div>`).join('')}
     </div>`;
   } else {
     html += `<div class="friends-overlap"><div class="friends-overlap-title">Hmm, no direct overlap yet · time to branch out!</div></div>`;
@@ -8451,7 +8451,7 @@ function renderFriendComparison (friendData) {
       <div class="friends-pick-item">
         <span style="font-size:1.2rem">${cuisineEmoji(p.c)}</span>
         <div class="friends-pick-name">${escHtml(p.n)}<br><span style="font-size:.72rem;color:var(--text-dim)">${escHtml(p.c||'')}</span></div>
-        <div class="friends-pick-stars">${'?'.repeat(p.r)}</div>
+        <div class="friends-pick-stars">${'★'.repeat(p.r)}</div>
         <button class="btn-sm btn-orange" onclick="openAddModalPreFilled('${escJsArg(p.n)}','${escJsArg(p.c||'')}')">Add +</button>
       </div>`).join('');
   }
@@ -11158,7 +11158,7 @@ function renderChallengesList () {
   const challenges = getChallenges();
   const el = document.getElementById('challenges-list');
   if (!challenges.length) {
-    el.innerHTML = '<div class="challenges-empty">No challenges yet. <a onclick="switchChalTab(\'create\')">Create one ?</a></div>';
+    el.innerHTML = '<div class="challenges-empty">No challenges yet. <a onclick="switchChalTab(\'create\')">Create one →</a></div>';
     return;
   }
   el.innerHTML = challenges.map((ch, idx) => {
@@ -11171,7 +11171,7 @@ function renderChallengesList () {
         <div class="challenge-item-name">${escHtml(ch.name)}</div>
         <div style="display:flex;gap:8px;align-items:center">
           ${ch.deadline ? `<div class="challenge-item-deadline">? ${ch.deadline}</div>` : ''}
-          <button class="icon-btn" style="font-size:.7rem;padding:2px 6px" onclick="deleteChallenge(${idx})" title="Delete">?</button>
+          <button class="icon-btn" style="font-size:.7rem;padding:2px 6px" onclick="deleteChallenge(${idx})" title="Delete">✕</button>
         </div>
       </div>
       <div class="challenge-progress-track">
@@ -11705,7 +11705,7 @@ function toggleRouteItem (id, el) {
     if (_routeSelected.size >= 5) { showToast('Max 5 stops', 'Remove one first.', 'error'); return; }
     _routeSelected.add(id);
     el.classList.add('selected');
-    document.getElementById('route-check-' + id).textContent = '?';
+    document.getElementById('route-check-' + id).textContent = '✓';
   }
   _updateRouteBar();
 }
@@ -11765,7 +11765,7 @@ function exportPassport () {
   if (!visited.length) { showToast('No visits yet', 'Mark some restaurants as visited first.', 'error'); return; }
 
   const priceStr = n => n ? '$'.repeat(n) : '';
-  const ratingStr = n => n ? '?'.repeat(n) + '?'.repeat(5-n) : 'Unrated';
+  const ratingStr = n => n ? '★'.repeat(n) + '☆'.repeat(5-n) : 'Unrated';
 
   const cards = visited.map(r => `
     <div style="border:1px solid #ddd;border-radius:12px;padding:16px 18px;break-inside:avoid;margin-bottom:12px;font-family:Georgia,serif">
@@ -11812,7 +11812,7 @@ function exportShareablePage () {
       <div style="flex:1">
         <div style="font-weight:700;font-size:.95rem">${escHtml(r.name)}</div>
         <div style="font-size:.78rem;color:#aaa">${escHtml(r.cuisine||'')}${r.priceRange ? ' · ' + '$'.repeat(r.priceRange) : ''}</div>
-        ${r.myRating ? `<div style="color:#ff6b35;font-size:.82rem">${'?'.repeat(r.myRating)}</div>` : ''}
+        ${r.myRating ? `<div style="color:#ff6b35;font-size:.82rem">${'★'.repeat(r.myRating)}</div>` : ''}
         ${r.notes ? `<div style="font-size:.75rem;color:#888;margin-top:4px">${escHtml(r.notes.slice(0,100))}</div>` : ''}
       </div>
       <span style="font-size:.7rem;padding:3px 8px;border-radius:10px;background:${r.status==='visited'?'#1a3a2a':r.status==='want-to-try'?'#1a1a3a':'#2a2a2a'};color:${r.status==='visited'?'#4caf50':r.status==='want-to-try'?'#7c83fd':'#888'}">${r.status}</span>
@@ -12165,12 +12165,12 @@ function _renderSwipeDeck () {
     card.style.zIndex = stackIdx + 1;
     card.style.transform = `scale(${1 - (remaining.slice(0,3).length - 1 - stackIdx) * 0.04}) translateY(${(remaining.slice(0,3).length - 1 - stackIdx) * -8}px)`;
     card.innerHTML = `
-      <div class="swipe-label yes">PICK ?</div>
-      <div class="swipe-label no">SKIP ?</div>
+      <div class="swipe-label yes">PICK ✓</div>
+      <div class="swipe-label no">SKIP ✕</div>
       <div class="swipe-card-emoji">${cuisineEmoji(r.cuisine)}</div>
       <div class="swipe-card-name">${escHtml(r.name)}</div>
       <div class="swipe-card-meta">${escHtml(r.cuisine||'')}${r.priceRange ? ' · ' + '$'.repeat(r.priceRange) : ''}</div>
-      ${r.myRating ? `<div class="swipe-card-rating">${'?'.repeat(r.myRating)}</div>` : ''}
+      ${r.myRating ? `<div class="swipe-card-rating">${'★'.repeat(r.myRating)}</div>` : ''}
       ${r.address ? `<div class="swipe-card-meta" style="margin-top:4px"> ${escHtml(r.address)}</div>` : ''}
     `;
     if (isTop) {
@@ -12484,9 +12484,9 @@ function _renderDigest () {
     <div class="digest-grid">
       <div class="digest-stat"><div class="digest-stat-val">${added.length}</div><div class="digest-stat-label">Added</div></div>
       <div class="digest-stat"><div class="digest-stat-val">${cuisines.size}</div><div class="digest-stat-label">Cuisines</div></div>
-      <div class="digest-stat"><div class="digest-stat-val">${avgRating}</div><div class="digest-stat-label">Avg ?</div></div>
+      <div class="digest-stat"><div class="digest-stat-val">${avgRating}</div><div class="digest-stat-label">Avg ★</div></div>
     </div>
-    ${topRated ? `<div><div class="digest-top-label">Top spot this month</div><div class="digest-top-name">${cuisineEmoji(topRated.cuisine)} ${escHtml(topRated.name)} ${'?'.repeat(topRated.myRating)}</div></div>` : ''}
+    ${topRated ? `<div><div class="digest-top-label">Top spot this month</div><div class="digest-top-name">${cuisineEmoji(topRated.cuisine)} ${escHtml(topRated.name)} ${'★'.repeat(topRated.myRating)}</div></div>` : ''}
     ${estSpend > 0 ? `<div class="digest-sub">Estimated spend: ~$${estSpend}</div>` : ''}
     ${visited.length === 0 ? '<div style="color:rgba(255,255,255,.35);font-size:.82rem;margin-top:8px">No visits recorded for this month.</div>' : ''}
   `;
