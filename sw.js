@@ -3,7 +3,7 @@
    Offline-first cache strategy
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-const CACHE  = 'ftb-v49';
+const CACHE  = 'ftb-v50';
 const ASSETS = [
   './',
   './index.html',
@@ -15,8 +15,12 @@ const ASSETS = [
   './analytics.js',
   './trust-layer.js',
   './decision-mode.js',
+  './micro-interactions.js',
+  './photo-gallery.js',
   './style.css',
   './decision-mode.css',
+  './micro-interactions.css',
+  './photo-gallery.css',
   './manifest.json',
   './icon.svg',
   'https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap',
