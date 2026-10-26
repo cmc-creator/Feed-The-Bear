@@ -13,7 +13,7 @@
 window.BearSwipe = (() => {
   'use strict';
 
-  const ROUND = 10;
+  const ROUND = 20;
   const STORE_KEY = 'ftb_bear_swipe_v2';
   const SEEN_LIMIT = 400;
 
@@ -40,7 +40,9 @@ window.BearSwipe = (() => {
     if (!manifest) {
       manifest = fetch('data/food-photos.json')
         .then(r => (r.ok ? r.json() : { photos: [] }))
-        .then(d => (Array.isArray(d.photos) ? d.photos : []).filter(p => /^https:\/\/upload\.wikimedia\.org\//.test(p.url)))
+        .then(d => (Array.isArray(d.photos) ? d.photos : [])// Wikimedia serves resized photos from thumb.wikimedia.org (newer) and
+        // upload.wikimedia.org; allowing only the latter dropped 97% of them.
+        .filter(p => /^https:\/\/(thumb|upload)\.wikimedia\.org\//.test(p.url)))
         .catch(() => []);
     }
     return manifest;
@@ -181,9 +183,9 @@ window.BearSwipe = (() => {
         halves.forEach(h => host.appendChild(h));
         card.remove();
         requestAnimationFrame(() => halves.forEach(h => h.classList.add('go')));
-        setTimeout(() => { halves.forEach(h => h.remove()); resolve(); }, 560);
+        setTimeout(() => { halves.forEach(h => h.remove()); resolve(); }, 900);
         void rect;
-      }, 300);
+      }, 1050); // let the claw marks sit long enough to see before the tear
     });
   }
 
@@ -318,7 +320,7 @@ window.BearSwipe = (() => {
   }
 
   function showHelp () {
-    window.showToast?.('How Bear Swipe works', 'Swipe right on dishes you\'d eat, left on ones you wouldn\'t. After 10, the bear names your craving and finds it nearby. It also tunes your picks.', 'info');
+    window.showToast?.('How Bear Swipe works', `Swipe right on dishes you'd eat, left on ones you wouldn't. After ${ROUND}, the bear names your craving and finds it nearby. It also tunes your picks.`, 'info');
   }
 
   /* ── Public ──────────────────────────────────────────────── */
@@ -348,7 +350,7 @@ window.BearSwipe = (() => {
       <div class="bs-header">
         <div>
           <div class="bs-title">Bear Swipe</div>
-          <div class="bs-sub">Swipe real dishes. <b>Right</b> if you'd eat it, <b>left</b> if not. After 10, the bear names your craving and finds it nearby.</div>
+          <div class="bs-sub">Swipe real dishes. <b>Right</b> if you'd eat it, <b>left</b> if not. After ${ROUND}, the bear names your craving and finds it nearby.</div>
         </div>
         <div class="bs-header-btns">
           <button type="button" class="bs-icon-btn bs-help-btn" aria-label="How Bear Swipe works">?</button>

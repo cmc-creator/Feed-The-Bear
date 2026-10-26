@@ -76,8 +76,11 @@
 .bs-gouge-edge { fill: none; stroke: rgba(255, 214, 170, .9); stroke-width: .45; vector-effect: non-scaling-stroke; }
 .bs-claw svg { filter: drop-shadow(0 0 4px rgba(200, 60, 30, .55)) drop-shadow(1px 2px 2px rgba(0, 0, 0, .6)); }
 @keyframes bs-rake { to { stroke-dashoffset: 0; } }
-.bs-half { transition: transform .55s cubic-bezier(.4, 0, .9, .6), opacity .55s ease; pointer-events: none; }
+.bs-half { transition: transform .9s cubic-bezier(.4, 0, .9, .6), opacity .9s ease-in; pointer-events: none; }
 .bs-half .bs-hint { display: none; }
+/* The halves are copies of the card; keep their claw marks fully drawn
+   instead of letting the copied animation rake in again from nothing. */
+.bs-half .bs-claw-reveal { animation: none; stroke-dashoffset: 0; }
 .bs-half-a { clip-path: polygon(0 0, 46% 0, 52% 18%, 44% 34%, 58% 52%, 50% 70%, 64% 86%, 58% 100%, 0 100%); }
 .bs-half-b { clip-path: polygon(46% 0, 100% 0, 100% 100%, 58% 100%, 64% 86%, 50% 70%, 58% 52%, 44% 34%, 52% 18%); }
 .bs-half-a.go { transform: translate(-70px, 140px) rotate(-14deg); opacity: 0; }
