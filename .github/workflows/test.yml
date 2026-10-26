@@ -71,3 +71,6 @@ jobs:
       - name: Usage dashboard
         working-directory: tests
         run: node usage.test.js
+      - name: Story cards
+        working-directory: tests
+        run: node story.test.js
