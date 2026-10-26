@@ -57,3 +57,7 @@ jobs:
       - name: Upgrade paths
         working-directory: tests
         run: node money.test.js
+
+      - name: Quick Add and the cub
+        working-directory: tests
+        run: node cub.test.js

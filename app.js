@@ -5298,8 +5298,10 @@ function setupEvents () {
   });
 
   // Add button
-  document.getElementById('add-btn')?.addEventListener('click', openAddModal);
-  document.getElementById('empty-add-btn')?.addEventListener('click', openAddModal);
+  // New spots go through the cub's Quick Add; the full form is behind "More details".
+  const openQuickAdd = () => (window.Cub ? window.Cub.openAdd() : openAddModal());
+  document.getElementById('add-btn')?.addEventListener('click', openQuickAdd);
+  document.getElementById('empty-add-btn')?.addEventListener('click', openQuickAdd);
 
   // Modal close
   document.getElementById('modal-close-btn').addEventListener('click', closeModal);
@@ -5444,7 +5446,7 @@ function setupEvents () {
   document.getElementById('mobile-bottom-nav').addEventListener('click', e => {
     const btn = e.target.closest('.mobile-nav-btn, .mobile-nav-fab');
     if (!btn) return;
-    if (btn.id === 'mobile-add-btn')  { hapticTap('medium'); openAddModal(); return; }
+    if (btn.id === 'mobile-add-btn')  { hapticTap('medium'); (window.Cub ? window.Cub.openAdd() : openAddModal()); return; }
     if (btn.id === 'mobile-play-btn') { openMobileHub(); return; }
     if (!btn.dataset.view) return;
     hapticTap('light');
@@ -12545,6 +12547,7 @@ const GRIZZLY_PITCH = {
   'byte-cub':  { title: 'Your personal food concierge', body: 'Ask Byte Cub anything: where to go tonight, what to order, date-night ideas, all from your own list.' },
   summary:     { title: 'Byte Cub sums up every spot', body: 'One tap for the vibe, what to order, and the best time to go.' },
   dishes:      { title: 'Know what to order before you go', body: 'Byte Cub picks the dishes worth ordering at each spot, tuned to your taste.' },
+  smartfill:   { title: 'Let the cub do the typing', body: 'Byte Cub fills in cuisine, price, tags, and a short description for every spot you add.' },
   review:      { title: 'Your foodie Year in Review', body: 'Your top spots, cuisines, and streaks, wrapped up and ready to share.' },
   // FREE_RESTAURANT_LIMIT lives in firebase.js, which loads after this file,
   // so read it when the pitch is shown, not while app.js is starting up.
