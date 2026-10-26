@@ -65,6 +65,7 @@ window.Cub = (() => {
   let stars = 0;
   let verdict = null;
   let photo = '';
+  let video = '';
   let searchTimer = null;
   let searchSeq = 0;
 
@@ -217,10 +218,10 @@ window.Cub = (() => {
       collectionId: null, priority: '', status, dateAdded: today,
       dateVisited: status === 'visited' ? today : null, updatedAt: Date.now(), visits: [],
     };
-    if (status === 'visited') r.visits.push({ date: today, note: '', rating: stars, dish, photo });
+    if (status === 'visited') r.visits.push({ date: today, note: '', rating: stars, dish, photo, ...(video ? { video } : {}) });
     if (photo) r.photo = photo;
     state.restaurants.unshift(r);
-    if (dish) a.upsertDish(r, { name: dish, verdict: status === 'visited' ? (verdict || (stars >= 4 ? 'again' : stars && stars <= 2 ? 'skip' : 'ok')) : 'want', photo });
+    if (dish) a.upsertDish(r, { name: dish, verdict: status === 'visited' ? (verdict || (stars >= 4 ? 'again' : stars && stars <= 2 ? 'skip' : 'ok')) : 'want', photo, video });
     else a.saveData();
     if (!Number.isFinite(r.lat) && r.address && typeof a.geocodeAddress === 'function') a.geocodeAddress(r.id, r.address);
     a.renderAll();
@@ -281,7 +282,7 @@ window.Cub = (() => {
           <div class="qa-extra">
             <div class="qa-row">
               <input class="form-input qa-dish" type="text" maxlength="80" autocomplete="off" />
-              <button type="button" class="qa-photo" aria-label="Add a photo"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+              <button type="button" class="qa-photo" aria-label="Add a photo or video"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
             </div>
             <img class="qa-photo-preview hidden" alt="Your photo" />
           </div>
@@ -315,13 +316,14 @@ window.Cub = (() => {
     el.querySelectorAll('.qa-star').forEach(b => b.addEventListener('click', () => setStars(Number(b.dataset.n))));
     el.querySelector('.qa-ai').addEventListener('click', aiFill);
     el.querySelector('.qa-photo').addEventListener('click', async () => {
-      const p = await app().pickFoodPhoto();
-      if (!p) return;
-      photo = p;
+      const media = await app().pickFoodMedia();
+      if (!media) return;
+      photo = media.photo;
+      video = media.video || '';
       const prev = el.querySelector('.qa-photo-preview');
-      prev.src = app().safeUrl(p);
+      prev.src = app().safeUrl(photo);
       prev.classList.remove('hidden');
-      say('Looks delicious.');
+      say(video ? 'Ooh, a video! That looks amazing.' : 'Looks delicious.');
     });
     el.querySelector('.qa-save').addEventListener('click', save);
     el.querySelector('.qa-more').addEventListener('click', moreDetails);
@@ -333,7 +335,7 @@ window.Cub = (() => {
 
   function openAdd () {
     sheet = sheet || build();
-    pick = null; status = null; stars = 0; verdict = null; photo = '';
+    pick = null; status = null; stars = 0; verdict = null; photo = ''; video = '';
     sheet.classList.remove('step-2', 'been', 'want');
     sheet.querySelector('.qa-input').value = '';
     sheet.querySelector('.qa-dish').value = '';

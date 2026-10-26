@@ -627,6 +627,136 @@ function pruneLegacyDemoRestaurants (list) {
 const PHOTO_DB = 'ftb-photos';
 const PHOTO_STORE = 'photos';
 const PHOTO_REF = 'idb:';
+
+/* ── Food videos (Grizzly) ──────────────────────────────────────
+   Up to 15 seconds. The file is kept as a Blob in IndexedDB's "videos"
+   store and referenced as "vid:<id>" on the dish or visit; a poster frame
+   becomes its photo, so everything that shows photos keeps working.
+   Videos stay on the device that recorded them (Firestore can't hold
+   them); other devices show the poster. */
+const VIDEO_STORE = 'videos';
+const VIDEO_REF = 'vid:';
+const FOOD_VIDEO_MAX_SECONDS = 15;
+const FOOD_VIDEO_MAX_BYTES = 80 * 1024 * 1024;
+
+// Duration plus a JPEG poster frame from a video file.
+function readVideoPoster (file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const v = document.createElement('video');
+    v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = url;
+    const done = (fn, arg) => { clearTimeout(timer); URL.revokeObjectURL(url); fn(arg); };
+    const timer = setTimeout(() => done(reject, new Error('timeout')), 10000);
+    v.onerror = () => done(reject, new Error('unreadable'));
+    // Some WebM files report an infinite duration until you seek to the end.
+    let measuring = false;
+    const seekPoster = () => { v.currentTime = Math.min(0.5, (Number.isFinite(v.duration) ? v.duration : 1) / 2); };
+    v.onloadedmetadata = () => {
+      if (Number.isFinite(v.duration)) { seekPoster(); return; }
+      measuring = true;
+      v.currentTime = 1e101;
+    };
+    v.onseeked = () => {
+      if (measuring) { measuring = false; seekPoster(); return; }
+      const duration = Number.isFinite(v.duration) ? v.duration : 0;
+      let poster = '';
+      try {
+        const scale = Math.min(1, FOOD_PHOTO_MAX_DIM / Math.max(v.videoWidth || 1, v.videoHeight || 1));
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round((v.videoWidth || 640) * scale));
+        c.height = Math.max(1, Math.round((v.videoHeight || 480) * scale));
+        c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+        poster = c.toDataURL('image/jpeg', FOOD_PHOTO_QUALITY);
+      } catch { /* some formats decode without a drawable frame */ }
+      done(resolve, { duration, poster });
+    };
+  });
+}
+
+function storeFoodVideo (file) {
+  const id = uid();
+  return photoDbOp('readwrite', store => store.put(file, id), VIDEO_STORE).then(ok => {
+    if (!ok) throw new Error('No video storage on this device');
+    return VIDEO_REF + id;
+  });
+}
+
+function getFoodVideo (ref) {
+  if (!String(ref || '').startsWith(VIDEO_REF)) return Promise.resolve(null);
+  let req;
+  return photoDbOp('readonly', store => { req = store.get(ref.slice(VIDEO_REF.length)); return req; }, VIDEO_STORE)
+    .then(() => (req?.result instanceof Blob ? req.result : null))
+    .catch(() => null);
+}
+
+// Photo or video picker. Resolves { photo } or { photo: poster, video }, or
+// null. Videos are Grizzly; free users who pick one get the pitch.
+function pickFoodMedia () {
+  return new Promise(resolve => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,video/*';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) { resolve(null); return; }
+      if (!file.type.startsWith('video/')) {
+        readImageFileCompressed(file, FOOD_PHOTO_MAX_DIM, FOOD_PHOTO_QUALITY)
+          .then(photo => resolve({ photo }))
+          .catch(() => { showToast('Photo Error', 'Could not load that image.', 'error'); resolve(null); });
+        return;
+      }
+      if (!hasGrizzly()) { trackProductEvent('video_upsell_shown', {}); showGrizzlyUpsell('video'); resolve(null); return; }
+      if (file.size > FOOD_VIDEO_MAX_BYTES) { showToast('Video too big', 'Try a shorter clip (up to 15 seconds).', 'error'); resolve(null); return; }
+      try {
+        const { duration, poster } = await readVideoPoster(file);
+        if (duration > FOOD_VIDEO_MAX_SECONDS + 0.5) {
+          showToast('Keep it to 15 seconds', `That clip is ${Math.round(duration)}s. Trim it in your camera app, then add it again.`, 'info');
+          resolve(null);
+          return;
+        }
+        const video = await storeFoodVideo(file);
+        trackProductEvent('video_added', { seconds: Math.round(duration) });
+        resolve({ photo: poster || 'assets/food/pizza.jpg', video });
+      } catch {
+        showToast('Video Error', 'Could not read that video. Try one from your camera.', 'error');
+        resolve(null);
+      }
+    };
+    input.click();
+  });
+}
+
+let _videoViewerUrl = '';
+async function playFoodVideo (ref, caption = '') {
+  const blob = await getFoodVideo(ref);
+  if (!blob) { showToast('Video not on this device', 'Videos stay on the phone that recorded them. The photo shows everywhere.', 'info'); return; }
+  let viewer = document.getElementById('video-viewer');
+  if (!viewer) {
+    viewer = document.createElement('div');
+    viewer.id = 'video-viewer';
+    viewer.className = 'video-viewer hidden';
+    viewer.setAttribute('role', 'dialog');
+    viewer.setAttribute('aria-modal', 'true');
+    viewer.setAttribute('aria-label', 'Food video');
+    viewer.innerHTML = '<button type="button" class="video-viewer-close" aria-label="Close">✕</button><video controls playsinline autoplay loop></video><div class="video-viewer-caption"></div>';
+    document.body.appendChild(viewer);
+    const close = () => {
+      const v = viewer.querySelector('video');
+      v.pause(); v.removeAttribute('src'); v.load();
+      if (_videoViewerUrl) { URL.revokeObjectURL(_videoViewerUrl); _videoViewerUrl = ''; }
+      viewer.classList.add('hidden');
+    };
+    viewer.querySelector('.video-viewer-close').addEventListener('click', close);
+    viewer.addEventListener('click', e => { if (e.target === viewer) close(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !viewer.classList.contains('hidden')) close(); });
+  }
+  if (_videoViewerUrl) URL.revokeObjectURL(_videoViewerUrl);
+  _videoViewerUrl = URL.createObjectURL(blob);
+  viewer.querySelector('video').src = _videoViewerUrl;
+  viewer.querySelector('.video-viewer-caption').textContent = caption;
+  viewer.classList.remove('hidden');
+  viewer.querySelector('video').play()?.catch?.(() => {});
+}
 let _photoDb = null;            // Promise<IDBDatabase|null>
 let _photosHydrated = false;    // in-memory photos restored from IndexedDB
 const _photoRefCache = new Map(); // data URL -> ref
@@ -637,8 +767,13 @@ function openPhotoDb () {
   if (_photoDb) return _photoDb;
   _photoDb = new Promise(resolve => {
     try {
-      const req = indexedDB.open(PHOTO_DB, 1);
-      req.onupgradeneeded = () => req.result.createObjectStore(PHOTO_STORE);
+      // v2 adds the videos store; v1 databases keep their photos.
+      const req = indexedDB.open(PHOTO_DB, 2);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(PHOTO_STORE)) db.createObjectStore(PHOTO_STORE);
+        if (!db.objectStoreNames.contains(VIDEO_STORE)) db.createObjectStore(VIDEO_STORE);
+      };
       req.onsuccess = () => { _photoDbReady = true; resolve(req.result); };
       req.onerror = () => resolve(null);
       req.onblocked = () => resolve(null);
@@ -647,10 +782,10 @@ function openPhotoDb () {
   return _photoDb;
 }
 
-function photoDbOp (mode, fn) {
+function photoDbOp (mode, fn, storeName = PHOTO_STORE) {
   return openPhotoDb().then(db => db && new Promise((resolve, reject) => {
-    const tx = db.transaction(PHOTO_STORE, mode);
-    const out = fn(tx.objectStore(PHOTO_STORE));
+    const tx = db.transaction(storeName, mode);
+    const out = fn(tx.objectStore(storeName));
     tx.oncomplete = () => resolve(out?.result ?? true);
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error);
@@ -5768,8 +5903,8 @@ function setupEvents () {
   });
   document.getElementById('just-ate-save')?.addEventListener('click', saveJustAte);
   document.getElementById('just-ate-photo')?.addEventListener('click', async () => {
-    const photo = await pickFoodPhoto();
-    if (photo) setJustAtePhoto(photo);
+    const media = await pickFoodMedia();
+    if (media) setJustAtePhoto(media.photo, media.video);
   });
   document.getElementById('just-ate-photo-preview')?.addEventListener('click', e => {
     if (e.target.closest('.ja-photo-clear')) setJustAtePhoto('');
@@ -5782,9 +5917,9 @@ function setupEvents () {
     logYourOrder(r?.status === 'want-to-try' ? 'want' : 'ok');
   });
   document.getElementById('your-order-photo')?.addEventListener('click', async () => {
-    const photo = await pickFoodPhoto();
-    if (!photo) return;
-    setYourOrderPendingPhoto(photo);
+    const media = await pickFoodMedia();
+    if (!media) return;
+    setYourOrderPendingPhoto(media.photo, media.video);
     document.getElementById('your-order-input')?.focus();
   });
   document.getElementById('your-order-pending')?.addEventListener('click', e => {
@@ -5795,6 +5930,8 @@ function setupEvents () {
     if (!r) return;
     const view = e.target.closest('.yo-dish-photo[data-view]');
     if (view) {
+      const vd = dishesOf(r).find(x => x.id === view.dataset.view);
+      if (vd?.video) { playFoodVideo(vd.video, `${vd.name} · ${r.name}`); return; }
       const photos = dishPhotosOf(r);
       if (typeof openPhotoGallery === 'function') openPhotoGallery(photos, Math.max(0, photos.findIndex(p => p.id === view.dataset.view)));
       return;
@@ -5802,9 +5939,11 @@ function setupEvents () {
     const photoFor = e.target.closest('.yo-photo-btn[data-photo-for]');
     if (photoFor) {
       const d = dishesOf(r).find(x => x.id === photoFor.dataset.photoFor);
-      const photo = d && await pickFoodPhoto();
-      if (!photo) return;
+      const media = d && await pickFoodMedia();
+      if (!media) return;
+      const photo = media.photo;
       d.photo = photo;
+      if (media.video) d.video = media.video; else delete d.video;
       r.updatedAt = Date.now();
       saveData();
       renderYourOrder(r.id);
@@ -7728,15 +7867,15 @@ let _lightboxIdx   = 0;
 function collectFoodPhotos () {
   const seen = new Set();
   const out = [];
-  const add = (src, name, id, date, type) => {
+  const add = (src, name, id, date, type, video = '') => {
     const safe = safeUrl(src || '');
     if (!safe || seen.has(safe)) return;
     seen.add(safe);
-    out.push({ src: safe, name, id, date: date || '', type });
+    out.push({ src: safe, name, id, date: date || '', type, video });
   };
   (state.restaurants || []).forEach(r => {
-    dishesOf(r).forEach(d => add(d.photo, `${d.name} · ${r.name}`, r.id, d.date, 'dish'));
-    (r.visits || []).forEach(v => add(v.photo, `${v.dish || r.name}${v.dish ? ` · ${r.name}` : ''} - ${fmtDate(v.date)}`, r.id, v.date, 'visit'));
+    dishesOf(r).forEach(d => add(d.photo, `${d.name} · ${r.name}`, r.id, d.date, 'dish', d.video));
+    (r.visits || []).forEach(v => add(v.photo, `${v.dish || r.name}${v.dish ? ` · ${r.name}` : ''} - ${fmtDate(v.date)}`, r.id, v.date, 'visit', v.video));
     add(r.photo, r.name, r.id, r.dateVisited || r.dateAdded, 'cover');
   });
   return out.sort((a, b) => String(b.date).localeCompare(String(a.date)));
@@ -7752,11 +7891,15 @@ function openGallery () {
       '<div class="gallery-item" data-idx="' + i + '">'
       + '<img src="' + escHtml(p.src) + '" alt="' + escHtml(p.name) + '" loading="lazy" />'
       + '<div class="gallery-item-name">' + escHtml(p.name) + '</div>'
+      + (p.video ? '<span class="video-badge" aria-label="Video">▶</span>' : '')
       + (p.type === 'visit' ? '<div class="gallery-type-badge">Visit</div>' : '')
       + '</div>'
     ).join('');
     grid.querySelectorAll('.gallery-item[data-idx]').forEach(el => {
-      el.addEventListener('click', () => openLightbox(parseInt(el.dataset.idx)));
+      el.addEventListener('click', () => {
+        const p = _galleryPhotos[parseInt(el.dataset.idx)];
+        if (p?.video) playFoodVideo(p.video, p.name); else openLightbox(parseInt(el.dataset.idx));
+      });
     });
   }
   document.getElementById('gallery-overlay').classList.remove('hidden');
@@ -8812,7 +8955,7 @@ function verdictFromRating (rating = 0) {
 
 // Adds a dish or updates the one with the same name, so re-logging a dish
 // changes its verdict instead of creating duplicates.
-function upsertDish (r, { name, verdict, rating, note, photo } = {}) {
+function upsertDish (r, { name, verdict, rating, note, photo, video } = {}) {
   const clean = String(name || '').trim().slice(0, 80);
   if (!r || !clean) return null;
   if (!Array.isArray(r.dishes)) r.dishes = [];
@@ -8825,7 +8968,7 @@ function upsertDish (r, { name, verdict, rating, note, photo } = {}) {
   if (DISH_VERDICTS.includes(verdict)) dish.verdict = verdict;
   else if (Number.isFinite(rating) && rating > 0) dish.verdict = verdictFromRating(rating);
   if (note != null) dish.note = String(note).slice(0, 200);
-  if (photo) dish.photo = photo;
+  if (photo) { dish.photo = photo; if (video) dish.video = video; else delete dish.video; }
   if (dish.verdict !== 'want') dish.date = iso();
   r.updatedAt = Date.now();
   saveData();
@@ -8912,7 +9055,7 @@ function renderYourOrder (restaurantId) {
       ${dishes.filter(d => d.verdict === g).map(d => `
         <div class="yo-dish${d.photo ? ' has-photo' : ''}">
           <div class="yo-dish-row">
-            ${safeUrl(d.photo || '') ? `<button type="button" class="yo-dish-photo" data-view="${escHtml(d.id)}" aria-label="View photo of ${escHtml(d.name)}"><img src="${escHtml(safeUrl(d.photo))}" alt="" loading="lazy" /></button>` : ''}
+            ${safeUrl(d.photo || '') ? `<button type="button" class="yo-dish-photo${d.video ? ' is-video' : ''}" data-view="${escHtml(d.id)}" aria-label="${d.video ? 'Play video' : 'View photo'} of ${escHtml(d.name)}"><img src="${escHtml(safeUrl(d.photo))}" alt="" loading="lazy" />${d.video ? '<span class="video-badge small" aria-hidden="true">▶</span>' : ''}</button>` : ''}
             <button type="button" class="yo-dish-name" aria-expanded="false">${escHtml(d.name)}${d.rating ? ` <span class="yo-dish-stars" aria-label="${d.rating} stars">${'★'.repeat(d.rating)}</span>` : ''}</button>
           </div>
           ${d.note ? `<div class="yo-dish-note">${escHtml(d.note)}</div>` : ''}
@@ -8927,14 +9070,16 @@ function renderYourOrder (restaurantId) {
 
 /* ── Food photos: snap first, name it, done ─────────────────── */
 let _yoPendingPhoto = '';
+let _yoPendingVideo = '';
 
-function setYourOrderPendingPhoto (dataUrl = '') {
+function setYourOrderPendingPhoto (dataUrl = '', video = '') {
   _yoPendingPhoto = dataUrl;
+  _yoPendingVideo = dataUrl ? video : '';
   const box = document.getElementById('your-order-pending');
   if (!box) return;
   box.classList.toggle('hidden', !dataUrl);
   box.innerHTML = dataUrl
-    ? `<img src="${escHtml(safeUrl(dataUrl))}" alt="" /><span>Now name the dish and tap how it was.</span><button type="button" class="yo-pending-clear" aria-label="Remove photo">✕</button>`
+    ? `<img src="${escHtml(safeUrl(dataUrl))}" alt="" />${video ? '<span class="video-badge small" aria-label="Video">▶</span>' : ''}<span>Now name the dish and tap how it was.</span><button type="button" class="yo-pending-clear" aria-label="Remove photo">✕</button>`
     : '';
 }
 
@@ -8958,7 +9103,7 @@ function photoReveal (dataUrl, caption = '') {
 }
 
 /* ── Just Ate: log a meal in about ten seconds ──────────────── */
-let _justAte = { placeId: null, verdict: null, photo: '' };
+let _justAte = { placeId: null, verdict: null, photo: '', video: '' };
 
 function justAteSuggestions (query = '') {
   const q = dishKey(query);
@@ -8998,7 +9143,7 @@ function openJustAte (restaurantId = null) {
   const overlay = document.getElementById('just-ate-overlay');
   if (!overlay) return;
   const preset = restaurantId ? state.restaurants.find(r => r.id === restaurantId) : null;
-  _justAte = { placeId: preset?.id || null, verdict: null, photo: '' };
+  _justAte = { placeId: preset?.id || null, verdict: null, photo: '', video: '' };
   document.getElementById('just-ate-place').value = preset?.name || '';
   document.getElementById('just-ate-dish').value = '';
   document.getElementById('just-ate-note').value = '';
@@ -9014,15 +9159,16 @@ function openJustAte (restaurantId = null) {
   setTimeout(() => document.getElementById(preset ? 'just-ate-dish' : 'just-ate-place')?.focus(), 60);
 }
 
-function setJustAtePhoto (dataUrl = '') {
+function setJustAtePhoto (dataUrl = '', video = '') {
   _justAte.photo = dataUrl;
+  _justAte.video = dataUrl ? video : '';
   const preview = document.getElementById('just-ate-photo-preview');
   const label = document.getElementById('just-ate-photo-label');
-  if (label) label.textContent = dataUrl ? 'Retake photo' : 'Snap a photo';
+  if (label) label.textContent = dataUrl ? (video ? 'Retake video' : 'Retake photo') : 'Snap a photo or video';
   if (!preview) return;
   preview.classList.toggle('hidden', !dataUrl);
   preview.innerHTML = dataUrl
-    ? `<img src="${escHtml(safeUrl(dataUrl))}" alt="Your photo" /><button type="button" class="ja-photo-clear" aria-label="Remove photo">✕</button>`
+    ? `<img src="${escHtml(safeUrl(dataUrl))}" alt="Your photo" />${video ? '<span class="video-badge" aria-label="Video">▶</span>' : ''}<button type="button" class="ja-photo-clear" aria-label="Remove photo">✕</button>`
     : '';
 }
 
@@ -9048,6 +9194,7 @@ function saveJustAte () {
   const dishName = (document.getElementById('just-ate-dish')?.value || '').trim();
   const note = (document.getElementById('just-ate-note')?.value || '').trim().slice(0, 300);
   const photo = _justAte.photo;
+  const video = _justAte.video || '';
   let r = state.restaurants.find(x => x.id === _justAte.placeId);
   // A typed name that matches a saved spot exactly counts as that spot.
   if (!r && placeName) r = state.restaurants.find(x => dishKey(x.name) === dishKey(placeName));
@@ -9070,14 +9217,14 @@ function saveJustAte () {
   }
 
   if (!Array.isArray(r.visits)) r.visits = [];
-  r.visits.push({ date: iso(), note, rating: 0, dish: dishName, photo });
+  r.visits.push({ date: iso(), note, rating: 0, dish: dishName, photo, ...(video ? { video } : {}) });
   r.status = 'visited';
   r.dateVisited = r.dateVisited || iso();
   // First photo of a spot becomes its cover so the list stops showing placeholders.
   if (photo && !r.photo) r.photo = photo;
   r.updatedAt = Date.now();
   const verdict = _justAte.verdict || 'ok';
-  if (dishName) upsertDish(r, { name: dishName, verdict, photo, note: note || null });
+  if (dishName) upsertDish(r, { name: dishName, verdict, photo, video, note: note || null });
   else saveData();
 
   closeJustAte();
@@ -9131,7 +9278,7 @@ function logYourOrder (verdict) {
     return;
   }
   const r = state.restaurants.find(x => x.id === state.detailId);
-  const dish = upsertDish(r, { name, verdict, photo: _yoPendingPhoto });
+  const dish = upsertDish(r, { name, verdict, photo: _yoPendingPhoto, video: _yoPendingVideo });
   if (!dish) return;
   input.value = '';
   if (_yoPendingPhoto) photoReveal(_yoPendingPhoto, dish.name);
@@ -12548,6 +12695,7 @@ const GRIZZLY_PITCH = {
   summary:     { title: 'Byte Cub sums up every spot', body: 'One tap for the vibe, what to order, and the best time to go.' },
   dishes:      { title: 'Know what to order before you go', body: 'Byte Cub picks the dishes worth ordering at each spot, tuned to your taste.' },
   smartfill:   { title: 'Let the cub do the typing', body: 'Byte Cub fills in cuisine, price, tags, and a short description for every spot you add.' },
+  video:       { title: 'Save food videos', body: 'Catch the cheese pull, the sizzle, the steam. Grizzly saves 15-second videos with every dish you log.' },
   review:      { title: 'Your foodie Year in Review', body: 'Your top spots, cuisines, and streaks, wrapped up and ready to share.' },
   // FREE_RESTAURANT_LIMIT lives in firebase.js, which loads after this file,
   // so read it when the pitch is shown, not while app.js is starting up.
