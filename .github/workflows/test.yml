@@ -61,3 +61,7 @@ jobs:
       - name: Quick Add and the cub
         working-directory: tests
         run: node cub.test.js
+
+      - name: Food videos
+        working-directory: tests
+        run: node video.test.js
