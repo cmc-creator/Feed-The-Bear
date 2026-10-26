@@ -6514,6 +6514,13 @@ document.addEventListener('DOMContentLoaded', () => {
   updateAppBadge();
   renderAll();
   showOnboarding();
+  // One "open" per browser session, so the usage dashboard has a baseline.
+  try {
+    if (!sessionStorage.getItem('ftb_open_counted')) {
+      sessionStorage.setItem('ftb_open_counted', '1');
+      trackProductEvent(state.restaurants.length ? 'app_opened' : 'app_opened_new');
+    }
+  } catch { /* private mode */ }
   checkIncomingChallenge();
   trackReferralOpen();
   updateChallengeBtnBadge();
