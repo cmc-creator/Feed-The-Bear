@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Feed The Bear Usage</title>
+  <link rel="icon" href="favicon-48.png?v=bear3" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #101712; --surface: #17221b; --surface2: #1f2c24; --border: rgba(255,255,255,.09);
+      --text: #eaf0f7; --text-muted: #b1bdce; --text-dim: #8b99ae; --gold: #c8a26a; --grid: rgba(255,255,255,.07);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: Manrope, system-ui, sans-serif; }
+    main { max-width: 980px; margin: 0 auto; padding: 20px 16px 48px; }
+    header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+    h1 { margin: 0; font-size: 1.4rem; }
+    h1 small { display: block; font-size: .8rem; font-weight: 600; color: var(--text-dim); margin-top: 2px; }
+    h2 { font-size: 1rem; margin: 0 0 12px; }
+    .range { display: inline-flex; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 3px; }
+    .range button { font: inherit; font-size: .85rem; font-weight: 700; color: var(--text-muted); background: none; border: 0; padding: 7px 14px; border-radius: 999px; cursor: pointer; }
+    .range button[aria-pressed="true"] { background: var(--gold); color: #1b130b; }
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+    .tile b { display: block; font-size: 1.7rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .tile span { font-size: .8rem; font-weight: 600; color: var(--text-dim); }
+    .chart { position: relative; }
+    .chart svg { display: block; width: 100%; height: 220px; overflow: visible; }
+    .chart text { fill: var(--text-dim); font-size: 11px; font-family: inherit; }
+    .tip { position: absolute; pointer-events: none; background: #0b100d; border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; font-size: .8rem; white-space: nowrap; transform: translate(-50%, -110%); }
+    .tip[hidden] { display: none; }
+    .funnels { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+    .step { margin-bottom: 10px; }
+    .step-head { display: flex; justify-content: space-between; font-size: .85rem; font-weight: 600; margin-bottom: 4px; }
+    .step-head em { font-style: normal; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+    .bar { height: 10px; background: var(--surface2); border-radius: 999px; overflow: hidden; }
+    .bar i { display: block; height: 100%; background: var(--gold); border-radius: 999px; }
+    table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+    th { color: var(--text-dim); font-weight: 600; font-size: .78rem; }
+    td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+    td code { color: var(--text-dim); font-size: .75rem; }
+    .gate { text-align: center; padding: 48px 16px; }
+    .gate p { color: var(--text-muted); }
+    .btn { font: inherit; font-weight: 800; background: var(--gold); color: #1b130b; border: 0; border-radius: 12px; padding: 12px 20px; cursor: pointer; }
+    .muted { color: var(--text-dim); font-size: .8rem; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Feed The Bear usage <small id="sub">Counts only. No names, no personal data.</small></h1>
+    <div class="range" role="group" aria-label="Date range">
+      <button type="button" data-days="7" aria-pressed="false">7 days</button>
+      <button type="button" data-days="30" aria-pressed="true">30 days</button>
+      <button type="button" data-days="90" aria-pressed="false">90 days</button>
+    </div>
+  </header>
+
+  <section id="gate" class="panel gate">
+    <p id="gate-msg">Sign in with the owner account to see usage.</p>
+    <button type="button" class="btn" id="sign-in">Sign in with Google</button>
+  </section>
+
+  <section id="board" hidden>
+    <div class="tiles" id="tiles"></div>
+    <div class="panel">
+      <h2>App opens per day</h2>
+      <div class="chart" id="chart"><svg role="img" aria-label="App opens per day"></svg><div class="tip" hidden></div></div>
+    </div>
+    <div class="funnels">
+      <div class="panel" id="funnel-welcome"></div>
+      <div class="panel" id="funnel-money"></div>
+    </div>
+    <div class="panel">
+      <h2>Every event</h2>
+      <table><thead><tr><th>Event</th><th class="n">Total</th><th class="n">Per day</th></tr></thead><tbody id="rows"></tbody></table>
+      <p class="muted">Days are UTC. Counts arrive up to 20 seconds after use, or when the app is closed.</p>
+    </div>
+  </section>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script>
+'use strict';
+// Same public web config as firebase.js.
+const FB_CONFIG = {
+  apiKey: 'AIzaSyDH4b9L-CmVsyl2xn2K6peQ3CRmeM6VKI4',
+  authDomain: 'feedthebear-3ab9c.firebaseapp.com',
+  projectId: 'feedthebear-3ab9c',
+  appId: '1:143862557009:web:f9605b80e2344c0d9e4b70',
+};
+
+const LABELS = {
+  app_opened: 'App opened', app_opened_new: 'App opened (brand-new user)',
+  quick_add_opened: 'Quick Add opened', quick_add_place_picked: 'Quick Add: place picked', quick_add_saved: 'Spot saved with Quick Add',
+  just_ate_opened: '"I just ate" opened', just_ate_logged: 'Meal logged',
+  bear_swipe_round_done: 'Bear Swipe round finished', bear_swipe_find_nearby: 'Bear Swipe: find nearby',
+  craving_alert_shown: 'Craving alert shown', share_order_clicked: 'Shared an order', friend_followed: 'Followed a friend',
+  photo_shared: 'Photo shared', photo_downloaded: 'Photo downloaded', photo_gallery_opened: 'Photo gallery opened', main_photo_changed: 'Main photo changed',
+  video_added: 'Food video added', video_upsell_shown: 'Video upsell shown',
+  upgrade_modal_opened: 'Upgrade screen shown', upgrade_cta_clicked: 'Upgrade button tapped', grizzly_upgraded: 'Upgraded to Grizzly', grizzly_card_snoozed: 'Grizzly card snoozed',
+  welcome_step_shown: 'Welcome step shown', welcome_step_done: 'Welcome step done', welcome_step_skipped: 'Welcome step skipped',
+  welcome_done: 'Welcome finished', welcome_skipped: 'Welcome skipped',
+  cub_menu_opened: 'Cub menu opened', cub_action: 'Cub action used', duel_free_verdict: 'Free duel verdict',
+  decision_session_started: 'Decision started', decision_session_completed: 'Decision finished', decision_option_selected: 'Decision option picked',
+};
+const label = k => LABELS[k] || k.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+const fmt = n => Number(n || 0).toLocaleString();
+const $ = id => document.getElementById(id);
+
+let days = 30;
+let user = null;
+const demo = new URLSearchParams(location.search).has('demo');
+
+// Made-up numbers for ?demo, so the layout can be checked without signing in.
+function demoData (n) {
+  const out = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    const base = 40 + Math.round(30 * Math.sin(i / 3)) + (n - i);
+    out.push({ date: d, counts: {
+      app_opened: base, app_opened_new: Math.round(base / 5), quick_add_saved: Math.round(base / 3), just_ate_logged: Math.round(base / 4),
+      bear_swipe_round_done: Math.round(base / 6), welcome_step_shown: Math.round(base / 2), welcome_step_done: Math.round(base / 3),
+      welcome_done: Math.round(base / 8), welcome_skipped: Math.round(base / 12), upgrade_modal_opened: Math.round(base / 7),
+      upgrade_cta_clicked: Math.round(base / 18), grizzly_upgraded: i % 4 ? 0 : 1,
+    } });
+  }
+  return { days: out };
+}
+
+async function load () {
+  $('sub').textContent = 'Loading...';
+  let data;
+  try {
+    if (demo) data = demoData(days);
+    else {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/usage?days=${days}`, { headers: { Authorization: `Bearer ${token}` } });
+      data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+    }
+  } catch (err) {
+    showGate(err.message);
+    return;
+  }
+  $('gate').hidden = true;
+  $('board').hidden = false;
+  render(data.days || []);
+}
+
+function showGate (msg) {
+  $('board').hidden = true;
+  $('gate').hidden = false;
+  $('gate-msg').textContent = msg;
+  $('sub').textContent = 'Counts only. No names, no personal data.';
+}
+
+function render (list) {
+  const totals = {};
+  list.forEach(d => Object.entries(d.counts).forEach(([k, v]) => { totals[k] = (totals[k] || 0) + v; }));
+  const t = k => totals[k] || 0;
+  const opens = t('app_opened') + t('app_opened_new');
+  const first = list[0]?.date, last = list[list.length - 1]?.date;
+  $('sub').textContent = `${first} to ${last} (UTC) · counts only, no personal data`;
+
+  $('tiles').innerHTML = [
+    [opens, 'App opens'],
+    [t('app_opened_new'), 'New users'],
+    [t('quick_add_saved'), 'Spots saved'],
+    [t('just_ate_logged'), 'Meals logged'],
+    [t('bear_swipe_round_done'), 'Swipe rounds'],
+    [t('grizzly_upgraded'), 'Grizzly upgrades'],
+  ].map(([n, l]) => `<div class="tile"><b>${fmt(n)}</b><span>${l}</span></div>`).join('');
+
+  drawChart(list.map(d => ({ date: d.date, v: (d.counts.app_opened || 0) + (d.counts.app_opened_new || 0) })));
+
+  funnel('funnel-welcome', 'New user welcome', [
+    ['Saw the welcome', t('app_opened_new')],
+    ['Finished it', t('welcome_done')],
+    ['Skipped it', t('welcome_skipped')],
+  ]);
+  funnel('funnel-money', 'Grizzly upgrades', [
+    ['Saw the upgrade screen', t('upgrade_modal_opened')],
+    ['Tapped upgrade', t('upgrade_cta_clicked')],
+    ['Paid', t('grizzly_upgraded')],
+  ]);
+
+  const rows = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+  $('rows').innerHTML = rows.length
+    ? rows.map(([k, v]) => `<tr><td>${label(k)} <code>${k}</code></td><td class="n">${fmt(v)}</td><td class="n">${(v / list.length).toFixed(1)}</td></tr>`).join('')
+    : '<tr><td colspan="3" class="muted">Nothing recorded in this range yet.</td></tr>';
+}
+
+function funnel (id, title, steps) {
+  const top = Math.max(1, steps[0][1]);
+  $(id).innerHTML = `<h2>${title}</h2>` + steps.map(([l, n]) => {
+    const pct = Math.round((n / top) * 100);
+    return `<div class="step"><div class="step-head"><span>${l}</span><em>${fmt(n)}${n && l !== steps[0][0] ? ` · ${pct}%` : ''}</em></div><div class="bar"><i style="width:${Math.min(100, pct)}%"></i></div></div>`;
+  }).join('');
+}
+
+function niceMax (v) {
+  if (v <= 5) return 5;
+  const p = 10 ** Math.floor(Math.log10(v));
+  return [1, 2, 2.5, 5, 10].map(m => m * p).find(m => m >= v);
+}
+
+function drawChart (points) {
+  const box = $('chart');
+  const svg = box.querySelector('svg');
+  const tip = box.querySelector('.tip');
+  const W = box.clientWidth || 600, H = 220, L = 36, R = 6, T = 8, B = 22;
+  const max = niceMax(Math.max(0, ...points.map(p => p.v)));
+  const slot = (W - L - R) / points.length;
+  const bw = Math.max(2, Math.min(28, slot - 2));
+  const y = v => T + (H - T - B) * (1 - v / max);
+  let s = '';
+  [0, .5, 1].forEach(f => {
+    const v = max * f;
+    s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" />`;
+    s += `<text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${fmt(Math.round(v))}</text>`;
+  });
+  const every = Math.ceil(points.length / 7);
+  points.forEach((p, i) => {
+    const x = L + i * slot + (slot - bw) / 2;
+    const h = Math.max(0, y(0) - y(p.v));
+    const r = Math.min(4, bw / 2, h);
+    // Rounded top, square base on the axis.
+    s += h ? `<path d="M${x},${y(0)} V${y(p.v) + r} Q${x},${y(p.v)} ${x + r},${y(p.v)} H${x + bw - r} Q${x + bw},${y(p.v)} ${x + bw},${y(p.v) + r} V${y(0)} Z" fill="var(--gold)" />` : '';
+    s += `<rect class="hit" data-i="${i}" x="${L + i * slot}" y="${T}" width="${slot}" height="${H - T - B}" fill="transparent" />`;
+    if (i % every === 0) s += `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle">${p.date.slice(5)}</text>`;
+  });
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = s;
+  svg.onmousemove = e => {
+    const i = e.target.dataset?.i;
+    if (i == null) { tip.hidden = true; return; }
+    const p = points[i];
+    tip.textContent = `${p.date}: ${fmt(p.v)} opens`;
+    tip.style.left = `${((L + i * slot + slot / 2) / W) * 100}%`;
+    tip.style.transform = `translate(${i > points.length * .75 ? '-100%' : i < points.length * .25 ? '0' : '-50%'}, -110%)`;
+    tip.style.top = `${(y(p.v) / H) * 220}px`;
+    tip.hidden = false;
+  };
+  svg.onmouseleave = () => { tip.hidden = true; };
+}
+
+document.querySelectorAll('.range button').forEach(b => b.addEventListener('click', () => {
+  days = Number(b.dataset.days);
+  document.querySelectorAll('.range button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  if (demo || user) load();
+}));
+
+if (demo) load();
+else {
+  try {
+    firebase.initializeApp(FB_CONFIG);
+    const auth = firebase.auth();
+    $('sign-in').addEventListener('click', () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e => showGate(e.message)));
+    auth.onAuthStateChanged(u => {
+      user = u;
+      $('sign-in').hidden = !!u;
+      if (u) load(); else showGate('Sign in with the owner account to see usage.');
+    });
+  } catch (err) {
+    showGate('Sign-in could not load. Check your connection and refresh.');
+  }
+}
+</script>
+</body>
+</html>

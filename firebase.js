@@ -316,6 +316,7 @@ function initFirebaseAuth () {
         if (sessionId) await _verifyAndActivatePlan(sessionId, user.uid);
         history.replaceState({}, '', window.location.pathname);
         if (isPremium()) {
+          if (typeof trackProductEvent === 'function') trackProductEvent('grizzly_upgraded');
           showToast('Welcome to Grizzly!', 'Unlimited restaurants, AI recs, and more are now unlocked.', 'success');
         }
       }

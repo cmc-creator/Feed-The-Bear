@@ -68,3 +68,6 @@ jobs:
       - name: First-run welcome
         working-directory: tests
         run: node welcome.test.js
+      - name: Usage dashboard
+        working-directory: tests
+        run: node usage.test.js
