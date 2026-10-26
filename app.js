@@ -3752,6 +3752,8 @@ const ONBOARDING_STEPS = [
 let _onboardingStep = 0;
 function showOnboarding () {
   if (state.settings.onboardingDone) return;
+  // The cub's hands-on welcome; the old slides stay as a fallback.
+  if (window.Cub?.welcome?.()) return;
   _onboardingStep = 0;
   renderOnboardingStep();
   document.getElementById('onboarding-overlay').classList.remove('hidden');
