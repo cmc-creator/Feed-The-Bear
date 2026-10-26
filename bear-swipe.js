@@ -50,6 +50,22 @@ window.BearSwipe = (() => {
 
   // One photo per dish, varied cuisines, leaning toward what you like, and
   // skipping photos you've seen recently.
+  // What most people in the US decide between on a normal night.
+  const EVERYDAY = new Set([
+    'Cheeseburger', 'Hamburger', 'French fries', 'Hot dog', 'Buffalo wings', 'Mac and cheese', 'Grilled cheese',
+    'Club sandwich', 'BLT', 'Philly cheesesteak', 'Cobb salad', 'Caesar salad', 'Fried chicken', 'Chicken tenders',
+    'Chicken nuggets', 'Chicken sandwich', 'Onion rings', 'Chili', 'Meatloaf', 'Pot roast', 'Mashed potatoes',
+    'Loaded baked potato', 'Sirloin steak', 'Steak frites', 'BBQ chicken', 'BBQ ribs', 'Pulled pork', 'Brisket',
+    'Chicken fried steak', 'Chicken pot pie', 'Clam chowder', 'Fish and chips', 'Grilled salmon', 'Sub sandwich',
+    'Meatball sub', 'Wrap', 'Reuben sandwich', 'Tacos', 'Burrito', 'Quesadilla', 'Nachos', 'Fajitas', 'Enchiladas',
+    'Cheese pizza', 'Pepperoni pizza', 'Pizza margherita', 'Spaghetti and meatballs', 'Lasagna', 'Fettuccine Alfredo',
+    'Chicken parmesan', 'Orange chicken', "General Tso's chicken", 'Fried rice', 'Chow mein', 'Kung pao chicken',
+    'Sweet and sour pork', 'Beef and broccoli', 'Sesame chicken', 'Egg rolls', 'Sushi', 'Ramen', 'Pad thai', 'Pho',
+    'Gyro', 'Pancakes', 'Waffles', 'French toast', 'Omelette', 'Eggs Benedict', 'Breakfast burrito', 'Hash browns',
+    'Donuts', 'Cupcakes', 'Cheesecake', 'Chocolate chip cookies', 'Brownies', 'Apple pie', 'Milkshake', 'Ice cream sundae',
+  ]);
+  const EVERYDAY_PER_ROUND = 15;
+
   function buildDeck (photos) {
     const store = loadStore();
     const seen = new Set(store.seen);
@@ -70,14 +86,25 @@ window.BearSwipe = (() => {
       return { ...photo, fresh: fresh.length > 0, sort: Math.random() * 3 + pref * 0.6 - (store.dishes[dish] < 0 ? 3 : 0) };
     }).sort((a, b) => (b.fresh - a.fresh) || (b.sort - a.sort));
 
-    // At most two of the same cuisine in a round so it stays a real choice.
+    // Mostly the everyday food people actually choose between, plus a few
+    // adventurous picks mixed in. A cap per cuisine keeps it a real choice.
+    const pick = (list, max, cap, out, perCuisine) => {
+      for (const d of list) {
+        if (out.length >= max) break;
+        if (out.includes(d) || (perCuisine[d.cuisine] || 0) >= cap) continue;
+        perCuisine[d.cuisine] = (perCuisine[d.cuisine] || 0) + 1;
+        out.push(d);
+      }
+    };
+    const everyday = [], adventure = [], perE = {}, perA = {};
+    pick(dishes.filter(d => EVERYDAY.has(d.dish)), EVERYDAY_PER_ROUND, 4, everyday, perE);
+    pick(dishes.filter(d => !EVERYDAY.has(d.dish)), ROUND - everyday.length, 2, adventure, perA);
+    if (everyday.length + adventure.length < ROUND) pick(dishes, ROUND - adventure.length, 99, everyday, perE);
+    // One adventurous card after every three everyday ones.
     const out = [];
-    const perCuisine = {};
-    for (const d of dishes) {
-      if ((perCuisine[d.cuisine] || 0) >= 2) continue;
-      perCuisine[d.cuisine] = (perCuisine[d.cuisine] || 0) + 1;
-      out.push(d);
-      if (out.length >= ROUND) break;
+    while (out.length < ROUND && (everyday.length || adventure.length)) {
+      if (everyday.length && (out.length % 4 !== 3 || !adventure.length)) out.push(everyday.shift());
+      else out.push(adventure.shift());
     }
     return out;
   }

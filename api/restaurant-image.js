@@ -50,10 +50,16 @@ function looksLikeParkedDomainPage (html = '') {
 
 // Providers fail quietly so the next one can try, but a bad key or a retired
 // endpoint should still be visible in the Vercel logs.
+// Out of credits, expired trial or a revoked key won't fix itself in the next
+// request, so a warm function skips that provider for an hour.
+const providerResting = {};
 async function providerFail (provider, step, resp) {
   let detail = '';
   try { detail = (await resp.text()).slice(0, 200); } catch { /* ignore */ }
   console.warn(`[FTB] restaurant-image ${provider} ${step} HTTP ${resp.status}: ${detail}`);
+  if ([401, 402, 403, 429].includes(resp.status) || /TRIAL_EXPIRED|credits/i.test(detail)) {
+    providerResting[provider] = Date.now() + 60 * 60 * 1000;
+  }
   return '';
 }
 
@@ -290,6 +296,7 @@ module.exports = async function handler (req, res) {
   let photoUrl = '';
   let source = 'none';
   for (const [provider, fn] of providers) {
+    if ((providerResting[provider] || 0) > Date.now()) continue;
     try {
       const next = await fn();
       if (next && !looksLikeJunkImage(next)) {
