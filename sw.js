@@ -3,7 +3,7 @@
    Offline-first cache strategy
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-const CACHE  = 'ftb-v64';
+const CACHE  = 'ftb-v66';
 const ASSETS = [
   './',
   './index.html',
@@ -14,6 +14,7 @@ const ASSETS = [
   './bear-swipe.css',
   './cub.js',
   './cub.css',
+  './story-card.js',
   './assets/cub-avatar.jpg',
   './ai.js',
   './firebase.js',

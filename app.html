@@ -664,19 +664,6 @@
         </div>
         <button id="ai-rec-refresh-btn" class="ai-rec-refresh" title="Refresh recommendation">↻</button>
       </div>
-      <!-- Go Grizzly: free users only -->
-      <div id="grizzly-home" class="grizzly-home home-module hidden" aria-label="Go Grizzly">
-        <div class="gz-top"><span class="gz-badge">GRIZZLY</span><button type="button" class="gz-snooze" aria-label="Not now">✕</button></div>
-        <div class="gz-title">Feed the bear without limits</div>
-        <div class="gz-meter" aria-hidden="true"><span></span></div>
-        <div class="gz-meter-label"></div>
-        <ul class="gz-perks">
-          <li>Unlimited spots, synced on every device</li>
-          <li>Byte Cub AI: picks, summaries, and what to order</li>
-          <li>15-second food videos, Duel verdicts, and Year in Review</li>
-        </ul>
-        <button type="button" class="btn-primary gz-cta" data-upsell="home">Go Grizzly · about $4.49/mo</button>
-      </div>
       <div class="home-quick-actions home-module" id="home-quick-actions" aria-label="Quick actions">
         <button class="home-quick-btn" id="home-quick-justate-btn" type="button">
           <span class="home-quick-emoji" aria-hidden="true">
@@ -742,25 +729,9 @@
           <span class="home-quick-label">Dinner Rooms</span>
         </button>
       </div>
-      <div id="today-status-row" class="today-status-row home-module" aria-label="Today status"></div>
       <div id="today-vibe-row" class="today-vibe-row home-module" aria-label="Tonight vibe"></div>
 
-      <div id="bear-swipe-home" class="bear-swipe-home home-module hidden" aria-label="Bear swipe picks">
-        <div class="bear-swipe-header">
-          <div>
-            <div class="bear-swipe-title">Bear Swipe</div>
-            <div class="bear-swipe-sub">Food photos first. Swipe your way to tonight's winner.</div>
-          </div>
-          <button id="bear-swipe-refresh-btn" class="btn-ghost btn-sm" type="button">New Stack ↻</button>
-        </div>
-        <div id="bear-swipe-card" class="bear-swipe-card" role="button" tabindex="0" aria-label="Reveal nearby restaurant card"></div>
-        <div class="bear-swipe-actions">
-          <button id="bear-swipe-no-btn" class="bear-swipe-action no" type="button">Nope Paw</button>
-          <button id="bear-swipe-yes-btn" class="bear-swipe-action yes" type="button">Heck Yes</button>
-        </div>
-        <div id="bear-swipe-joke" class="bear-swipe-joke">I can bear-ly decide, so swipe your mood.</div>
-      </div>
-
+      <!-- Home order: act now, what is near, what you want, then play, upsell, extras. -->
       <!-- Nearby strip -->
       <div class="nearby-home-header">
         <div>
@@ -798,6 +769,36 @@
         </div>
         <div id="for-you-home-list" class="for-you-home-list"></div>
       </div>
+
+      <div id="bear-swipe-home" class="bear-swipe-home home-module hidden" aria-label="Bear swipe picks">
+        <div class="bear-swipe-header">
+          <div>
+            <div class="bear-swipe-title">Bear Swipe</div>
+            <div class="bear-swipe-sub">Food photos first. Swipe your way to tonight's winner.</div>
+          </div>
+          <button id="bear-swipe-refresh-btn" class="btn-ghost btn-sm" type="button">New Stack ↻</button>
+        </div>
+        <div id="bear-swipe-card" class="bear-swipe-card" role="button" tabindex="0" aria-label="Reveal nearby restaurant card"></div>
+        <div class="bear-swipe-actions">
+          <button id="bear-swipe-no-btn" class="bear-swipe-action no" type="button">Nope Paw</button>
+          <button id="bear-swipe-yes-btn" class="bear-swipe-action yes" type="button">Heck Yes</button>
+        </div>
+        <div id="bear-swipe-joke" class="bear-swipe-joke">I can bear-ly decide, so swipe your mood.</div>
+      </div>
+
+      <!-- Go Grizzly: free users only -->
+      <div id="grizzly-home" class="grizzly-home home-module hidden" aria-label="Go Grizzly">
+        <div class="gz-top"><span class="gz-badge">GRIZZLY</span><button type="button" class="gz-snooze" aria-label="Not now">✕</button></div>
+        <div class="gz-title">Feed the bear without limits</div>
+        <div class="gz-meter" aria-hidden="true"><span></span></div>
+        <div class="gz-meter-label"></div>
+        <ul class="gz-perks">
+          <li>Unlimited spots, synced on every device</li>
+          <li>Byte Cub AI: picks, summaries, and what to order</li>
+          <li>15-second food videos, Duel verdicts, and Year in Review</li>
+        </ul>
+        <button type="button" class="btn-primary gz-cta" data-upsell="home">Go Grizzly · about $4.49/mo</button>
+      </div>
       <div id="mood-picks-home" class="mood-picks-home home-module hidden">
         <div class="mood-picks-home-header">
           <span class="mood-picks-home-title">Mood Picks</span>
@@ -814,6 +815,7 @@
         <div class="week-recap-title">Your Week So Far</div>
         <div id="week-recap-text" class="week-recap-text"></div>
       </div>
+      <div id="today-status-row" class="today-status-row home-module" aria-label="Today status"></div>
     </section>
 
     <!-- Restaurant grid -->
@@ -2547,6 +2549,7 @@
   <script src="app.js"></script>
   <script src="bear-swipe.js"></script>
   <script src="cub.js"></script>
+  <script src="story-card.js"></script>
   <!-- Firebase SDK (compat layer - no build step required) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>

@@ -9266,6 +9266,10 @@ async function shareYourOrder () {
   if (!r || !dishesOf(r).length) return;
   const text = buildOrderShareText(r);
   trackProductEvent('share_order_clicked', { restaurantId: r.id, dishes: dishesOf(r).length });
+  // A story-sized picture card; the plain-text share below is the fallback.
+  if (window.StoryCard) {
+    try { await StoryCard.open(r, text); return; } catch (err) { console.warn('[FTB] story card failed:', err); }
+  }
   if (navigator.share) {
     try { await navigator.share({ title: `What to order at ${r.name}`, text }); return; }
     catch (err) { if (err?.name === 'AbortError') return; }
