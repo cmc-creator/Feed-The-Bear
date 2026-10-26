@@ -8465,3 +8465,14 @@ body[data-ui-motion='playful'] .btn-primary:hover { box-shadow: 0 6px 20px rgba(
 .story-save, .story-copy { flex: 1 1 0; min-height: 44px; font: inherit; font-weight: 700; color: var(--text); background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; }
 .story-save.hidden { display: none; }
 .story-x { position: absolute; top: -6px; right: -6px; z-index: 1; width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--surface3); color: var(--text); font-size: 1rem; cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, .4); }
+
+/* ── Home: quick actions as one compact row on phones ── */
+@media (max-width: 768px) {
+  .home-quick-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .home-quick-actions .home-quick-btn { flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 84px; padding: 10px 6px; text-align: center; }
+  .home-quick-actions .home-quick-copy { align-items: center; }
+  .home-quick-actions .home-quick-label { font-size: .82rem; line-height: 1.15; }
+  .home-quick-actions .home-quick-sub { display: none; }
+}
+/* One location ask at a time: the Near You card already has an Enable button. */
+#main-content:has(#nearby-home-list .nearby-home-teaser-title) #location-banner { display: none; }

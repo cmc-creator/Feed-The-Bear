@@ -74,3 +74,6 @@ jobs:
       - name: Story cards
         working-directory: tests
         run: node story.test.js
+      - name: Home screen
+        working-directory: tests
+        run: node home.test.js
