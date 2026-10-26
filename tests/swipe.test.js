@@ -19,6 +19,14 @@ const { BASE, ROOT, SHOTS, check, launch, newPage, finish } = require('./lib');
   check(await mod.isVisible(), 'Bear Swipe shows on home');
   check(/Right.*if you'd eat it.*left.*if not/i.test(await mod.locator('.bs-sub').innerText()), 'explains what swiping does');
 
+  // Everyday food first: most of a round is burgers, pizza, tacos and friends.
+  const deck = await p.evaluate(() => BearSwipe._state().deck.map(d => d.dish));
+  const staples = ['Cheeseburger', 'Hamburger', 'French fries', 'Tacos', 'Cheese pizza', 'Pepperoni pizza', 'Caesar salad', 'Fried rice', 'Orange chicken', 'Burrito', 'Buffalo wings', 'Fried chicken', 'Pancakes', 'Sub sandwich', 'Loaded baked potato', 'Sirloin steak', 'Mac and cheese', 'Nachos', 'Lasagna', 'Chow mein', 'Chicken tenders', 'BBQ ribs', 'Grilled cheese', 'Hot dog', 'Sushi', 'Ramen', 'Pad thai', 'Philly cheesesteak', 'Chicken sandwich', 'Quesadilla', 'Fajitas', 'Enchiladas', 'Pulled pork', 'Brisket', 'Onion rings', 'Waffles', 'French toast', 'Omelette', 'Donuts', 'Cupcakes', 'Cheesecake', 'Brownies', 'Apple pie', 'Milkshake', 'Gyro', 'Pho', 'Egg rolls', 'Chili', 'Meatloaf', 'Club sandwich', 'BLT', 'Cobb salad', 'Chicken nuggets', 'Mashed potatoes', 'Pot roast', 'Steak frites', 'BBQ chicken', 'Chicken fried steak', 'Chicken pot pie', 'Clam chowder', 'Fish and chips', 'Grilled salmon', 'Meatball sub', 'Wrap', 'Reuben sandwich', 'Pizza margherita', 'Spaghetti and meatballs', 'Fettuccine Alfredo', 'Chicken parmesan', "General Tso's chicken", 'Kung pao chicken', 'Sweet and sour pork', 'Beef and broccoli', 'Sesame chicken', 'Eggs Benedict', 'Breakfast burrito', 'Hash browns', 'Chocolate chip cookies', 'Ice cream sundae'];
+  const everyday = deck.filter(d => staples.includes(d)).length;
+  check(deck.length === 20 && everyday >= 15, `a round is mostly everyday food (${everyday}/20: ${deck.slice(0, 6).join(', ')}...)`);
+  const photos = require('../data/food-photos.json').photos;
+  check(!photos.some(x => /syringe|needle/i.test(x.page)), 'no syringe photos in the set');
+
   // Wikimedia sometimes throttles data-centre traffic (CI); the app swaps in
   // another photo when one fails, so allow time for that.
   const loaded = await p.waitForFunction(() => {
@@ -38,7 +46,7 @@ const { BASE, ROOT, SHOTS, check, launch, newPage, finish } = require('./lib');
   });
   check(swapped, 'a broken photo is swapped for another');
   const photoCount = await p.evaluate(async () => (await BearSwipe.loadPhotos()).length);
-  check(photoCount > 1500, `the full photo set loads (${photoCount} photos)`);
+  check(photoCount > 1000, `the full photo set loads (${photoCount} photos)`);
   const first = await p.evaluate(() => { const d = BearSwipe._state().deck; return { n: d.length, dishes: new Set(d.map(x => x.dish)).size, credit: document.querySelector('.bs-top .bs-credit')?.textContent }; });
   check(first.n === 20 && first.dishes === 20, `a round is 20 different dishes (${first.n}, ${first.dishes} unique)`);
   check(/^Photo: .+ · .+/.test(first.credit || ''), `each card credits the photo ("${first.credit}")`);

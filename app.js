@@ -38,7 +38,8 @@ const LOCATION_BANNER_SNOOZE_UNTIL_KEY = 'ftb_location_banner_snooze_until_v1';
 const LOCATION_BANNER_SNOOZE_MS = 12 * 60 * 60 * 1000;
 const ALERT_RADIUS  = 805;   // ~0.5 miles - show proximity alert
 const NOTIFY_RADIUS = 1609;  // ~1 mile - browser notification
-const NOTIFY_COOLDOWN = 10 * 60 * 1000; // 10 min between alerts for same place
+const NOTIFY_COOLDOWN = 3 * 24 * 60 * 60 * 1000; // a saved spot near you: remind at most every 3 days
+const NOTIFY_SNOOZE = 7 * 24 * 60 * 60 * 1000;   // closing the alert: quiet for a week
 
 /* ── Cuisine badge map ───────────────────────────────────── */
 const CUISINE_EMOJI = {
@@ -1835,6 +1836,18 @@ function findNearbyCraving () {
   return best;
 }
 
+// When each spot last alerted (or was dismissed). Kept across app opens, so
+// a place you live near doesn't pop up every time you open the app.
+const NEAR_ALERTS_KEY = 'ftb_near_alerts_v1';
+function getNearAlertLog () {
+  try { return JSON.parse(localStorage.getItem(NEAR_ALERTS_KEY)) || {}; } catch { return {}; }
+}
+function noteNearAlert (id, until) {
+  const log = getNearAlertLog();
+  log[id] = until;
+  try { localStorage.setItem(NEAR_ALERTS_KEY, JSON.stringify(log)); } catch { /* storage full */ }
+}
+
 function checkProximity () {
   if (!state.locationEnabled) return;
   const now = Date.now();
@@ -1848,22 +1861,25 @@ function checkProximity () {
     sendBrowserNotification(craving.r, craving.d, craving.crave);
     trackProductEvent('craving_alert_shown', { restaurantId: craving.r.id, meters: Math.round(craving.d) });
   }
+  if (craving) return;
+  // Otherwise at most one alert: the closest saved spot that isn't resting.
+  const quietUntil = getNearAlertLog();
+  let near = null;
   state.restaurants.forEach(r => {
-    if (!r.lat || !r.lng || r.id === craving?.r.id) return;
+    if (!r.lat || !r.lng || (quietUntil[r.id] || 0) > now || (state.notifiedAt[r.id] || 0) > now - NOTIFY_COOLDOWN) return;
     const d = haversine(state.userLat, state.userLng, r.lat, r.lng);
-    if (d <= NOTIFY_RADIUS) {
-      const last = state.notifiedAt[r.id] || 0;
-      if (now - last > NOTIFY_COOLDOWN) {
-        state.notifiedAt[r.id] = now;
-        showProximityAlert(r, d);
-        sendBrowserNotification(r, d);
-      }
-    }
+    if (d <= NOTIFY_RADIUS && (!near || d < near.d)) near = { r, d };
   });
+  if (!near) return;
+  state.notifiedAt[near.r.id] = now;
+  noteNearAlert(near.r.id, now + NOTIFY_COOLDOWN);
+  showProximityAlert(near.r, near.d);
+  sendBrowserNotification(near.r, near.d);
 }
 
 function showProximityAlert (r, distM, crave = null) {
   const alert = document.getElementById('proximity-alert');
+  alert.dataset.rid = r.id;
   alert.classList.toggle('craving', !!crave);
   document.getElementById('proximity-icon').textContent = crave ? 'CRAVE' : cuisineEmoji(r.cuisine);
   document.getElementById('proximity-name').textContent = crave ? `${crave.name} is ${fmtDist(distM)} away` : r.name;
@@ -5531,7 +5547,9 @@ function setupEvents () {
 
   // Proximity alert close
   document.getElementById('proximity-close').addEventListener('click', () => {
-    document.getElementById('proximity-alert').classList.add('hidden');
+    const alert = document.getElementById('proximity-alert');
+    alert.classList.add('hidden');
+    if (alert.dataset.rid) noteNearAlert(alert.dataset.rid, Date.now() + NOTIFY_SNOOZE);
   });
 
   // Chat
@@ -7610,9 +7628,8 @@ function checkWeeklySuggestion () {
   const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
   const last = state.settings.lastWeeklySuggest || 0;
   const now  = Date.now();
-  // Only show on Monday (day 1) and if >6 days since last shown
-  const isMonday = new Date().getDay() === 1;
-  if (!isMonday && (now - last) < WEEK_MS) return;
+  // At most once a week.
+  if (now - last < WEEK_MS) return;
 
   const wantToTry = state.restaurants.filter(r => r.status === 'want-to-try');
   if (!wantToTry.length) return;
@@ -7641,7 +7658,7 @@ function checkWeeklySuggestion () {
     + '<div class="wsb-title">Byte Cub\'s Pick of the Week</div>'
     + '<div class="wsb-text">How about <strong>' + escHtml(suggestion.name) + '</strong>'
     + (suggestion.cuisine ? ' (' + escHtml(suggestion.cuisine) + ')' : '')
-    + (favCuisine ? ' · you love ' + escHtml(favCuisine) + '!' : '') + '</div>'
+    + (favCuisine && suggestion.cuisine === favCuisine ? ' · you love ' + escHtml(favCuisine) + '!' : (favCuisine ? ' · a break from your usual ' + escHtml(favCuisine) : '')) + '</div>'
     + '</div>'
     + '<button class="btn-sm btn-orange" onclick="openDetailModal(\'' + suggestion.id + '\');this.closest(\'.weekly-suggest-banner\').remove()">View</button>'
     + '<button class="wsb-dismiss" onclick="this.closest(\'.weekly-suggest-banner\').remove()" aria-label="Dismiss">✕</button>';

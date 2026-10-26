@@ -38,6 +38,17 @@ DISHES = [
     ('Chicken pot pie', 'Pot pie', 'American'), ('Cobb salad', 'Cobb salad', 'American'),
     ('Chili', 'Chili con carne', 'American'), ('Corn dog', 'Corn dog', 'American'),
     ('Sloppy joe', 'Sloppy joe', 'American'), ('Onion rings', 'Onion ring', 'American'),
+    ('Pepperoni pizza', 'Pepperoni', 'Pizza'), ('Cheese pizza', 'Pizza', 'Pizza'),
+    ('Loaded baked potato', 'Baked potato', 'American'), ('Garden salad', 'Salad', 'American'),
+    ('Sub sandwich', 'Submarine sandwich', 'Sandwiches'), ('Chicken tenders', 'Chicken fingers', 'American'),
+    ('Chicken nuggets', 'Chicken nugget', 'American'), ('Chicken sandwich', 'Chicken sandwich', 'American'),
+    ('Spaghetti and meatballs', 'Spaghetti and meatballs', 'Italian'), ('Mashed potatoes', 'Mashed potato', 'American'),
+    ('Egg rolls', 'Egg roll', 'Chinese'), ('Wrap', 'Wrap (food)', 'Sandwiches'), ('BBQ chicken', 'Barbecue chicken', 'BBQ'),
+    ('Bacon and eggs', 'Bacon and eggs', 'Breakfast'), ('Sirloin steak', 'Sirloin steak', 'Steakhouse'),
+    ('Turkey sandwich', 'Turkey sandwich', 'Sandwiches'), ('Meatball sub', 'Meatball sandwich', 'Sandwiches'),
+    ('Baked ziti', 'Baked ziti', 'Italian'), ('Chicken Alfredo', 'Fettuccine Alfredo', 'Italian'),
+    ('Beef and broccoli', 'Beef and broccoli', 'Chinese'), ('Sesame chicken', 'Sesame chicken', 'Chinese'),
+    ('Chicken fried steak', 'Chicken fried steak', 'Southern'), ('Pot roast', 'Pot roast', 'American'),
     # Southern / BBQ
     ('Fried chicken', 'Fried chicken', 'Southern'), ('Chicken and waffles', 'Chicken and waffles', 'Southern'),
     ('Biscuits and gravy', 'Biscuits and gravy', 'Southern'), ('Shrimp and grits', 'Shrimp and grits', 'Southern'),
@@ -176,7 +187,9 @@ STOP = re.compile(
     r'1[89]\d\d|book|page|scan|newspaper|chart|graph|neon|night|party|event|crowd|audience|guests|wedding|'
     r'prepar|making|wrapping|hands?_|hand_|fingers|display|counter|buffet_line|queue|cart|stand_|booth|'
     r'cooking|frying|grill_master|oven|pot_on|wok_on|fire|smoke_|steam_|blur|out_of_focus|close-?up_of_|texture|'
-    r'conference|meeting|class|lesson|workshop|competition|contest|award|price|sale|for_sale)', re.I)
+    r'conference|meeting|class|lesson|workshop|competition|contest|award|price|sale|for_sale|'
+    r'syringe|needle|inject|medic|hospital|pill|drug|tattoo|costume|dog_|cat_|pet_|animal|insect|bug_|worm|'
+    r'mold|mould|rotten|spoiled|waste|trash|garbage|vomit|blood|cosmetic|soap|candle|craft|art_|exhibit)', re.I)
 FREE = re.compile(r'^(cc0|cc by|cc-by|public domain|pd|attribution)', re.I)
 
 
@@ -313,9 +326,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--per-dish', type=int, default=12)
     ap.add_argument('--out', default='data/food-photos.json')
+    ap.add_argument('--add', action='store_true', help='only build dishes missing from --out, and merge them in')
     args = ap.parse_args()
+    existing = []
+    if args.add:
+        with open(args.out, encoding='utf-8') as f:
+            existing = json.load(f)['photos']
 
-    seen, dishes = set(), []
+    seen, dishes = {p['dish'].lower() for p in existing}, []
     for d in DISHES:
         if d[0].lower() not in seen:
             seen.add(d[0].lower())
@@ -348,7 +366,7 @@ def main():
     print(f'{len(all_files)} candidate files; fetching details...', flush=True)
     pages = file_pages(all_files)
 
-    photos, seen_urls = [], set()
+    photos, seen_urls = list(existing), {p['url'] for p in existing}
     for label, _, cuisine in dishes:
         ranked = sorted(votes[label].items(), key=lambda kv: -kv[1])
         picked = []
@@ -363,11 +381,10 @@ def main():
                 rec['votes'] = min(score, 99)
                 seen_urls.add(rec['url'])
                 picked.append(rec)
-        # A photo only one language edition used was wrong about one time in
-        # eight in spot checks; use those only to give a dish at least three.
-        strong = [p for p in picked if p['lead'] or p['votes'] >= 2]
-        weak = [p for p in picked if p not in strong]
-        picked = strong + weak[:max(0, 3 - len(strong))]
+        # Photos only one or two other language editions used were sometimes
+        # not the dish at all (a "food syringe" turned up under Cupcakes), so
+        # only the English lead photo and photos 3+ editions agree on are kept.
+        picked = [p for p in picked if p['lead'] or p['votes'] >= 3]
         photos += picked
         print(f'{label:28} {len(picked)}', flush=True)
 

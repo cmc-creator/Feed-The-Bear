@@ -30,6 +30,20 @@ const { BASE, SHOTS, check, launch, newPage, finish } = require('./lib');
   check(await d.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'desktop: no sideways scroll');
   await d.context().close();
 
+  // A saved spot near you: one alert, and closing it keeps it quiet next time.
+  const n = await newPage(browser, { seed: [{ id: 'w1', name: 'Irish Wolfhound Pub', cuisine: 'Irish', status: 'want-to-try', lat: 33.4945, lng: -111.9265, tags: [], visits: [], dishes: [] }] });
+  await n.route(/wikimedia|overpass|nominatim/, r => r.abort());
+  await n.goto(`${BASE}/app.html`);
+  await n.waitForTimeout(1500);
+  await n.evaluate(() => { state.locationEnabled = true; state.userLat = 33.4942; state.userLng = -111.9261; checkProximity(); });
+  check(await n.locator('#proximity-alert').isVisible(), 'a saved spot nearby gets one alert');
+  await n.click('#proximity-close');
+  await n.reload();
+  await n.waitForTimeout(1500);
+  await n.evaluate(() => { state.locationEnabled = true; state.userLat = 33.4942; state.userLng = -111.9261; checkProximity(); });
+  check(await n.locator('#proximity-alert').isHidden(), 'after closing it, reopening the app does not show it again');
+  await n.context().close();
+
   await browser.close();
   finish('home');
 })();
