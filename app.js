@@ -1804,7 +1804,19 @@ function getFiltered () {
     list = list.filter(r => r.collectionId === state.filter.collection);
   }
   // Sort
+  // Your rating counts first, Google's fills in when you haven't rated;
+  // unrated spots always sort last so "lowest rated" means something.
+  const bestRating = r => Number(r.myRating) || Number(r.googleRating) || 0;
+  const byRating = dir => (a, b) => {
+    const ra = bestRating(a), rb = bestRating(b);
+    if (!ra !== !rb) return ra ? -1 : 1;
+    return dir * (ra - rb) || dir * ((a.googleRating || 0) - (b.googleRating || 0)) || a.name.localeCompare(b.name);
+  };
   switch (state.filter.sort) {
+    case 'best-desc':
+      list.sort(byRating(-1)); break;
+    case 'best-asc':
+      list.sort(byRating(1)); break;
     case 'name-asc':
       list.sort((a,b) => a.name.localeCompare(b.name)); break;
     case 'name-desc':
@@ -5467,8 +5479,8 @@ function setupEvents () {
     chip.addEventListener('click', () => {
       const action = chip.dataset.action;
       if (action === 'top-rated') {
-        state.filter.sort = 'rating-desc';
-        document.getElementById('sort-select').value = 'rating-desc';
+        state.filter.sort = 'best-desc';
+        document.getElementById('sort-select').value = 'best-desc';
       } else if (action === 'nearest') {
         if (!state.locationEnabled) { showToast('Location needed', 'Enable location tracking first.', 'error'); return; }
         state.filter.sort = 'distance-asc';

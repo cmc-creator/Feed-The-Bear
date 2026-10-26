@@ -144,6 +144,22 @@ async function legacyDishMigration (browser) {
   await p.waitForTimeout(3000);
   check(!(await p.locator('#proximity-alert').isVisible() && /Birria/.test(await p.locator('#proximity-alert').innerText())), 'craving alert does not repeat the same day');
 
+  // Rating sorts: your rating first, Google's when you haven't rated, unrated last
+  await closeAllDialogs(p);
+  const order = await p.evaluate(() => {
+    state.restaurants.push({ id: 'g1', name: 'Google Only', googleRating: 4.6, status: 'want-to-try', tags: [], visits: [] },
+                           { id: 'n1', name: 'Never Rated', status: 'want-to-try', tags: [], visits: [] },
+                           { id: 'l1', name: 'Low One', myRating: 2, status: 'visited', tags: [], visits: [] });
+    const names = sort => { state.filter.sort = sort; return getFiltered().map(r => r.name); };
+    const top = names('best-desc'); const low = names('best-asc');
+    state.filter.sort = 'date-desc';
+    return { top, low };
+  });
+  const rated = ['The Mission', 'Google Only', 'Low One'];
+  check(JSON.stringify(order.top.slice(0, 3)) === JSON.stringify(rated), `Top Rated: your 5 stars, then Google's 4.6, then your 2, unrated after (${order.top.join(', ')})`);
+  check(JSON.stringify(order.low.slice(0, 3)) === JSON.stringify([...rated].reverse()), `Lowest Rated starts with the lowest, unrated after (${order.low.join(', ')})`);
+  check(await p.locator('#sort-select option[value="best-desc"]').count() === 1, 'Top Rated is in the sort menu');
+
   // Dates are local calendar dates
   check(await p.evaluate(() => { const d = new Date(); return iso() === `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }), 'iso() is the local date');
   check(await p.evaluate(() => fmtDate('2026-10-02') === 'Oct 2, 2026'), 'fmtDate shows YYYY-MM-DD without shifting a day');
