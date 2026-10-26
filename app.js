@@ -8491,25 +8491,127 @@ const HUB_SECTIONS = [
   ]},
 ];
 
+// Big preview cards for the fun stuff; utility sections stay compact tiles.
+const HUB_COMPACT_SECTIONS = new Set(['Money', 'Data & tools']);
+// [one-line pitch, preview style]
+const HUB_INFO = {
+  'just-ate':    ['Snap it, rate it, done in 10 seconds', 'photo'],
+  decision:      ['Your top 3 in under a minute', 'podium'],
+  'open-now':    ['Places serving right now', 'photo'],
+  discover:      ['New spots picked for your taste', 'photo'],
+  swipe:         ['Swipe your saved spots to a winner', 'stack'],
+  spin:          ['Let fate pick dinner', 'wheel'],
+  duel:          ['Two spots enter. One wins.', 'vs'],
+  craving:       ['Tell the bear your mood', 'chips'],
+  tonight:       ['One perfect pick for tonight', 'spotlight'],
+  fortune:       ['Crack open a food fortune', 'cookie'],
+  friends:       ['See what your friends order', 'friends'],
+  groupvote:     ['Everyone votes, the bear decides', 'bars'],
+  rooms:         ['Plan dinner with your crew', 'friends'],
+  profile:       ['Your taste, shareable', 'photo'],
+  itinerary:     ['A multi-stop food crawl', 'route'],
+  route:         ['Map a food trip', 'route'],
+  mealplanner:   ['Byte Cub plans your week', 'photo'],
+  travel:        ['Eat like a local anywhere', 'globe'],
+  gallery:       ['Every plate you snapped', 'photo'],
+  visitlog:      ['Your food diary', 'photo'],
+  passport:      ['Stamp every cuisine', 'stamp'],
+  worldmap:      ['Where your taste has traveled', 'globe'],
+  moodcal:       ['How your meals made you feel', 'grid'],
+  beenawhile:    ['Old favorites missing you', 'photo'],
+  review:        ['Your year in food', 'photo'],
+  wrap:          ['Your month, wrapped', 'photo'],
+  digest:        ['This month at a glance', 'bars'],
+  stats2:        ['Deep dive into your habits', 'bars'],
+  challenge:     ['Food quests with rewards', 'trophy'],
+  achievements:  ['Badges you have earned', 'trophy'],
+  bingo:         ['Fill the cuisine card', 'grid'],
+  feedbear:      ['Catch food, dodge pests', 'bear'],
+};
+
+function hubPreviewHtml (style) {
+  const food = n => Array.from({ length: n }, () => '<img data-food alt="" loading="lazy" />').join('');
+  switch (style) {
+    case 'stack':     return `<div class="hp hp-stack">${food(3)}</div>`;
+    case 'vs':        return `<div class="hp hp-vs">${food(2)}<b>VS</b></div>`;
+    case 'wheel':     return '<div class="hp hp-wheel"><i></i><b></b></div>';
+    case 'chips':     return '<div class="hp hp-chips"><span>Spicy</span><span>Cheesy</span><span>Fresh</span><span>Sweet</span></div>';
+    case 'spotlight': return `<div class="hp hp-spot">${food(1)}<b>★</b></div>`;
+    case 'cookie':    return '<div class="hp hp-cookie"><svg viewBox="0 0 64 40" aria-hidden="true"><path d="M4 30 Q32 -6 60 30 Q46 22 32 30 Q18 22 4 30Z" fill="#e7b46a" stroke="#a46a2a" stroke-width="2"/></svg><span>Good food finds you</span></div>';
+    case 'podium':    return `<div class="hp hp-podium">${food(3)}</div>`;
+    case 'friends':   return `<div class="hp hp-friends">${food(3)}</div>`;
+    case 'bars':      return '<div class="hp hp-bars"><i style="height:45%"></i><i style="height:80%"></i><i style="height:60%"></i><i style="height:95%"></i></div>';
+    case 'route':     return '<div class="hp hp-route"><svg viewBox="0 0 100 50" aria-hidden="true"><path d="M8 40 C 30 5, 50 50, 92 12" fill="none" stroke="#e7c48a" stroke-width="3" stroke-dasharray="5 5"/><circle cx="8" cy="40" r="5" fill="#a8d5a2"/><circle cx="50" cy="30" r="5" fill="#e7c48a"/><circle cx="92" cy="12" r="5" fill="#ff8a7a"/></svg></div>';
+    case 'globe':     return '<div class="hp hp-globe"><i></i></div>';
+    case 'stamp':     return '<div class="hp hp-stamp"><span>EAT<br/>WORLD</span></div>';
+    case 'grid':      return `<div class="hp hp-grid">${Array.from({ length: 15 }, (_, i) => `<i class="${[0, 2, 6, 7, 11, 13].includes(i) ? 'on' : ''}"></i>`).join('')}</div>`;
+    case 'trophy':    return '<div class="hp hp-trophy"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M14 6h20v8a10 10 0 0 1-20 0z" fill="#e7c48a"/><path d="M14 9H7a7 7 0 0 0 7 9M34 9h7a7 7 0 0 1-7 9" fill="none" stroke="#e7c48a" stroke-width="3"/><rect x="21" y="24" width="6" height="8" fill="#c99a4f"/><rect x="14" y="32" width="20" height="6" rx="2" fill="#a8d5a2"/></svg></div>';
+    case 'bear':      return '<div class="hp hp-bear"><img src="icon-192.png" alt="" /></div>';
+    default:          return `<div class="hp hp-photo">${food(1)}</div>`;
+  }
+}
+
+// A small live stat on cards where one is meaningful.
+function hubStat (action) {
+  try {
+    const visitedCuisines = new Set(state.restaurants.filter(r => r.status === 'visited').map(r => cuisineFilterKey(r.cuisine)).filter(Boolean));
+    switch (action) {
+      case 'gallery': { const n = collectFoodPhotos().length; return n ? `${n} photo${n === 1 ? '' : 's'}` : ''; }
+      case 'visitlog': { const n = state.restaurants.reduce((s, r) => s + (r.visits || []).length, 0); return n ? `${n} visit${n === 1 ? '' : 's'}` : ''; }
+      case 'passport': case 'worldmap': return visitedCuisines.size ? `${visitedCuisines.size} cuisine${visitedCuisines.size === 1 ? '' : 's'}` : '';
+      case 'bingo': return `${Math.min(24, visitedCuisines.size)}/24`;
+      case 'friends': { const n = getFriends().length; return n ? `${n} friend${n === 1 ? '' : 's'}` : ''; }
+      case 'duel': case 'spin': { const n = state.restaurants.length; return n >= 2 ? `${n} spots` : 'Add 2 spots'; }
+      default: return '';
+    }
+  } catch { return ''; }
+}
+
+// Fill [data-food] previews with random real dish photos.
+function fillHubFoodPhotos (root) {
+  const imgs = [...root.querySelectorAll('img[data-food]')];
+  if (!imgs.length) return;
+  const fallback = Object.values(BEAR_SWIPE_LOCAL_FOOD_IMAGES || {});
+  const apply = urls => imgs.forEach(img => { img.src = urls[Math.floor(Math.random() * urls.length)]; });
+  const photos = window.BearSwipe?.loadPhotos?.();
+  if (!photos) { if (fallback.length) apply(fallback); return; }
+  photos.then(list => {
+    const urls = list.filter(p => p.lead).map(p => p.url);
+    apply(urls.length ? urls : fallback);
+  });
+}
+
 function renderMobileHub (filter = '') {
   const body = document.getElementById('mobile-hub-body');
   if (!body) return;
   const q = filter.trim().toLowerCase();
+  const lock = action => (GRIZZLY_TOOLS.has(action) && !hasGrizzly() ? '<span class="hub-lock">GRIZZLY</span>' : '');
   const html = HUB_SECTIONS.map(sec => {
-    const items = sec.items.filter(([, , label]) => !q || label.toLowerCase().includes(q));
+    const items = sec.items.filter(([action, , label]) => !q || label.toLowerCase().includes(q) || (HUB_INFO[action]?.[0] || '').toLowerCase().includes(q));
     if (!items.length) return '';
+    const compact = HUB_COMPACT_SECTIONS.has(sec.title);
     return `<div class="hub-section">
       <div class="hub-section-title">${sec.title}</div>
-      <div class="hub-grid">
-        ${items.map(([action, emoji, label]) => `<button class="hub-tile" data-tool="${action}">
-          ${GRIZZLY_TOOLS.has(action) && !hasGrizzly() ? '<span class="hub-lock">GRIZZLY</span>' : ''}
-          <span class="hub-tile-emoji">${emoji}</span>
-          <span class="hub-tile-label">${label}</span>
-        </button>`).join('')}
+      <div class="${compact ? 'hub-grid' : 'hub-cards'}">
+        ${items.map(([action, emoji, label]) => {
+          if (compact) {
+            return `<button class="hub-tile" data-tool="${action}">${lock(action)}
+              <span class="hub-tile-emoji">${emoji}</span><span class="hub-tile-label">${label}</span></button>`;
+          }
+          const [sub, style] = HUB_INFO[action] || ['', 'photo'];
+          const stat = hubStat(action);
+          return `<button class="hub-card" data-tool="${action}">${lock(action)}
+            ${hubPreviewHtml(style)}
+            <span class="hub-card-text"><span class="hub-card-title">${label}</span>
+              <span class="hub-card-sub">${escHtml(sub)}</span>
+              ${stat ? `<span class="hub-card-stat">${escHtml(stat)}</span>` : ''}</span>
+          </button>`;
+        }).join('')}
       </div>
     </div>`;
   }).join('');
-  body.innerHTML = html || '<p class="hub-empty">No tools match “' + filter + '”.</p>';
+  body.innerHTML = html || '<p class="hub-empty">No tools match “' + escHtml(filter) + '”.</p>';
+  fillHubFoodPhotos(body);
 }
 
 function openMobileHub () {
@@ -8532,7 +8634,7 @@ function initMobileHub () {
   document.getElementById('mobile-hub-close')?.addEventListener('click', closeMobileHub);
   document.getElementById('mobile-hub-search')?.addEventListener('input', e => renderMobileHub(e.target.value));
   document.getElementById('mobile-hub-body')?.addEventListener('click', e => {
-    const tile = e.target.closest('.hub-tile');
+    const tile = e.target.closest('.hub-tile, .hub-card');
     if (!tile) return;
     const action = tile.dataset.tool;
     closeMobileHub();
