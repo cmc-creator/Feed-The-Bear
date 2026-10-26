@@ -200,6 +200,7 @@ window.Cub = (() => {
     }
   }
 
+  let saving = false;
   function save () {
     if (!pick || !status) return;
     const a = app();
@@ -226,10 +227,13 @@ window.Cub = (() => {
     if (!Number.isFinite(r.lat) && r.address && typeof a.geocodeAddress === 'function') a.geocodeAddress(r.id, r.address);
     a.renderAll();
     track('quick_add_saved', { status, source: pick.source, stars, hasDish: !!dish, hasPhoto: !!photo });
+    saving = true;
     close();
+    saving = false;
     if (photo) a.photoReveal(photo, dish || r.name);
     a.showToast(status === 'visited' ? `${r.name} logged` : `${r.name} saved`, status === 'visited' ? 'In your den, with your rating.' : 'On your Want to Try list.', 'success');
     if (typeof a.celebrateMilestones === 'function') a.celebrateMilestones();
+    if (welcomeActive) { resumeWelcome(true); return; }
     buddyTip(status === 'want-to-try' && !dish ? `Tip: open ${r.name} and add a must-try dish to your Crave List.` : '', true);
   }
 
@@ -354,9 +358,112 @@ window.Cub = (() => {
   }
 
   function close () {
+    const wasOpen = sheet && !sheet.classList.contains('hidden');
     sheet?.classList.add('hidden');
     clearTimeout(searchTimer);
     if (typeof app().maybeHideOverlay === 'function') app().maybeHideOverlay();
+    if (wasOpen && welcomeActive && !saving) resumeWelcome(false);
+  }
+
+  /* ── First-run welcome ───────────────────────────────────────
+     Replaces five read-only slides with three things to actually do:
+     turn on location, add a first spot, swipe a few dishes. Every step can
+     be skipped. Quick Add hands back here when it saves or closes. */
+  let welcomeEl = null;
+  let welcomeStep = 0;
+  let welcomeActive = false;
+  const welcomeDid = new Set();
+
+  const WELCOME_STEPS = [
+    { key: 'hi', title: "Hi! I'm Cub.", body: "I'll help you remember every great bite, and find the next one.", go: "Let's go", skip: 'Skip setup' },
+    { key: 'location', title: 'Can I sniff around where you are?', body: "I'll show restaurants near you and give you a nudge when something you're craving is close.", go: 'Use my location', skip: 'Not now' },
+    { key: 'spot', title: "What's a spot you love?", body: 'Or one you are dying to try. It takes about ten seconds.', go: 'Add my first spot', skip: 'Skip for now' },
+    { key: 'swipe', title: 'Last thing: teach me your taste', body: "Swipe a few real dishes. Right if you'd eat it, left if not.", go: 'Show me the dishes', skip: "I'm all set" },
+  ];
+
+  function buildWelcome () {
+    const el = document.createElement('div');
+    el.id = 'cub-welcome';
+    el.className = 'cub-welcome hidden';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-labelledby', 'cub-welcome-title');
+    el.innerHTML = `
+      <div class="cw-card">
+        <img class="cw-avatar" src="${AVATAR}" alt="Cub the bear cub" />
+        <div class="cw-dots" aria-hidden="true">${WELCOME_STEPS.map(() => '<i></i>').join('')}</div>
+        <h2 id="cub-welcome-title" class="cw-title"></h2>
+        <p class="cw-body"></p>
+        <button type="button" class="btn-primary cw-go"></button>
+        <button type="button" class="cw-skip"></button>
+      </div>`;
+    document.body.appendChild(el);
+    el.querySelector('.cw-go').addEventListener('click', welcomeGo);
+    el.querySelector('.cw-skip').addEventListener('click', () => {
+      track('welcome_step_skipped', { step: WELCOME_STEPS[welcomeStep].key });
+      if (welcomeStep === 0) finishWelcome(true); else showWelcomeStep(welcomeStep + 1);
+    });
+    return el;
+  }
+
+  function showWelcomeStep (i) {
+    if (i >= WELCOME_STEPS.length) { finishWelcome(false); return; }
+    welcomeStep = i;
+    const s = WELCOME_STEPS[i];
+    welcomeEl.querySelector('.cw-title').textContent = s.title;
+    welcomeEl.querySelector('.cw-body').textContent = s.body;
+    welcomeEl.querySelector('.cw-go').textContent = s.go;
+    welcomeEl.querySelector('.cw-skip').textContent = s.skip;
+    welcomeEl.querySelectorAll('.cw-dots i').forEach((d, n) => d.classList.toggle('on', n <= i));
+    welcomeEl.dataset.step = s.key;
+    welcomeEl.classList.remove('hidden');
+    document.body.classList.add('overlay-open');
+    const card = welcomeEl.querySelector('.cw-card');
+    card.classList.remove('cw-in'); void card.offsetWidth; card.classList.add('cw-in');
+    track('welcome_step_shown', { step: s.key });
+  }
+
+  function welcomeGo () {
+    const key = WELCOME_STEPS[welcomeStep].key;
+    welcomeDid.add(key);
+    track('welcome_step_done', { step: key });
+    if (key === 'location') {
+      try { app().enableLocation?.(); } catch { /* the browser asks; we move on either way */ }
+      showWelcomeStep(welcomeStep + 1);
+    } else if (key === 'spot') {
+      welcomeEl.classList.add('hidden');
+      openAdd();
+    } else if (key === 'swipe') {
+      finishWelcome(false);
+      setTimeout(() => document.getElementById('bear-swipe-home')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 250);
+    } else {
+      showWelcomeStep(welcomeStep + 1);
+    }
+  }
+
+  // Quick Add calls this when it saves or closes during the welcome.
+  function resumeWelcome (saved) {
+    if (!welcomeActive || WELCOME_STEPS[welcomeStep]?.key !== 'spot') return;
+    if (!saved) welcomeDid.delete('spot');
+    setTimeout(() => showWelcomeStep(welcomeStep + 1), saved ? 900 : 150);
+  }
+
+  function finishWelcome (skippedAll) {
+    welcomeActive = false;
+    welcomeEl?.classList.add('hidden');
+    try { app().dismissOnboarding?.(); } catch { /* keeps working without it */ }
+    if (typeof app().maybeHideOverlay === 'function') app().maybeHideOverlay();
+    track(skippedAll ? 'welcome_skipped' : 'welcome_done', { did: [...welcomeDid].join(',') });
+    if (!skippedAll) app().showToast?.("You're all set!", 'Tap me any time for quick actions.', 'success');
+  }
+
+  function welcome () {
+    if (state?.settings?.onboardingDone) return false;
+    welcomeEl = welcomeEl || buildWelcome();
+    welcomeActive = true;
+    welcomeDid.clear();
+    showWelcomeStep(0);
+    return true;
   }
 
   /* ── Buddy ───────────────────────────────────────────────── */
@@ -460,13 +567,13 @@ window.Cub = (() => {
       buddy = buildBuddy();
       setTimeout(() => {
         // Not over another screen, and not before onboarding is done.
-        if (document.body.classList.contains('overlay-open') || !state?.settings?.onboardingDone) return;
+        if (welcomeActive || document.body.classList.contains('overlay-open') || !state?.settings?.onboardingDone) return;
         buddyTip();
       }, 8000);
     }
   }
 
-  return { init, openAdd, close, guessCuisine, parseMapsLink, tip: buddyTip };
+  return { init, openAdd, close, welcome, guessCuisine, parseMapsLink, tip: buddyTip };
 })();
 
 document.addEventListener('DOMContentLoaded', () => window.Cub.init());

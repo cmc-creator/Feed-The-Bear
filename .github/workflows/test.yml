@@ -65,3 +65,6 @@ jobs:
       - name: Food videos
         working-directory: tests
         run: node video.test.js
+      - name: First-run welcome
+        working-directory: tests
+        run: node welcome.test.js
