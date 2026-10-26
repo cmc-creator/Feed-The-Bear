@@ -1,11 +1,17 @@
 // Bear Swipe: real photos load, drag and buttons both work, the claw and bite
 // effects run, a round of 10 ends with a craving and a way to find it.
 const path = require('path');
-const { BASE, SHOTS, check, launch, newPage, finish } = require('./lib');
+const { BASE, ROOT, SHOTS, check, launch, newPage, finish } = require('./lib');
 
 (async () => {
   const browser = await launch();
   const p = await newPage(browser, { seed: [{ id: 'r1', name: 'The Mission', cuisine: 'Mexican', status: 'visited', tags: [], visits: [] }] });
+  // Wikimedia throttles data-centre traffic (GitHub runners), which made this
+  // test flaky. Locally and in CI, serve a bundled food photo instead; a run
+  // against the live site (TEST_BASE) still loads real Wikimedia photos.
+  if (!process.env.TEST_BASE) {
+    await p.route('https://upload.wikimedia.org/**', route => route.fulfill({ path: path.join(ROOT, 'assets', 'food', 'ramen.jpg'), contentType: 'image/jpeg' }));
+  }
   await p.goto(`${BASE}/app.html`);
   await p.waitForSelector('#bear-swipe-home .bs-card.bs-top .bs-photo', { timeout: 15000 });
   const mod = p.locator('#bear-swipe-home');
