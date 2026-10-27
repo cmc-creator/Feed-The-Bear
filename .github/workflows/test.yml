@@ -77,3 +77,6 @@ jobs:
       - name: Home screen
         working-directory: tests
         run: node home.test.js
+      - name: Polish (audit fixes)
+        working-directory: tests
+        run: node polish.test.js

@@ -38,7 +38,7 @@
       <h1 class="signup-headline">Create your dining profile</h1>
       <p class="signup-subline">Your private restaurant concierge. Save standout spots, discover gems, and track every memorable meal.</p>
       <div class="signup-avatar-wrap">
-        <span id="setup-avatar-display" class="signup-avatar-big">FTB</span>
+        <span id="setup-avatar-display" class="signup-avatar-big"></span>
       </div>
       <div class="signup-field">
         <label class="form-label">Your name</label>
@@ -65,7 +65,7 @@
         <button id="account-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="account-portal-hero">
-        <div id="account-avatar-display" class="account-avatar-display">FTB</div>
+        <div id="account-avatar-display" class="account-avatar-display"></div>
         <h2 id="account-name-display" class="account-name-display">Foodie</h2>
         <div id="account-since-display" class="account-since-display">Foodie since today</div>
         <div class="account-badges-row">
@@ -77,42 +77,42 @@
       <div class="account-portal-actions">
         <!-- Sign in row - hidden when logged in -->
         <button class="account-action-row account-signin-row" id="account-signin-row">
-          <span class="aar-icon">SI</span><span class="aar-label">Sign in or create account</span><span class="aar-chevron">›</span>
+          <span class="aar-icon" aria-hidden="true">👤</span><span class="aar-label">Sign in or create account</span><span class="aar-chevron">›</span>
         </button>
         <button class="account-action-row" id="account-edit-btn">
-          <span class="aar-icon">✏</span><span class="aar-label">Edit Profile</span><span class="aar-chevron">›</span>
+          <span class="aar-icon" aria-hidden="true">✏️</span><span class="aar-label">Edit Profile</span><span class="aar-chevron">›</span>
         </button>
         <button class="account-action-row" id="account-personalize-btn">
-          <span class="aar-icon">TH</span><span class="aar-label">Themes &amp; Personalize</span><span class="aar-chevron">›</span>
+          <span class="aar-icon" aria-hidden="true">🎨</span><span class="aar-label">Themes &amp; Personalize</span><span class="aar-chevron">›</span>
         </button>
         <button class="account-action-row" id="account-dishes-link-btn">
-          <span class="aar-icon">TD</span><span class="aar-label">Top Dishes Leaderboard</span><span class="aar-chevron">›</span>
+          <span class="aar-icon" aria-hidden="true">🏆</span><span class="aar-label">Top Dishes Leaderboard</span><span class="aar-chevron">›</span>
         </button>
         <button class="account-action-row" id="account-smartplanner-btn">
-          <span class="aar-icon">PL</span><span class="aar-label">Smart Planner</span><span class="aar-chevron">›</span>
+          <span class="aar-icon" aria-hidden="true">🗓️</span><span class="aar-label">Smart Planner</span><span class="aar-chevron">›</span>
         </button>
         <button class="account-action-row" id="account-sharehighlights-btn">
-          <span class="aar-icon">SH</span><span class="aar-label">Share Highlights</span><span class="aar-chevron">›</span>
+          <span class="aar-icon" aria-hidden="true">✨</span><span class="aar-label">Share Highlights</span><span class="aar-chevron">›</span>
         </button>
         <button class="account-action-row" id="account-profile-link-btn">
-          <span class="aar-icon">PF</span><span class="aar-label">My Foodie Profile</span><span class="aar-chevron">›</span>
+          <span class="aar-icon" aria-hidden="true">🐻</span><span class="aar-label">My Foodie Profile</span><span class="aar-chevron">›</span>
         </button>
         <button class="account-action-row" id="account-review-link-btn">
-          <span class="aar-icon">YR</span><span class="aar-label">Year in Review</span><span class="aar-chevron prem-lock">LOCK</span>
+          <span class="aar-icon" aria-hidden="true">📅</span><span class="aar-label">Year in Review</span><span class="aar-chevron prem-lock" aria-label="Grizzly feature">🔒</span>
         </button>
         <button class="account-action-row" id="account-ach-link-btn">
-          <span class="aar-icon">XP</span><span class="aar-label">Achievements &amp; XP</span><span class="aar-chevron prem-lock">LOCK</span>
+          <span class="aar-icon" aria-hidden="true">⭐</span><span class="aar-label">Achievements &amp; XP</span><span class="aar-chevron prem-lock" aria-label="Grizzly feature">🔒</span>
         </button>
         <button class="account-action-row" id="account-export-link-btn">
-          <span class="aar-icon">EX</span><span class="aar-label">Export My Data</span><span class="aar-chevron">›</span>
+          <span class="aar-icon" aria-hidden="true">📤</span><span class="aar-label">Export My Data</span><span class="aar-chevron">›</span>
         </button>
         <!-- Upgrade row - hidden for Grizzly members -->
         <button class="account-action-row account-upgrade-row" id="account-upgrade-row">
-          <span class="aar-icon">UP</span><span class="aar-label"><strong>Upgrade to Grizzly</strong> - unlock the full tasting suite</span><span class="aar-chevron">›</span>
+          <span class="aar-icon" aria-hidden="true">👑</span><span class="aar-label"><strong>Upgrade to Grizzly</strong> - unlock the full tasting suite</span><span class="aar-chevron">›</span>
         </button>
         <!-- Sign out row - hidden when not logged in -->
         <button class="account-action-row account-signout-row hidden" id="account-signout-row">
-          <span class="aar-icon">SO</span><span class="aar-label">Sign Out</span><span class="aar-chevron">›</span>
+          <span class="aar-icon" aria-hidden="true">🚪</span><span class="aar-label">Sign Out</span><span class="aar-chevron">›</span>
         </button>
       </div>
     </div>
@@ -127,7 +127,7 @@
       </div>
       <div style="padding:16px 20px 24px">
         <div style="text-align:center;margin-bottom:16px">
-          <span id="edit-avatar-display" class="setup-avatar-display">FTB</span>
+          <span id="edit-avatar-display" class="setup-avatar-display"></span>
           <img id="edit-photo-preview" class="profile-photo-preview hidden" alt="Profile photo preview" />
         </div>
         <label class="form-label">Your name</label>
@@ -323,7 +323,7 @@
 
   <!-- ── Proximity Alert Banner ───────────────────────────── -->
   <div id="proximity-alert" class="proximity-alert hidden" role="alert">
-    <span id="proximity-icon">NEAR</span>
+    <span id="proximity-icon">📍</span>
     <div id="proximity-content">
       <strong id="proximity-name"></strong>
       <span id="proximity-msg"></span>
@@ -423,7 +423,7 @@
         </div>
       </div>
       <button id="account-btn" class="account-header-btn" title="My Account" aria-label="My Account">
-        <span id="header-avatar">FTB</span>
+        <span id="header-avatar"></span>
       </button>
 
       <!-- Hidden but still in DOM for JS compatibility -->
@@ -641,7 +641,7 @@
     <!-- Weekly Dining Goal Widget -->
     <div id="weekly-goal-widget" class="weekly-goal-widget hidden">
       <div class="wg-left">
-        <span class="wg-icon">GO</span>
+        <span class="wg-icon" aria-hidden="true">🎯</span>
         <div class="wg-text-col">
           <div class="wg-title">Weekly Dining Goal: <strong id="wg-count">0</strong>/<strong id="wg-goal">3</strong> meals</div>
           <div class="wg-label" id="wg-label">Plan a delicious week, one reservation at a time.</div>
@@ -657,7 +657,7 @@
     <section id="home-discovery" class="home-discovery" aria-label="Restaurants near you">
       <!-- AI Recommendation Banner -->
       <div id="ai-rec-banner" class="ai-rec-banner home-module hidden">
-        <div class="ai-rec-icon">AI</div>
+        <div class="ai-rec-icon" aria-hidden="true">✨</div>
         <div class="ai-rec-body">
           <div class="ai-rec-label">Byte Cub's Pick For You</div>
           <div id="ai-rec-text" class="ai-rec-text">Thinking…</div>
@@ -1990,7 +1990,7 @@
         <!-- Developer key override (normally hidden) -->
         <div id="ai-key-setup" class="ai-key-setup hidden">
           <div class="ai-key-setup-inner">
-            <div class="ai-key-icon">DEV</div>
+            <div class="ai-key-icon" aria-hidden="true">🔑</div>
             <h3>Developer Override</h3>
             <p>Byte Cub is already included for users. This field is only for local developer fallback testing.</p>
             <div class="ai-key-input-row">
@@ -2049,7 +2049,7 @@
           </div>
         </div>
         <div class="export2-option" id="export2-csv-btn">
-          <div class="export2-icon">STATS</div>
+          <div class="export2-icon" aria-hidden="true">📊</div>
           <div>
             <div class="export2-label">CSV Spreadsheet</div>
             <div class="export2-sub">Open in Excel or Google Sheets</div>
@@ -2286,7 +2286,7 @@
         <button id="fortune-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="fortune-cookie-wrap">
-        <div id="fortune-cookie" class="fortune-cookie" role="button" tabindex="0" aria-label="Tap to crack open fortune cookie">FORTUNE</div>
+        <div id="fortune-cookie" class="fortune-cookie" role="button" tabindex="0" aria-label="Tap to crack open fortune cookie">🥠</div>
         <p id="fortune-tap-hint" class="fortune-tap-hint">Tap the cookie for your food fortune…</p>
       </div>
       <div id="fortune-result" class="fortune-result hidden">

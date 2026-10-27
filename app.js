@@ -42,14 +42,20 @@ const NOTIFY_COOLDOWN = 3 * 24 * 60 * 60 * 1000; // a saved spot near you: remin
 const NOTIFY_SNOOZE = 7 * 24 * 60 * 60 * 1000;   // closing the alert: quiet for a week
 
 /* ── Cuisine badge map ───────────────────────────────────── */
+// Food emoji for each cuisine (an earlier pass had swapped these for letter
+// codes like "MX", which read as broken placeholders).
 const CUISINE_EMOJI = {
-  american:'AM',bbq:'BBQ',breakfast:'BRK',brunch:'BR',burgers:'BRG',cafe:'CAF',
-  chinese:'CHN',desserts:'DES',french:'FR',greek:'GR',indian:'IND',italian:'IT',
-  japanese:'JP',korean:'KR',mediterranean:'MED',mexican:'MX',pizza:'PIZ',
-  seafood:'SEA',steakhouse:'STK',sushi:'SUS',thai:'TH',vegan:'VGN',
-  vietnamese:'VN',default:''
+  american: '🍔', bbq: '🍖', breakfast: '🥞', brunch: '🥂', burgers: '🍔', cafe: '☕', coffee: '☕',
+  chinese: '🥡', desserts: '🍰', dessert: '🍰', bakery: '🥐', french: '🥐', greek: '🥙', indian: '🍛', italian: '🍝',
+  japanese: '🍱', korean: '🍲', mediterranean: '🫒', mexican: '🌮', pizza: '🍕', seafood: '🦞', steakhouse: '🥩',
+  steak: '🥩', sushi: '🍣', thai: '🍜', vegan: '🥗', vegetarian: '🥗', vietnamese: '🍜', ramen: '🍜', irish: '☘️',
+  pub: '🍺', bar: '🍺', sandwiches: '🥪', deli: '🥪', chicken: '🍗', wings: '🍗', 'fast food': '🍟', southern: '🍗',
+  'middle eastern': '🧆', spanish: '🥘', german: '🥨', caribbean: '🍹', ethiopian: '🍲', peruvian: '🐟', 'ice cream': '🍦',
+  'dim sum': '🥟', pasta: '🍝', 'pub/bar': '🍺', 'salad/healthy': '🥗', 'bakery/cafe': '🥐', 'korean bbq': '🥩',
+  donuts: '🍩', healthy: '🥗', salad: '🥗', soul_food: '🍗', 'soul food': '🍗', turkish: '🥙', filipino: '🍢', hawaiian: '🍍',
+  default: '🍽️'
 };
-const cuisineEmoji = c => CUISINE_EMOJI[(c||'').toLowerCase()] || CUISINE_EMOJI.default;
+const cuisineEmoji = c => CUISINE_EMOJI[String(c || '').toLowerCase().trim()] || CUISINE_EMOJI.default;
 
 const CUISINE_FAVORITE_DISHES = {
   mexican: ['Birria Tacos', 'Carne Asada Fries', 'Street Corn'],
@@ -279,7 +285,7 @@ function renderNearbyVisualCard ({
 
   return `<article class="nearby-home-card${isSaved ? ' saved' : ''}" data-nearby-key="${escHtml(key || `${name}-${distText}`)}" data-nearby-price="${effectivePrice}" data-nearby-popularity="${escHtml(effectivePopularity)}" data-card-link="${escHtml(cardLink || '')}" role="link" tabindex="0" title="Open ${safeName}">
     <div class="nearby-home-card-media">
-      <div class="nearby-home-card-photo-empty"${photo ? ' style="display:none"' : ''}>Restaurant photo unavailable</div>
+      <div class="nearby-home-card-photo-empty"${photo ? ' style="display:none"' : ''}><span class="nhc-empty-emoji" aria-hidden="true">${cuisineEmoji(cuisine)}</span><span class="nhc-empty-text">${escHtml(cuisineLabel)}</span></div>
       ${photo ? `<img class="nearby-home-card-photo" src="${escHtml(photo)}" alt="Photo of ${safeName}" loading="lazy" onerror="this.previousElementSibling.style.display='grid';this.remove()" />` : ''}
       <div class="nearby-home-card-badges">
         ${effectivePrice ? `<span class="nearby-home-card-badge price">${'$'.repeat(effectivePrice)}</span>` : ''}
@@ -1256,8 +1262,73 @@ function hapticTap (strength = 'light') {
 /* ════════════════════════════════════════════════════════════
    USER PROFILE
    ════════════════════════════════════════════════════════════ */
-const AVATAR_OPTIONS = ['FTB', 'VIP', 'DINE', 'CHEF', 'TABLE', 'CITY', 'DATE', 'GOLD', 'CLUB', 'FINE', 'PLUS', 'NYX'];
-const DEFAULT_AVATAR = 'FTB';
+// Illustrated bear avatars, drawn as inline SVG so they look the same on every
+// phone. Profiles saved before these existed hold short text codes ('FTB',
+// 'CHEF', ...); normalizeAvatar maps those to a bear.
+const BEAR_AVATARS = {
+  'bear-chef':   { fur: '#9a6236', ear: '#d9a36f', muzzle: '#f1d2a8', bg: '#2f5d50', acc: 'chef' },
+  'bear-crown':  { fur: '#c98a4b', ear: '#f0c18a', muzzle: '#f7e1bf', bg: '#5b3f8c', acc: 'crown' },
+  'bear-shades': { fur: '#6b4a2e', ear: '#a8784e', muzzle: '#e2c29b', bg: '#d76b3f', acc: 'shades' },
+  'bear-pizza':  { fur: '#8b5a2b', ear: '#c79262', muzzle: '#efcfa3', bg: '#c84b3c', acc: 'pizza' },
+  'bear-donut':  { fur: '#c98a4b', ear: '#f0c18a', muzzle: '#f7e1bf', bg: '#3e7fa3', acc: 'donut' },
+  'bear-taco':   { fur: '#6b4a2e', ear: '#a8784e', muzzle: '#e2c29b', bg: '#e2a93b', acc: 'taco' },
+  'bear-bow':    { fur: '#b07a4a', ear: '#e6b384', muzzle: '#f5dcb8', bg: '#e48aa6', acc: 'bow' },
+  'bear-beanie': { fur: '#3b2f2a', ear: '#6e5a4f', muzzle: '#c9a98a', bg: '#4f8a5b', acc: 'beanie' },
+  'bear-phones': { fur: '#8b5a2b', ear: '#c79262', muzzle: '#efcfa3', bg: '#22313f', acc: 'phones' },
+  'bear-party':  { fur: '#c98a4b', ear: '#f0c18a', muzzle: '#f7e1bf', bg: '#7a4fb0', acc: 'party' },
+  'panda':       { fur: '#f4f1ec', ear: '#2b2b2b', muzzle: '#ffffff', bg: '#6aa26b', acc: 'panda' },
+  'polar':       { fur: '#f3eee6', ear: '#d9cfc1', muzzle: '#ffffff', bg: '#4a90b8', acc: 'scarf' },
+};
+const AVATAR_OPTIONS = Object.keys(BEAR_AVATARS);
+const DEFAULT_AVATAR = 'bear-chef';
+const LEGACY_AVATARS = { FTB: 'bear-chef', VIP: 'bear-crown', DINE: 'bear-pizza', CHEF: 'bear-chef', TABLE: 'bear-taco', CITY: 'bear-shades', DATE: 'bear-bow', GOLD: 'bear-crown', CLUB: 'bear-party', FINE: 'bear-donut', PLUS: 'bear-beanie', NYX: 'bear-phones' };
+
+function normalizeAvatar (id) {
+  if (BEAR_AVATARS[id]) return id;
+  return LEGACY_AVATARS[id] || DEFAULT_AVATAR;
+}
+
+// Extras drawn over the face; panda patches go under the eyes instead.
+function bearAccessory (a) {
+  switch (a.acc) {
+    case 'chef': return '<path d="M19 15h26v7H19z" fill="#fff"/><circle cx="23" cy="11" r="6" fill="#fff"/><circle cx="32" cy="8" r="7" fill="#fff"/><circle cx="41" cy="11" r="6" fill="#fff"/><path d="M19 20h26" stroke="#e3e3e3" stroke-width="1.5"/>';
+    case 'crown': return '<path d="M20 17l3-10 5 6 4-8 4 8 5-6 3 10z" fill="#f2c23a" stroke="#c9952a" stroke-width="1"/><circle cx="32" cy="7" r="1.6" fill="#e2574c"/>';
+    case 'shades': return '<rect x="18" y="27" width="12" height="7" rx="3" fill="#1b1b1b"/><rect x="34" y="27" width="12" height="7" rx="3" fill="#1b1b1b"/><path d="M30 29.5h4" stroke="#1b1b1b" stroke-width="2"/><path d="M20 29l3-1" stroke="#fff" stroke-width="1" opacity=".6"/>';
+    case 'pizza': return '<path d="M46 60l11-19c-6-3-13-3-19 0z" fill="#f2c56b"/><path d="M38 41c6-3 13-3 19 0l-1.5 2.5c-5-2.4-11-2.4-16 0z" fill="#c98a4b"/><circle cx="47" cy="47" r="2" fill="#c84b3c"/><circle cx="50" cy="52" r="1.6" fill="#c84b3c"/><circle cx="44" cy="51" r="1.4" fill="#c84b3c"/>';
+    case 'donut': return `<circle cx="50" cy="51" r="9" fill="#e7a45a"/><circle cx="50" cy="51" r="7" fill="#f08fb0"/><circle cx="50" cy="51" r="2.6" fill="${a.bg}"/><path d="M46 47l1 1M53 47l-1 1.5M54 53l-1.5-.5M47 55l1-1" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/>`;
+    case 'taco': return '<path d="M38 58a11 11 0 0 1 22 0z" fill="#f2c56b"/><path d="M40 57c2-4 5-6 9-6s7 2 9 6" fill="none" stroke="#5aa346" stroke-width="2.4"/><circle cx="45" cy="54" r="1.3" fill="#d84a3a"/><circle cx="52" cy="53" r="1.3" fill="#d84a3a"/>';
+    case 'bow': return '<path d="M47 13l-7-5v10z" fill="#e2457a"/><path d="M47 13l7-5v10z" fill="#e2457a"/><circle cx="47" cy="13" r="2.4" fill="#c22e62"/>';
+    case 'beanie': return '<path d="M13 26a19 16 0 0 1 38 0z" fill="#e2574c"/><rect x="12" y="23" width="40" height="6" rx="3" fill="#c23f36"/><circle cx="32" cy="9" r="4" fill="#fff"/>';
+    case 'phones': return '<path d="M12 33a20 20 0 0 1 40 0" fill="none" stroke="#1f1f1f" stroke-width="4"/><rect x="8" y="30" width="8" height="12" rx="3" fill="#e2574c"/><rect x="48" y="30" width="8" height="12" rx="3" fill="#e2574c"/>';
+    case 'party': return '<path d="M32 2l8 17H24z" fill="#f2c23a"/><path d="M28 10l7 4M26 15l11 3" stroke="#e2457a" stroke-width="2"/><circle cx="32" cy="2.5" r="2.4" fill="#4fb3e8"/>';
+    case 'scarf': return '<path d="M14 50c10 5 26 5 36 0v6c-10 5-26 5-36 0z" fill="#e2574c"/><path d="M40 54l3 9h-6z" fill="#c23f36"/>';
+    default: return '';
+  }
+}
+
+function avatarSvg (id) {
+  const a = BEAR_AVATARS[normalizeAvatar(id)];
+  const dark = '#2a1d16';
+  const panda = a.acc === 'panda';
+  const earOuter = panda ? a.ear : a.fur;
+  const earInner = panda ? '#444' : a.ear;
+  const patches = panda
+    ? '<ellipse cx="24.5" cy="31.5" rx="5" ry="4.2" fill="#2b2b2b" transform="rotate(-20 24.5 31.5)"/><ellipse cx="39.5" cy="31.5" rx="5" ry="4.2" fill="#2b2b2b" transform="rotate(20 39.5 31.5)"/>'
+    : '';
+  return `<svg class="bear-avatar" viewBox="0 0 64 64" role="img" aria-label="Bear avatar"><circle cx="32" cy="32" r="32" fill="${a.bg}"/>`
+    + `<circle cx="17" cy="20" r="8.5" fill="${earOuter}"/><circle cx="47" cy="20" r="8.5" fill="${earOuter}"/>`
+    + `<circle cx="17" cy="20" r="4.2" fill="${earInner}"/><circle cx="47" cy="20" r="4.2" fill="${earInner}"/>`
+    + `<circle cx="32" cy="35" r="20" fill="${a.fur}"/>${patches}`
+    + `<ellipse cx="32" cy="42.5" rx="10" ry="7.5" fill="${a.muzzle}"/>`
+    + `<circle cx="24.5" cy="31" r="3" fill="#fff"/><circle cx="39.5" cy="31" r="3" fill="#fff"/><circle cx="25" cy="31.5" r="1.9" fill="${dark}"/><circle cx="40" cy="31.5" r="1.9" fill="${dark}"/>`
+    + `<circle cx="20" cy="39" r="2.6" fill="#f08a8a" opacity=".45"/><circle cx="44" cy="39" r="2.6" fill="#f08a8a" opacity=".45"/>`
+    + `<ellipse cx="32" cy="39" rx="3.6" ry="2.6" fill="${dark}"/><path d="M28.5 44.5q3.5 3 7 0" fill="none" stroke="${dark}" stroke-width="1.6" stroke-linecap="round"/>`
+    + `${bearAccessory(a)}</svg>`;
+}
+
+function renderAvatarInto (el, id) {
+  if (el) el.innerHTML = avatarSvg(id);
+}
 const PROFILE_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 const THEME_PRESETS = {
   dark:     { mode: 'dark',  accent: 'midnight' },
@@ -1324,8 +1395,7 @@ function updateHeaderAvatar (emoji) {
   if (profile.photo) {
     el.innerHTML = `<img src="${profile.photo}" alt="Profile" class="account-avatar-photo" />`;
   } else {
-    const avatar = (emoji === '' ? DEFAULT_AVATAR : emoji) || (profile.avatar === '' ? DEFAULT_AVATAR : profile.avatar) || DEFAULT_AVATAR;
-    el.textContent = avatar;
+    renderAvatarInto(el, emoji || profile.avatar);
   }
 }
 
@@ -1338,7 +1408,7 @@ function updateProfileVisuals (profile = null) {
     if (p.photo) {
       accountAvatar.innerHTML = `<img src="${p.photo}" alt="Profile" class="account-avatar-photo account-avatar-photo-lg" />`;
     } else {
-      accountAvatar.textContent = normalizedAvatar;
+      renderAvatarInto(accountAvatar, normalizedAvatar);
     }
   }
 
@@ -1400,9 +1470,9 @@ function applyPersonalizationSettings () {
 function buildAvatarGrid (gridId, currentAvatar, onSelect) {
   const grid = document.getElementById(gridId);
   if (!grid) return;
-  let selected = currentAvatar || AVATAR_OPTIONS[0];
+  let selected = normalizeAvatar(currentAvatar);
   grid.innerHTML = AVATAR_OPTIONS.map(e =>
-    `<button class="avatar-option${e === selected ? ' selected' : ''}" data-emoji="${e}" type="button">${e}</button>`
+    `<button class="avatar-option${e === selected ? ' selected' : ''}" data-emoji="${e}" type="button" aria-label="Choose this bear">${avatarSvg(e)}</button>`
   ).join('');
   grid.addEventListener('click', e => {
     const btn = e.target.closest('.avatar-option');
@@ -1420,11 +1490,11 @@ function openProfileSetup () {
   overlay.classList.remove('hidden');
   let chosenAvatar = DEFAULT_AVATAR;
   const avatarDisplay = document.getElementById('setup-avatar-display');
-  if (avatarDisplay) avatarDisplay.textContent = chosenAvatar;
+  renderAvatarInto(avatarDisplay, chosenAvatar);
   buildAvatarGrid('avatar-emoji-grid', chosenAvatar, emoji => {
     chosenAvatar = emoji;
     const d = document.getElementById('setup-avatar-display');
-    if (d) d.textContent = emoji;
+    renderAvatarInto(d, emoji);
   });
   const nameInput = document.getElementById('setup-name');
   if (nameInput) nameInput.focus();
@@ -1471,7 +1541,7 @@ function openAccountModal () {
     if (profile.photo) {
       avatarEl.innerHTML = `<img src="${profile.photo}" alt="Profile" class="account-avatar-photo account-avatar-photo-lg" />`;
     } else {
-      avatarEl.textContent = normalizedAvatar;
+      renderAvatarInto(avatarEl, normalizedAvatar);
     }
   }
   if (nameEl)   nameEl.textContent   = profile.name   || 'Foodie';
@@ -1529,7 +1599,7 @@ function openEditProfile () {
   const overlay = document.getElementById('edit-profile-overlay');
   if (!overlay) return;
   const profile = loadUserProfile() || { name: 'Foodie', avatar: DEFAULT_AVATAR };
-  let chosenAvatar = (profile.avatar === '' ? DEFAULT_AVATAR : profile.avatar) || DEFAULT_AVATAR;
+  let chosenAvatar = normalizeAvatar(profile.avatar);
   let chosenPhoto = profile.photo || '';
   document.getElementById('edit-name').value = profile.name || '';
 
@@ -1545,7 +1615,7 @@ function openEditProfile () {
       previewEl.classList.add('hidden');
       previewEl.removeAttribute('src');
       avatarEl.classList.remove('hidden');
-      avatarEl.textContent = chosenAvatar;
+      renderAvatarInto(avatarEl, chosenAvatar);
     }
   };
 
@@ -1553,7 +1623,7 @@ function openEditProfile () {
 
   buildAvatarGrid('edit-avatar-grid', chosenAvatar, emoji => {
     chosenAvatar = emoji;
-    if (!chosenPhoto) document.getElementById('edit-avatar-display').textContent = emoji;
+    if (!chosenPhoto) renderAvatarInto(document.getElementById('edit-avatar-display'), emoji);
   });
 
   const photoInput = document.getElementById('edit-photo-input');
@@ -1702,7 +1772,7 @@ function enableLocation () {
       renderTodayStatusRow();
       // Decision Mode ignores distance without location, so refresh an open shortlist.
       if (!document.getElementById('decision-mode-overlay')?.classList.contains('hidden')) runDecisionMode();
-      showToast(' Location enabled', 'You\'ll get a nudge when you\'re near spots on your list!', 'success');
+      showToast('Location enabled', 'You\'ll get a nudge when you\'re near spots on your list!', 'success');
       // Request notification permission
       if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
@@ -1782,7 +1852,7 @@ function disableLocation () {
   state.userLng = null;
   updateLocationBtn();
   renderCards();
-  showToast(' Location Off', 'Location tracking disabled.', 'info');
+  showToast('Location Off', 'Location tracking disabled.', 'info');
 }
 
 function updateLocationBtn () {
@@ -1881,7 +1951,7 @@ function showProximityAlert (r, distM, crave = null) {
   const alert = document.getElementById('proximity-alert');
   alert.dataset.rid = r.id;
   alert.classList.toggle('craving', !!crave);
-  document.getElementById('proximity-icon').textContent = crave ? 'CRAVE' : cuisineEmoji(r.cuisine);
+  document.getElementById('proximity-icon').textContent = crave ? '😋' : cuisineEmoji(r.cuisine);
   document.getElementById('proximity-name').textContent = crave ? `${crave.name} is ${fmtDist(distM)} away` : r.name;
   document.getElementById('proximity-msg').textContent = crave
     ? `At ${r.name}. It's on your Crave List.`
@@ -1920,8 +1990,9 @@ function sendBrowserNotification (r, distM, crave = null) {
 function getFiltered () {
   let list = [...state.restaurants];
 
-  // View filter
-  if (state.currentView !== 'all') {
+  // View filter. Map and Stats are screens, not statuses: they show everything
+  // (filtering by status 'map' left the map with no pins at all).
+  if (state.currentView === 'visited' || state.currentView === 'want-to-try') {
     list = list.filter(r => r.status === state.currentView);
   }
   // Search
@@ -2005,9 +2076,11 @@ function renderStats () {
   const all = state.restaurants;
   const visited = all.filter(r => r.status === 'visited');
   const want    = all.filter(r => r.status === 'want-to-try');
-  const rated   = all.filter(r => r.googleRating > 0);
+  // Your own ratings; Google's only stand in until you've rated something.
+  const mine    = all.filter(r => r.myRating > 0);
+  const rated   = mine.length ? mine : all.filter(r => r.googleRating > 0);
   const avg     = rated.length
-    ? (rated.reduce((s,r) => s + r.googleRating, 0) / rated.length).toFixed(1)
+    ? (rated.reduce((s,r) => s + (mine.length ? r.myRating : r.googleRating), 0) / rated.length).toFixed(1)
     : null;
 
   document.getElementById('stat-total').textContent   = all.length;
@@ -2136,7 +2209,7 @@ function buildCard (r) {
     <div class="card-photo">
       ${hasPhoto
         ? `<img src="${escHtml(photoSrc)}" alt="${escHtml(r.name)}" loading="lazy" onload="this.classList.add('loaded')" />`
-        : `<div class="card-photo-empty"><span>No verified photo yet</span></div>`}
+        : `<div class="card-photo-empty"><span class="card-photo-empty-emoji" aria-hidden="true">${cuisineEmoji(r.cuisine)}</span><span class="card-photo-empty-text">${r.status === 'visited' ? 'Add your photo' : escHtml(r.cuisine || 'Saved spot')}</span></div>`}
       <div class="card-img-overlay"></div>
       <span class="card-status-badge ${r.status === 'want-to-try' ? 'want' : 'visited'}">
         ${r.status === 'want-to-try' ? 'Want to Try' : 'Visited'}
@@ -2951,7 +3024,7 @@ async function scheduleReminder (r) {
   state.settings[`reminder_${r.id}`] = when.toISOString();
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
   document.getElementById('detail-reminder-status').textContent = ` Reminder set for ${when.toLocaleString()}`;
-  showToast(' Reminder Set!', `We'll remind you on ${when.toLocaleDateString()} at ${when.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`, 'success');
+  showToast('Reminder Set!', `We'll remind you on ${when.toLocaleDateString()} at ${when.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`, 'success');
 }
 
 /* ── Share via SMS ─────────────────────────────────────── */
@@ -3532,6 +3605,17 @@ const QUICK_REPLIES = [
 function randomFrom (arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 /* ── Chat UI ──────────────────────────────────────────────── */
+// Byte Cub is the cub; you are your profile photo or bear.
+function setChatAvatar (el, role) {
+  if (role === 'bot') {
+    el.innerHTML = '<img src="assets/cub-avatar.jpg" alt="Byte Cub" />';
+    return;
+  }
+  const profile = loadUserProfile() || {};
+  if (profile.photo) el.innerHTML = `<img src="${escHtml(profile.photo)}" alt="You" />`;
+  else renderAvatarInto(el, profile.avatar);
+}
+
 function addChatMsg (text, role = 'bot') {
   const messages = document.getElementById('chat-messages');
   const div = document.createElement('div');
@@ -3539,7 +3623,7 @@ function addChatMsg (text, role = 'bot') {
 
   const avatar = document.createElement('div');
   avatar.className = 'chat-msg-avatar';
-  avatar.textContent = role === 'bot' ? 'BC' : 'YOU';
+  setChatAvatar(avatar, role);
 
   const bubble = document.createElement('div');
   bubble.className = 'chat-bubble';
@@ -3575,7 +3659,7 @@ function showTyping () {
 
   const avatar = document.createElement('div');
   avatar.className = 'chat-msg-avatar';
-  avatar.textContent = 'BC';
+  setChatAvatar(avatar, 'bot');
 
   const bubble = document.createElement('div');
   bubble.className = 'chat-typing';
@@ -3835,7 +3919,7 @@ async function discoverNearby () {
 
   // Update location label
   const locLabel = document.getElementById('disc-location-label');
-  if (locLabel) locLabel.textContent = ' Near your current location';
+  if (locLabel) locLabel.textContent = '📍 Near your current location';
 
   const discRadius = document.getElementById('disc-radius');
   if (discRadius) {
@@ -3978,7 +4062,7 @@ async function _discFetch () {
 
     if (!_discAllResults.length) {
       resultsEl.innerHTML = `<div class="disc-empty">
-        <div class="disc-empty-icon">FTB</div>
+        <div class="disc-empty-icon" aria-hidden="true">🐻</div>
         <div class="disc-empty-title">No spots found nearby</div>
         <div class="disc-empty-sub">Try increasing the radius above.</div>
       </div>`;
@@ -3995,7 +4079,7 @@ async function _discFetch () {
 
   } catch (err) {
     resultsEl.innerHTML = `<div class="disc-empty">
-      <div class="disc-empty-icon"></div>
+      <div class="disc-empty-icon" aria-hidden="true">🐻</div>
       <div class="disc-empty-title">${err?.name === 'AbortError' ? 'Took too long' : 'Connection error'}</div>
       <div class="disc-empty-sub">Check your connection and tap the refresh button.</div>
     </div>`;
@@ -4055,7 +4139,7 @@ function _discApplyFilters () {
   const resultsEl = document.getElementById('nearby-results');
   if (!results.length) {
     resultsEl.innerHTML = `<div class="disc-empty">
-      <div class="disc-empty-icon"></div>
+      <div class="disc-empty-icon" aria-hidden="true">🐻</div>
       <div class="disc-empty-title">No matches</div>
       <div class="disc-empty-sub">Try a different filter or search term.</div>
     </div>`;
@@ -4205,7 +4289,7 @@ function shareCard (r) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href=url; a.download=file.name; a.click(); URL.revokeObjectURL(url);
     }
-    showToast(' Card Ready!', `"${r.name}" card saved!`, 'success');
+    showToast('Card Ready!', `"${r.name}" card saved!`, 'success');
   }, 'image/png');
 }
 
@@ -4234,7 +4318,7 @@ function bulkDelete () {
   recordRestaurantDeletion([...state.selectedIds]);
   state.restaurants = state.restaurants.filter(r => !state.selectedIds.has(r.id));
   saveData(); toggleBulkMode(); renderAll();
-  showToast(' Deleted', `${n} restaurant${n>1?'s':''} removed.`, 'info');
+  showToast('Deleted', `${n} restaurant${n>1?'s':''} removed.`, 'info');
 }
 function bulkTag () {
   if (!state.selectedIds.size) return;
@@ -4246,7 +4330,7 @@ function bulkTag () {
     if (idx !== -1) { if (!state.restaurants[idx].tags) state.restaurants[idx].tags = []; if (!state.restaurants[idx].tags.includes(t)) state.restaurants[idx].tags.push(t); }
   });
   saveData(); toggleBulkMode(); renderAll();
-  showToast(' Tagged!', `"${t}" added to ${state.selectedIds.size} restaurants.`, 'success');
+  showToast('Tagged!', `"${t}" added to ${state.selectedIds.size} restaurants.`, 'success');
 }
 function bulkExport () {
   const sel = state.restaurants.filter(r => state.selectedIds.has(r.id));
@@ -4254,7 +4338,7 @@ function bulkExport () {
   const blob = new Blob([JSON.stringify(sel, null, 2)], {type:'application/json'});
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a'); a.href=url; a.download=`ftb-export-${iso()}.json`; a.click(); URL.revokeObjectURL(url);
-  showToast(' Exported!', `${sel.length} restaurants saved.`, 'success');
+  showToast('Exported!', `${sel.length} restaurants saved.`, 'success');
 }
 function bulkMoveToCollection () {
   if (!state.selectedIds.size) return;
@@ -4267,7 +4351,7 @@ function bulkMoveToCollection () {
   const col = num===0 ? null : cols[num-1];
   state.selectedIds.forEach(id => { const idx = state.restaurants.findIndex(r=>r.id===id); if (idx!==-1) state.restaurants[idx].collectionId = col?.id||null; });
   saveData(); toggleBulkMode(); renderAll();
-  showToast(' Moved!', col ? `Added to "${col.name}".` : 'Removed from all lists.', 'success');
+  showToast('Moved!', col ? `Added to "${col.name}".` : 'Removed from all lists.', 'success');
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -4583,7 +4667,7 @@ function initCollections () {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
     document.getElementById('new-collection-name').value = '';
     renderCollectionsList(); renderCollectionFilter();
-    showToast(' List Created!', `"${name}" ready.`, 'success');
+    showToast('List Created!', `"${name}" ready.`, 'success');
   });
 
   window.addEventListener('storage', e => {
@@ -6263,7 +6347,7 @@ function setupEvents () {
     const visitedCuisines = new Set(state.restaurants.map(r => r.cuisine?.toLowerCase()).filter(Boolean));
     const filled = card.filter(c => !c.free && visitedCuisines.has(c.n.toLowerCase())).length;
     const total = card.filter(c => !c.free).length;
-    const txt = ` My Cuisine Bingo: ${filled}/${total} cuisines explored! #FeedTheBear`;
+    const txt = `🎯 My Cuisine Bingo: ${filled}/${total} cuisines explored! #FeedTheBear`;
     if (navigator.share) { navigator.share({ title: 'Cuisine Bingo', text: txt }); }
     else { navigator.clipboard?.writeText(txt); showToast('Copied!', 'Bingo result copied.', 'success'); }
   });
@@ -6351,7 +6435,7 @@ function setupEvents () {
   document.getElementById('worldmap-overlay').addEventListener('click', e => { if (e.target === document.getElementById('worldmap-overlay')) safeFn('closeWorldMap')(); });
   document.getElementById('worldmap-share-btn').addEventListener('click', () => {
     const { countries, cuisineVisits } = safeFn('_getVisitedCountries', () => ({ countries: new Set(), cuisineVisits: {} }))();
-    const txt = ` I've tasted ${countries.size} countries & ${Object.keys(cuisineVisits).length} cuisines! #FeedTheBear`;
+    const txt = `🌍 I've tasted ${countries.size} countries & ${Object.keys(cuisineVisits).length} cuisines! #FeedTheBear`;
     if (navigator.share) navigator.share({ title: 'My Food World Map', text: txt });
     else { navigator.clipboard?.writeText(txt); showToast('Copied!', 'Map summary copied.', 'success'); }
   });
@@ -7176,14 +7260,14 @@ function checkConfettiMilestones (prev, next) {
   const hit = milestones.find(m => prevTotal < m && nextTotal >= m);
   if (hit) {
     launchConfetti(3000);
-    showToast(' Milestone!', 'You have ' + hit + ' total check-in' + (hit>1?'s':'') + '! Keep exploring!', 'success');
+    showToast('Milestone!', 'You have ' + hit + ' total check-in' + (hit>1?'s':'') + '! Keep exploring!', 'success');
   }
   // streak milestone
   if (next.length > prev.length) {
     const { currentStreak } = calcStreaks();
     if ([3,5,10,20].includes(currentStreak)) {
       launchConfetti(2500);
-      showToast(' Streak ' + currentStreak + '!', currentStreak + '-week streak! You are a foodie legend.', 'success');
+      showToast('Streak ' + currentStreak + '!', currentStreak + '-week streak! You are a foodie legend.', 'success');
     }
   }
 }
@@ -7311,7 +7395,7 @@ function initSwipeGestures () {
 function renderLeaderboard () {
   const el = document.getElementById('chart-leaderboard');
   if (!el) return;
-  const medals = ['','','','4th','5th','6th','7th','8th'];
+  const medals = ['🥇','🥈','🥉','4th','5th','6th','7th','8th'];
   const top = [...state.restaurants]
     .filter(r => r.myRating > 0)
     .sort((a,b) => {
@@ -7434,7 +7518,7 @@ function renderPassport () {
     state.settings.passportUnlocked = [...new Set([...(state.settings.passportUnlocked||[]), ...Array.from(triedSet)])];
     saveData();
     launchConfetti(2000);
-    showToast(' Passport Stamped!', newUnlocks + ' new cuisine' + (newUnlocks>1?'s':'') + ' unlocked!', 'success');
+    showToast('Passport Stamped!', newUnlocks + ' new cuisine' + (newUnlocks>1?'s':'') + ' unlocked!', 'success');
   }
 }
 
@@ -7471,7 +7555,8 @@ function renderWrapContent () {
   const visitedThatMonth = all.filter(r => r.status==='visited' && r.dateVisited?.slice(0,7)===monthKey && !(r.visits||[]).length);
   const totalVisits = allVisits.length + visitedThatMonth.length;
   const addedThatMonth = all.filter(r => (r.dateAdded||'').slice(0,7) === monthKey);
-  const ratedThatMonth = allVisits.filter(v => v.stars > 0);
+  const visitStars = v => Number(v.rating || v.stars || v.r?.myRating || 0);
+  const ratedThatMonth = allVisits.filter(v => visitStars(v) > 0);
 
   // Top cuisine
   const cuisineCounts = {};
@@ -7480,7 +7565,7 @@ function renderWrapContent () {
   const topCuisine = Object.entries(cuisineCounts).sort(([,a],[,b])=>b-a)[0];
 
   // Best rated visit this month
-  const bestVisit = [...allVisits].sort((a,b) => (b.stars||0)-(a.stars||0))[0];
+  const bestVisit = [...allVisits].sort((a,b) => visitStars(b) - visitStars(a))[0];
 
   let headline = '';
   if (totalVisits === 0) headline = 'A quiet ' + monthName + '.';
@@ -7495,10 +7580,10 @@ function renderWrapContent () {
     + '<div class="wrap-stat-grid">'
     + '<div class="wrap-stat"><div class="ws-val">' + totalVisits + '</div><div class="ws-lbl">Meals Out</div></div>'
     + '<div class="wrap-stat"><div class="ws-val">' + addedThatMonth.length + '</div><div class="ws-lbl">Places Added</div></div>'
-    + '<div class="wrap-stat"><div class="ws-val">' + (ratedThatMonth.length > 0 ? (ratedThatMonth.reduce((s,v)=>s+(v.stars||0),0)/ratedThatMonth.length).toFixed(1)+' ★' : '-') + '</div><div class="ws-lbl">Avg Rating</div></div>'
+    + '<div class="wrap-stat"><div class="ws-val">' + (ratedThatMonth.length > 0 ? (ratedThatMonth.reduce((s,v)=>s+visitStars(v),0)/ratedThatMonth.length).toFixed(1)+' ★' : '-') + '</div><div class="ws-lbl">Avg Rating</div></div>'
     + '</div>'
     + (topCuisine ? '<div class="wrap-top"><h4>Top Cuisine</h4><div class="wrap-top-item">' + cuisineEmoji(topCuisine[0]) + ' ' + escHtml(topCuisine[0]) + '<span class="wrap-badge">' + topCuisine[1] + 'x</span></div></div>' : '')
-    + (bestVisit ? '<div class="wrap-top"><h4>Best Visit</h4><div class="wrap-top-item">' + cuisineEmoji(bestVisit.r.cuisine) + ' ' + escHtml(bestVisit.r.name) + ' <span class="wrap-badge">?'.repeat(bestVisit.stars||0) + '</span></div></div>' : '')
+    + (bestVisit ? '<div class="wrap-top"><h4>Best Visit</h4><div class="wrap-top-item">' + cuisineEmoji(bestVisit.r.cuisine) + ' ' + escHtml(bestVisit.r.name) + ' <span class="wrap-badge">' + '★'.repeat(visitStars(bestVisit)) + '</span></div></div>' : '')
     + (totalVisits === 0 ? '<div style="text-align:center;padding:20px;color:var(--text-dim)">No visits logged this month. Time to get out there! </div>' : '');
 
   // Disable next if we're at current month
@@ -7758,7 +7843,7 @@ function parseVoiceInput (text) {
   openAddModal();
   document.getElementById('form-name').value = name;
   if (address) document.getElementById('form-address').value = address;
-  showToast(' Voice Captured!', '"' + name + '"' + (address ? ' at ' + address : '') + ' · review and save.', 'success');
+  showToast('Voice Captured!', '"' + name + '"' + (address ? ' at ' + address : '') + ' · review and save.', 'success');
 }
 
 /* ------------------------------------------------------------
@@ -7851,7 +7936,7 @@ function fireReminder (r) {
       icon: './icon-192.png',
     });
   }
-  showToast(' Reminder!', 'Time for your visit to "' + r.name + '"!', 'success');
+  showToast('Reminder!', 'Time for your visit to "' + r.name + '"!', 'success');
 }
 function setReminder (restaurantId) {
   const r = state.restaurants.find(x => x.id === restaurantId);
@@ -8057,7 +8142,7 @@ function saveBudget () {
   state.settings.avgSpend      = parseFloat(document.getElementById('budget-avg-input').value) || 35;
   saveData();
   closeBudget();
-  showToast(' Budget Saved!', 'Monthly budget set to $' + state.settings.monthlyBudget, 'success');
+  showToast('Budget Saved!', 'Monthly budget set to $' + state.settings.monthlyBudget, 'success');
   if (state.currentView === 'stats') renderBudgetChart();
 }
 function renderBudgetChart () {
@@ -8298,11 +8383,15 @@ function openFoodieProfile () {
   // Generate QR code
   const canvas = document.getElementById('profile-qr');
   canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
-  if (window.QRCode) {
+  // The whole profile rides in the link, so long ones make a QR too dense for
+  // a phone camera; past ~500 characters the link alone is more useful.
+  const qrFits = url.length <= 500;
+  document.getElementById('profile-qr-wrap')?.classList.toggle('hidden', !qrFits || !window.QRCode);
+  if (window.QRCode && qrFits) {
     try {
       // qrcodejs uses a div; we'll render to a temp div then extract img
       const tmp = document.createElement('div');
-      new QRCode(tmp, { text: url, width:180, height:180, colorDark:'#E8B15A', colorLight:'#281F34' });
+      new QRCode(tmp, { text: url, width:180, height:180, colorDark:'#1b130b', colorLight:'#ffffff', correctLevel: QRCode.CorrectLevel.L });
       setTimeout(() => {
         const img = tmp.querySelector('img');
         if (img) {
@@ -8314,7 +8403,7 @@ function openFoodieProfile () {
   }
 
   // Profile preview
-  const medals = ['','',''];
+  const medals = ['🥇','🥈','🥉'];
   document.getElementById('profile-preview').innerHTML = data.picks.map((p,i) =>
     '<div class="profile-preview-item">'
     + '<span class="pp-rank">' + (medals[i]||'') + '</span>'
@@ -8353,7 +8442,7 @@ function checkGuestProfile () {
 function renderGuestProfile (data) {
   const overlay = document.getElementById('guest-profile-overlay');
   const list    = document.getElementById('guest-profile-list');
-  const medals  = ['','',''];
+  const medals  = ['🥇','🥈','🥉'];
   const priceMap = ['','$','$$','$$$','$$$$'];
   const nameEl = document.getElementById('guest-profile-name');
   if (nameEl) nameEl.textContent = data.u ? `${data.u}'s food picks` : 'Foodie Profile';
@@ -8410,7 +8499,7 @@ function handleWebShareTarget () {
       if (/maps\.google|goo\.gl\/maps|maps\.app\.goo\.gl/i.test(sharedUrl)) parseMapsUrl(sharedUrl);
     }
   }
-  showToast(' Shared!', '"' + name + '" opened for review · fill in details and save!', 'success');
+  showToast('Shared!', '"' + name + '" opened for review · fill in details and save!', 'success');
 }
 
 function handleLaunchActions () {
@@ -8586,7 +8675,8 @@ const TOOL_ACTIONS = {
   'gallery':          openGallery,
   'compare':          toggleCompareMode,
   'budget':           openBudget,
-  'dishes':           () => { if (state.detailId) openDishTracker(state.detailId); else showToast('Open a restaurant first', 'View a restaurant then tap Dishes.', 'error'); },
+  // From a restaurant: its dishes. From the menu: every dish you've rated.
+  'dishes':           () => { if (state.detailId && !document.getElementById('detail-overlay')?.classList.contains('hidden')) openDishTracker(state.detailId); else openDishLeaderboard(); },
   'review':           () => (hasGrizzly() ? openYearReview() : showGrizzlyUpsell('review')),
   'profile':          openFoodieProfile,
   'friends':          openFoodieFriends,
@@ -9326,7 +9416,7 @@ function openDishTracker (restaurantId) {
   const r = state.restaurants.find(x => x.id === restaurantId);
   if (!r) return;
   state.detailId = restaurantId;
-  document.getElementById('dish-title').textContent = ' Dish Tracker';
+  document.getElementById('dish-title').textContent = '🍽️ Dish Tracker';
   document.getElementById('dish-restaurant-name').textContent = r.name;
   document.getElementById('dish-name-input').value = '';
   _dishRating = 0;
@@ -9468,7 +9558,7 @@ function shareYearReview () {
     (r.visits||[]).forEach(v => { if ((v.date||'').startsWith(yr)) yearVisits.push(r); });
     if (r.dateVisited?.startsWith(yr) && !(r.visits||[]).length) yearVisits.push(r);
   });
-  const text = ` My ${yr} Foodie Year: ${yearVisits.length} meals out, ${new Set(yearVisits.map(r=>r.id)).size} restaurants. Track yours at Feed The Bear!`;
+  const text = `📅 My ${yr} Foodie Year: ${yearVisits.length} meals out, ${new Set(yearVisits.map(r=>r.id)).size} restaurants. Track yours at Feed The Bear!`;
   if (navigator.share) navigator.share({ title: 'My Foodie Year ' + yr, text }).catch(()=>{});
   else { navigator.clipboard?.writeText(text); showToast('Copied!', 'Year in Review summary copied.', 'success'); }
 }
@@ -10439,7 +10529,7 @@ function openDishLeaderboard () {
     list.innerHTML = '<div class="dish-empty">No dish data yet. Start adding dish notes and ratings first.</div>';
   } else {
     list.innerHTML = top.map((d, i) => {
-      const badge = i < 3 ? ['', '', ''][i] : `#${i + 1}`;
+      const badge = i < 3 ? ['🥇', '🥈', '🥉'][i] : `#${i + 1}`;
       return `<button class="dish-board-row" type="button" data-id="${d.topRestaurantId}">
         <div class="dish-board-rank">${badge}</div>
         <div class="dish-board-main">
@@ -10674,7 +10764,7 @@ function renderDailyQuestHome () {
         title="${escHtml(def.title)} - ${escHtml(def.desc)}"
         style="--quest-arc:${meterDeg}deg;"
       >
-        <span class="daily-quest-pulse-core">DQ</span>
+        <span class="daily-quest-pulse-core">🎯</span>
       </button>
       <div class="daily-quest-compact-meta">
         <div class="daily-quest-compact-title">Daily Quest ${done && !claimed ? 'Ready' : ''}</div>
@@ -12400,7 +12490,7 @@ function createChallenge () {
   document.getElementById('chal-name-input').value = '';
   document.getElementById('chal-goal-input').value = '';
   document.getElementById('chal-deadline-input').value = '';
-  showToast(' Challenge created!', name, 'success');
+  showToast('Challenge created!', name, 'success');
   switchChalTab('active');
   renderChallengesList();
 }
@@ -12438,7 +12528,7 @@ function loadFriendChallenge () {
     const challenges = getChallenges();
     challenges.push({ id: uid(), name: ch.n + ' (from friend)', type: ch.t||'visit_count', goal: ch.g, deadline: ch.d||'', createdAt: iso() });
     saveChallenges(challenges);
-    showToast(' Challenge joined!', ch.n, 'success');
+    showToast('Challenge joined!', ch.n, 'success');
     switchChalTab('active');
     renderChallengesList();
   } catch(_) {
@@ -13247,7 +13337,7 @@ async function requestPushPermission () {
   }
   const perm = await Notification.requestPermission();
   if (perm === 'granted') {
-    showToast(' Notifications on!', 'You\'ll get nudges when you haven\'t visited anywhere in a while.', 'success');
+    showToast('Notifications on!', 'You\'ll get nudges when you haven\'t visited anywhere in a while.', 'success');
     localStorage.setItem('ftb_push_enabled', '1');
     schedulePushNudge();
   } else {
@@ -13303,18 +13393,18 @@ const LEVELS = [
 ];
 
 const BADGE_DEFS = [
-  { id: 'first_visit',      icon: '',  name: 'First Bite',       desc: 'Log your first visited restaurant',  xp: 20,  check: r => r.filter(x=>x.status==='visited').length >= 1 },
+  { id: 'first_visit',      icon: '🍴',  name: 'First Bite',       desc: 'Log your first visited restaurant',  xp: 20,  check: r => r.filter(x=>x.status==='visited').length >= 1 },
   { id: 'visits_5',         icon: '⭐',  name: 'Regular',           desc: '5 restaurants visited',              xp: 30,  check: r => r.filter(x=>x.status==='visited').length >= 5 },
   { id: 'visits_10',        icon: '⭐⭐',  name: 'Foodie',            desc: '10 restaurants visited',             xp: 50,  check: r => r.filter(x=>x.status==='visited').length >= 10 },
-  { id: 'visits_25',        icon: '',  name: 'Veteran',           desc: '25 restaurants visited',             xp: 100, check: r => r.filter(x=>x.status==='visited').length >= 25 },
-  { id: 'visits_50',        icon: '',  name: 'Legend',            desc: '50 restaurants visited',             xp: 200, check: r => r.filter(x=>x.status==='visited').length >= 50 },
-  { id: 'cuisines_5',       icon: '',  name: 'Globe Trotter',     desc: '5 different cuisines explored',      xp: 40,  check: r => new Set(r.filter(x=>x.status==='visited').map(x=>(x.cuisine||'').toLowerCase()).filter(Boolean)).size >= 5 },
-  { id: 'cuisines_10',      icon: '', name: 'Culinary Tourist',  desc: '10 different cuisines explored',     xp: 80,  check: r => new Set(r.filter(x=>x.status==='visited').map(x=>(x.cuisine||'').toLowerCase()).filter(Boolean)).size >= 10 },
-  { id: 'wishlist_10',      icon: '',  name: 'Dream List',        desc: '10 places on your wishlist',         xp: 25,  check: r => r.filter(x=>x.status==='want-to-try').length >= 10 },
+  { id: 'visits_25',        icon: '🏅',  name: 'Veteran',           desc: '25 restaurants visited',             xp: 100, check: r => r.filter(x=>x.status==='visited').length >= 25 },
+  { id: 'visits_50',        icon: '👑',  name: 'Legend',            desc: '50 restaurants visited',             xp: 200, check: r => r.filter(x=>x.status==='visited').length >= 50 },
+  { id: 'cuisines_5',       icon: '🌍',  name: 'Globe Trotter',     desc: '5 different cuisines explored',      xp: 40,  check: r => new Set(r.filter(x=>x.status==='visited').map(x=>(x.cuisine||'').toLowerCase()).filter(Boolean)).size >= 5 },
+  { id: 'cuisines_10',      icon: '✈️', name: 'Culinary Tourist',  desc: '10 different cuisines explored',     xp: 80,  check: r => new Set(r.filter(x=>x.status==='visited').map(x=>(x.cuisine||'').toLowerCase()).filter(Boolean)).size >= 10 },
+  { id: 'wishlist_10',      icon: '📝',  name: 'Dream List',        desc: '10 places on your wishlist',         xp: 25,  check: r => r.filter(x=>x.status==='want-to-try').length >= 10 },
   { id: 'first_5star',      icon: '⭐',  name: 'Perfection',        desc: 'Give a restaurant 5 stars',          xp: 30,  check: r => r.some(x=>x.myRating >= 5) },
-  { id: 'photo_added',      icon: '',  name: 'Shutterbug',        desc: 'Add a photo to a restaurant',        xp: 15,  check: r => r.some(x=>x.photo) },
-  { id: 'has_notes',        icon: '',  name: 'Critic',            desc: 'Write notes on 5 restaurants',       xp: 20,  check: r => r.filter(x=>x.notes&&x.notes.length>10).length >= 5 },
-  { id: 'cheap_gem',        icon: '',  name: 'Bargain Hunter',    desc: 'Rate a $ restaurant 4+ stars',       xp: 25,  check: r => r.some(x=>x.priceRange===1&&x.myRating>=4) },
+  { id: 'photo_added',      icon: '📸',  name: 'Shutterbug',        desc: 'Add a photo to a restaurant',        xp: 15,  check: r => r.some(x=>x.photo) },
+  { id: 'has_notes',        icon: '✍️',  name: 'Critic',            desc: 'Write notes on 5 restaurants',       xp: 20,  check: r => r.filter(x=>x.notes&&x.notes.length>10).length >= 5 },
+  { id: 'cheap_gem',        icon: '💰',  name: 'Bargain Hunter',    desc: 'Rate a $ restaurant 4+ stars',       xp: 25,  check: r => r.some(x=>x.priceRange===1&&x.myRating>=4) },
 ];
 
 function getXpData () {
@@ -13337,25 +13427,23 @@ function getNextLevel (xp) {
   return LEVELS[1];
 }
 
-function awardXp (amount, reason) {
+// Returns the new level's name when this award levels you up.
+function awardXp (amount, reason, { quiet = false } = {}) {
   const data = getXpData();
   const before = getLevelForXp(data.xp);
   data.xp += amount;
   const after = getLevelForXp(data.xp);
   saveXpData(data);
+  const leveled = before.name !== after.name ? after.name : '';
+  if (quiet) return leveled;
 
-  // XP toast
   const toast = document.createElement('div');
   toast.className = 'ach-xp-toast';
   toast.textContent = '+' + amount + ' XP · ' + reason;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 2400);
-
-  // Level up
-  if (before.name !== after.name) {
-    showCelebrationMoment('Level Up', `Now: ${after.name}`, { durationMs: 2300, glow: true, confetti: true, confettiMs: 2400, haptic: 'medium' });
-    setTimeout(() => showToast('⭐ Level Up!', 'You are now: ' + after.name, 'success'), 400);
-  }
+  if (leveled) showCelebrationMoment('Level Up!', `You are now: ${leveled}`, { durationMs: 2300, glow: true, confetti: true, confettiMs: 2400, haptic: 'medium' });
+  return leveled;
 }
 
 function checkAchievements () {
@@ -13372,13 +13460,15 @@ function checkAchievements () {
 
   if (newUnlocks.length) {
     saveXpData(data);
-    newUnlocks.forEach((def, i) => {
-      setTimeout(() => {
-        showCelebrationMoment('Badge Unlocked', def.name, { durationMs: 1800, glow: true, confetti: true, confettiMs: 1800, haptic: 'light' });
-        showToast(' Badge Unlocked!', def.icon + ' ' + def.name, 'success');
-        awardXp(def.xp, def.name);
-      }, i * 600);
-    });
+    // One celebration for the whole batch: several badges can unlock at once
+    // (say, after an update adds new ones), and a stack of popups is noise.
+    let leveled = '';
+    newUnlocks.forEach(def => { leveled = awardXp(def.xp, def.name, { quiet: true }) || leveled; });
+    const names = newUnlocks.map(d => d.name);
+    const title = newUnlocks.length === 1 ? 'Badge unlocked!' : `${newUnlocks.length} badges unlocked!`;
+    const body = (names.length > 3 ? names.slice(0, 3).join(', ') + ` +${names.length - 3} more` : names.join(', '))
+      + (leveled ? ` · You are now: ${leveled}` : '');
+    showCelebrationMoment(title, body, { durationMs: 2600, glow: true, confetti: true, confettiMs: 2200, haptic: 'light' });
   }
 }
 
@@ -13659,7 +13749,7 @@ function spinWheel () {
       const resultEl = document.getElementById('spin-result');
       resultEl.innerHTML = `${cuisineEmoji(winner.cuisine)} <strong>${escHtml(winner.name)}</strong> wins the spin!`;
       resultEl.classList.remove('hidden');
-      showToast(' The wheel chose!', winner.name, 'success');
+      showToast('The wheel chose!', winner.name, 'success');
       awardXp(5, 'Spun the wheel');
     }
   }
@@ -13792,7 +13882,7 @@ function shareDigest () {
     const d = r.dateVisited || r.dateAdded || '';
     return r.status === 'visited' && d.startsWith(_digestYear + '-' + String(_digestMonth + 1).padStart(2,'0'));
   }).length;
-  const text = ` Feed The Bear · ${_MONTH_NAMES[_digestMonth]} ${_digestYear} Digest\n` +
+  const text = `🐻 Feed The Bear · ${_MONTH_NAMES[_digestMonth]} ${_digestYear} Digest\n` +
                `Visited: ${visitedCount} restaurant${visitedCount !== 1 ? 's' : ''}\n` +
                `Track yours at https://cmc-creator.github.io/Feed-The-Bear/`;
   if (navigator.share) {
@@ -13982,7 +14072,7 @@ function shareTasteDna () {
   ctx.fillText('', W - 240, H - 10); ctx.globalAlpha = 1;
 
   ctx.fillStyle = '#FFF'; ctx.font = 'bold 38px system-ui,sans-serif';
-  ctx.fillText(' My Taste DNA', 50, 75);
+  ctx.fillText('🧬 My Taste DNA', 50, 75);
   ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.font = '16px system-ui,sans-serif';
   ctx.fillText('Based on ' + total + ' restaurant' + (total !== 1 ? 's' : '') + ' visited', 50, 104);
 
@@ -14010,7 +14100,7 @@ function shareTasteDna () {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = file.name; a.click(); URL.revokeObjectURL(url);
     }
-    showToast(' Taste DNA!', 'Your flavor profile card is ready!', 'success');
+    showToast('Taste DNA!', 'Your flavor profile card is ready!', 'success');
   }, 'image/png');
 }
 
@@ -14065,7 +14155,7 @@ function setWeeklyGoal () {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
   renderWeeklyGoal();
   if (n > 0) {
-    showToast(' Weekly Goal Set!', n + ' meal' + (n !== 1 ? 's' : '') + ' per week. Let\'s eat!', 'success');
+    showToast('Weekly Goal Set!', n + ' meal' + (n !== 1 ? 's' : '') + ' per week. Let\'s eat!', 'success');
   } else {
     showToast('Goal Cleared', 'Weekly goal widget hidden.', 'info');
   }
@@ -14105,7 +14195,7 @@ function openCheckinWithPhoto (id) {
         saveData();
         renderAll();
         openDetailModal(id);
-        showToast(' Photo Added!', 'Visit photo saved to gallery.', 'success');
+        showToast('Photo Added!', 'Visit photo saved to gallery.', 'success');
       }).catch(() => showToast('Photo Error', 'Could not load that image.', 'error'));
     };
     input.click();
@@ -14269,7 +14359,7 @@ async function runDuel () {
     resultEl.classList.add('duel-animate');
     document.getElementById('duel-share-row').classList.remove('hidden');
     document.getElementById('duel-share-btn').onclick = () => {
-      const txt = ` Restaurant Duel: ${rA.name} vs ${rB.name}\n\n${text}`;
+      const txt = `⚔️ Restaurant Duel: ${rA.name} vs ${rB.name}\n\n${text}`;
       if (navigator.share) { navigator.share({ title: 'Restaurant Duel', text: txt }); }
       else { navigator.clipboard?.writeText(txt); showToast('Copied!', 'Fight card copied to clipboard.', 'success'); }
     };
@@ -14283,14 +14373,14 @@ async function runDuel () {
    PHASE 12 - Feature:  CUISINE BINGO
    ═══════════════════════════════════════════════════════════ */
 const _BINGO_POOL = [
-  {e:'',n:'Italian'},{e:'',n:'Mexican'},{e:'',n:'Japanese'},{e:'',n:'Indian'},
-  {e:'',n:'Chinese'},{e:'',n:'French'},{e:'',n:'Mediterranean'},{e:'',n:'American'},
-  {e:'',n:'Middle Eastern'},{e:'',n:'Thai'},{e:'',n:'Steakhouse'},{e:'',n:'Seafood'},
-  {e:'',n:'Vietnamese'},{e:'',n:'Salad/Healthy'},{e:'',n:'Pub/Bar'},{e:'',n:'Breakfast'},
-  {e:'',n:'Korean'},{e:'',n:'Ethiopian'},{e:'',n:'German'},{e:'',n:'Peruvian'},
-  {e:'',n:'Brunch'},{e:'',n:'Dim Sum'},{e:'',n:'BBQ'},{e:'',n:'Vegan'},
-  {e:'',n:'Spanish'},{e:'',n:'Pasta'},{e:'',n:'Fast Food'},{e:'',n:'Soul Food'},
-  {e:'',n:'Hawaiian'},{e:'',n:'Bakery/Cafe'}
+  {e:'🍝',n:'Italian'},{e:'🌮',n:'Mexican'},{e:'🍱',n:'Japanese'},{e:'🍛',n:'Indian'},
+  {e:'🥡',n:'Chinese'},{e:'🥐',n:'French'},{e:'🫒',n:'Mediterranean'},{e:'🍔',n:'American'},
+  {e:'🧆',n:'Middle Eastern'},{e:'🍜',n:'Thai'},{e:'🥩',n:'Steakhouse'},{e:'🦞',n:'Seafood'},
+  {e:'🍜',n:'Vietnamese'},{e:'🥗',n:'Salad/Healthy'},{e:'🍺',n:'Pub/Bar'},{e:'🥞',n:'Breakfast'},
+  {e:'🍲',n:'Korean'},{e:'🍲',n:'Ethiopian'},{e:'🥨',n:'German'},{e:'🐟',n:'Peruvian'},
+  {e:'🥂',n:'Brunch'},{e:'🥟',n:'Dim Sum'},{e:'🍖',n:'BBQ'},{e:'🌱',n:'Vegan'},
+  {e:'🥘',n:'Spanish'},{e:'🍝',n:'Pasta'},{e:'🍟',n:'Fast Food'},{e:'🍗',n:'Soul Food'},
+  {e:'🍍',n:'Hawaiian'},{e:'🥐',n:'Bakery/Cafe'}
 ];
 function _getBingoCard () {
   if (!state.settings.bingoCard) { _newBingoCard(); }
@@ -14300,7 +14390,7 @@ function _newBingoCard () {
   const userCuisines = [...new Set(state.restaurants.map(r => r.cuisine).filter(Boolean))];
   const poolNames = _BINGO_POOL.map(b => b.n);
   const extras = userCuisines.filter(c => !poolNames.includes(c)).slice(0, 5);
-  const extraCells = extras.map(n => ({ e: '', n }));
+  const extraCells = extras.map(n => ({ e: cuisineEmoji(n), n }));
   const fullPool = [..._BINGO_POOL, ...extraCells];
   const shuffled = fullPool.sort(() => Math.random() - .5).slice(0, 24);
   const card = [...shuffled.slice(0, 12), { e: '⭐', n: 'FREE', free: true }, ...shuffled.slice(12)];
@@ -14326,7 +14416,7 @@ function _renderBingoGrid () {
     const filled = cell.free || visitedCuisines.has(cell.n.toLowerCase());
     if (filled) filledIndices.add(i);
     return `<div class="bingo-cell${filled ? ' filled' : ''}${cell.free ? ' free' : ''}" data-idx="${i}">
-      <span class="bingo-cell-emoji">${cell.e}</span>
+      <span class="bingo-cell-emoji">${cell.e || cuisineEmoji(cell.n)}</span>
       <span>${escHtml(cell.n)}</span>
     </div>`;
   }).join('');
@@ -14388,7 +14478,7 @@ function _resetFortuneCookie () {
   const hint = document.getElementById('fortune-tap-hint');
   const result = document.getElementById('fortune-result');
   cookie.classList.remove('cracking');
-  cookie.textContent = '';
+  cookie.textContent = '🥠';
   hint.classList.remove('hidden');
   result.classList.add('hidden');
   _fortuneLoading = false;
@@ -14420,7 +14510,7 @@ async function crackFortuneCookie () {
     }
     textEl.textContent = fortune;
     document.getElementById('fortune-share-btn').onclick = () => {
-      const txt = ' My food fortune: ' + fortune;
+      const txt = '🥠 My food fortune: ' + fortune;
       if (navigator.share) { navigator.share({ title: 'Food Fortune', text: txt }); }
       else { navigator.clipboard?.writeText(txt); showToast('Copied!', 'Fortune copied.', 'success'); }
     };
@@ -14455,15 +14545,21 @@ function _renderMoodCal () {
   const daysInMonth = new Date(y, m + 1, 0).getDate();
   const today = new Date();
   const visitMap = {};
+  const ratingOn = {};
   state.restaurants.forEach(r => {
-    const dateStr = r.visitedAt || r.updatedAt || r.createdAt || null;
-    if (!dateStr) return;
-    const d = new Date(dateStr);
-    if (d.getFullYear() === y && d.getMonth() === m) {
+    const dates = (r.visits || []).length
+      ? r.visits.map(v => ({ date: v.date, rating: v.rating || r.myRating || 0 }))
+      : (r.dateVisited ? [{ date: r.dateVisited, rating: r.myRating || 0 }] : []);
+    dates.forEach(({ date, rating }) => {
+      if (!date) return;
+      // "2026-10-21" is a calendar day, not UTC midnight.
+      const d = /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(date + 'T12:00:00') : new Date(date);
+      if (d.getFullYear() !== y || d.getMonth() !== m) return;
       const day = d.getDate();
-      if (!visitMap[day]) visitMap[day] = [];
-      visitMap[day].push(r);
-    }
+      if (!visitMap[day]) { visitMap[day] = []; ratingOn[day] = []; }
+      if (!visitMap[day].includes(r)) visitMap[day].push(r);
+      ratingOn[day].push(Number(rating) || 0);
+    });
   });
   const dows = ['Su','Mo','Tu','We','Th','Fr','Sa'];
   let html = dows.map(d => `<div class="moodcal-dow">${d}</div>`).join('');
@@ -14473,7 +14569,8 @@ function _renderMoodCal () {
     const isToday = today.getFullYear() === y && today.getMonth() === m && today.getDate() === day;
     let dotHtml = '';
     if (visits.length) {
-      const avgRating = visits.reduce((s, r) => s + (r.myRating || 0), 0) / visits.length;
+      const rs = ratingOn[day] || [];
+      const avgRating = rs.length ? rs.reduce((s, n) => s + n, 0) / rs.length : 0;
       const dotColor = avgRating >= 4 ? 'var(--green)' : avgRating >= 3 ? '#f5a623' : avgRating > 0 ? 'var(--primary)' : 'var(--surface3)';
       dotHtml = `<div class="moodcal-dot-inner" style="background:${dotColor}"></div>`;
     }
@@ -14490,26 +14587,26 @@ function _renderMoodCal () {
    PHASE 12 - Feature:  DAILY FOODIE CHALLENGE
    ═══════════════════════════════════════════════════════════ */
 const _DC_CHALLENGES = [
-  { e: '', t: 'New territory', d: 'Visit a cuisine type you have never rated before.' },
-  { e: '', t: 'Snap & rate', d: 'Add a photo to one of your saved restaurants today.' },
+  { e: '🧭', t: 'New territory', d: 'Visit a cuisine type you have never rated before.' },
+  { e: '📸', t: 'Snap & rate', d: 'Add a photo to one of your saved restaurants today.' },
   { e: '⭐', t: 'Rate something', d: 'Rate a restaurant you visited but never scored.' },
-  { e: '', t: 'Leave a note', d: 'Add personal tasting notes to a restaurant with none.' },
-  { e: '', t: 'Hidden gem', d: 'Find and add a restaurant with under 100 Google reviews.' },
-  { e: '', t: 'Spice it up', d: 'Try or add a restaurant serving spicy cuisine.' },
-  { e: '', t: 'Budget bite', d: 'Visit a $ price-range restaurant you have never tried.' },
-  { e: '', t: 'Special occasion', d: 'Book a fine dining ($$$+) spot for an upcoming occasion.' },
-  { e: '', t: 'Top the list', d: 'Rate a restaurant 5 stars and add a note on why.' },
-  { e: '', t: 'Return visit', d: 'Revisit a restaurant you rated 4+ stars over 3 months ago.' },
-  { e: '', t: 'World tour', d: 'Add a restaurant of a cuisine from a continent you have not tracked yet.' },
-  { e: '', t: 'Squad goals', d: 'Plan a group outing to one of your want-to-try spots.' },
-  { e: '', t: 'Foodie detective', d: 'Find a restaurant in your city that opened in the last 6 months.' },
-  { e: '', t: 'Green & lean', d: 'Try a plant-based or vegan restaurant today.' },
-  { e: '', t: 'Breakfast club', d: 'Track a breakfast or brunch spot you love.' },
-  { e: '', t: 'Spin the wheel', d: 'Use Spin the Wheel to pick a restaurant and actually go.' },
-  { e: '', t: 'Story time', d: 'Add a funny memory or story to a restaurant\'s notes.' },
-  { e: '', t: 'Monthly review', d: 'Open Monthly Digest and reflect on last month\'s visits.' },
-  { e: '', t: 'Share the love', d: 'Export your Food Passport and share it with a friend.' },
-  { e: '', t: 'Bucket list', d: 'Add 3 restaurants to your want-to-try list right now.' },
+  { e: '✍️', t: 'Leave a note', d: 'Add personal tasting notes to a restaurant with none.' },
+  { e: '💎', t: 'Hidden gem', d: 'Find and add a restaurant with under 100 Google reviews.' },
+  { e: '🌶️', t: 'Spice it up', d: 'Try or add a restaurant serving spicy cuisine.' },
+  { e: '💰', t: 'Budget bite', d: 'Visit a $ price-range restaurant you have never tried.' },
+  { e: '🥂', t: 'Special occasion', d: 'Book a fine dining ($$$+) spot for an upcoming occasion.' },
+  { e: '🏆', t: 'Top the list', d: 'Rate a restaurant 5 stars and add a note on why.' },
+  { e: '🔁', t: 'Return visit', d: 'Revisit a restaurant you rated 4+ stars over 3 months ago.' },
+  { e: '🌍', t: 'World tour', d: 'Add a restaurant of a cuisine from a continent you have not tracked yet.' },
+  { e: '👯', t: 'Squad goals', d: 'Plan a group outing to one of your want-to-try spots.' },
+  { e: '🔎', t: 'Foodie detective', d: 'Find a restaurant in your city that opened in the last 6 months.' },
+  { e: '🥗', t: 'Green & lean', d: 'Try a plant-based or vegan restaurant today.' },
+  { e: '🥞', t: 'Breakfast club', d: 'Track a breakfast or brunch spot you love.' },
+  { e: '🎡', t: 'Spin the wheel', d: 'Use Spin the Wheel to pick a restaurant and actually go.' },
+  { e: '📖', t: 'Story time', d: 'Add a funny memory or story to a restaurant\'s notes.' },
+  { e: '📅', t: 'Monthly review', d: 'Open Monthly Digest and reflect on last month\'s visits.' },
+  { e: '💌', t: 'Share the love', d: 'Export your Food Passport and share it with a friend.' },
+  { e: '🪣', t: 'Bucket list', d: 'Add 3 restaurants to your want-to-try list right now.' },
 ];
 function _getDCState () {
   return state.settings.dailyChallenge || { date: '', text: '', emoji: '', completed: false, streak: 0, xp: 0, history: [] };
@@ -14580,7 +14677,7 @@ function completeDailyChallenge () {
   dc.history.push({ date: today, done: true, text: dc.text });
   state.settings.dailyChallenge = dc;
   persistSettingsLocal();
-  showToast(' Challenge complete!', `+25 XP · ${dc.streak} day streak!`, 'success');
+  showToast('Challenge complete!', `+25 XP · ${dc.streak} day streak!`, 'success');
   _renderDailyChallenge();
 }
 function skipDailyChallenge () {
@@ -14812,11 +14909,10 @@ function _renderBeenaWhile () {
     listEl.innerHTML = '<div class="beenawhile-empty"> You\'re on top of it! All your faves have been visited recently.</div>';
     return;
   }
-  const cuisineEmoji = { Italian:'', Mexican:'', Japanese:'', Indian:'', Chinese:'', French:'', American:'', Thai:'', Mediterranean:'' };
   listEl.innerHTML = candidates.map(({ r, ms }) => {
     const days = Math.floor(ms / (24 * 60 * 60 * 1000));
     const ago = days > 365 ? `${Math.floor(days/365)}y ago` : `${days}d ago`;
-    const emoji = (r.cuisine && cuisineEmoji[r.cuisine]) || '';
+    const emoji = cuisineEmoji(r.cuisine);
     const stars = '⭐'.repeat(Math.round(r.myRating || 0));
     return `<div class="beenawhile-item" data-id="${r.id}">
       <div class="beenawhile-emoji">${emoji}</div>
@@ -15097,16 +15193,16 @@ function _buildWorldMapSVG (visitedCountries) {
    PHASE 13 - Feature:  FOODIE PASSPORT
    ═══════════════════════════════════════════════════════════ */
 const _PASSPORT_CUISINES = [
-  {e:'',n:'Italian'},{e:'',n:'Mexican'},{e:'',n:'Japanese'},{e:'',n:'Indian'},
-  {e:'',n:'Chinese'},{e:'',n:'French'},{e:'',n:'Mediterranean'},{e:'',n:'American'},
-  {e:'',n:'Middle Eastern'},{e:'',n:'Thai'},{e:'',n:'Korean'},{e:'',n:'Vietnamese'},
-  {e:'',n:'Steakhouse'},{e:'',n:'Seafood'},{e:'',n:'Pub/Bar'},{e:'',n:'Breakfast'},
-  {e:'',n:'Ethiopian'},{e:'',n:'German'},{e:'',n:'Spanish'},{e:'',n:'Peruvian'},
-  {e:'',n:'Brunch'},{e:'',n:'Dim Sum'},{e:'',n:'BBQ'},{e:'',n:'Vegan'},
-  {e:'',n:'Pasta'},{e:'',n:'Fast Food'},{e:'',n:'Hawaiian'},{e:'',n:'Bakery/Cafe'},
-  {e:'',n:'Salad/Healthy'},{e:'',n:'Soul Food'},{e:'',n:'Brazilian'},{e:'',n:'Greek'},
-  {e:'',n:'Turkish'},{e:'',n:'Moroccan'},{e:'',n:'Lebanese'},{e:'',n:'Sri Lankan'},
-  {e:'',n:'Singaporean'},{e:'',n:'Malaysian'},{e:'',n:'Filipino'},{e:'',n:'Nepalese'},
+  {e:'🍝',n:'Italian'},{e:'🌮',n:'Mexican'},{e:'🍱',n:'Japanese'},{e:'🍛',n:'Indian'},
+  {e:'🥡',n:'Chinese'},{e:'🥐',n:'French'},{e:'🫒',n:'Mediterranean'},{e:'🍔',n:'American'},
+  {e:'🧆',n:'Middle Eastern'},{e:'🍜',n:'Thai'},{e:'🍲',n:'Korean'},{e:'🍜',n:'Vietnamese'},
+  {e:'🥩',n:'Steakhouse'},{e:'🦞',n:'Seafood'},{e:'🍺',n:'Pub/Bar'},{e:'🥞',n:'Breakfast'},
+  {e:'🍲',n:'Ethiopian'},{e:'🥨',n:'German'},{e:'🥘',n:'Spanish'},{e:'🐟',n:'Peruvian'},
+  {e:'🥂',n:'Brunch'},{e:'🥟',n:'Dim Sum'},{e:'🍖',n:'BBQ'},{e:'🌱',n:'Vegan'},
+  {e:'🍝',n:'Pasta'},{e:'🍟',n:'Fast Food'},{e:'🍍',n:'Hawaiian'},{e:'🥐',n:'Bakery/Cafe'},
+  {e:'🥗',n:'Salad/Healthy'},{e:'🍗',n:'Soul Food'},{e:'🍖',n:'Brazilian'},{e:'🥙',n:'Greek'},
+  {e:'🥙',n:'Turkish'},{e:'🍲',n:'Moroccan'},{e:'🧆',n:'Lebanese'},{e:'🍛',n:'Sri Lankan'},
+  {e:'🍜',n:'Singaporean'},{e:'🍜',n:'Malaysian'},{e:'🍢',n:'Filipino'},{e:'🥟',n:'Nepalese'},
 ];
 function openPassport () {
   document.getElementById('passport-overlay').classList.remove('hidden');
@@ -15139,7 +15235,7 @@ function _renderPassport () {
     // Add user cuisines not in the list
     ...Object.keys(visitedCuisines)
       .filter(c => !_PASSPORT_CUISINES.find(p => p.n === c))
-      .map(c => ({ e: '', n: c }))
+      .map(c => ({ e: cuisineEmoji(c), n: c }))
   ];
   document.getElementById('passport-stamps').innerHTML = allStamps.map(p => {
     const count = visitedCuisines[p.n] || 0;
@@ -15152,7 +15248,7 @@ function _renderPassport () {
   }).join('');
 
   document.getElementById('passport-share-btn').onclick = () => {
-    const txt = ` My Foodie Passport: ${earnedCount} cuisine stamps, ${totalCuisines} cuisines explored, ${state.restaurants.length} restaurants. #FeedTheBear`;
+    const txt = `🛂 My Foodie Passport: ${earnedCount} cuisine stamps, ${totalCuisines} cuisines explored, ${state.restaurants.length} restaurants. #FeedTheBear`;
     if (navigator.share) navigator.share({ title: 'My Foodie Passport', text: txt });
     else { navigator.clipboard?.writeText(txt); showToast('Copied!', 'Passport summary copied.', 'success'); }
   };
@@ -15177,12 +15273,12 @@ const _FTB = {
 };
 
 const _FTB_GOOD = [
-  '','','','','','','','','',
-  '','','','','','','','','',
-  '','','','','','','',
+  '🍔','🍕','🌮','🍟','🌭','🍗','🥩','🍣','🍜',
+  '🍝','🥪','🌯','🥗','🍩','🍪','🧁','🍰','🥞',
+  '🍦','🥨','🥟','🍤','🍓','🍎','🧀',
 ];
-const _FTB_BONUS  = ['⭐','',''];  // +50 pts each
-const _FTB_BAD    = ['','',''];  // dodge! -1 life if caught
+const _FTB_BONUS  = ['⭐','🍯','🐟'];  // +50 pts each
+const _FTB_BAD    = ['🐝','🪳','🦟'];  // dodge! -1 life if caught
 
 function _ftbPts(e) {
   if (_FTB_BONUS.includes(e)) return 50;
@@ -15451,11 +15547,11 @@ function _ftbDrawIdle() {
   if (g.hiScore > 0) {
     ctx.font = `${Math.round(W * 0.048)}px sans-serif`;
     ctx.fillStyle = '#ffd700';
-    ctx.fillText(' Best: ' + g.hiScore, W / 2, H * 0.38);
+    ctx.fillText('🏆 Best: ' + g.hiScore, W / 2, H * 0.38);
   }
 
   /* food preview strip */
-  const previews = ['','','','','','','⭐'];
+  const previews = ['🍔','🍕','🌮','🍣','🍩','🐝','⭐'];
   const gap = W / (previews.length + 1);
   ctx.font = '20px serif';
   previews.forEach((e, i) => ctx.fillText(e, gap * (i + 1), H * 0.65));
@@ -15490,7 +15586,7 @@ function _ftbDrawGameOver() {
   if (isHi) {
     ctx.font = `bold ${Math.round(W * 0.056)}px sans-serif`;
     ctx.fillStyle = '#ffd700';
-    ctx.fillText(' NEW HIGH SCORE!', W / 2, H * 0.5);
+    ctx.fillText('🏆 NEW HIGH SCORE!', W / 2, H * 0.5);
   } else if (g.hiScore > 0) {
     ctx.font = `${Math.round(W * 0.05)}px sans-serif`;
     ctx.fillStyle = '#888';
