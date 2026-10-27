@@ -5105,7 +5105,7 @@ body.light-mode #profile-btn {
 .bingo-sub { color: var(--text2); font-size: .85rem; margin: 0 0 8px; }
 .bingo-progress { font-size: .8rem; color: var(--text2); margin-bottom: 10px; }
 .bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 10px; }
-.bingo-cell { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 4px; text-align: center; font-size: .65rem; line-height: 1.3; cursor: default; transition: background .25s,transform .2s; min-height: 54px; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; overflow-wrap: anywhere; }
+.bingo-cell { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 4px; text-align: center; font-size: .65rem; line-height: 1.3; cursor: default; transition: background .25s,transform .2s; min-height: 54px; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; overflow-wrap: normal; word-break: normal; hyphens: auto; }
 .bingo-cell .bingo-cell-emoji { font-size: 1.1rem; }
 .bingo-cell.filled { background: var(--primary); border-color: var(--primary); color: #fff; transform: scale(1.04); }
 .bingo-cell.bingo-line { background: var(--green); border-color: var(--green); color: #fff; box-shadow: 0 0 10px var(--green); }
@@ -8476,3 +8476,48 @@ body[data-ui-motion='playful'] .btn-primary:hover { box-shadow: 0 6px 20px rgba(
 }
 /* One location ask at a time: the Near You card already has an Enable button. */
 #main-content:has(#nearby-home-list .nearby-home-teaser-title) #location-banner { display: none; }
+
+/* ── Bear avatars (inline SVG) ── */
+.bear-avatar { display: block; width: 100%; height: 100%; border-radius: 50%; }
+#account-btn { padding: 0; overflow: hidden; }
+#header-avatar { display: block; width: 100%; height: 100%; }
+.signup-avatar-big, .setup-avatar-display, .account-avatar-display { width: 96px; height: 96px; margin-left: auto; margin-right: auto; font-size: 0; }
+.signup-avatar-big .bear-avatar, .setup-avatar-display .bear-avatar, .account-avatar-display .bear-avatar { box-shadow: 0 6px 18px rgba(0, 0, 0, .3); }
+.avatar-option { padding: 4px; }
+.avatar-option .bear-avatar { width: 100%; height: auto; aspect-ratio: 1; }
+
+/* ── My Lists panel: title and ✕ on one row, everything else full width ── */
+.collections-panel { display: grid; grid-template-columns: 1fr auto; align-content: start; column-gap: 8px; width: min(340px, 90vw); }
+.collections-panel > * { grid-column: 1 / -1; }
+.collections-panel > h3 { grid-column: 1; float: none; align-self: center; margin: 0; font-size: 1.15rem; }
+.collections-panel > .panel-close { grid-column: 2; float: none; margin: 0; }
+.collections-panel::after { display: none; }
+.collections-panel .new-collection-row { margin-top: 14px; }
+.collections-panel input { min-width: 0; }
+.collections-panel .collection-colors { margin-top: 12px; }
+.collections-panel .collection-join-label { margin-top: 18px; font-size: .9rem; font-weight: 700; color: var(--text); }
+
+/* Compare bar: readable, and never on top of an open dialog. */
+.compare-bar { z-index: 150; background: var(--surface); color: var(--text); border-bottom: 2px solid var(--primary); box-shadow: 0 6px 16px rgba(0, 0, 0, .25); }
+body.overlay-open .compare-bar { visibility: hidden; }
+
+/* Near You card with no photo: a warm cuisine tile, not an error message. */
+.nearby-home-card-photo-empty { display: grid; place-content: center; justify-items: center; gap: 6px; background: radial-gradient(circle at 50% 40%, #4a2f1c, #1c120b 75%); text-transform: none; letter-spacing: 0; }
+.nhc-empty-emoji { font-size: 4rem; line-height: 1; filter: drop-shadow(0 6px 12px rgba(0, 0, 0, .4)); }
+.nhc-empty-text { font-size: .85rem; font-weight: 700; color: rgba(255, 246, 230, .75); }
+
+/* Duel: stack the two pickers on phones so restaurant names fit. */
+@media (max-width: 520px) {
+  .duel-pickers { grid-template-columns: 1fr; gap: 6px; }
+  .duel-vs { padding: 2px 0; }
+  .duel-select { font-size: .95rem; }
+}
+
+/* Chat: Byte Cub's photo and your bear instead of "BC" / "YOU". */
+.chat-msg-avatar { overflow: hidden; padding: 0; font-size: 0; }
+.chat-msg-avatar img, .chat-msg-avatar .bear-avatar { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+
+/* List card with no photo: a warm cuisine tile instead of an error line. */
+.card-photo-empty { display: grid; place-content: center; justify-items: center; gap: 6px; background: radial-gradient(circle at 50% 40%, #4a2f1c, #1c120b 75%); text-transform: none; letter-spacing: 0; }
+.card-photo-empty-emoji { font-size: 3.6rem; line-height: 1; filter: drop-shadow(0 6px 12px rgba(0, 0, 0, .4)); }
+.card-photo-empty-text { font-size: .8rem; font-weight: 700; color: rgba(255, 246, 230, .75); }
