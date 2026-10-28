@@ -80,3 +80,6 @@ jobs:
       - name: Polish (audit fixes)
         working-directory: tests
         run: node polish.test.js
+      - name: Free accounts
+        working-directory: tests
+        run: node account.test.js

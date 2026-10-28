@@ -180,11 +180,11 @@ async function fbDeleteRestaurantsCloud (uid, ids) {
 }
 window.fbDeleteRestaurantsCloud = fbDeleteRestaurantsCloud;
 
-// Called after every saveData() in app.js - debounced to avoid write storms
-// Cloud sync of restaurants is a Grizzly feature (matches the pricing page).
+// Called after every saveData() in app.js - debounced to avoid write storms.
+// Every signed-in account is backed up; Grizzly sells unlimited spots and AI.
 function fbDebouncedSync () {
   const uid = window._ftbUid;
-  if (!uid || !isPremium()) return;
+  if (!uid) return;
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(() => fbSaveRestaurants(uid, state.restaurants), 3000);
 }
@@ -223,6 +223,7 @@ window.fbSharedListSubscribe = fbSharedListSubscribe;
 // ─── AUTH STATE OBSERVER ──────────────────────────────────────
 function initFirebaseAuth () {
   _auth.onAuthStateChanged(async user => {
+    window._ftbAuthReady = true;
     if (user) {
       window._ftbUid       = user.uid;
       window._ftbUserEmail = user.email;
@@ -242,7 +243,7 @@ function initFirebaseAuth () {
       try { pendingUpgrade = sessionStorage.getItem('ftb_pending_upgrade'); sessionStorage.removeItem('ftb_pending_upgrade'); } catch { /* private mode */ }
       if (pendingUpgrade && window._ftbPlan !== 'grizzly') {
         setTimeout(() => openUpgradeModal({ key: 'resume', period: pendingUpgrade, title: "You're in! One tap to Grizzly",
-          body: 'Unlimited spots, Byte Cub AI, Year in Review, and your food life synced on every device.' }), 700);
+          body: 'Unlimited spots, Byte Cub AI picks, Year in Review, and 15-second food videos.' }), 700);
       }
 
       // Restore restaurants on sign-in for ALL users (never lock anyone out
@@ -394,9 +395,7 @@ async function _handleAuthSubmit () {
     closeAuthModal();
     showToast(
       'You are in',
-      isPremium()
-        ? 'Your den is synced across your devices.'
-        : 'Welcome back. Upgrade to Grizzly to keep new saves synced across devices.',
+      'Your food diary is backed up. Sign in on any device to see it.',
       'success'
     );
   } catch (err) {
@@ -419,11 +418,11 @@ async function _handleGoogleAuth () {
   try {
     await fbSignInGoogle();
     closeAuthModal();
-    showToast('You are in', 'Synced with Google. Your account is ready.', 'success');
+    showToast('You are in', 'Your food diary is backed up. Sign in on any device to see it.', 'success');
   } catch (err) {
     if (err.code !== 'auth/popup-closed-by-user') showToast('Google Sign-In failed', err.message, 'error');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🟠 Continue with Google'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Continue with Google'; }
   }
 }
 
@@ -500,7 +499,7 @@ function updateAuthUI (user) {
   if (el('account-signout-row')) el('account-signout-row').classList.toggle('hidden', !user);
   if (el('account-upgrade-row')) el('account-upgrade-row').classList.toggle('hidden', isPremium());
   if (el('account-sync-badge')) {
-    const synced = !!user && isPremium();
+    const synced = !!user;
     el('account-sync-badge').textContent = synced ? '☁️ Cloud synced' : '📱 Device only';
     el('account-sync-badge').className   = 'account-sync-badge' + (synced ? ' badge-synced' : '');
   }

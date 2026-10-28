@@ -8521,3 +8521,14 @@ body.overlay-open .compare-bar { visibility: hidden; }
 .card-photo-empty { display: grid; place-content: center; justify-items: center; gap: 6px; background: radial-gradient(circle at 50% 40%, #4a2f1c, #1c120b 75%); text-transform: none; letter-spacing: 0; }
 .card-photo-empty-emoji { font-size: 3.6rem; line-height: 1; filter: drop-shadow(0 6px 12px rgba(0, 0, 0, .4)); }
 .card-photo-empty-text { font-size: .8rem; font-weight: 700; color: rgba(255, 246, 230, .75); }
+
+/* "Save your food diary" nudge: a card above the bottom nav, never a modal. */
+.save-diary-nudge { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 140; width: min(460px, calc(100% - 32px)); display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--surface); color: var(--text); border: 1px solid rgba(var(--primary-rgb), .45); box-shadow: 0 10px 30px rgba(0, 0, 0, .35); animation: sdn-up .35s ease-out; }
+.sdn-icon { font-size: 2rem; line-height: 1; }
+.sdn-body { display: grid; gap: 4px; font-size: .9rem; }
+.sdn-body strong { font-size: 1rem; }
+.sdn-body span { color: var(--text-muted, var(--text)); opacity: .85; }
+.sdn-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+body.overlay-open .save-diary-nudge { visibility: hidden; }
+@keyframes sdn-up { from { opacity: 0; transform: translateX(-50%) translateY(20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .save-diary-nudge { animation: none; } }
