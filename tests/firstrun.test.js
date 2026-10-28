@@ -27,6 +27,9 @@ const lightText = el => {
   check(await one.locator('#week-recap-home').isHidden(), 'one spot: no empty week recap');
   check(await one.locator('.restaurant-card').count() === 1, 'the spot itself is shown');
   check(await one.locator('.restaurant-card .my-rating-row').evaluate(lightText), 'card text is light on the dark card');
+  await one.evaluate(() => openDetailModal('s0'));
+  check(await one.locator('#detail-name').evaluate(lightText), 'the spot name on its photo is white');
+  await one.evaluate(() => closeDetailModal());
   check(one.errors.length === 0, `no page errors (${one.errors.slice(0, 2).join(' | ')})`);
   await one.close();
 
