@@ -65,6 +65,22 @@ service cloud.firestore {
       allow delete: if request.auth != null;
     }
 
+    // ── Live friend profiles ──
+    // Doc id is the random share id from your profile link, so only people
+    // with the link can read it (get only; listing is off). Only the owner
+    // can write or delete it.
+    match /profiles/{shareId} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if request.auth != null
+        && resource.data.uid == request.auth.uid;
+    }
+
     // Everything else: locked down
     match /{document=**} {
       allow read, write: if false;
