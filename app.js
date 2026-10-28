@@ -2293,9 +2293,10 @@ function buildCard (r) {
       </div>
       ${cardOrderLine(r)}
       <div class="card-highlights">
-        <span class="card-highlight good"> ${matchScore}% match</span>
-        <span class="card-highlight mood"> ${escHtml(moodLabel)}</span>
-        ${distStr ? `<span class="card-highlight neutral"> ${distStr}</span>` : ''}
+        ${openChipHtml(r)}
+        <span class="card-highlight good">${matchScore}% match</span>
+        <span class="card-highlight mood">${escHtml(moodLabel)}</span>
+        ${distStr ? `<span class="card-highlight neutral">📍 ${distStr}</span>` : ''}
       </div>
       ${r.address ? `
         <div class="card-address">
@@ -2437,6 +2438,131 @@ function priceDollars (n) {
   return n ? '$'.repeat(n) : '';
 }
 
+/* ── Place info: Google rating, price, hours, open now ────── */
+// Looked up through /api/place-info and kept on the spot for a week.
+const PLACE_INFO_TTL = 7 * 86400000;
+const _placeInfoTried = new Set();
+const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+async function refreshPlaceInfo (r) {
+  if (!r || !r.name || _placeInfoTried.has(r.id) || navigator.onLine === false) return false;
+  if (r.placeInfoAt && Date.now() - r.placeInfoAt < PLACE_INFO_TTL) return false;
+  _placeInfoTried.add(r.id);
+  try {
+    const q = new URLSearchParams({ name: r.name });
+    if (r.address) q.set('address', r.address);
+    const lat = Number(r.lat);
+    const lng = Number(r.lng);
+    if (r.lat != null && r.lng != null && Number.isFinite(lat) && Number.isFinite(lng)) {
+      q.set('lat', lat.toFixed(3));
+      q.set('lng', lng.toFixed(3));
+    }
+    const resp = await fetch(`/api/place-info?${q.toString()}`);
+    if (!resp.ok) return false;
+    const info = await resp.json();
+    r.placeInfoAt = Date.now();
+    if (info.found) {
+      if (info.rating) { r.googleRating = info.rating; r.googleReviews = info.reviews || 0; }
+      if (info.priceLevel && !r.priceRange) r.priceRange = info.priceLevel;
+      r.hours = Array.isArray(info.hours) ? info.hours : [];
+      r.periods = Array.isArray(info.periods) ? info.periods : [];
+      if (info.phone && !r.phone) r.phone = info.phone;
+      if (info.website && !r.website) r.website = info.website;
+      if (info.mapsUrl) r.mapsUrl = info.mapsUrl;
+      if (info.placeId) r.placeId = info.placeId;
+    }
+    saveData();
+    return !!info.found;
+  } catch {
+    return false;
+  }
+}
+
+function fmtClock ({ hour = 0, minute = 0 } = {}) {
+  const h = hour % 12 || 12;
+  return `${h}${minute ? `:${String(minute).padStart(2, '0')}` : ''} ${hour < 12 ? 'AM' : 'PM'}`;
+}
+
+// Open or closed right now, from Google's weekly periods (day 0 = Sunday).
+function openStatus (r, now = new Date()) {
+  const periods = Array.isArray(r?.periods) ? r.periods.filter(p => p && p.open) : [];
+  if (!periods.length) return null;
+  if (periods.length === 1 && !periods[0].close) return { open: true, text: 'Open 24 hours' };
+  const WEEK = 7 * 1440;
+  const mins = d => d.day * 1440 + d.hour * 60 + (d.minute || 0);
+  const t = now.getDay() * 1440 + now.getHours() * 60 + now.getMinutes();
+  let next = null;
+  for (const p of periods) {
+    if (!p.close) continue;
+    const o = mins(p.open);
+    let c = mins(p.close);
+    if (c <= o) c += WEEK;
+    for (const shift of [0, -WEEK]) {
+      if (t >= o + shift && t < c + shift) {
+        const left = c + shift - t;
+        return { open: true, soon: left <= 60, text: left <= 60 ? `Closes soon · ${fmtClock(p.close)}` : `Open · closes ${fmtClock(p.close)}` };
+      }
+    }
+    const until = ((o - t) % WEEK + WEEK) % WEEK;
+    if (!next || until < next.until) next = { until, p };
+  }
+  if (!next) return null;
+  const day = next.p.open.day;
+  const when = day === now.getDay() && next.until < 1440 ? fmtClock(next.p.open)
+    : day === (now.getDay() + 1) % 7 ? `tomorrow ${fmtClock(next.p.open)}`
+    : `${WEEKDAY_SHORT[day]} ${fmtClock(next.p.open)}`;
+  return { open: false, text: `Closed · opens ${when}` };
+}
+
+function openChipHtml (r) {
+  const st = openStatus(r);
+  if (!st) return '';
+  return `<span class="card-highlight ${st.open ? (st.soon ? 'open-soon' : 'open-now') : 'closed-now'}">${escHtml(st.text)}</span>`;
+}
+
+function fillDetailFacts (r) {
+  const dim = text => `<div style="color:var(--text-dim);font-size:.85rem">${text}</div>`;
+  const looking = !r.placeInfoAt && !_placeInfoTried.has(r.id) ? 'Looking it up…' : 'Not available';
+  document.getElementById('detail-google-rating').innerHTML =
+    r.googleRating ? googleStarsLgHtml(r.googleRating, r.googleReviews) : `<label>Google Rating</label>${dim(looking)}`;
+  document.getElementById('detail-price').innerHTML =
+    `<label>Price Range</label><div style="font-size:1.2rem;color:var(--gold);font-weight:700">${priceDollars(r.priceRange) || dim('Unknown')}</div>`;
+
+  let box = document.getElementById('detail-hours');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'detail-hours';
+    box.className = 'detail-hours';
+    document.getElementById('detail-meta')?.insertAdjacentElement('afterend', box);
+  }
+  const st = openStatus(r);
+  const today = (new Date().getDay() + 6) % 7; // Google lists Monday first
+  const links = [
+    r.phone ? `<a class="detail-hours-link" href="tel:${escHtml(r.phone.replace(/[^\d+]/g, ''))}">📞 ${escHtml(r.phone)}</a>` : '',
+    r.mapsUrl ? `<a class="detail-hours-link" href="${escHtml(r.mapsUrl)}" target="_blank" rel="noopener">⭐ Google reviews</a>` : '',
+  ].join('');
+  if (!st && !links) { box.innerHTML = ''; box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  box.innerHTML = `
+    ${st ? `<details class="detail-hours-toggle">
+      <summary><span class="detail-open-dot ${st.open ? (st.soon ? 'soon' : 'open') : 'closed'}" aria-hidden="true"></span>${escHtml(st.text)}</summary>
+      <ul>${(r.hours || []).map((h, i) => `<li class="${i === today ? 'today' : ''}">${escHtml(h)}</li>`).join('')}</ul>
+    </details>` : ''}
+    ${links ? `<div class="detail-hours-links">${links}</div>` : ''}`;
+}
+
+// After launch, quietly look up a few saved spots that have no info yet.
+async function fillMissingPlaceInfo () {
+  const todo = (state.restaurants || []).filter(r => !r.placeInfoAt && r.name).slice(0, 6);
+  let changed = false;
+  for (const r of todo) {
+    if (await refreshPlaceInfo(r)) changed = true;
+    await new Promise(res => setTimeout(res, 1200));
+  }
+  if (changed) renderCards();
+}
+window.addEventListener('load', () => setTimeout(fillMissingPlaceInfo, 5000));
+
 /* ── Detail Modal ─────────────────────────────────────────── */
 function openDetailModal (id) {
   const r = state.restaurants.find(x => x.id === id);
@@ -2463,14 +2589,13 @@ function openDetailModal (id) {
   document.getElementById('detail-cuisine-badge').textContent =
     r.cuisine ? `${cuisineEmoji(r.cuisine)} ${r.cuisine}` : '';
 
-  document.getElementById('detail-google-rating').innerHTML =
-    r.googleRating ? googleStarsLgHtml(r.googleRating, r.googleReviews)
-    : `<label>Google Rating</label><div style="color:var(--text-dim);font-size:.85rem">Not available</div>`;
+  fillDetailFacts(r);
+  refreshPlaceInfo(r).then(() => {
+    if (state.detailId === r.id) fillDetailFacts(r);
+  });
 
   // The star row below already shows your rating; this tile shows your history.
   document.getElementById('detail-my-rating').innerHTML = visitsTileHtml(r);
-  document.getElementById('detail-price').innerHTML =
-    `<label>Price Range</label><div style="font-size:1.2rem;color:var(--gold);font-weight:700">${priceDollars(r.priceRange)||'<span style="color:var(--text-dim);font-size:.85rem">Unknown</span>'}</div>`;
 
   const notesEdit = document.getElementById('detail-notes-edit');
   if (notesEdit) notesEdit.value = r.notes || '';
@@ -2480,11 +2605,11 @@ function openDetailModal (id) {
 
   const dist = distOf(r);
   const meta = [];
-  if (dist < Infinity) meta.push(` ${fmtDist(dist)} away`);
-  meta.push(` Added ${fmtDate(r.dateAdded)}`);
+  if (dist < Infinity) meta.push(`📍 ${fmtDist(dist)} away`);
+  meta.push(`📅 Added ${fmtDate(r.dateAdded)}`);
   if (r.dateVisited) meta.push(`✅ Visited ${fmtDate(r.dateVisited)}`);
   meta.push(`<span style="padding:3px 8px;border-radius:12px;font-size:.72rem;background:${r.status==='visited'?'rgba(46,204,113,.15)':'rgba(74,144,217,.15)'};color:${r.status==='visited'?'var(--green)':'var(--blue-lt)'};font-weight:600">
-    ${r.status==='visited'?'✅ Visited':' Want to Try'}</span>`);
+    ${r.status==='visited'?'✅ Visited':'🔖 Want to Try'}</span>`);
   document.getElementById('detail-meta').innerHTML = meta.join('<span style="color:var(--border)">|</span>');
 
   // Tags display

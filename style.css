@@ -8532,3 +8532,21 @@ body.overlay-open .compare-bar { visibility: hidden; }
 body.overlay-open .save-diary-nudge { visibility: hidden; }
 @keyframes sdn-up { from { opacity: 0; transform: translateX(-50%) translateY(20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .save-diary-nudge { animation: none; } }
+
+/* Open now / closes soon / closed, on cards and the spot page. */
+.card-highlight.open-now { background: rgba(46, 204, 113, .15); color: var(--green); }
+.card-highlight.open-soon { background: rgba(243, 156, 18, .18); color: #e67e22; }
+.card-highlight.closed-now { background: rgba(231, 76, 60, .14); color: #e74c3c; }
+.detail-hours { margin: 10px 0 4px; display: grid; gap: 8px; font-size: .9rem; }
+.detail-hours-toggle summary { cursor: pointer; font-weight: 700; display: flex; align-items: center; gap: 8px; list-style: none; }
+.detail-hours-toggle summary::-webkit-details-marker { display: none; }
+.detail-hours-toggle summary::after { content: '▾'; opacity: .6; }
+.detail-hours-toggle[open] summary::after { content: '▴'; }
+.detail-hours-toggle ul { list-style: none; margin: 8px 0 0; padding: 0 0 0 18px; display: grid; gap: 3px; color: var(--text-dim); }
+.detail-hours-toggle li.today { color: var(--text); font-weight: 700; }
+.detail-open-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.detail-open-dot.open { background: var(--green); }
+.detail-open-dot.soon { background: #e67e22; }
+.detail-open-dot.closed { background: #e74c3c; }
+.detail-hours-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.detail-hours-link { padding: 6px 12px; border-radius: 999px; background: var(--surface2); color: var(--text); text-decoration: none; font-weight: 600; font-size: .85rem; }
