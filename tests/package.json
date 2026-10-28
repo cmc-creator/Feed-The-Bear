@@ -3,7 +3,7 @@
   "private": true,
   "description": "Browser tests. Serve the repo root on :8765 first (python -m http.server 8765).",
   "scripts": {
-    "test": "node smoke.test.js && node flows.test.js && node friends.test.js && node photos.test.js && node swipe.test.js && node money.test.js && node cub.test.js && node video.test.js && node welcome.test.js && node usage.test.js && node story.test.js && node home.test.js && node polish.test.js && node account.test.js && node placeinfo.test.js && node feed.test.js && node hub.test.js && node opennow.test.js && node firstrun.test.js && node stockphoto.test.js && node play.test.js"
+    "test": "node smoke.test.js && node flows.test.js && node friends.test.js && node photos.test.js && node swipe.test.js && node money.test.js && node cub.test.js && node video.test.js && node welcome.test.js && node usage.test.js && node story.test.js && node home.test.js && node polish.test.js && node account.test.js && node placeinfo.test.js && node feed.test.js && node hub.test.js && node opennow.test.js && node firstrun.test.js && node stockphoto.test.js && node play.test.js && node audit.test.js"
   },
   "devDependencies": {
     "playwright-core": "1.56.1"

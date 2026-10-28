@@ -104,3 +104,6 @@ jobs:
       - name: Google Play requirements
         working-directory: tests
         run: node play.test.js
+      - name: Audit fixes
+        working-directory: tests
+        run: node audit.test.js

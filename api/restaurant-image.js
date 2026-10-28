@@ -16,9 +16,31 @@
 const WIKI_API = 'https://en.wikipedia.org/w/api.php';
 
 function cors (res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', 'https://www.feed-the-bear.com');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
+// Per-instance limit so one client can't run up the Google bill.
+const hits = new Map();
+function limited (ip) {
+  const now = Date.now();
+  const list = (hits.get(ip) || []).filter(t => now - t < 10 * 60 * 1000);
+  list.push(now);
+  hits.set(ip, list);
+  return list.length > 60;
+}
+
+// The website scraper must never reach private or internal addresses.
+function isPublicHost (hostname = '') {
+  const h = String(hostname).toLowerCase().replace(/^\[|\]$/g, '');
+  if (!h || h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local') || h.endsWith('.internal')) return false;
+  if (h.includes(':')) return false; // IPv6 literals
+  const m = h.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (!m) return /[a-z]/.test(h);
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  return !(a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224);
 }
 
 function safeHttpUrl (value = '') {
@@ -213,14 +235,21 @@ function extractMetaImage (html = '', baseUrl = '') {
 
 async function scrapeWebsiteImage (website = '') {
   if (isJunkWebsiteUrl(website)) return { parked: true, photoUrl: '' };
-  const url = safeHttpUrl(website);
-  if (!url) return { parked: false, photoUrl: '' };
-  const resp = await fetchWithTimeout(url, {
-    headers: {
-      'user-agent': 'FeedTheBearBot/1.0 (+https://github.com/cmc-creator/Feed-The-Bear)',
-      accept: 'text/html,application/xhtml+xml'
-    }
-  });
+  let url = safeHttpUrl(website);
+  let resp = null;
+  // Follow redirects by hand so every hop is checked against internal addresses.
+  for (let hop = 0; hop < 4; hop++) {
+    if (!url || !isPublicHost(new URL(url).hostname)) return { parked: false, photoUrl: '' };
+    resp = await fetchWithTimeout(url, {
+      redirect: 'manual',
+      headers: {
+        'user-agent': 'FeedTheBearBot/1.0 (+https://github.com/cmc-creator/Feed-The-Bear)',
+        accept: 'text/html,application/xhtml+xml'
+      }
+    });
+    if (resp.status < 300 || resp.status >= 400) break;
+    url = safeHttpUrl(new URL(resp.headers.get('location') || '', url).toString());
+  }
   if (!resp.ok) return { parked: false, photoUrl: '' };
   const type = String(resp.headers.get('content-type') || '').toLowerCase();
   if (!type.includes('text/html') && !type.includes('application/xhtml+xml')) return { parked: false, photoUrl: '' };
@@ -271,6 +300,8 @@ module.exports = async function handler (req, res) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
+  if (limited(ip)) return res.status(429).json({ found: false, error: 'Slow down a little.' });
 
   const name = String(req.query?.name || '').trim();
   const website = String(req.query?.website || '').trim();

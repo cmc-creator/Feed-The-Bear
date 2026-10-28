@@ -37,6 +37,8 @@ async function legacyDishMigration (browser) {
 
   // Standing next to Tacos Chiwas, which has a craved dish.
   const p = await newPage(browser, { seed: SEED(), settings: { locationEnabled: true }, geo: { latitude: 33.5096, longitude: -112.0460 } });
+  // Live Google ratings would reorder the seeded spots on production.
+  await p.route(/\/api\/place-info/, r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"found":false}' }));
   await p.goto(`${BASE}/app.html`);
   await p.waitForTimeout(3500);
 
