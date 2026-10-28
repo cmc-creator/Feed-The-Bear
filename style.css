@@ -8626,3 +8626,12 @@ body.light-mode .mood-picks-home .home-mood-chip:not(.active) { background: rgba
 /* The spot name sits on a photo that fades to black: always white, whatever the theme. */
 .detail-hero #detail-name { color: #fff; text-shadow: 0 2px 10px rgba(0, 0, 0, .7); }
 .detail-hero .detail-address { color: rgba(255, 255, 255, .85); }
+
+/* Delete account */
+.account-delete-row .aar-label { color: #e74c3c; }
+.delete-account-card { max-width: 440px; display: grid; gap: 10px; }
+.delete-account-card p { margin: 0; font-size: .92rem; line-height: 1.45; }
+.delete-account-check { display: flex; gap: 8px; align-items: center; font-size: .9rem; }
+.delete-account-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; flex-wrap: wrap; }
+.btn-danger:disabled { opacity: .45; cursor: not-allowed; }
+.app-footer-legal a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }

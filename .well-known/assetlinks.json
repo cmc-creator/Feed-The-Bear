@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.feedthebear.app",
+        "sha256_cert_fingerprints": ["31:58:04:E2:41:95:FD:21:0E:72:5D:19:55:51:53:CC:87:B5:9C:6E:6B:D4:5B:F3:D8:20:95:5C:90:02:B2:46"]
+      }
+    }]

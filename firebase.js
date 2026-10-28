@@ -77,6 +77,79 @@ async function fbSignOut () {
   showToast?.('Signed out', 'You are now signed out. Your theme and local settings were kept.', 'info');
 }
 
+// ─── DELETE ACCOUNT ───────────────────────────────────────────
+// Confirms who you are again, then the server deletes your data, any
+// Grizzly subscription and the sign-in itself (api/delete-account.js).
+function openDeleteAccount () {
+  const user = _auth?.currentUser;
+  if (!user) return;
+  const el = id => document.getElementById(id);
+  const usesPassword = user.providerData.some(p => p.providerId === 'password') && !user.providerData.some(p => p.providerId === 'google.com');
+  el('delete-account-password-wrap').classList.toggle('hidden', !usesPassword);
+  el('delete-account-password').value = '';
+  el('delete-account-confirm').value = '';
+  el('delete-account-go').disabled = true;
+  el('delete-account-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+
+function closeDeleteAccount () {
+  document.getElementById('delete-account-overlay')?.classList.add('hidden');
+  maybeHideOverlay();
+}
+
+async function _reauthForDelete (user) {
+  if (user.providerData.some(p => p.providerId === 'google.com')) {
+    await user.reauthenticateWithPopup(new firebase.auth.GoogleAuthProvider());
+    return;
+  }
+  const password = document.getElementById('delete-account-password').value;
+  if (!password) throw Object.assign(new Error('Enter your password to confirm it is you.'), { code: 'ftb/need-password' });
+  await user.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(user.email, password));
+}
+
+function eraseLocalData () {
+  try {
+    Object.keys(localStorage).filter(k => k.startsWith('ftb_') || k.startsWith('ftb-')).forEach(k => localStorage.removeItem(k));
+    sessionStorage.clear();
+  } catch { /* storage blocked */ }
+  try { indexedDB.deleteDatabase(typeof PHOTO_DB !== 'undefined' ? PHOTO_DB : 'ftb-photos'); } catch { /* not available */ }
+}
+
+async function fbDeleteAccount () {
+  const user = _auth?.currentUser;
+  if (!user) return;
+  const btn = document.getElementById('delete-account-go');
+  const eraseLocal = document.getElementById('delete-account-local').checked;
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+  try {
+    await _reauthForDelete(user);
+    const token = await user.getIdToken(true);
+    const resp = await fetch('/api/delete-account', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+    const body = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(body.message || body.error || 'Deleting your account failed. Please try again.');
+    if (typeof trackProductEvent === 'function') trackProductEvent('account_deleted');
+    try { await _auth.signOut(); } catch { /* already gone */ }
+    window._ftbUid = null;
+    window._ftbPlan = 'free';
+    localStorage.removeItem('ftb_plan_v1');
+    localStorage.removeItem('ftb_uid_v1');
+    if (eraseLocal) eraseLocalData();
+    closeDeleteAccount();
+    showToast('Account deleted', eraseLocal ? 'Your account and this device are wiped clean.' : 'Your account is gone. Spots on this device were kept.', 'success');
+    setTimeout(() => window.location.replace('app.html'), 1800);
+  } catch (err) {
+    const msg = err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' ? 'That password is not right.'
+      : err.code === 'auth/popup-closed-by-user' ? 'Confirm with Google to delete your account.'
+      : err.message;
+    showToast('Account not deleted', msg, 'error');
+    btn.disabled = false;
+  } finally {
+    btn.textContent = 'Delete forever';
+  }
+}
+
 // ─── FIRESTORE SYNC ───────────────────────────────────────────
 async function fbLoadUserData (uid) {
   try {
@@ -536,6 +609,7 @@ function updateAuthUI (user) {
   const el = id => document.getElementById(id);
   if (el('account-signin-row'))  el('account-signin-row').classList.toggle('hidden', !!user);
   if (el('account-signout-row')) el('account-signout-row').classList.toggle('hidden', !user);
+  if (el('account-delete-row')) el('account-delete-row').classList.toggle('hidden', !user);
   if (el('account-upgrade-row')) el('account-upgrade-row').classList.toggle('hidden', isPremium());
   if (el('account-sync-badge')) {
     const synced = !!user;
@@ -569,6 +643,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Account portal additional rows
   document.getElementById('account-signin-row')?.addEventListener('click',  () => { closeAccountModal(); setTimeout(openAuthModal, 150); });
   document.getElementById('account-signout-row')?.addEventListener('click', () => { closeAccountModal(); setTimeout(fbSignOut,          150); });
+  document.getElementById('account-delete-row')?.addEventListener('click', () => { closeAccountModal(); setTimeout(openDeleteAccount, 150); });
+
+  // Delete account
+  document.getElementById('delete-account-close')?.addEventListener('click', closeDeleteAccount);
+  document.getElementById('delete-account-cancel')?.addEventListener('click', closeDeleteAccount);
+  document.getElementById('delete-account-overlay')?.addEventListener('click', e => { if (e.target.id === 'delete-account-overlay') closeDeleteAccount(); });
+  document.getElementById('delete-account-confirm')?.addEventListener('input', e => {
+    document.getElementById('delete-account-go').disabled = e.target.value.trim().toUpperCase() !== 'DELETE';
+  });
+  document.getElementById('delete-account-go')?.addEventListener('click', fbDeleteAccount);
   document.getElementById('account-upgrade-row')?.addEventListener('click', () => { closeAccountModal(); setTimeout(openUpgradeModal,   150); });
 });
 
