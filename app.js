@@ -3456,7 +3456,7 @@ function renderAll () {
   updateLocationBanner();
   // Home sections are isolated: a failure in one must never cascade and
   // abort renderAll (which would leave later init wiring unattached).
-  [renderGrizzlyUi, renderTodayStatusRow, renderWeeklyGoal, renderCraveHome, renderFriendsFeedHome, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
+  [renderGrizzlyUi, renderTodayStatusRow, renderWeeklyGoal, renderOpenNowHome, renderCraveHome, renderFriendsFeedHome, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
     .forEach(fn => { try { fn(); } catch (err) { console.error(`${fn.name} failed:`, err); } });
 }
 
@@ -7690,7 +7690,12 @@ function renderPassport () {
   if (!el) return;
   const visited = state.restaurants.filter(r => r.status === 'visited');
   const triedSet = new Set(visited.map(r => (r.cuisine||'').toLowerCase().trim()));
-  const prevUnlocked = new Set(state.settings.passportUnlocked || []);
+  // First run (or an older profile): stamps you already had aren't news.
+  if (!Array.isArray(state.settings.passportUnlocked)) {
+    state.settings.passportUnlocked = [...triedSet];
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); } catch { /* storage full */ }
+  }
+  const prevUnlocked = new Set(state.settings.passportUnlocked);
 
   let html = '';
   let newUnlocks = 0;
@@ -10967,6 +10972,42 @@ function miniHash (str) {
 }
 
 // Dishes marked "Want to try" across every saved spot, nearest first.
+// Your saved spots that are open right now: cravings first, then your
+// want-to-try list, then favorites. Uses hours from Google place info.
+function openNowPicks (now = new Date()) {
+  const score = r => (dishesOf(r).some(d => d.verdict === 'want') ? 3 : 0)
+    + (r.status === 'want-to-try' ? 2 : 0) + (r.isFavorite ? 1 : 0) + (r.myRating >= 4 ? 1 : 0);
+  return (state.restaurants || [])
+    .map(r => ({ r, st: openStatus(r, now) }))
+    .filter(x => x.st?.open)
+    .sort((a, b) => (score(b.r) - score(a.r)) || (distOf(a.r) - distOf(b.r)) || a.r.name.localeCompare(b.r.name));
+}
+
+function renderOpenNowHome () {
+  const section = document.getElementById('open-now-home');
+  const list = document.getElementById('open-now-home-list');
+  if (!section || !list) return;
+  const picks = openNowPicks();
+  section.classList.toggle('hidden', !picks.length);
+  if (!picks.length) return;
+  const count = document.getElementById('open-now-home-count');
+  if (count) count.textContent = `${picks.length} open`;
+  list.innerHTML = picks.slice(0, 6).map(({ r, st }) => {
+    const crave = dishesOf(r).find(d => d.verdict === 'want');
+    const dist = distOf(r);
+    const sub = [crave ? `Craving: ${crave.name}` : r.status === 'want-to-try' ? 'On your list' : r.isFavorite ? 'A favorite' : '',
+      Number.isFinite(dist) ? fmtDist(dist) : ''].filter(Boolean).join(' · ');
+    return `<button class="open-now-card" type="button" data-id="${escHtml(r.id)}">
+      <span class="onc-name">${cuisineEmoji(r.cuisine)} ${escHtml(r.name)}</span>
+      <span class="onc-status ${st.soon ? 'soon' : ''}">${escHtml(st.text)}</span>
+      ${sub ? `<span class="onc-sub">${escHtml(sub)}</span>` : ''}
+    </button>`;
+  }).join('');
+  list.querySelectorAll('.open-now-card').forEach(el => el.addEventListener('click', () => openDetailModal(el.dataset.id)));
+}
+// Opening and closing times pass while the app sits open.
+setInterval(() => { if (!document.hidden) renderOpenNowHome(); }, 5 * 60 * 1000);
+
 function renderCraveHome () {
   const section = document.getElementById('crave-home');
   const list = document.getElementById('crave-home-list');
@@ -13953,14 +13994,21 @@ function _renderSwipeDeck () {
     card.className = 'swipe-card-item';
     card.style.zIndex = stackIdx + 1;
     card.style.transform = `scale(${1 - (remaining.slice(0,3).length - 1 - stackIdx) * 0.04}) translateY(${(remaining.slice(0,3).length - 1 - stackIdx) * -8}px)`;
+    // The spot's real photo when we have one; otherwise its cuisine emoji.
+    const photo = pickRealRestaurantPhoto({ savedRestaurant: r, cuisine: r.cuisine, amenity: 'restaurant', width: 800, height: 600, allowFallback: false }).url;
+    const open = openStatus(r);
+    card.classList.toggle('has-photo', !!photo);
     card.innerHTML = `
       <div class="swipe-label yes">PICK ✓</div>
       <div class="swipe-label no">SKIP ✕</div>
-      <div class="swipe-card-emoji">${cuisineEmoji(r.cuisine)}</div>
+      ${photo
+        ? `<div class="swipe-card-photo"><img src="${escHtml(photo)}" alt="" draggable="false" /></div>`
+        : `<div class="swipe-card-emoji">${cuisineEmoji(r.cuisine)}</div>`}
       <div class="swipe-card-name">${escHtml(r.name)}</div>
-      <div class="swipe-card-meta">${escHtml(r.cuisine||'')}${r.priceRange ? ' · ' + '$'.repeat(r.priceRange) : ''}</div>
+      <div class="swipe-card-meta">${escHtml(`${cuisineEmoji(r.cuisine)} ${r.cuisine || ''}`.trim())}${r.priceRange ? ' · ' + '$'.repeat(r.priceRange) : ''}${r.googleRating ? ` · ⭐ ${r.googleRating}` : ''}</div>
+      ${open ? `<div class="swipe-card-open ${open.open ? (open.soon ? 'soon' : 'open') : 'closed'}">${escHtml(open.text)}</div>` : ''}
       ${r.myRating ? `<div class="swipe-card-rating">${'★'.repeat(r.myRating)}</div>` : ''}
-      ${r.address ? `<div class="swipe-card-meta" style="margin-top:4px"> ${escHtml(r.address)}</div>` : ''}
+      ${r.address ? `<div class="swipe-card-meta" style="margin-top:4px">📍 ${escHtml(r.address)}</div>` : ''}
     `;
     if (isTop) {
       _attachSwipeListeners(card, r);

@@ -92,3 +92,6 @@ jobs:
       - name: Discover hub
         working-directory: tests
         run: node hub.test.js
+      - name: Open now
+        working-directory: tests
+        run: node opennow.test.js
