@@ -98,3 +98,6 @@ jobs:
       - name: First run
         working-directory: tests
         run: node firstrun.test.js
+      - name: Stand-in dish photos
+        working-directory: tests
+        run: node stockphoto.test.js
