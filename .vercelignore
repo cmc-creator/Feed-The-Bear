@@ -2,3 +2,5 @@
 tests/
 .github/
 *.md
+store/
+scripts/
