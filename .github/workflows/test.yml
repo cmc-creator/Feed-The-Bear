@@ -83,3 +83,6 @@ jobs:
       - name: Free accounts
         working-directory: tests
         run: node account.test.js
+      - name: Place info
+        working-directory: tests
+        run: node placeinfo.test.js
