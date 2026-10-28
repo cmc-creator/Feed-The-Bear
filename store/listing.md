@@ -60,9 +60,10 @@ Free to start with up to 15 spots and backup on every device with a free account
 
 Welcome to Feed the Bear! Save your spots, see what's open, and let the bear help pick dinner.
 
-## Still needed before submitting
+## Status
 
-- Apple Developer account ($99/year) and Google Play Console account ($25 one time).
-- A privacy policy URL. The app stores sign-in email, saved spots and photos (Firebase) and uses location only while the app is open.
-- A support URL or email.
-- Packaging: Feed the Bear is a web app. Google Play can take it as a Trusted Web Activity (built with Bubblewrap; needs a `/.well-known/assetlinks.json` on the site). Apple needs a native wrapper (for example Capacitor) and must offer real app features beyond the website, which Feed the Bear does.
+- Google Play: package built (`com.feedthebear.app`), privacy policy and account deletion live. Follow `store/play-console.md`.
+- Privacy policy: https://www.feed-the-bear.com/privacy.html
+- Account deletion: https://www.feed-the-bear.com/delete-account.html
+- Support: support@feed-the-bear.com
+- Apple App Store: needs an Apple Developer account ($99/year) and a native wrapper (for example Capacitor).

@@ -1,0 +1,25 @@
+/* Privacy policy and account deletion pages. */
+:root {
+  --bg: #f7f3ec;
+  --text: #2a1d16;
+  --muted: #6b5a4c;
+  --link: #9a4f2e;
+  --rule: rgba(42, 29, 22, .12);
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1b1410; --text: #f6ecdc; --muted: #c9b59a; --link: #f0b27a; --rule: rgba(246, 236, 220, .14); }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.legal { max-width: 720px; margin: 0 auto; padding: 28px 16px 64px; }
+.legal-brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 800; color: var(--text); text-decoration: none; }
+.legal-brand img { width: 36px; height: 36px; border-radius: 10px; object-fit: cover; }
+h1 { font-size: 2rem; line-height: 1.2; margin: 24px 0 4px; }
+h2 { font-size: 1.25rem; margin: 32px 0 8px; padding-top: 16px; border-top: 1px solid var(--rule); }
+h3 { font-size: 1rem; margin: 18px 0 6px; }
+.legal-date { color: var(--muted); margin-top: 0; }
+a { color: var(--link); }
+ul, ol { padding-left: 22px; }
+li { margin: 6px 0; }
+.legal-foot { margin-top: 32px; color: var(--muted); }

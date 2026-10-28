@@ -114,6 +114,32 @@
         <button class="account-action-row account-signout-row hidden" id="account-signout-row">
           <span class="aar-icon" aria-hidden="true">🚪</span><span class="aar-label">Sign Out</span><span class="aar-chevron">›</span>
         </button>
+        <!-- Delete account row - signed in only -->
+        <button class="account-action-row account-delete-row hidden" id="account-delete-row">
+          <span class="aar-icon" aria-hidden="true">🗑️</span><span class="aar-label">Delete Account</span><span class="aar-chevron">›</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Delete Account ────────────────────────────────────── -->
+  <div id="delete-account-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="delete-account-title">
+    <div class="modal-card delete-account-card">
+      <div class="modal-header">
+        <h2 id="delete-account-title">Delete your account?</h2>
+        <button id="delete-account-close" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p>This permanently deletes your account and everything backed up with it: your spots, ratings, dishes, photos, profile and anything you shared with friends. A Grizzly subscription is cancelled. This can't be undone.</p>
+      <label class="delete-account-check"><input type="checkbox" id="delete-account-local" checked /> Also erase everything saved on this device</label>
+      <div id="delete-account-password-wrap" class="hidden">
+        <label class="form-label" for="delete-account-password">Your password</label>
+        <input id="delete-account-password" class="form-input" type="password" autocomplete="current-password" />
+      </div>
+      <label class="form-label" for="delete-account-confirm">Type DELETE to confirm</label>
+      <input id="delete-account-confirm" class="form-input" autocomplete="off" autocapitalize="characters" />
+      <div class="delete-account-actions">
+        <button type="button" class="btn-ghost" id="delete-account-cancel">Keep my account</button>
+        <button type="button" class="btn-danger" id="delete-account-go" disabled>Delete forever</button>
       </div>
     </div>
   </div>
@@ -871,6 +897,7 @@
     <div class="app-footer-legal">
       <span>A product in the NyxCollective LLC line.</span>
       <span>Feed The Bear&trade; &copy; 2026 NyxCollective LLC. All rights reserved.</span>
+      <span><a href="privacy.html">Privacy</a> · <a href="delete-account.html">Delete account</a> · <a href="mailto:support@feed-the-bear.com">Support</a></span>
     </div>
   </footer>
 

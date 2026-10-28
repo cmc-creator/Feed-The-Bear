@@ -101,3 +101,6 @@ jobs:
       - name: Stand-in dish photos
         working-directory: tests
         run: node stockphoto.test.js
+      - name: Google Play requirements
+        working-directory: tests
+        run: node play.test.js
