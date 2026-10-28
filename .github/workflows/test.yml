@@ -95,3 +95,6 @@ jobs:
       - name: Open now
         working-directory: tests
         run: node opennow.test.js
+      - name: First run
+        working-directory: tests
+        run: node firstrun.test.js

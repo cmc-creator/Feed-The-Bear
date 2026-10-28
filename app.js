@@ -10741,7 +10741,7 @@ function renderMoodPicksHome (selectedMood = null) {
   const chipsWrap = document.getElementById('mood-picks-chips');
   if (!section || !list || !chipsWrap) return;
 
-  if (!state.restaurants.length) {
+  if (state.restaurants.length < HOME_MIN_SPOTS_FOR_PICKS) {
     section.classList.add('hidden');
     return;
   }
@@ -10786,7 +10786,7 @@ function renderWeeklyRecapHome () {
   const text = document.getElementById('week-recap-text');
   if (!wrap || !text) return;
 
-  if (!state.restaurants.length) {
+  if (state.restaurants.length < HOME_MIN_SPOTS_FOR_PICKS) {
     wrap.classList.add('hidden');
     return;
   }
@@ -10812,8 +10812,9 @@ function renderWeeklyRecapHome () {
   });
 
   const fav = state.restaurants.filter(r => r.isFavorite).length;
-  const topCuisine = Object.entries(cuisineHits).sort((a, b) => b[1] - a[1])[0]?.[0] || 'No streak yet';
-  text.innerHTML = `<strong>${checkins}</strong> check-in${checkins === 1 ? '' : 's'} this week • <strong>${fav}</strong> favorite${fav === 1 ? '' : 's'} • <strong>${escHtml(topCuisine)}</strong> in the lead`;
+  const topCuisine = Object.entries(cuisineHits).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+  text.innerHTML = `<strong>${checkins}</strong> check-in${checkins === 1 ? '' : 's'} this week • <strong>${fav}</strong> favorite${fav === 1 ? '' : 's'}`
+    + (topCuisine ? ` • <strong>${escHtml(topCuisine)}</strong> in the lead` : ' • Log a meal to start a streak');
   wrap.classList.remove('hidden');
 }
 
@@ -11234,7 +11235,7 @@ function renderForYouHome () {
   if (!section || !list) return;
 
   const all = state.restaurants || [];
-  if (!all.length) {
+  if (all.length < HOME_MIN_SPOTS_FOR_PICKS) {
     section.classList.add('hidden');
     return;
   }
@@ -13283,6 +13284,10 @@ function grizzlyUnlockHtml (key) {
     <span>${escHtml(pitch.body)}</span><button type="button" class="btn-primary btn-sm" data-upsell="${escHtml(key)}">Unlock with Grizzly</button></div>`;
 }
 
+const GRIZZLY_CARD_MIN_SPOTS = 5;
+// Taste-based modules need a few spots before they have anything to say.
+const HOME_MIN_SPOTS_FOR_PICKS = 3;
+
 function renderGrizzlyUi () {
   const free = !hasGrizzly();
   document.getElementById('grizzly-pill')?.classList.toggle('hidden', !free);
@@ -13291,9 +13296,10 @@ function renderGrizzlyUi () {
     const count = (state.restaurants || []).length;
     let snoozedUntil = 0;
     try { snoozedUntil = Number(localStorage.getItem(GRIZZLY_SNOOZE_KEY)) || 0; } catch { /* storage blocked */ }
-    // Near the limit it always shows; otherwise it respects "Not now".
+    // Not before 5 spots (let new users fall for the app first). Near the
+    // limit it always shows; otherwise it respects "Not now".
     const nearLimit = count >= FREE_RESTAURANT_LIMIT - 3;
-    card.classList.toggle('hidden', !free || (!nearLimit && Date.now() < snoozedUntil));
+    card.classList.toggle('hidden', !free || count < GRIZZLY_CARD_MIN_SPOTS || (!nearLimit && Date.now() < snoozedUntil));
     const pct = Math.min(100, Math.round((count / FREE_RESTAURANT_LIMIT) * 100));
     const meter = card.querySelector('.gz-meter span');
     if (meter) meter.style.width = `${pct}%`;
