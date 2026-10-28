@@ -8579,3 +8579,23 @@ body.overlay-open .save-diary-nudge { visibility: hidden; }
 .hub-more[open] summary::after { content: '▴'; }
 .hub-more-count { font-size: .7rem; padding: 1px 8px; border-radius: 999px; background: var(--surface2); color: var(--text-muted); }
 .hub-more .hub-grid { margin-top: 10px; }
+
+/* Open right now: saved spots serving at this moment. */
+.open-now-home { margin-bottom: 14px; }
+.open-now-home-list { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 4px; scrollbar-width: none; }
+.open-now-home-list::-webkit-scrollbar { display: none; }
+.open-now-card { flex: 0 0 auto; min-width: 170px; max-width: 230px; scroll-snap-align: start; display: grid; gap: 3px; text-align: left; padding: 10px 12px; border-radius: var(--radius); background: var(--surface2); border: 1px solid rgba(46, 204, 113, .35); color: var(--text); font: inherit; cursor: pointer; }
+.onc-name { font-weight: 800; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.onc-status { font-size: .76rem; font-weight: 700; color: var(--green); }
+.onc-status.soon { color: #e67e22; }
+.onc-sub { font-size: .72rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Swipe to Decide: real photos and open status on each card. */
+.swipe-card-item.has-photo { padding-top: 0; overflow: hidden; }
+.swipe-card-photo { margin: 0 -24px 14px; aspect-ratio: 4 / 3; background: #2a1c12; }
+.swipe-card-photo img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.swipe-card-open { text-align: center; font-size: .78rem; font-weight: 700; margin-top: 6px; }
+.swipe-card-open.open { color: var(--green); }
+.swipe-card-open.soon { color: #e67e22; }
+.swipe-card-open.closed { color: #e74c3c; }
+.swipe-card-item .swipe-label { z-index: 2; }
