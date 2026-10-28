@@ -908,8 +908,72 @@ function saveData () {
   updateTagSuggestions();
   setTimeout(checkAchievements, 0);
   setTimeout(renderWeeklyGoal, 0);
+  setTimeout(maybeAskToSaveDiary, 1800);
   // Sync to Firestore if user is signed in (debounced)
   if (typeof fbDebouncedSync === 'function') fbDebouncedSync();
+}
+
+// Once someone has a few spots, offer a free account so the diary isn't
+// stuck on one phone. Only right after they add a spot, at most every 5 days,
+// and never again after three "Not now"s.
+const SAVE_NUDGE_KEY = 'ftb_save_nudge_v1';
+const SAVE_NUDGE_MIN_SPOTS = 3;
+const SAVE_NUDGE_GAP = 5 * 86400000;
+let _saveNudgeCount = null;
+let _saveNudgeShown = false;
+
+function getSaveNudgeLog () {
+  try { return JSON.parse(localStorage.getItem(SAVE_NUDGE_KEY) || '{}') || {}; } catch { return {}; }
+}
+
+function noteSaveNudge (dismissed) {
+  const log = getSaveNudgeLog();
+  log.at = Date.now();
+  if (dismissed) log.dismissed = (log.dismissed || 0) + 1;
+  try { localStorage.setItem(SAVE_NUDGE_KEY, JSON.stringify(log)); } catch { /* private mode */ }
+}
+
+function maybeAskToSaveDiary () {
+  const count = (state.restaurants || []).length;
+  const grew = _saveNudgeCount !== null && count > _saveNudgeCount;
+  _saveNudgeCount = count;
+  if (!grew || _saveNudgeShown || count < SAVE_NUDGE_MIN_SPOTS) return;
+  if (!window._ftbAuthReady || window._ftbUid || typeof openAuthModal !== 'function') return;
+  if (document.body.classList.contains('overlay-open')) return;
+  const welcome = document.getElementById('cub-welcome');
+  if (welcome && !welcome.classList.contains('hidden')) return;
+  const log = getSaveNudgeLog();
+  if ((log.dismissed || 0) >= 3 || Date.now() - (log.at || 0) < SAVE_NUDGE_GAP) return;
+
+  _saveNudgeShown = true;
+  noteSaveNudge(false);
+  let returning = false;
+  try { returning = !!localStorage.getItem('ftb_uid_v1'); } catch { /* private mode */ }
+  const card = document.createElement('div');
+  card.id = 'save-diary-nudge';
+  card.className = 'save-diary-nudge';
+  card.setAttribute('role', 'dialog');
+  card.setAttribute('aria-labelledby', 'save-diary-title');
+  card.innerHTML = `
+    <div class="sdn-icon" aria-hidden="true">🐻</div>
+    <div class="sdn-body">
+      <strong id="save-diary-title">Don't lose your ${count} spots</strong>
+      <span>Right now they only live on this phone. ${returning ? 'Sign back in' : 'Make a free account'} and they're backed up for good.</span>
+      <div class="sdn-actions">
+        <button type="button" class="btn-primary btn-sm sdn-save">${returning ? 'Sign in' : 'Save my diary'}</button>
+        <button type="button" class="btn-ghost btn-sm sdn-later">Not now</button>
+      </div>
+    </div>`;
+  document.body.appendChild(card);
+  if (typeof trackProductEvent === 'function') trackProductEvent('save_nudge_shown');
+  const close = () => card.remove();
+  card.querySelector('.sdn-save').addEventListener('click', () => {
+    close();
+    if (typeof trackProductEvent === 'function') trackProductEvent('save_nudge_accepted');
+    openAuthModal();
+    if (!returning && typeof _setAuthMode === 'function') _setAuthMode('signup');
+  });
+  card.querySelector('.sdn-later').addEventListener('click', () => { noteSaveNudge(true); close(); });
 }
 
 /* Read an image file as a data URL, downscaled/compressed so a single phone
@@ -12807,7 +12871,7 @@ function renderVisitHeatmap (visited) {
    pitches what you'd get and opens the upgrade screen, and free users see
    where Grizzly lives (header pill, home card, badges on locked tools). */
 const GRIZZLY_PITCH = {
-  general:     { title: 'Go Grizzly', body: 'Unlimited spots, Byte Cub AI, Year in Review, and your food life synced on every device.' },
+  general:     { title: 'Go Grizzly', body: 'Unlimited spots, Byte Cub AI picks, Year in Review, and 15-second food videos.' },
   home:        { title: 'Feed the bear without limits', body: 'Unlimited spots, Byte Cub AI picks and dish tips, Duel verdicts, Year in Review, and sync on every device.' },
   duel:        { title: 'Let Byte Cub judge the showdown', body: 'A dramatic AI fight card that weighs vibe, value, and your notes, then crowns a winner you can share.' },
   mealplanner: { title: 'Plan your week of eating out', body: 'Byte Cub builds a day-by-day dining plan around your budget, cravings, and wish list.' },
