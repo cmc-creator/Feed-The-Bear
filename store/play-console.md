@@ -2,6 +2,8 @@
 
 Everything below is ready. Files are in `C:\Users\Ccooper\Documents\FeedTheBear-Android\`.
 
+**Doing it from another computer:** email yourself `Play-Upload-Kit.zip` from the FeedTheBear-Android folder (the .aab, icon, feature graphic and phone screenshots; no signing key). The icon, graphic and screenshots are also in this repo's `store/` folder on GitHub.
+
 > **Keep `signing.keystore` and `signing-key-info.txt` safe and private.** They prove future updates come from you. Back them up somewhere besides this computer (for example a password manager). Never put them in GitHub or send them to anyone.
 
 ## 1. Create the app
@@ -23,8 +25,8 @@ Google re-signs the app with its own key. Go to **Test and release → App integ
 ## 4. Store listing
 **Grow users → Store presence → Main store listing**
 - Short and full description: from `store/listing.md`
-- App icon (512×512): `icon-512.png` in the project folder
-- Feature graphic (1024×500): still needed (ask Claude to make one)
+- App icon (512×512): `store/icon-512.png`
+- Feature graphic (1024×500): `store/feature-graphic.png`
 - Phone screenshots: the 5 files in `store/screenshots/android/`
 
 ## 5. App content (Policy → App content)
