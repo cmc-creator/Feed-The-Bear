@@ -8619,3 +8619,6 @@ body.light-mode .restaurant-card .card-highlight.closed-now { color: #ff9a8a; }
 body.light-mode .restaurant-card .card-action-btn { border-color: rgba(246, 236, 220, .25); }
 body.light-mode .for-you-home .for-you-chip.alt { color: #8ee6a8; background: rgba(46, 204, 113, .16); border-color: rgba(142, 230, 168, .35); }
 body.light-mode .mood-picks-home .home-mood-chip:not(.active) { background: rgba(246, 236, 220, .12); border-color: rgba(246, 236, 220, .3); color: #f6ecdc; }
+
+/* Stand-in dish photo on cards with no photo of their own, clearly labeled. */
+.card-stock-tag { position: absolute; left: 10px; bottom: 10px; z-index: 2; padding: 3px 9px; border-radius: 999px; font-size: .7rem; font-weight: 700; color: #fff6e6; background: rgba(20, 12, 6, .72); backdrop-filter: blur(4px); max-width: calc(100% - 20px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

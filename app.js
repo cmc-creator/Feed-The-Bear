@@ -2273,7 +2273,7 @@ function buildCard (r) {
     <div class="card-photo">
       ${hasPhoto
         ? `<img src="${escHtml(photoSrc)}" alt="${escHtml(r.name)}" loading="lazy" onload="this.classList.add('loaded')" />`
-        : `<div class="card-photo-empty"><span class="card-photo-empty-emoji" aria-hidden="true">${cuisineEmoji(r.cuisine)}</span><span class="card-photo-empty-text">${r.status === 'visited' ? 'Add your photo' : escHtml(r.cuisine || 'Saved spot')}</span></div>`}
+        : stockDishPhotoHtml(r)}
       <div class="card-img-overlay"></div>
       <span class="card-status-badge ${r.status === 'want-to-try' ? 'want' : 'visited'}">
         ${r.status === 'want-to-try' ? 'Want to Try' : 'Visited'}
@@ -2436,6 +2436,64 @@ function myRatingHtml (rating) {
 
 function priceDollars (n) {
   return n ? '$'.repeat(n) : '';
+}
+
+/* ── Stand-in dish photos ────────────────────────────────────
+   A spot with no photo of its own gets a photo of a dish it likely serves,
+   from the Bear Swipe library, always labeled so it never passes as the
+   restaurant's own picture. A saved dish wins over the cuisine. */
+const STOCK_CUISINE = {
+  Burgers: 'American', 'Fast Food': 'American', Diner: 'American', Wings: 'American', 'Soul Food': 'Southern',
+  Sushi: 'Japanese', Ramen: 'Japanese', Pasta: 'Italian', 'Dim Sum': 'Chinese', Tapas: 'Spanish',
+  'Pub/Bar': 'British', Irish: 'British', 'Salad/Healthy': 'Healthy', Vegan: 'Healthy', 'Bakery/Cafe': 'Bakery',
+  Brunch: 'Breakfast', Lebanese: 'Middle Eastern', Peruvian: 'Latin American', Brazilian: 'Latin American',
+  Colombian: 'Latin American', Ethiopian: 'African', 'Ice Cream': 'Dessert', Desserts: 'Dessert',
+};
+const STOCK_KEYWORD = { Steakhouse: /steak/i, Burgers: /burger/i, Sushi: /sushi|nigiri|maki|sashimi/i, Ramen: /ramen/i, Wings: /wings/i, Pizza: /pizza/i };
+let _stockPhotos = null;
+let _stockLoading = false;
+
+function loadStockPhotos () {
+  if (_stockPhotos || _stockLoading || !window.BearSwipe?.loadPhotos) return;
+  _stockLoading = true;
+  window.BearSwipe.loadPhotos().then(list => {
+    _stockPhotos = Array.isArray(list) ? list : [];
+    if (_stockPhotos.length) renderCards();
+  }).catch(() => { _stockPhotos = []; });
+}
+
+function stockDishPhoto (r) {
+  if (!_stockPhotos) { loadStockPhotos(); return null; }
+  if (!_stockPhotos.length || !r) return null;
+  const seed = [...String(r.id || r.name)].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
+  const pickFrom = list => {
+    if (!list.length) return null;
+    const leads = list.filter(x => x.lead);
+    const pool = leads.length ? leads : list;
+    return pool[seed % pool.length];
+  };
+  for (const d of dishesOf(r)) {
+    const key = dishKey(d.name);
+    const hit = _stockPhotos.find(x => dishKey(x.dish) === key);
+    if (hit) return { photo: hit, label: d.name };
+  }
+  const cuisine = String(r.cuisine || '').trim();
+  if (!cuisine) return null;
+  const kw = STOCK_KEYWORD[cuisine];
+  const byKeyword = kw ? pickFrom(_stockPhotos.filter(x => kw.test(x.dish))) : null;
+  if (byKeyword) return { photo: byKeyword, label: `Typical ${cuisine}` };
+  const lib = STOCK_CUISINE[cuisine] || cuisine;
+  const byCuisine = pickFrom(_stockPhotos.filter(x => String(x.cuisine).toLowerCase() === lib.toLowerCase()));
+  return byCuisine ? { photo: byCuisine, label: `Typical ${cuisine}` } : null;
+}
+
+function stockDishPhotoHtml (r) {
+  const stock = stockDishPhoto(r);
+  if (!stock) {
+    return `<div class="card-photo-empty"><span class="card-photo-empty-emoji" aria-hidden="true">${cuisineEmoji(r.cuisine)}</span><span class="card-photo-empty-text">${r.status === 'visited' ? 'Add your photo' : escHtml(r.cuisine || 'Saved spot')}</span></div>`;
+  }
+  return `<img class="card-photo-stock" src="${escHtml(stock.photo.url)}" alt="${escHtml(stock.photo.dish)}" loading="lazy" onload="this.classList.add('loaded')" />
+    <span class="card-stock-tag" title="Photo: ${escHtml(stock.photo.credit || 'Wikimedia Commons')}">📷 ${escHtml(stock.label)}${r.status === 'visited' ? ' · add yours' : ''}</span>`;
 }
 
 /* ── Place info: Google rating, price, hours, open now ────── */
