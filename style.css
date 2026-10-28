@@ -8599,3 +8599,23 @@ body.overlay-open .save-diary-nudge { visibility: hidden; }
 .swipe-card-open.soon { color: #e67e22; }
 .swipe-card-open.closed { color: #e74c3c; }
 .swipe-card-item .swipe-label { z-index: 2; }
+
+/* Light theme: these cards keep their dark wood/navy backgrounds, so they
+   need light text (they were getting the light theme's dark ink). */
+body.light-mode .for-you-home, body.light-mode .mood-picks-home, body.light-mode .week-recap-home,
+body.light-mode .for-you-card, body.light-mode .restaurant-card {
+  --text: #f6ecdc; --text-dim: #d8c4a7; --text-muted: #d8c4a7; --green: #7fdc9a;
+  color: #f6ecdc;
+}
+body.light-mode .for-you-home-title, body.light-mode .mood-picks-home-title, body.light-mode .week-recap-title,
+body.light-mode .week-recap-text, body.light-mode .week-recap-home strong { color: #f6ecdc; }
+body.light-mode .for-you-home .btn-ghost, body.light-mode .for-you-card-meta, body.light-mode .home-mood-chip:not(.active),
+body.light-mode .restaurant-card .my-rating-row, body.light-mode .restaurant-card .card-action-btn { color: #e8d8bf; }
+body.light-mode .for-you-chip, body.light-mode .mood-pick-fit, body.light-mode .restaurant-card .card-highlight.good { color: #8ee6a8; background: rgba(46, 204, 113, .16); }
+body.light-mode .restaurant-card .card-highlight.mood, body.light-mode .restaurant-card .card-highlight { color: #f3c9a5; }
+body.light-mode .restaurant-card .card-highlight.open-now { color: #8ee6a8; }
+body.light-mode .restaurant-card .card-highlight.open-soon { color: #f5b36b; }
+body.light-mode .restaurant-card .card-highlight.closed-now { color: #ff9a8a; }
+body.light-mode .restaurant-card .card-action-btn { border-color: rgba(246, 236, 220, .25); }
+body.light-mode .for-you-home .for-you-chip.alt { color: #8ee6a8; background: rgba(46, 204, 113, .16); border-color: rgba(142, 230, 168, .35); }
+body.light-mode .mood-picks-home .home-mood-chip:not(.active) { background: rgba(246, 236, 220, .12); border-color: rgba(246, 236, 220, .3); color: #f6ecdc; }

@@ -27,7 +27,12 @@ async function upgradeTitle (p) {
   check(await upgradeTitle(p) === 'Go Grizzly', 'the pill opens the upgrade screen');
   await closeAllDialogs(p);
   const card = p.locator('#grizzly-home');
-  check(await card.isVisible() && /2 of 15 free spots used/.test(await card.innerText()), 'home card shows spots used');
+  check(await card.isHidden(), 'no Grizzly card for a brand-new den (2 spots)');
+  await p.evaluate(() => {
+    for (let i = 0; i < 3; i++) state.restaurants.push({ id: 'y' + i, name: 'Early ' + i, status: 'want-to-try', tags: [], visits: [] });
+    renderAll();
+  });
+  check(await card.isVisible() && /5 of 15 free spots used/.test(await card.innerText()), 'home card shows spots used once they have 5');
   await card.scrollIntoViewIfNeeded();
   await card.screenshot({ path: path.join(SHOTS, 'grizzly-card.png') }).catch(() => {});
   await p.click('#grizzly-home .gz-snooze');
@@ -35,7 +40,7 @@ async function upgradeTitle (p) {
 
   // Near the limit the card comes back regardless.
   await p.evaluate(() => {
-    for (let i = 0; i < 11; i++) state.restaurants.push({ id: 'x' + i, name: 'Spot ' + i, status: 'want-to-try', tags: [], visits: [] });
+    for (let i = 0; i < 8; i++) state.restaurants.push({ id: 'x' + i, name: 'Spot ' + i, status: 'want-to-try', tags: [], visits: [] });
     renderAll();
   });
   check(await card.isVisible() && /13 of 15/.test(await card.innerText()), 'near the limit the card shows even after "Not now"');
