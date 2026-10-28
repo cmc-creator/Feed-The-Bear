@@ -3456,7 +3456,7 @@ function renderAll () {
   updateLocationBanner();
   // Home sections are isolated: a failure in one must never cascade and
   // abort renderAll (which would leave later init wiring unattached).
-  [renderGrizzlyUi, renderTodayStatusRow, renderWeeklyGoal, renderCraveHome, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
+  [renderGrizzlyUi, renderTodayStatusRow, renderWeeklyGoal, renderCraveHome, renderFriendsFeedHome, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
     .forEach(fn => { try { fn(); } catch (err) { console.error(`${fn.name} failed:`, err); } });
 }
 
@@ -6285,7 +6285,15 @@ function setupEvents () {
     renderFriendsList();
   });
   document.getElementById('friends-link-input').addEventListener('keydown', e => { if (e.key === 'Enter') loadFriendProfile(); });
-  document.getElementById('friends-copy-btn').addEventListener('click', () => { navigator.clipboard?.writeText(document.getElementById('friends-my-link-input').value); showToast('Copied!', 'Profile link copied.', 'success'); });
+  document.getElementById('friends-copy-btn').addEventListener('click', () => {
+    const link = document.getElementById('friends-my-link-input').value;
+    if (!link) { showToast('Almost there', 'Rate a spot or log a dish first, so friends have something to see.', 'info'); return; }
+    navigator.clipboard?.writeText(link);
+    startSharingLive();
+    showToast('Copied!', 'Profile link copied.', 'success');
+  });
+  document.getElementById('friends-invite-btn')?.addEventListener('click', inviteFriend);
+  document.getElementById('ff-open-friends')?.addEventListener('click', openFoodieFriends);
 
   // Phase 8 - Smart Discovery
   document.getElementById('discover-close-btn').addEventListener('click', closeDiscover);
@@ -7693,7 +7701,7 @@ function renderPassport () {
     const isNew = unlocked && !prevUnlocked.has(key);
     if (isNew) newUnlocks++;
     html += '<div class="passport-stamp ' + (unlocked ? 'unlocked' : 'locked') + (isNew ? ' new-unlock' : '') + '" title="' + (count > 0 ? count + ' visit' + (count>1?'s':'') : 'Not tried yet') + '">'
-      + '<span class="ps-emoji">' + (unlocked ? emoji : '') + '</span>'
+      + '<span class="ps-emoji">' + (unlocked ? (emoji || cuisineEmoji(name)) : '🔒') + '</span>'
       + '<span>' + escHtml(name) + '</span>'
       + (count > 0 ? '<span class="ps-count">' + count + 'x</span>' : '')
       + '</div>';
@@ -8476,6 +8484,206 @@ function profileHasContent (data) {
 function encodeProfileLink (data) {
   const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
   return window.location.href.split('?')[0].split('#')[0] + '#profile=' + encoded;
+}
+
+/* ── Friends' feed: what the people you follow ate lately ──
+   After you share your link, your latest activity is published (signed-in
+   only) so followers see it live. Friends' data is untrusted: re-shaped,
+   clipped and escaped like profile links. */
+const FRIENDS_LIVE_EVERY = 30 * 60 * 1000;
+let _friendsLiveAt = 0;
+
+function buildRecentActivity () {
+  const items = [];
+  const day = v => String(v || '').slice(0, 10);
+  (state.restaurants || []).forEach(r => {
+    const base = { n: String(r.name || '').slice(0, 60), c: String(r.cuisine || '').slice(0, 40), a: String(r.address || '').slice(0, 60) };
+    if (!base.n) return;
+    const visits = Array.isArray(r.visits) ? r.visits : [];
+    visits.forEach(v => { if (v.date) items.push({ ...base, k: 'visit', r: Math.round(Number(v.rating) || 0), at: day(v.date) }); });
+    if (!visits.length && r.dateVisited) items.push({ ...base, k: 'visit', r: r.myRating || 0, at: day(r.dateVisited) });
+    dishesOf(r).forEach(d => {
+      if (d.verdict === 'again' && d.date) items.push({ ...base, k: 'dish', d: String(d.name).slice(0, 40), at: day(d.date) });
+    });
+    if (r.status === 'want-to-try' && r.dateAdded) items.push({ ...base, k: 'save', at: day(r.dateAdded) });
+  });
+  return items.filter(i => /^\d{4}-\d{2}-\d{2}$/.test(i.at)).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 15);
+}
+
+// What friends who follow your link can see, or null while you're not sharing.
+function buildLiveProfile () {
+  if (!state.settings.shareLive || !state.settings.profileShareId) return null;
+  const { ts, ...profile } = buildProfileData();
+  const me = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
+  return { id: profile.id, u: profile.u, av: normalizeAvatar(me.avatar), profile, recent: buildRecentActivity() };
+}
+
+function startSharingLive () {
+  if (state.settings.shareLive) return;
+  state.settings.shareLive = true;
+  getProfileShareId();
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); } catch { /* storage full */ }
+  if (typeof fbPublishFriendProfile === 'function') fbPublishFriendProfile();
+  renderFriendsLiveNote();
+}
+
+function stopSharingLive () {
+  state.settings.shareLive = false;
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); } catch { /* storage full */ }
+  if (typeof fbUnpublishFriendProfile === 'function') fbUnpublishFriendProfile(state.settings.profileShareId);
+  renderFriendsLiveNote();
+  showToast('Sharing paused', "Friends keep what they already have, but won't see new visits.", 'info');
+}
+
+function renderFriendsLiveNote () {
+  const el = document.getElementById('friends-live-note');
+  if (!el) return;
+  if (!state.settings.shareLive) { el.innerHTML = ''; return; }
+  el.innerHTML = window._ftbUid
+    ? 'Friends with your link see your latest visits. <button type="button" class="auth-link-btn" id="friends-stop-live">Stop sharing</button>'
+    : 'Sign in so friends see your new visits as they happen. <button type="button" class="auth-link-btn" id="friends-live-signin">Sign in</button>';
+  el.querySelector('#friends-stop-live')?.addEventListener('click', stopSharingLive);
+  el.querySelector('#friends-live-signin')?.addEventListener('click', () => { closeFoodieFriends(); setTimeout(openAuthModal, 150); });
+}
+
+async function inviteFriend () {
+  const data = buildProfileData();
+  const url = profileHasContent(data) ? encodeProfileLink(data) : window.location.href.split('?')[0].split('#')[0];
+  const text = profileHasContent(data)
+    ? "Here's where I eat and what I order. Follow me on Feed the Bear and send me yours!"
+    : 'Come track your favorite food spots with me on Feed the Bear!';
+  if (profileHasContent(data)) startSharingLive();
+  trackProductEvent('friend_invite', { withProfile: profileHasContent(data) });
+  try {
+    if (navigator.share) { await navigator.share({ title: 'Feed the Bear', text, url }); return; }
+  } catch (err) {
+    if (err && err.name === 'AbortError') return;
+  }
+  try { await navigator.clipboard.writeText(`${text} ${url}`); } catch { /* no clipboard */ }
+  showToast('Invite copied', 'Paste it in a text to a friend.', 'success');
+}
+
+function sanitizeRecent (list) {
+  const str = (v, n) => String(v ?? '').slice(0, n);
+  return (Array.isArray(list) ? list : []).slice(0, 15).map(x => ({
+    k: ['visit', 'dish', 'save'].includes(x?.k) ? x.k : '',
+    n: str(x?.n, 60), c: str(x?.c, 40), a: str(x?.a, 60), d: str(x?.d, 40),
+    r: Math.max(0, Math.min(5, Math.round(Number(x?.r) || 0))),
+    at: /^\d{4}-\d{2}-\d{2}$/.test(str(x?.at, 10)) ? str(x.at, 10) : '',
+  })).filter(x => x.k && x.n && x.at);
+}
+
+// Pull followed friends' live profiles (at most every 30 minutes).
+async function refreshFriendsLive (force = false) {
+  if (typeof fbFetchFriendProfiles !== 'function') return;
+  if (!force && Date.now() - _friendsLiveAt < FRIENDS_LIVE_EVERY) return;
+  const friends = getFriends().filter(f => f.data?.id);
+  if (!friends.length) return;
+  _friendsLiveAt = Date.now();
+  const docs = await fbFetchFriendProfiles(friends.map(f => f.data.id));
+  let changed = false;
+  const list = getFriends();
+  docs.forEach((doc, i) => {
+    if (!doc) return;
+    const entry = list.find(f => f.key === friends[i].key);
+    if (!entry) return;
+    const data = sanitizeFriendData({ ...(doc.profile || {}), id: friends[i].data.id, u: doc.u || entry.name });
+    entry.data = data;
+    entry.name = data.u || entry.name;
+    entry.recent = sanitizeRecent(doc.recent);
+    entry.av = typeof doc.av === 'string' ? doc.av.slice(0, 20) : '';
+    entry.liveAt = Date.now();
+    changed = true;
+  });
+  if (changed) {
+    saveFriends(list);
+    renderFriendsFeedHome();
+    if (!document.getElementById('friends-overlay')?.classList.contains('hidden')) renderFriendsList();
+  }
+}
+window.addEventListener('load', () => setTimeout(() => refreshFriendsLive(), 3000));
+
+function feedAgo (day) {
+  const [y, m, d] = String(day).split('-').map(Number);
+  if (!y) return '';
+  const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(y, m - 1, d).getTime()) / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 7) return `${days}d ago`;
+  if (days < 60) return `${Math.round(days / 7)}w ago`;
+  return `${Math.round(days / 30)}mo ago`;
+}
+
+function friendsFeedItems () {
+  const items = [];
+  getFriends().forEach(f => {
+    const who = { name: f.name || 'Friend', av: f.av || '' };
+    if (Array.isArray(f.recent) && f.recent.length) {
+      f.recent.forEach(x => items.push({ ...x, who }));
+    } else {
+      // Not live yet: show their go-to orders from the link they shared.
+      (f.data?.picks || []).slice(0, 3).forEach(p => items.push({ k: p.g?.length ? 'dish' : 'visit', n: p.n, c: p.c, a: p.a, d: p.g?.[0] || '', r: p.r, at: '', who }));
+    }
+  });
+  return items.sort((a, b) => (b.at || '').localeCompare(a.at || '')).slice(0, 6);
+}
+
+function renderFriendsFeedHome () {
+  const section = document.getElementById('friends-feed-home');
+  const list = document.getElementById('ff-list');
+  if (!section || !list) return;
+  if (!(state.restaurants || []).length) { section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+  const items = friendsFeedItems();
+  if (!items.length) {
+    list.innerHTML = `<div class="ff-empty">
+      <span class="ff-empty-icon" aria-hidden="true">🍽️</span>
+      <span><strong>Food's better with friends.</strong> Invite someone and see where they eat and what they order.</span>
+      <button type="button" class="btn-primary btn-sm" id="ff-invite">Invite a friend</button>
+    </div>`;
+    list.querySelector('#ff-invite').addEventListener('click', inviteFriend);
+    return;
+  }
+  const mine = new Map((state.restaurants || []).map(r => [normalizeName(r.name), r]));
+  list.innerHTML = items.map((x, i) => {
+    const who = `<strong>${escHtml(x.who.name)}</strong>`;
+    const at = `<strong>${escHtml(x.n)}</strong>`;
+    const stars = x.r ? ` <span class="ff-stars">${'★'.repeat(x.r)}</span>` : '';
+    const line = x.k === 'dish' && x.d ? `${who} would get the <strong>${escHtml(x.d)}</strong> again at ${at}`
+      : x.k === 'save' ? `${who} wants to try ${at}`
+      : `${who} ate at ${at}${stars}`;
+    const have = mine.get(normalizeName(x.n));
+    return `<div class="ff-item">
+      <span class="ff-avatar" aria-hidden="true">${avatarSvg(x.who.av)}</span>
+      <span class="ff-text">${line}<span class="ff-meta">${escHtml([cuisineEmoji(x.c) + ' ' + (x.c || ''), feedAgo(x.at)].map(s => s.trim()).filter(Boolean).join(' · '))}</span></span>
+      ${have ? `<button type="button" class="btn-ghost btn-sm ff-view" data-id="${escHtml(have.id)}">View</button>`
+        : `<button type="button" class="btn-sm btn-orange ff-save" data-i="${i}">＋ Save</button>`}
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.ff-view').forEach(b => b.addEventListener('click', () => openDetailModal(b.dataset.id)));
+  list.querySelectorAll('.ff-save').forEach(b => b.addEventListener('click', () => saveFromFriend(items[Number(b.dataset.i)])));
+}
+
+function saveFromFriend (x) {
+  if (!x) return;
+  if (typeof isPremium === 'function' && !isPremium() && state.restaurants.length >= FREE_RESTAURANT_LIMIT) {
+    showGrizzlyUpsell('limit');
+    return;
+  }
+  const today = iso();
+  const r = {
+    id: uid(), name: x.n.slice(0, 80), cuisine: x.c || '', priceRange: 0, address: x.a || '', lat: null, lng: null,
+    website: '', photo: '', googleRating: 0, googleReviews: 0, myRating: 0,
+    notes: `${x.who.name} recommended it.`, tags: ['From a friend'], collectionId: null, priority: '',
+    status: 'want-to-try', dateAdded: today, dateVisited: null, updatedAt: Date.now(), visits: [],
+  };
+  state.restaurants.unshift(r);
+  if (x.d) upsertDish(r, { name: x.d, verdict: 'want' });
+  else saveData();
+  if (r.address && typeof geocodeAddress === 'function') geocodeAddress(r.id, r.address);
+  renderAll();
+  trackProductEvent('friend_spot_saved');
+  showToast(`${r.name} saved`, x.d ? `On your list, with the ${x.d} to try.` : 'On your Want to Try list.', 'success');
 }
 
 /* ── Friends: follow someone's profile link, see their orders ──
@@ -9783,6 +9991,8 @@ function renderFriendsList () {
 function openFoodieFriends () {
   _buildFriendsMyLink();
   renderFriendsList();
+  renderFriendsLiveNote();
+  refreshFriendsLive(true);
   document.getElementById('friends-link-input').value = '';
   document.getElementById('friends-result').classList.add('hidden');
   document.getElementById('friends-result').innerHTML = '';

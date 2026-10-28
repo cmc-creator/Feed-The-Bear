@@ -8550,3 +8550,20 @@ body.overlay-open .save-diary-nudge { visibility: hidden; }
 .detail-open-dot.closed { background: #e74c3c; }
 .detail-hours-links { display: flex; flex-wrap: wrap; gap: 8px; }
 .detail-hours-link { padding: 6px 12px; border-radius: 999px; background: var(--surface2); color: var(--text); text-decoration: none; font-weight: 600; font-size: .85rem; }
+
+/* Friends' feed on the home screen. */
+.friends-feed-home { margin: 16px 0; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--border); }
+.ff-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.ff-title { font-weight: 800; font-size: 1.05rem; }
+.ff-list { display: grid; gap: 10px; }
+.ff-item { display: flex; align-items: center; gap: 10px; }
+.ff-avatar { width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; overflow: hidden; }
+.ff-avatar svg { width: 100%; height: 100%; display: block; }
+.ff-text { flex: 1; min-width: 0; font-size: .9rem; line-height: 1.35; }
+.ff-meta { display: block; font-size: .76rem; color: var(--text-dim); margin-top: 2px; }
+.ff-stars { color: var(--gold); letter-spacing: 1px; }
+.ff-item .btn-sm { flex-shrink: 0; }
+.ff-empty { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; font-size: .9rem; }
+.ff-empty-icon { font-size: 2rem; grid-row: span 2; }
+.ff-empty .btn-sm { justify-self: start; }
+.friends-live-note { margin-top: 8px; font-size: .78rem; color: var(--text-dim); }

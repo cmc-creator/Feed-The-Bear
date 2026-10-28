@@ -186,8 +186,47 @@ function fbDebouncedSync () {
   const uid = window._ftbUid;
   if (!uid) return;
   clearTimeout(_syncTimer);
-  _syncTimer = setTimeout(() => fbSaveRestaurants(uid, state.restaurants), 3000);
+  _syncTimer = setTimeout(() => {
+    fbSaveRestaurants(uid, state.restaurants);
+    fbPublishFriendProfile();
+  }, 3000);
 }
+
+// ─── LIVE FRIEND PROFILES ─────────────────────────────────────
+// Once you've shared your profile link, friends who follow it read
+// profiles/{shareId} for your latest visits and orders. The share id is
+// the random part of your link; only people with the link can read it.
+let _lastPublishedProfile = '';
+async function fbPublishFriendProfile () {
+  const uid = window._ftbUid;
+  if (!uid || !_db || typeof buildLiveProfile !== 'function') return;
+  const doc = buildLiveProfile();
+  if (!doc) return;
+  const json = JSON.stringify(doc);
+  if (json === _lastPublishedProfile) return;
+  try {
+    await _db.doc(`profiles/${doc.id}`).set({ ...doc, uid, updatedAt: Date.now() });
+    _lastPublishedProfile = json;
+  } catch (err) {
+    console.warn('[FTB] profile publish failed:', err.code || err);
+  }
+}
+
+async function fbUnpublishFriendProfile (id) {
+  _lastPublishedProfile = '';
+  if (!_db || !window._ftbUid || !id) return;
+  try { await _db.doc(`profiles/${id}`).delete(); } catch (err) { console.warn('[FTB] profile unpublish failed:', err.code || err); }
+}
+
+async function fbFetchFriendProfiles (ids) {
+  if (!_db || !ids.length) return [];
+  return Promise.all(ids.map(id => _db.doc(`profiles/${id}`).get()
+    .then(snap => (snap.exists ? snap.data() : null))
+    .catch(() => null)));
+}
+window.fbPublishFriendProfile = fbPublishFriendProfile;
+window.fbUnpublishFriendProfile = fbUnpublishFriendProfile;
+window.fbFetchFriendProfiles = fbFetchFriendProfiles;
 
 // ─── SHARED LISTS REALTIME ───────────────────────────────────
 function fbSharedListUpsert (sharedId, payload) {

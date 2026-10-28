@@ -86,3 +86,6 @@ jobs:
       - name: Place info
         working-directory: tests
         run: node placeinfo.test.js
+      - name: Friends feed
+        working-directory: tests
+        run: node feed.test.js

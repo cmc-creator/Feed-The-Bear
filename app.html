@@ -760,6 +760,14 @@
         <div id="crave-home-list" class="crave-home-list"></div>
       </div>
 
+      <div id="friends-feed-home" class="friends-feed-home home-module hidden" aria-label="Friends feed">
+        <div class="ff-header">
+          <span class="ff-title">Friends' Feed</span>
+          <button type="button" class="btn-ghost btn-sm" id="ff-open-friends">Friends</button>
+        </div>
+        <div id="ff-list" class="ff-list"></div>
+      </div>
+
       <!-- Personal recommendation strip (below nearby) -->
       <div id="for-you-home" class="for-you-home home-module hidden">
         <div class="for-you-home-header">
@@ -1850,7 +1858,9 @@
         <div style="display:flex;gap:6px;margin-top:4px">
           <input id="friends-my-link-input" class="form-input" readonly style="flex:1;font-size:.75rem" />
           <button id="friends-copy-btn" class="btn-sm btn-orange">Copy</button>
+          <button id="friends-invite-btn" class="btn-sm btn-primary">Invite</button>
         </div>
+        <div id="friends-live-note" class="friends-live-note"></div>
       </div>
     </div>
   </div>
