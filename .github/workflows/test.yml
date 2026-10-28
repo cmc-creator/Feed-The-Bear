@@ -89,3 +89,6 @@ jobs:
       - name: Friends feed
         working-directory: tests
         run: node feed.test.js
+      - name: Discover hub
+        working-directory: tests
+        run: node hub.test.js

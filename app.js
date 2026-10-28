@@ -9120,49 +9120,48 @@ function runToolAction (action) {
    thumb-friendly, searchable grid of tiles, grouped by intent. */
 // Grouped by what you're trying to do, most common first. The two everyday
 // actions lead; the many "pick for me" games sit together under one heading.
+// Six favorites up top, themed rows you swipe sideways, and utilities
+// folded under "More tools". Overlapping tools only show up in search.
 const HUB_SECTIONS = [
-  { title: 'Eat now', items: [
-    ['just-ate','','Just Ate'], ['decision','','Decision Mode'],
-    ['open-now','','Open Now'], ['discover','','Smart Discovery'],
+  { title: 'Start here', layout: 'featured', items: [
+    ['just-ate','📸','Just Ate'], ['swipe','👆','Swipe to Decide'],
+    ['tonight','🌙',"Tonight's Pick"], ['open-now','🟢','Open Now'],
+    ['friends','👯','Friends'], ['spin','🎡','Spin the Wheel'],
   ]},
-  { title: "Can't decide? Play it out", items: [
-    ['swipe','','Swipe to Decide'], ['spin','','Spin the Wheel'],
-    ['duel','','Restaurant Duel'], ['craving','','Craving Engine'],
-    ['tonight','',"Tonight's Pick"], ['fortune','','Fortune Cookie'],
+  { title: "Can't decide?", items: [
+    ['decision','🏆','Decision Mode'], ['duel','⚔️','Restaurant Duel'],
+    ['craving','😋','Craving Engine'], ['fortune','🥠','Fortune Cookie'],
+    ['discover','🔎','Smart Discovery'],
   ]},
-  { title: 'With friends', items: [
-    ['friends','','Friends'], ['groupvote','','Group Vote'],
-    ['rooms','','Dinner Rooms'], ['profile','','My Profile'],
-  ]},
-  { title: 'Plan a food day', items: [
-    ['itinerary','','Smart Itinerary'], ['route','','Route Planner'],
-    ['mealplanner','','Meal Planner'], ['travel','✈','Travel Mode'],
+  { title: 'Eat with your crew', items: [
+    ['groupvote','🗳️','Group Vote'], ['rooms','🍽️','Dinner Rooms'], ['profile','🐻','My Profile'],
   ]},
   { title: 'Your food life', items: [
-    ['gallery','','Photo Gallery'], ['visitlog','','Visit Log'],
-    ['passport','','Passport'], ['worldmap','','Cuisine Map'],
-    ['moodcal','','Mood Calendar'], ['beenawhile','⏰','Been a While'],
-    ['review','','Year in Review'], ['wrap','','Monthly Wrap'],
-    ['digest','','Monthly Digest'], ['stats2','','Deep Stats'],
+    ['review','🎉','Year in Review'], ['wrap','🎁','Monthly Wrap'],
+    ['passport','🛂','Passport'], ['gallery','🖼️','Photo Gallery'],
+    ['visitlog','📖','Visit Log'], ['moodcal','📅','Mood Calendar'],
+    ['beenawhile','⏰','Been a While'], ['stats2','📊','Deep Stats'],
   ]},
   { title: 'Games & rewards', items: [
-    ['challenge','','Challenges'], ['achievements','','Achievements'],
-    ['bingo','','Cuisine Bingo'], ['feedbear','','Feed the Bear'],
+    ['challenge','🎯','Challenges'], ['achievements','🏅','Achievements'],
+    ['bingo','🎱','Cuisine Bingo'], ['feedbear','🐻','Feed the Bear'],
   ]},
-  { title: 'Money', items: [
-    ['budget','','Budget'], ['spend','','Spend Tracker'], ['compare','⚖','Compare'],
+  { title: 'Plan a food day', items: [
+    ['itinerary','🗺️','Smart Itinerary'], ['mealplanner','🥗','Meal Planner'], ['travel','✈️','Travel Mode'],
   ]},
-  { title: 'Data & tools', items: [
-    ['ai-panel','','Byte Cub'], ['command','⌘','Command Palette'],
-    ['collections','','My Lists'], ['bulk','☑','Bulk Select'],
-    ['location','','Location'], ['export2','','Export Passport'],
-    ['export','','Export JSON'], ['import','','Import JSON'],
-    ['import-bookmarks','','Import Bookmarks'], ['pdf','','Export PDF'],
+  { title: 'More tools', layout: 'more', items: [
+    ['ai-panel','🤖','Byte Cub'], ['collections','📋','My Lists'],
+    ['budget','💰','Budget'], ['spend','🧾','Spend Tracker'], ['compare','⚖️','Compare'],
+    ['location','📍','Location'], ['bulk','☑️','Bulk Select'], ['command','⌘','Command Palette'],
+    ['export2','🛂','Export Passport'], ['pdf','📄','Export PDF'],
+    ['export','💾','Export JSON'], ['import','📥','Import JSON'],
+    ['import-bookmarks','🔖','Import Bookmarks'],
+  ]},
+  { title: 'Also try', layout: 'search', items: [
+    ['digest','🗞️','Monthly Digest'], ['worldmap','🌍','Cuisine Map'], ['route','🛣️','Route Planner'],
   ]},
 ];
 
-// Big preview cards for the fun stuff; utility sections stay compact tiles.
-const HUB_COMPACT_SECTIONS = new Set(['Money', 'Data & tools']);
 // [one-line pitch, preview style]
 const HUB_INFO = {
   'just-ate':    ['Snap it, rate it, done in 10 seconds', 'photo'],
@@ -9256,28 +9255,34 @@ function renderMobileHub (filter = '') {
   if (!body) return;
   const q = filter.trim().toLowerCase();
   const lock = action => (GRIZZLY_TOOLS.has(action) && !hasGrizzly() ? '<span class="hub-lock">GRIZZLY</span>' : '');
+  const card = ([action, , label]) => {
+    const [sub, style] = HUB_INFO[action] || ['', 'photo'];
+    const stat = hubStat(action);
+    return `<button class="hub-card" data-tool="${action}">${lock(action)}
+      ${hubPreviewHtml(style)}
+      <span class="hub-card-text"><span class="hub-card-title">${label}</span>
+        <span class="hub-card-sub">${escHtml(sub)}</span>
+        ${stat ? `<span class="hub-card-stat">${escHtml(stat)}</span>` : ''}</span>
+    </button>`;
+  };
+  const tile = ([action, emoji, label]) => `<button class="hub-tile" data-tool="${action}">${lock(action)}
+    <span class="hub-tile-emoji" aria-hidden="true">${emoji}</span><span class="hub-tile-label">${label}</span></button>`;
   const html = HUB_SECTIONS.map(sec => {
     const items = sec.items.filter(([action, , label]) => !q || label.toLowerCase().includes(q) || (HUB_INFO[action]?.[0] || '').toLowerCase().includes(q));
-    if (!items.length) return '';
-    const compact = HUB_COMPACT_SECTIONS.has(sec.title);
+    if (!items.length || (sec.layout === 'search' && !q)) return '';
+    if (q) {
+      // Searching: one flat grid, no folding.
+      return `<div class="hub-section"><div class="hub-section-title">${sec.title}</div>
+        <div class="hub-grid">${items.map(tile).join('')}</div></div>`;
+    }
+    if (sec.layout === 'more') {
+      return `<details class="hub-section hub-more"><summary class="hub-section-title">${sec.title} <span class="hub-more-count">${items.length}</span></summary>
+        <div class="hub-grid">${items.map(tile).join('')}</div></details>`;
+    }
+    const rowClass = sec.layout === 'featured' ? 'hub-cards' : 'hub-cards hub-row';
     return `<div class="hub-section">
       <div class="hub-section-title">${sec.title}</div>
-      <div class="${compact ? 'hub-grid' : 'hub-cards'}">
-        ${items.map(([action, emoji, label]) => {
-          if (compact) {
-            return `<button class="hub-tile" data-tool="${action}">${lock(action)}
-              <span class="hub-tile-emoji">${emoji}</span><span class="hub-tile-label">${label}</span></button>`;
-          }
-          const [sub, style] = HUB_INFO[action] || ['', 'photo'];
-          const stat = hubStat(action);
-          return `<button class="hub-card" data-tool="${action}">${lock(action)}
-            ${hubPreviewHtml(style)}
-            <span class="hub-card-text"><span class="hub-card-title">${label}</span>
-              <span class="hub-card-sub">${escHtml(sub)}</span>
-              ${stat ? `<span class="hub-card-stat">${escHtml(stat)}</span>` : ''}</span>
-          </button>`;
-        }).join('')}
-      </div>
+      <div class="${rowClass}">${items.map(card).join('')}</div>
     </div>`;
   }).join('');
   body.innerHTML = html || '<p class="hub-empty">No tools match “' + escHtml(filter) + '”.</p>';

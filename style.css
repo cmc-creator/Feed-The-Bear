@@ -8567,3 +8567,15 @@ body.overlay-open .save-diary-nudge { visibility: hidden; }
 .ff-empty-icon { font-size: 2rem; grid-row: span 2; }
 .ff-empty .btn-sm { justify-self: start; }
 .friends-live-note { margin-top: 8px; font-size: .78rem; color: var(--text-dim); }
+
+/* Discover & Play: themed rows scroll sideways; utilities fold away. */
+.hub-cards.hub-row { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 10px; padding-bottom: 6px; scrollbar-width: none; }
+.hub-cards.hub-row::-webkit-scrollbar { display: none; }
+.hub-cards.hub-row .hub-card { flex: 0 0 42%; scroll-snap-align: start; }
+@media (min-width: 700px) { .hub-cards.hub-row .hub-card { flex-basis: 30%; } }
+.hub-more summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; }
+.hub-more summary::-webkit-details-marker { display: none; }
+.hub-more summary::after { content: '▾'; margin-left: auto; opacity: .6; }
+.hub-more[open] summary::after { content: '▴'; }
+.hub-more-count { font-size: .7rem; padding: 1px 8px; border-radius: 999px; background: var(--surface2); color: var(--text-muted); }
+.hub-more .hub-grid { margin-top: 10px; }
