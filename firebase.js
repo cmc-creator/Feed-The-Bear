@@ -10,13 +10,13 @@
 // ⚠️  Stripe Dashboard → Products → (your product) → Prices
 
 const _FB_CONFIG = {
-  apiKey:            'AIzaSyDH4b9L-CmVsyl2xn2K6peQ3CRmeM6VKI4',
-  authDomain:        'feedthebear-3ab9c.firebaseapp.com',
-  projectId:         'feedthebear-3ab9c',
-  storageBucket:     'feedthebear-3ab9c.firebasestorage.app',
-  messagingSenderId: '143862557009',
-  appId:             '1:143862557009:web:f9605b80e2344c0d9e4b70',
-  measurementId:     'G-2R1LWK111N',
+  apiKey:            'AIzaSyCqWTvEFYCEVjooO_eCVGNFsIeya17q3WQ',
+  authDomain:        'feed-the-bear-app-2-102926.firebaseapp.com',
+  projectId:         'feed-the-bear-app-2-102926',
+  storageBucket:     'feed-the-bear-app-2-102926.firebasestorage.app',
+  messagingSenderId: '565915716798',
+  appId:             '1:565915716798:web:1b40da485d3d59c54622ef',
+  measurementId:     'G-3B8CXBZCZ0',
 };
 
 const _STRIPE_PK = 'pk_live_51Tk95ILzFIsRCvKRhcGFReLfSCM0AkX6I2jyN7qjjHEPce8sycXOZVvCxxeNsT84yysNdxxzeiDFHXhyB45BewaK00ne0FeBR4';
