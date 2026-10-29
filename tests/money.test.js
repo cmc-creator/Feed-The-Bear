@@ -90,6 +90,11 @@ async function upgradeTitle (p) {
   await p.waitForTimeout(400);
   check(await p.locator('#auth-overlay').isVisible().catch(() => false), 'signed-out upgrade opens sign-in');
   check(await p.evaluate(() => sessionStorage.getItem('ftb_pending_upgrade')) === 'yearly', 'upgrade intent is remembered through sign-in');
+  const authText = await p.locator('#auth-overlay').innerText();
+  check(!/free/i.test(authText) && /Grizzly/.test(authText), `upgrade sign-in talks Grizzly, never "free" (${authText.slice(0, 90)})`);
+  await closeAllDialogs(p);
+  await p.evaluate(() => openAuthModal());
+  check(/backed up/.test(await p.locator('#auth-overlay .auth-sub').innerText()) && await p.locator('#auth-title').innerText() === 'Welcome back', 'regular sign-in keeps its own wording');
   await closeAllDialogs(p);
 
   // Grizzly members don't see upsells

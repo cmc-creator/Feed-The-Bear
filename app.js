@@ -8624,7 +8624,7 @@ function renderFriendsLiveNote () {
     ? 'Friends with your link see your latest visits. <button type="button" class="auth-link-btn" id="friends-stop-live">Stop sharing</button>'
     : 'Sign in so friends see your new visits as they happen. <button type="button" class="auth-link-btn" id="friends-live-signin">Sign in</button>';
   el.querySelector('#friends-stop-live')?.addEventListener('click', stopSharingLive);
-  el.querySelector('#friends-live-signin')?.addEventListener('click', () => { closeFoodieFriends(); setTimeout(openAuthModal, 150); });
+  el.querySelector('#friends-live-signin')?.addEventListener('click', () => { closeFoodieFriends(); setTimeout(() => openAuthModal(), 150); });
 }
 
 async function inviteFriend () {
