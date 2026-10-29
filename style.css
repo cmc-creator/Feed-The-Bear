@@ -6939,6 +6939,17 @@ body[data-ui-motion='playful'] .restaurant-grid.card-enter-run .restaurant-card:
   .home-quick-actions { grid-template-columns: 1fr; }
   .nearby-home-list { grid-template-columns: 1fr; gap: 10px; }
   .nearby-home-card { aspect-ratio: auto; min-height: 310px; }
+  /* Nearby spots swipe sideways on phones; stacked, 24 of them buried everything below. */
+  .nearby-home-list:has(.nearby-home-card) {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 82%;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .nearby-home-list:has(.nearby-home-card) > * { scroll-snap-align: start; }
 }
 
 /* Nearby Strip */
