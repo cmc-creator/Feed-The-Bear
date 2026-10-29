@@ -9,7 +9,7 @@
 const Stripe = require('stripe');
 
 // Only the Grizzly prices may be bought. STRIPE_PRICE_IDS (comma-separated) overrides.
-const ALLOWED_PRICES = (process.env.STRIPE_PRICE_IDS || 'price_1Tk9n0LzFIsRCvKRQpBwQRjN,price_1Tk9ntLzFIsRCvKRgn4KnUZm')
+const ALLOWED_PRICES = (process.env.STRIPE_PRICE_IDS || 'price_1UW2DmLzFIsRCvKRfFexC3P8,price_1UW2F1LzFIsRCvKRvztAuCOE')
   .split(',').map(s => s.trim()).filter(Boolean);
 
 module.exports = async function handler (req, res) {

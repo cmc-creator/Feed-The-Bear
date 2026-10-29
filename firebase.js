@@ -22,8 +22,8 @@ const _FB_CONFIG = {
 const _STRIPE_PK = 'pk_live_51Tk95ILzFIsRCvKRhcGFReLfSCM0AkX6I2jyN7qjjHEPce8sycXOZVvCxxeNsT84yysNdxxzeiDFHXhyB45BewaK00ne0FeBR4';
 
 const _PRICES = {
-  monthly: 'price_1Tk9n0LzFIsRCvKRQpBwQRjN',
-  yearly:  'price_1Tk9ntLzFIsRCvKRgn4KnUZm',
+  monthly: 'price_1UW2DmLzFIsRCvKRfFexC3P8',
+  yearly:  'price_1UW2F1LzFIsRCvKRvztAuCOE',
 };
 
 // ─── INIT ─────────────────────────────────────────────────────

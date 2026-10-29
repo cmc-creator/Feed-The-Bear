@@ -50,7 +50,8 @@ const SEED = [
   const cards = await p.$$eval('#swipe-deck .swipe-card-item', els => els.map(e => ({ name: e.querySelector('.swipe-card-name').textContent, img: !!e.querySelector('.swipe-card-photo img'), open: e.querySelector('.swipe-card-open')?.textContent || '' })));
   const crave = cards.find(c => c.name === 'Crave Open');
   const noPhoto = cards.find(c => c.name === 'No Hours');
-  check(crave && crave.img && crave.open.startsWith('Open'), `swipe card shows the photo and Open (${JSON.stringify(crave)})`);
+  // In the last hour of the day it says "Closes soon", which is still open.
+  check(crave && crave.img && /^(Open|Closes soon)/.test(crave.open), `swipe card shows the photo and Open (${JSON.stringify(crave)})`);
   check(noPhoto && !noPhoto.img && !noPhoto.open, 'no photo, no hours: emoji card with no made-up status');
   check(p.errors.length === 0, `no page errors (${p.errors.slice(0, 2).join(' | ')})`);
   await browser.close();
