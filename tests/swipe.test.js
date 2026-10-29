@@ -106,6 +106,18 @@ const { BASE, ROOT, SHOTS, check, launch, newPage, finish } = require('./lib');
   check(repeats.length === 0, 'next round has fresh photos');
 
   check(!p.errors.length, `no page errors ${p.errors.join(' | ')}`);
+
+  // Bear Swipe brings its own photos, so an empty diary or a failed nearby
+  // search must not hide it (it used to vanish for good).
+  for (const [label, settings] of [['empty diary, no location', {}], ['empty diary, nearby search fails', { locationEnabled: true }]]) {
+    const q = await newPage(browser, { seed: [], settings });
+    await q.route(/overpass|\/api\/nearby/, r => r.abort());
+    await q.goto(`${BASE}/app.html`);
+    await q.waitForTimeout(4000);
+    const shown = await q.locator('#bear-swipe-home').isVisible() && await q.locator('#bear-swipe-home .bs-title').count() === 1;
+    check(shown, `Bear Swipe still shows: ${label}`);
+    await q.close();
+  }
   await browser.close();
   finish('swipe');
 })();

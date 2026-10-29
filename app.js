@@ -12033,6 +12033,8 @@ function openSwipeChoiceDetails (item) {
 }
 
 function hideBearSwipeHome () {
+  // Bear Swipe v2 brings its own dish photos, so it never depends on saved or nearby spots.
+  if (window.BearSwipe) { window.BearSwipe.init(); return; }
   const mod = document.getElementById('bear-swipe-home');
   if (mod) mod.classList.add('hidden');
 }
