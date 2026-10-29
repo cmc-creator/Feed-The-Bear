@@ -459,9 +459,16 @@ async function _verifyAndActivatePlan (sessionId, uid) {
 }
 
 // ─── AUTH MODAL ───────────────────────────────────────────────
-function openAuthModal () {
+// forUpgrade: opened from the Grizzly upgrade, so it talks about upgrading, not "free".
+const AUTH_SUB_DEFAULT = "It's free. Your spots, ratings and photos get backed up, so a new phone never means a lost food diary.";
+const AUTH_SUB_UPGRADE = 'Sign in or create your account, and you will go straight to Grizzly checkout.';
+
+function openAuthModal ({ forUpgrade = false } = {}) {
   const overlay = document.getElementById('auth-overlay');
   if (!overlay) return;
+  overlay.dataset.purpose = forUpgrade ? 'upgrade' : '';
+  const sub = overlay.querySelector('.auth-sub');
+  if (sub) sub.textContent = forUpgrade ? AUTH_SUB_UPGRADE : AUTH_SUB_DEFAULT;
   overlay.classList.remove('hidden');
   document.body.classList.add('overlay-open');
   _setAuthMode('signin');
@@ -475,11 +482,12 @@ function closeAuthModal () {
 function _setAuthMode (mode) {
   const isSignup = mode === 'signup';
   const el = id => document.getElementById(id);
-  if (el('auth-title'))      el('auth-title').textContent      = isSignup ? 'Create your profile' : 'Welcome back';
+  const forUpgrade = el('auth-overlay')?.dataset.purpose === 'upgrade';
+  if (el('auth-title'))      el('auth-title').textContent      = forUpgrade ? (isSignup ? 'Create your account for Grizzly' : 'Sign in to get Grizzly') : isSignup ? 'Create your profile' : 'Welcome back';
   if (el('auth-submit-btn')) el('auth-submit-btn').textContent  = isSignup ? 'Create Profile'   : 'Sign In';
   if (el('auth-toggle-text')) el('auth-toggle-text').innerHTML  = isSignup
     ? 'Already have an account? <button class="auth-link-btn" id="auth-mode-toggle">Sign in</button>'
-    : 'New here? <button class="auth-link-btn" id="auth-mode-toggle">Sign up, it\'s free</button>';
+    : `New here? <button class="auth-link-btn" id="auth-mode-toggle">${forUpgrade ? 'Create an account' : 'Sign up, it\'s free'}</button>`;
   document.getElementById('auth-overlay').dataset.mode = mode;
   document.getElementById('auth-mode-toggle')?.addEventListener('click', () => _setAuthMode(isSignup ? 'signin' : 'signup'));
 }
@@ -580,8 +588,7 @@ async function _handleUpgradeClick () {
     // Remember the intent so signing in brings them straight back here.
     try { sessionStorage.setItem('ftb_pending_upgrade', document.getElementById('upgrade-cta-btn')?.dataset.period || 'yearly'); } catch { /* private mode */ }
     closeUpgradeModal();
-    setTimeout(openAuthModal, 200);
-    showToast('One quick step', "Create a free account and you'll come right back to upgrade.", 'info');
+    setTimeout(() => openAuthModal({ forUpgrade: true }), 200);
     return;
   }
   if (typeof trackProductEvent === 'function') trackProductEvent('upgrade_cta_clicked', { period: document.getElementById('upgrade-cta-btn')?.dataset.period || 'yearly' });
@@ -641,7 +648,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('upgrade-cta-btn')?.addEventListener('click',    _handleUpgradeClick);
 
   // Account portal additional rows
-  document.getElementById('account-signin-row')?.addEventListener('click',  () => { closeAccountModal(); setTimeout(openAuthModal, 150); });
+  document.getElementById('account-signin-row')?.addEventListener('click',  () => { closeAccountModal(); setTimeout(() => openAuthModal(), 150); });
   document.getElementById('account-signout-row')?.addEventListener('click', () => { closeAccountModal(); setTimeout(fbSignOut,          150); });
   document.getElementById('account-delete-row')?.addEventListener('click', () => { closeAccountModal(); setTimeout(openDeleteAccount, 150); });
 
