@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /usage.html
+
+Sitemap: https://www.feed-the-bear.com/sitemap.xml

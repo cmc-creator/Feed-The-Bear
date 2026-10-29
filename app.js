@@ -4696,9 +4696,27 @@ function applySharedCloudData (collectionId, data) {
   if (data.token) meta.token = data.token;
   if (data.cloudId) meta.cloudId = data.cloudId;
   if (data.ownerName) meta.ownerName = data.ownerName;
-  if (Array.isArray(data.collaborators)) meta.collaborators = data.collaborators;
-  if (Array.isArray(data.activity)) meta.activity = data.activity;
-  meta.updatedAt = data.updatedAt || Date.now();
+  if (Array.isArray(data.collaborators)) meta.collaborators = sanitizeCollaborators(data.collaborators);
+  if (Array.isArray(data.activity)) meta.activity = sanitizeSharedActivity(data.activity);
+  meta.updatedAt = Number(data.updatedAt) || Date.now();
+}
+
+// Shared list docs are written by every collaborator, so treat them as untrusted.
+function sanitizeCollaborators (list) {
+  const str = (v, n) => String(v ?? '').slice(0, n);
+  return list.slice(0, 50).map(c => ({
+    id: str(c?.id, 64).replace(/[^\w-]/g, ''),
+    name: str(c?.name, 40),
+    role: ['owner', 'editor', 'viewer'].includes(c?.role) ? c.role : 'viewer',
+    updatedAt: Number(c?.updatedAt) || 0,
+  })).filter(c => c.id);
+}
+function sanitizeSharedActivity (list) {
+  return list.slice(0, 10).map(a => ({
+    id: String(a?.id ?? '').slice(0, 64),
+    text: String(a?.text ?? '').slice(0, 160),
+    ts: Number(a?.ts) || 0,
+  })).filter(a => a.text);
 }
 
 function refreshSharedRealtimeSubscriptions () {
@@ -5015,12 +5033,12 @@ function renderSharedManageModal () {
   collabList.innerHTML = meta.collaborators.length
     ? meta.collaborators.map(c => `<div class="shared-collab-row">
         <div class="shared-collab-name">${escHtml(c.name || 'Foodie')}</div>
-        <select class="shared-collab-role" data-collab="${c.id}">
+        <select class="shared-collab-role" data-collab="${escHtml(c.id)}">
           <option value="owner" ${c.role === 'owner' ? 'selected' : ''}>Owner</option>
           <option value="editor" ${c.role === 'editor' ? 'selected' : ''}>Editor</option>
           <option value="viewer" ${c.role === 'viewer' ? 'selected' : ''}>Viewer</option>
         </select>
-        <button class="shared-collab-remove" data-collab="${c.id}" type="button">Remove</button>
+        <button class="shared-collab-remove" data-collab="${escHtml(c.id)}" type="button">Remove</button>
       </div>`).join('')
     : '<div class="dish-empty">No collaborators yet.</div>';
 
@@ -11851,7 +11869,7 @@ function formatLocalFoodKeyLabel (key = '') {
 }
 
 function getMoodFoodImage (term = 'food', seed = '') {
-  return getMoodFoodImageCandidates(term, seed)[0] || 'feedbear.png';
+  return getMoodFoodImageCandidates(term, seed)[0] || 'feedbear.jpg';
 }
 
 function buildMoodSwipeDeck (elements = [], savedRows = []) {
@@ -14400,7 +14418,7 @@ function shareDigest () {
   }).length;
   const text = `🐻 Feed The Bear · ${_MONTH_NAMES[_digestMonth]} ${_digestYear} Digest\n` +
                `Visited: ${visitedCount} restaurant${visitedCount !== 1 ? 's' : ''}\n` +
-               `Track yours at https://cmc-creator.github.io/Feed-The-Bear/`;
+               `Track yours at https://www.feed-the-bear.com/`;
   if (navigator.share) {
     navigator.share({ title: 'My Food Digest', text }).catch(() => {});
   } else {
@@ -15566,7 +15584,7 @@ function _loadGroupVoteResults (encoded) {
     document.getElementById('groupvote-bars').innerHTML = items.map(item =>
       `<div class="groupvote-bar-row">
         <span class="groupvote-bar-name">${escHtml(item.n)}${item.c ? ' <small style="color:var(--text2)">(' + escHtml(item.c) + ')</small>' : ''}</span>
-        <button class="btn-sm btn-orange" style="font-size:.72rem;padding:3px 10px" onclick="_castVote('${escHtml(item.id)}', '${encoded}')">Vote</button>
+        <button class="btn-sm btn-orange" style="font-size:.72rem;padding:3px 10px" onclick="_castVote('${escJsArg(item.id)}', '${escJsArg(encoded)}')">Vote</button>
       </div>`
     ).join('');
   } catch (e) { /* ignore bad encoded */ }

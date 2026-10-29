@@ -46,7 +46,7 @@ const SEED = [spot('r1', 'Taqueria Uno'), spot('r2', 'Taqueria Dos')];
     window._ftbUid = 'test-user';
     localStorage.setItem('ftb_plan_v1', 'free');
     fbDebouncedSync();
-    await new Promise(r => setTimeout(r, 3300));
+    await new Promise(r => setTimeout(r, 4500));
     window._ftbUid = null;
     fbSaveRestaurants = orig;
     return called;
