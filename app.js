@@ -6929,6 +6929,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('home-quick-share-btn')?.addEventListener('click', () => { hapticTap('medium'); openShareHighlights(); });
   document.getElementById('home-quick-itinerary-btn')?.addEventListener('click', () => { hapticTap('medium'); openSmartItinerary(); });
   document.getElementById('home-quick-rooms-btn')?.addEventListener('click', () => { hapticTap('medium'); openDinnerRooms(); });
+  document.getElementById('ai-rec-banner')?.addEventListener('click', e => {
+    if (!e.target.closest('#ai-rec-refresh-btn')) openAiRecPick();
+  });
   document.getElementById('ai-rec-refresh-btn')?.addEventListener('click', () => {
     const cacheKey = 'ftb_airec_' + new Date().toDateString();
     sessionStorage.removeItem(cacheKey);
@@ -8019,13 +8022,24 @@ function checkWeeklySuggestion () {
   banner.innerHTML = '<div class="wsb-icon">✨</div>'
     + '<div class="wsb-body">'
     + '<div class="wsb-title">Byte Cub\'s Pick of the Week</div>'
-    + '<div class="wsb-text">How about <strong>' + escHtml(suggestion.name) + '</strong>'
-    + (suggestion.cuisine ? ' (' + escHtml(suggestion.cuisine) + ')' : '')
-    + (favCuisine && suggestion.cuisine === favCuisine ? ' · you love ' + escHtml(favCuisine) + '!' : (favCuisine ? ' · a break from your usual ' + escHtml(favCuisine) : '')) + '</div>'
+    + '<div class="wsb-text">' + weeklyPickSentence(suggestion, favCuisine) + '</div>'
     + '</div>'
-    + '<button class="btn-sm btn-orange" onclick="openDetailModal(\'' + suggestion.id + '\');this.closest(\'.weekly-suggest-banner\').remove()">View</button>'
-    + '<button class="wsb-dismiss" onclick="this.closest(\'.weekly-suggest-banner\').remove()" aria-label="Dismiss">✕</button>';
+    + '<button class="btn-sm btn-orange wsb-view" type="button">View</button>'
+    + '<button class="wsb-dismiss" type="button" aria-label="Dismiss">✕</button>';
+  // The whole banner opens the pick; only ✕ dismisses.
+  banner.addEventListener('click', e => {
+    banner.remove();
+    if (!e.target.closest('.wsb-dismiss')) openDetailModal(suggestion.id);
+  });
   main.prepend(banner);
+}
+
+function weeklyPickSentence (pick, favCuisine) {
+  const name = '<strong>' + escHtml(pick.name) + '</strong>';
+  const cuisine = escHtml(pick.cuisine || '');
+  if (cuisine && favCuisine && pick.cuisine === favCuisine) return `Try ${name} this week. It's ${cuisine}, and you love ${cuisine}!`;
+  if (cuisine && favCuisine) return `Try ${name} this week. It's ${cuisine}, a nice break from all that ${escHtml(favCuisine)}.`;
+  return `Try ${name} this week. It's been waiting on your Want to Try list.`;
 }
 
 /* ------------------------------------------------------------
@@ -12782,10 +12796,32 @@ async function loadAiRec (discData) {
 Mention a specific place or cuisine name. Be warm and exciting.`;
 
     const rec = await AI.call(prompt);
-    const clean = (rec || '').trim().split('\n')[0].replace(/^["']|["']$/g, '');
+    const clean = wholeSentences((rec || '').trim().split('\n')[0].replace(/^["']|["']$/g, ''));
     if (clean) { sessionStorage.setItem(cacheKey, clean); textEl.textContent = clean; }
     else { banner.classList.add('hidden'); }
   } catch { banner.classList.add('hidden'); }
+}
+
+// Never show a reply that stops mid-sentence: keep the complete sentences, or nothing.
+function wholeSentences (text = '') {
+  const t = String(text).trim();
+  if (/[.!?…][)"'”’]*$/.test(t)) return t;
+  const cut = Math.max(t.lastIndexOf('. '), t.lastIndexOf('! '), t.lastIndexOf('? '));
+  return cut > 0 ? t.slice(0, cut + 1) : '';
+}
+
+// Tapping Byte Cub's pick opens the place it names, or Byte Cub to talk it over.
+function openAiRecPick () {
+  const text = (document.getElementById('ai-rec-text')?.textContent || '').toLowerCase();
+  if (!text || text === 'thinking…') return;
+  const saved = (state.restaurants || []).find(r => r.name && text.includes(r.name.toLowerCase()));
+  if (saved) { openDetailModal(saved.id); return; }
+  const near = (_nearbyCards || []).find(c => c.name && text.includes(c.name.toLowerCase()));
+  if (near && Number.isFinite(near.lat) && Number.isFinite(near.lon)) {
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${near.name} ${near.lat},${near.lon}`)}`, '_blank', 'noopener');
+    return;
+  }
+  openAiPanel();
 }
 
 /* ------------------------------------------------------------

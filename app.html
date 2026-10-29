@@ -687,6 +687,22 @@
 
     <!-- ── Home Discovery: Near You + AI Rec ─────────── -->
     <section id="home-discovery" class="home-discovery" aria-label="Restaurants near you">
+      <div id="bear-swipe-home" class="bear-swipe-home home-module hidden" aria-label="Bear swipe picks">
+        <div class="bear-swipe-header">
+          <div>
+            <div class="bear-swipe-title">Bear Swipe</div>
+            <div class="bear-swipe-sub">Food photos first. Swipe your way to tonight's winner.</div>
+          </div>
+          <button id="bear-swipe-refresh-btn" class="btn-ghost btn-sm" type="button">New Stack ↻</button>
+        </div>
+        <div id="bear-swipe-card" class="bear-swipe-card" role="button" tabindex="0" aria-label="Reveal nearby restaurant card"></div>
+        <div class="bear-swipe-actions">
+          <button id="bear-swipe-no-btn" class="bear-swipe-action no" type="button">Nope Paw</button>
+          <button id="bear-swipe-yes-btn" class="bear-swipe-action yes" type="button">Heck Yes</button>
+        </div>
+        <div id="bear-swipe-joke" class="bear-swipe-joke">I can bear-ly decide, so swipe your mood.</div>
+      </div>
+
       <!-- AI Recommendation Banner -->
       <div id="ai-rec-banner" class="ai-rec-banner home-module hidden">
         <div class="ai-rec-icon" aria-hidden="true">✨</div>
@@ -816,22 +832,6 @@
           <button id="for-you-refresh-btn" class="btn-ghost btn-sm">Shuffle ↻</button>
         </div>
         <div id="for-you-home-list" class="for-you-home-list"></div>
-      </div>
-
-      <div id="bear-swipe-home" class="bear-swipe-home home-module hidden" aria-label="Bear swipe picks">
-        <div class="bear-swipe-header">
-          <div>
-            <div class="bear-swipe-title">Bear Swipe</div>
-            <div class="bear-swipe-sub">Food photos first. Swipe your way to tonight's winner.</div>
-          </div>
-          <button id="bear-swipe-refresh-btn" class="btn-ghost btn-sm" type="button">New Stack ↻</button>
-        </div>
-        <div id="bear-swipe-card" class="bear-swipe-card" role="button" tabindex="0" aria-label="Reveal nearby restaurant card"></div>
-        <div class="bear-swipe-actions">
-          <button id="bear-swipe-no-btn" class="bear-swipe-action no" type="button">Nope Paw</button>
-          <button id="bear-swipe-yes-btn" class="bear-swipe-action yes" type="button">Heck Yes</button>
-        </div>
-        <div id="bear-swipe-joke" class="bear-swipe-joke">I can bear-ly decide, so swipe your mood.</div>
       </div>
 
       <!-- Go Grizzly: free users only -->

@@ -471,11 +471,11 @@ window.Cub = (() => {
   let bubbleTimer = null;
 
   const ACTIONS = [
+    ['ask', 'Chat with Byte Cub', () => (app().hasGrizzly() ? app().openAiPanel?.() : app().showGrizzlyUpsell('byte-cub'))],
     ['add', 'Add a spot', () => openAdd()],
     ['ate', 'I just ate', () => app().openJustAte?.()],
     ['pick', 'Pick for me', () => app().openDecisionMode?.()],
     ['swipe', 'Bear Swipe', () => { const m = document.getElementById('bear-swipe-home'); m?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }],
-    ['ask', 'Ask Byte Cub', () => (app().hasGrizzly() ? app().openAiPanel?.() : app().showGrizzlyUpsell('byte-cub'))],
     ['hide', 'Hide the cub for a week', () => hideBuddy()],
   ];
 
