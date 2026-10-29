@@ -107,3 +107,6 @@ jobs:
       - name: Audit fixes
         working-directory: tests
         run: node audit.test.js
+      - name: Payments
+        working-directory: tests
+        run: node payments.test.js
