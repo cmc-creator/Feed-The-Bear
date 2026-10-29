@@ -118,6 +118,19 @@ const { BASE, ROOT, SHOTS, check, launch, newPage, finish } = require('./lib');
     check(shown, `Bear Swipe still shows: ${label}`);
     await q.close();
   }
+
+  // A long nearby list must not bury Bear Swipe on a phone.
+  const n = await newPage(browser, { seed: [{ id: 'r1', name: 'The Mission', cuisine: 'Mexican', status: 'visited', tags: [], visits: [] }] });
+  await n.goto(`${BASE}/app.html`);
+  await n.waitForTimeout(2500);
+  const depth = await n.evaluate(() => {
+    setNearbyCards(Array.from({ length: 24 }, (_, i) => ({ key: 'k' + i, name: `Taqueria Number ${i}`, cuisine: 'mexican', lat: 33.49 + i / 1000, lon: -111.92, distanceMiles: 1 })));
+    const list = document.getElementById('nearby-home-list');
+    return { swipeTop: document.getElementById('bear-swipe-home').getBoundingClientRect().top + scrollY, listH: list.offsetHeight, cards: list.querySelectorAll('.nearby-home-card').length, scrollsSideways: list.scrollWidth > list.clientWidth };
+  });
+  check(depth.cards === 24 && depth.scrollsSideways && depth.listH < 700, `nearby spots swipe sideways on a phone (${depth.cards} cards, ${depth.listH}px tall)`);
+  check(depth.swipeTop < 3500, `Bear Swipe stays near the top (${Math.round(depth.swipeTop)}px down)`);
+  await n.close();
   await browser.close();
   finish('swipe');
 })();
