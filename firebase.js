@@ -334,6 +334,7 @@ window.fbSharedListSubscribe = fbSharedListSubscribe;
 
 // ─── AUTH STATE OBSERVER ──────────────────────────────────────
 function initFirebaseAuth () {
+  _capturePaidSession();
   _auth.onAuthStateChanged(async user => {
     window._ftbAuthReady = true;
     if (user) {
@@ -422,15 +423,23 @@ function initFirebaseAuth () {
       updateAuthUI(user);
       if (typeof refreshSharedRealtimeSubscriptions === 'function') refreshSharedRealtimeSubscriptions();
 
-      // Handle ?upgrade=success redirect back from Stripe
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('upgrade') === 'success') {
-        const sessionId = params.get('session_id');
-        if (sessionId) await _verifyAndActivatePlan(sessionId, user.uid);
-        history.replaceState({}, '', window.location.pathname);
-        if (isPremium()) {
+      // A Stripe payment to finish (saved by _capturePaidSession, maybe on an earlier visit)
+      const pendingSession = _getPendingSession();
+      if (pendingSession) {
+        const result = await _verifyAndActivatePlan(pendingSession, user.uid);
+        if (result === 'grizzly') {
+          _clearPendingSession();
+          if (typeof renderGrizzlyUi === 'function') renderGrizzlyUi();
+          updateAuthUI(user);
           if (typeof trackProductEvent === 'function') trackProductEvent('grizzly_upgraded');
           showToast('Welcome to Grizzly!', 'Unlimited restaurants, AI recs, and more are now unlocked.', 'success');
+        } else if (result === 'wrong-account') {
+          _clearPendingSession();
+          showToast('Different account', 'That Grizzly payment belongs to another account. Sign in with the one you upgraded.', 'error');
+        } else if (result === 'unpaid') {
+          _clearPendingSession();
+        } else {
+          showToast('Payment received', "We're still turning on Grizzly. Reopen the app in a minute and it will finish.", 'info');
         }
       }
     } else {
@@ -438,23 +447,54 @@ function initFirebaseAuth () {
       window._ftbPlan = localStorage.getItem('ftb_plan_v1') || 'free';
       updateAuthUI(null);
       if (typeof refreshSharedRealtimeSubscriptions === 'function') refreshSharedRealtimeSubscriptions();
+      // Back from Stripe but signed out here (e.g. it opened in a browser, not the app)
+      if (_getPendingSession()) {
+        showToast('Payment received!', 'Sign in to the account you upgraded to finish turning on Grizzly.', 'success');
+        setTimeout(() => openAuthModal({ forUpgrade: true }), 400);
+      }
     }
   });
 }
 
-// Called after returning from Stripe - fetches plan from Vercel API
+// Stripe sends buyers back with ?upgrade=success&session_id=…; keep the id until
+// a signed-in check succeeds so a sign-out, slow network or different window
+// never loses a paid upgrade.
+const PENDING_SESSION_KEY = 'ftb_pending_session_v1';
+function _capturePaidSession () {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('upgrade') !== 'success') return;
+  const sessionId = params.get('session_id');
+  if (sessionId && /^cs_[\w]+$/.test(sessionId)) {
+    try { localStorage.setItem(PENDING_SESSION_KEY, sessionId); } catch { /* private mode */ }
+  }
+  history.replaceState({}, '', window.location.pathname);
+}
+function _getPendingSession () {
+  try { return localStorage.getItem(PENDING_SESSION_KEY); } catch { return null; }
+}
+function _clearPendingSession () {
+  try { localStorage.removeItem(PENDING_SESSION_KEY); } catch { /* private mode */ }
+}
+
+// Asks the server to confirm the Stripe payment and turn on Grizzly.
+// Returns 'grizzly', 'wrong-account', 'unpaid' or 'retry'.
 async function _verifyAndActivatePlan (sessionId, uid) {
   try {
     const resp = await fetch(`/api/verify-session?sessionId=${encodeURIComponent(sessionId)}&uid=${encodeURIComponent(uid)}`);
-    const data = await resp.json();
+    const data = await resp.json().catch(() => ({}));
     if (data.plan === 'grizzly') {
       window._ftbPlan = 'grizzly';
       localStorage.setItem('ftb_plan_v1', 'grizzly');
       // First cloud push now that sync is unlocked
       if (state?.restaurants?.length) fbSaveRestaurants(uid, state.restaurants);
+      return 'grizzly';
     }
+    if (resp.status === 403) return 'wrong-account';
+    if (resp.status === 404 || (resp.status === 402 && data.payment_status === 'unpaid')) return 'unpaid';
+    return 'retry';
   } catch (err) {
     console.warn('[FTB] Plan verification failed:', err);
+    return 'retry';
   }
 }
 

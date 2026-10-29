@@ -38,6 +38,9 @@ module.exports = async function handler (req, res) {
       customer_email:       email,
       line_items:           [{ price: priceId, quantity: 1 }],
       metadata:             { uid },
+      client_reference_id:  uid,
+      // The webhook reads this to find the account when a subscription changes.
+      subscription_data:    { metadata: { uid } },
       success_url:          `${appUrl}/app.html?upgrade=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url:           `${appUrl}/app.html?upgrade=cancel`,
       allow_promotion_codes: true,

@@ -65,9 +65,15 @@ module.exports = async function handler (req, res) {
       },
       { merge: true }
     );
+    if (session.customer) await db.doc(`stripeCustomers/${session.customer}`).set({ uid }, { merge: true });
 
     res.status(200).json({ plan: 'grizzly' });
   } catch (err) {
+    // An unknown session id will never succeed, so tell the app to stop retrying.
+    if (err.type === 'StripeInvalidRequestError') {
+      res.status(404).json({ error: 'Unknown checkout session' });
+      return;
+    }
     console.error('[FTB] verify-session error:', err.message);
     res.status(500).json({ error: 'Verification failed. Please contact support.' });
   }
