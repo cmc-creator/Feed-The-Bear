@@ -22,6 +22,7 @@ const NEARBY = [
   await p.click('#cub-buddy .cub-btn');
   const actions = await p.$$eval('#cub-buddy .cub-menu button', bs => bs.map(b => b.textContent.trim()));
   check(actions.includes('Add a spot') && actions.includes('I just ate') && actions.includes('Pick for me'), `tapping the cub shows quick actions (${actions.join(', ')})`);
+  check(actions[0] === 'Chat with Byte Cub', 'chatting with Byte Cub is the first thing the cub offers');
 
   // Quick add: nearby suggestions, pick one, "Want to try" with a crave dish
   await p.locator('#cub-buddy .cub-menu [data-act="add"]').click();

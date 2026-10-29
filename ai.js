@@ -15,6 +15,12 @@ const GEMINI_BASE    = 'https://generativelanguage.googleapis.com/v1beta/models/
 const GEMINI_GEN     = `${GEMINI_BASE}${GEMINI_MODEL}:generateContent`;
 const GEMINI_STREAM  = `${GEMINI_BASE}${GEMINI_MODEL}:streamGenerateContent`;
 
+// The answer can come in several parts; thinking models may add thought parts.
+function answerText (data) {
+  const parts = data?.candidates?.[0]?.content?.parts || [];
+  return parts.filter(p => p.text && !p.thought).map(p => p.text).join('');
+}
+
 /* ── Key helpers ─────────────────────────────────────────── */
 const AI = {
 
@@ -88,7 +94,7 @@ const AI = {
       try {
         const resp = await this._proxyFetch(body, false);
         const data = await resp.json();
-        return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        return answerText(data);
       } catch (err) {
         if (!this.hasKey()) throw err; // no local fallback — surface the error
       }
@@ -109,7 +115,7 @@ const AI = {
     }
 
     const data = await resp.json();
-    return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    return answerText(data);
   },
 
   /* ── 3 · Text-only shorthand ─────────────────────────── */

@@ -18,6 +18,7 @@ const admin = require('firebase-admin');
 // Flash model. Set GEMINI_MODEL in Vercel to pin a specific version.
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
 const GEMINI_BASE  = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}`;
+const THINKING_HEADROOM = 1536;
 
 function getAdmin () {
   if (!admin.apps.length) {
@@ -52,7 +53,9 @@ function sanitizeBody (input) {
   const gen = input.generationConfig || {};
   body.generationConfig = {
     temperature:     Math.min(Math.max(Number(gen.temperature) || 0.85, 0), 2),
-    maxOutputTokens: Math.min(Math.max(parseInt(gen.maxOutputTokens) || 512, 1), 1024),
+    // Flash models think first and that counts toward this limit, so add
+    // headroom on top of the visible answer or replies stop mid-sentence.
+    maxOutputTokens: Math.min(Math.max(parseInt(gen.maxOutputTokens) || 512, 1), 1024) + THINKING_HEADROOM,
     topP:            Math.min(Math.max(Number(gen.topP) || 0.95, 0), 1),
   };
   return body;
