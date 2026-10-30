@@ -8700,3 +8700,8 @@ body.light-mode .mood-picks-home .home-mood-chip:not(.active) { background: rgba
 .dv-recent-list h3 { font-size: .9rem; margin: 6px 0; }
 .dv-recent { display: flex; justify-content: space-between; gap: 8px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); color: var(--text); text-decoration: none; font-weight: 600; margin-bottom: 6px; }
 .dv-recent span { color: var(--text-dim); font-weight: 500; white-space: nowrap; }
+
+/* Searching: matches show right under the search bar */
+#main-content.is-searching > :not(#restaurant-grid):not(#no-results):not(#empty-state):not(#search-summary) { display: none !important; }
+.search-summary { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 2px 4px; font-weight: 700; color: var(--text); }
+.search-summary span { flex: 1; min-width: 0; }

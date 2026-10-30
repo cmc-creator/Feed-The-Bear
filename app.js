@@ -4188,6 +4188,136 @@ function hideBanner (id) {
   if (el) el.classList.add('hidden');
 }
 
+// While a search is typed, home sections step aside so the matches show
+// right under the search bar instead of far below them.
+function renderSearchMode () {
+  const q = String(state.filter.search || '').trim();
+  const main = document.getElementById('main-content');
+  if (!main) return;
+  const on = !!q && !['map', 'stats'].includes(state.currentView);
+  main.classList.toggle('is-searching', on);
+  let bar = document.getElementById('search-summary');
+  if (!on) { bar?.remove(); BackNav.layer('search', false); return; }
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'search-summary';
+    bar.className = 'search-summary';
+    main.prepend(bar);
+  }
+  const n = getFiltered().length;
+  bar.innerHTML = `<span>${n ? `${n} spot${n === 1 ? '' : 's'} match` : 'Nothing matches'} “${escHtml(q)}”</span>
+    ${n ? '' : `<button type="button" class="btn-ghost btn-sm" data-act="nearby">Search nearby</button>`}
+    <button type="button" class="btn-ghost btn-sm" data-act="clear">Clear</button>`;
+  bar.querySelector('[data-act=clear]').onclick = () => { clearSearch(); };
+  const near = bar.querySelector('[data-act=nearby]');
+  if (near) near.onclick = () => { const term = q; clearSearch(); openDiscoverSearch(term); };
+  window.scrollTo({ top: 0 });
+  BackNav.layer('search', true);
+}
+
+function clearSearch () {
+  const input = document.getElementById('search-input');
+  if (input) input.value = '';
+  state.filter.search = '';
+  updateClearBtn();
+  renderCards();
+  renderSearchMode();
+}
+
+// Discover with the search box filled in (for spots you haven't saved).
+function openDiscoverSearch (term) {
+  discoverNearby();
+  setTimeout(() => {
+    const box = document.getElementById('disc-search');
+    if (!box) return;
+    box.value = term;
+    box.dispatchEvent(new Event('input', { bubbles: true }));
+  }, 300);
+}
+
+/* ── Phone Back button ────────────────────────────────────────
+   Each panel, tab or search you open adds a step to the browser history,
+   so Back closes the top one (like a native app) instead of leaving.
+   Home with nothing open: Back leaves the app as usual. */
+const BackNav = (() => {
+  const OVERLAYS = '.modal-overlay, #chat-panel';
+  const stack = []; // { kind: 'overlay', el } | { kind: 'view' } | { kind: 'search' }
+  let ignorePops = 0;
+  let undoing = null;
+  let ready = false;
+
+  function push (entry) {
+    stack.push(entry);
+    try { history.pushState({ ftbBack: stack.length }, ''); } catch { /* sandboxed */ }
+  }
+  // Closed by a tap, not by Back: drop its history step quietly.
+  function drop (match) {
+    const i = stack.findIndex(match);
+    if (i === -1) return;
+    stack.splice(i, 1);
+    if (undoing && match(undoing)) return; // Back already used up its step
+    ignorePops++;
+    history.back();
+  }
+
+  function closeOverlay (el) {
+    const btn = [...el.querySelectorAll('[id$="close-btn"], [id$="-close"], .qa-close, .modal-close, [aria-label="Close"]')]
+      .find(b => b.offsetParent !== null && b.closest(OVERLAYS) === el);
+    if (btn) btn.click();
+    if (!el.classList.contains('hidden')) { el.classList.add('hidden'); maybeHideOverlay(); }
+  }
+
+  function onPop () {
+    if (ignorePops > 0) { ignorePops--; return; }
+    const top = stack.pop();
+    if (!top) return;
+    undoing = top;
+    try {
+      if (top.kind === 'overlay') closeOverlay(top.el);
+      else if (top.kind === 'view') setView('all');
+      else if (top.kind === 'search') clearSearch();
+    } finally { undoing = null; }
+  }
+
+  function watchOverlays () {
+    const isOpen = el => !el.classList.contains('hidden');
+    const seen = new Map();
+    document.querySelectorAll(OVERLAYS).forEach(el => seen.set(el, isOpen(el)));
+    new MutationObserver(records => {
+      records.forEach(r => {
+        const el = r.target;
+        if (!el.matches?.(OVERLAYS)) return;
+        const was = seen.get(el) || false;
+        const now = isOpen(el);
+        seen.set(el, now);
+        if (now && !was) push({ kind: 'overlay', el });
+        else if (!now && was) drop(e => e.kind === 'overlay' && e.el === el);
+      });
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
+    // Panels the app adds later (the Cub's quick add sheet, etc.)
+    new MutationObserver(records => records.forEach(r => r.addedNodes.forEach(n => {
+      if (n.nodeType === 1 && n.matches(OVERLAYS)) seen.set(n, !n.classList.contains('hidden'));
+    }))).observe(document.body, { childList: true });
+  }
+
+  return {
+    init () {
+      if (ready) return;
+      ready = true;
+      window.addEventListener('popstate', onPop);
+      watchOverlays();
+    },
+    // A tab other than Home, or a search, counts as one step.
+    layer (kind, on) {
+      if (!ready) return;
+      const has = stack.some(e => e.kind === kind);
+      if (on && !has) push({ kind });
+      else if (!on && has) drop(e => e.kind === kind);
+    },
+    depth: () => stack.length,
+  };
+})();
+
 function maybeHideOverlay () {
   const anyOpen = !!document.querySelector('.modal-overlay:not(.hidden), #chat-panel:not(.hidden)');
   if (!anyOpen) {
@@ -5918,6 +6048,8 @@ function setupEvents () {
     if (state.currentView === 'map') { showMapView(); }
     else if (state.currentView === 'stats') { showStatsView(); }
     else { hideMapView(); hideStatsView(); renderCards(); }
+    BackNav.layer('view', state.currentView !== 'all');
+    renderSearchMode();
   });
 
   // Add button
@@ -5981,6 +6113,10 @@ function setupEvents () {
     state.filter.search = e.target.value;
     updateClearBtn();
     renderCards();
+    renderSearchMode();
+  });
+  document.getElementById('search-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') e.target.blur(); // close the phone keyboard to see results
   });
   document.getElementById('filter-cuisine').addEventListener('change', e => {
     state.filter.cuisine = e.target.value;
@@ -6970,6 +7106,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDetailQuickCapture();
   initReminders();
   initInstallPrompt();
+  BackNav.init();
   // A tapped "near a spot" notification opens that spot.
   openSpotFromLink(new URLSearchParams(window.location.search).get('spot'));
   navigator.serviceWorker?.addEventListener('message', e => { if (e.data?.type === 'OPEN_SPOT') openSpotFromLink(e.data.id); });
@@ -9546,6 +9683,8 @@ function setView (view) {
   if (view === 'map') { showMapView(); }
   else if (view === 'stats') { showStatsView(); }
   else { hideMapView(); hideStatsView(); renderCards(); }
+  BackNav.layer('view', view !== 'all');
+  renderSearchMode();
 }
 
 /* ------------------------------------------------------------

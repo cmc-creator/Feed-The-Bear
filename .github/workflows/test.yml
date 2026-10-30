@@ -134,3 +134,6 @@ jobs:
       - name: Weekly picks email
         working-directory: tests
         run: node digest.test.js
+      - name: Search and the Back button
+        working-directory: tests
+        run: node back.test.js
