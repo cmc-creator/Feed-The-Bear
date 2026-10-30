@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Sign in · Feed The Bear</title>
+  <link rel="icon" href="favicon-48.png" />
+  <link rel="stylesheet" href="vote.css" />
+</head>
+<body>
+  <!-- Opened in Chrome by the Android app: Google won't sign in inside an
+       app's web view. Signs in here, tells the server (api/verify-session.js,
+       native-start) for the app's challenge, then hands back to the app. -->
+  <main class="vote">
+    <a class="vote-brand" href="index.html"><img src="feedbear.jpg" alt="" /> Feed The Bear</a>
+    <h1 id="ns-title">Sign in with Google</h1>
+    <p id="ns-sub" class="vote-muted">You'll go straight back to the app.</p>
+    <button id="ns-google" class="vote-btn" type="button">Continue with Google</button>
+    <a id="ns-back" class="vote-btn vote-btn-alt hidden" href="com.feedthebear.app://signin?done=1">Back to Feed The Bear</a>
+  </main>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script>
+    (() => {
+      const $ = id => document.getElementById(id);
+      const challenge = new URLSearchParams(location.search).get('c') || '';
+      if (!/^[A-Za-z0-9_-]{43}$/.test(challenge)) {
+        $('ns-title').textContent = 'Open this from the app';
+        $('ns-sub').textContent = 'Tap "Continue with Google" in the Feed The Bear app to sign in.';
+        $('ns-google').classList.add('hidden');
+        return;
+      }
+      firebase.initializeApp({
+        apiKey: 'AIzaSyCqWTvEFYCEVjooO_eCVGNFsIeya17q3WQ',
+        authDomain: 'feed-the-bear-app-2-102926.firebaseapp.com',
+        projectId: 'feed-the-bear-app-2-102926',
+        appId: '1:565915716798:web:1b40da485d3d59c54622ef',
+      });
+      const auth = firebase.auth();
+      async function handBack (user) {
+        $('ns-sub').textContent = 'Finishing up…';
+        const token = await user.getIdToken();
+        const resp = await fetch('/api/verify-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ action: 'native-start', challenge }),
+        });
+        if (!resp.ok) throw new Error('Could not finish signing in.');
+        $('ns-title').textContent = `Signed in as ${user.email || 'you'}`;
+        $('ns-sub').textContent = 'Taking you back to the app…';
+        $('ns-google').classList.add('hidden');
+        $('ns-back').classList.remove('hidden');
+        location.href = $('ns-back').href;
+      }
+      $('ns-google').addEventListener('click', async () => {
+        $('ns-google').disabled = true;
+        try {
+          const cred = await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+          await handBack(cred.user);
+        } catch (err) {
+          $('ns-sub').textContent = err?.code === 'auth/popup-closed-by-user' ? 'Sign-in was cancelled.' : (err.message || 'Sign-in failed. Please try again.');
+          $('ns-google').disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

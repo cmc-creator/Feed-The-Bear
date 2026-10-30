@@ -1,0 +1,13 @@
+{
+  "appId": "com.feedthebear.app",
+  "appName": "Feed The Bear",
+  "webDir": "www",
+  "server": {
+    "url": "https://www.feed-the-bear.com/app.html",
+    "androidScheme": "https",
+    "allowNavigation": ["www.feed-the-bear.com", "feed-the-bear.com", "checkout.stripe.com", "billing.stripe.com", "*.firebaseapp.com", "accounts.google.com"]
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

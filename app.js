@@ -906,6 +906,7 @@ function saveData () {
     _saveChain = _saveChain.then(persistRestaurants, persistRestaurants).finally(() => { _queuedSaves--; });
   }
   updateTagSuggestions();
+  NativeAlerts?.schedule();
   setTimeout(checkAchievements, 0);
   setTimeout(renderWeeklyGoal, 0);
   setTimeout(maybeAskToSaveDiary, 1800);
@@ -2100,8 +2101,12 @@ function renderNearAlertsRow () {
   const el = document.getElementById('account-nearalerts-state');
   if (!el) return;
   const on = nearAlertsOn() && state.settings.locationEnabled;
-  const blocked = 'Notification' in window && Notification.permission === 'denied';
+  // In the Android app, notifications are Android's (NativeAlerts), not the page's.
+  const native = !!NativeAlerts?.available();
+  const blocked = !native && 'Notification' in window && Notification.permission === 'denied';
   el.textContent = !on ? 'Off. Tap to get a heads-up near spots you want to try.'
+    : native && NativeAlerts.closedToo() ? `On, within ${milesLabel(nearAlertMiles())}, even when the app is closed.`
+    : native ? `On, within ${milesLabel(nearAlertMiles())}, while the app is open. Tap to get them when it's closed too.`
     : blocked ? `On, within ${milesLabel(nearAlertMiles())}. Phone notifications are blocked in settings.`
     : `On, within ${milesLabel(nearAlertMiles())}, while Feed The Bear is open.`;
 }
@@ -2114,6 +2119,10 @@ function openNearAlerts () {
     b.classList.toggle('active', on ? m === nearAlertMiles() : m === 'off');
     b.onclick = () => { closeNearAlerts(); setNearAlerts(m); };
   });
+  const note = document.getElementById('nearalerts-note');
+  if (note) note.textContent = NativeAlerts.available()
+    ? (NativeAlerts.closedToo() ? 'Works even when the app is closed.' : 'Works while the app is open. Pick a distance to set up alerts when it is closed too.')
+    : 'Works while Feed The Bear is open on your phone.';
   document.getElementById('nearalerts-overlay').classList.remove('hidden');
   document.body.classList.add('overlay-open');
 }
@@ -2128,6 +2137,7 @@ async function setNearAlerts (miles) {
     state.settings.nearAlerts = false;
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
     renderNearAlertsRow();
+    NativeAlerts.schedule();
     showToast('Nearby alerts off', 'You will not get a heads-up near your Want to Try spots.', 'info');
     return;
   }
@@ -2141,11 +2151,90 @@ async function setNearAlerts (miles) {
   else checkProximity();
   pinWantToTrySpots();
   renderNearAlertsRow();
+  NativeAlerts.schedule();
+  if (NativeAlerts.available()) setTimeout(() => NativeAlerts.askBackground(), 1200);
   const want = state.restaurants.filter(r => r.status === 'want-to-try');
   const pinned = want.filter(r => r.lat && r.lng).length;
   showToast('Nearby alerts on', want.length
     ? `We will tell you when you are within ${milesLabel(miles)} of a Want to Try spot (${pinned} of ${want.length} have a map pin so far).`
     : 'Add spots to your Want to Try list and we will tell you when you are close.', 'success');
+}
+
+/* ── Android app: alerts even when the app is closed ─────────
+   In the Android app (native/), the Want to Try spots and the chosen
+   distance are handed to Android geofencing (NearbyAlerts plugin), which
+   wakes the app near a spot. On the website none of this runs. */
+// var, not const: saveData can run during start-up before this line.
+var NativeAlerts = (() => {
+  const plugin = () => (window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins?.NearbyAlerts : null);
+  let lastSig = '';
+  let timer = null;
+  let background = false;
+
+  async function sync () {
+    const p = plugin();
+    if (!p) return;
+    const on = nearAlertsOn() && !!state.settings.locationEnabled;
+    const here = Number.isFinite(state.userLat) && Number.isFinite(state.userLng);
+    // Android allows 100 geofences: keep the closest Want to Try spots.
+    const spots = state.restaurants
+      .filter(r => r.status === 'want-to-try' && r.lat != null && r.lng != null && Number.isFinite(Number(r.lat)) && Number.isFinite(Number(r.lng)))
+      .map(r => ({ id: r.id, name: String(r.name || '').slice(0, 80), lat: Number(r.lat), lng: Number(r.lng), d: here ? haversine(state.userLat, state.userLng, Number(r.lat), Number(r.lng)) : 0 }))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 100)
+      .map(({ d, ...spot }) => spot);
+    const radiusMeters = Math.round(nearAlertMiles() * 1609.344);
+    const sig = JSON.stringify([on, radiusMeters, spots.map(x => `${x.id}:${x.lat}:${x.lng}`)]);
+    if (sig === lastSig) return;
+    lastSig = sig;
+    try { await p.setSpots({ enabled: on, radiusMeters, spots }); } catch { lastSig = ''; }
+  }
+
+  async function refresh () {
+    const p = plugin();
+    if (!p) return;
+    try { background = !!(await p.status()).background; } catch { /* plugin missing */ }
+    renderNearAlertsRow();
+  }
+
+  return {
+    available: () => !!plugin(),
+    closedToo: () => background,
+    schedule () {
+      if (!plugin()) return;
+      clearTimeout(timer);
+      timer = setTimeout(sync, 1500);
+    },
+    refresh,
+    // Explain first (Google Play requires it), then ask for "Allow all the time".
+    askBackground () {
+      if (!plugin() || background) return;
+      document.getElementById('bg-location-overlay')?.classList.remove('hidden');
+      document.body.classList.add('overlay-open');
+    },
+    async allowBackground () {
+      const p = plugin();
+      closeBgLocation();
+      if (!p) return;
+      try {
+        await p.requestLocation();
+        await p.requestNotifications();
+        const st = await p.requestBackground(); // Android 11+ opens the app's settings page
+        background = !!st?.background;
+        if (!background) showToast('One more step', 'Choose "Allow all the time" under Location, then come back.', 'info');
+      } catch (err) {
+        showToast('Location is off', 'Allow location for Feed The Bear to get nearby alerts.', 'error');
+      }
+      lastSig = '';
+      sync();
+      renderNearAlertsRow();
+    },
+  };
+})();
+
+function closeBgLocation () {
+  document.getElementById('bg-location-overlay')?.classList.add('hidden');
+  maybeHideOverlay();
 }
 
 function openSpotFromLink (id) {
@@ -7114,6 +7203,14 @@ document.addEventListener('DOMContentLoaded', () => {
   initReminders();
   initInstallPrompt();
   BackNav.init();
+  if (NativeAlerts.available()) {
+    NativeAlerts.refresh();
+    NativeAlerts.schedule();
+    // Back from Android's settings page after choosing "Allow all the time".
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { NativeAlerts.refresh(); NativeAlerts.schedule(); } });
+  }
+  document.getElementById('bg-location-allow')?.addEventListener('click', () => NativeAlerts.allowBackground());
+  document.getElementById('bg-location-later')?.addEventListener('click', closeBgLocation);
   // A tapped "near a spot" notification opens that spot.
   openSpotFromLink(new URLSearchParams(window.location.search).get('spot'));
   navigator.serviceWorker?.addEventListener('message', e => { if (e.data?.type === 'OPEN_SPOT') openSpotFromLink(e.data.id); });

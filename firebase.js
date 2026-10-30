@@ -445,6 +445,7 @@ window.fbSharedListSubscribe = fbSharedListSubscribe;
 function initFirebaseAuth () {
   _capturePaidSession();
   _captureInviteRef();
+  _finishNativeSignIn();
   _auth.onAuthStateChanged(async user => {
     window._ftbAuthReady = true;
     if (user) {
@@ -688,7 +689,51 @@ async function _handleAuthSubmit () {
   }
 }
 
+// ─── ANDROID APP: GOOGLE SIGN-IN IN CHROME ────────────────────
+// Google refuses to sign in inside an app's web view, so the Android app
+// (native/) opens native-signin.html in Chrome. Only a SHA-256 challenge
+// leaves the app; the verifier stays here, and the server only hands out a
+// sign-in token for it (api/verify-session.js native-start / native-finish).
+const NATIVE_VERIFIER_KEY = 'ftb_native_verifier_v1';
+const _isNativeApp = () => !!window.Capacitor?.isNativePlatform?.();
+const _b64url = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+async function _nativeGoogleSignIn () {
+  const verifier = _b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  const challenge = _b64url(new Uint8Array(digest));
+  try { localStorage.setItem(NATIVE_VERIFIER_KEY, verifier); } catch { /* private mode */ }
+  const url = `https://www.feed-the-bear.com/native-signin.html?c=${challenge}`;
+  const browser = window.Capacitor?.Plugins?.Browser;
+  if (browser) await browser.open({ url });
+  else window.open(url, '_blank', 'noopener');
+}
+
+async function _finishNativeSignIn () {
+  if (location.hash !== '#native-signin-done') return;
+  history.replaceState(null, '', location.pathname + location.search);
+  try { window.Capacitor?.Plugins?.Browser?.close?.(); } catch { /* already closed */ }
+  let verifier = null;
+  try { verifier = localStorage.getItem(NATIVE_VERIFIER_KEY); localStorage.removeItem(NATIVE_VERIFIER_KEY); } catch { /* private mode */ }
+  if (!verifier) { showToast('Sign-in did not finish', 'Please tap Continue with Google again.', 'error'); return; }
+  try {
+    const resp = await fetch('/api/verify-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'native-finish', verifier }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.token) throw new Error(data.error || 'Please try again.');
+    await _auth.signInWithCustomToken(data.token);
+    closeAuthModal?.();
+    showToast('You are in', 'Your food diary is backed up. Sign in on any device to see it.', 'success');
+  } catch (err) {
+    showToast('Sign-in did not finish', err.message || 'Please try again.', 'error');
+  }
+}
+
 async function _handleGoogleAuth () {
+  if (_isNativeApp()) { _nativeGoogleSignIn(); return; }
   const btn = document.getElementById('auth-google-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Connecting Google...'; }
   try {

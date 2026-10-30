@@ -137,3 +137,6 @@ jobs:
       - name: Search and the Back button
         working-directory: tests
         run: node back.test.js
+      - name: Android app hand-off (alerts and sign-in)
+        working-directory: tests
+        run: node native.test.js

@@ -30,9 +30,34 @@ function getAdmin () {
 // POST (Authorization: Bearer <ID token>), signed-in account actions:
 //   { action: 'rewards' } → { grizzlyUntil, invites }; an ended free invite month goes back to free
 //   { action: 'portal' }  → { url } Stripe's page to change or cancel the subscription
+//   { action: 'native-start', challenge } / { action: 'native-finish', verifier } (no token)
+//                         → Android app sign-in with Google (see native-signin.html)
 // (Kept in this file rather than new endpoints: the free Vercel plan allows 12 functions.)
+// Android app, step 2 (back in the app, not signed in yet): Google won't sign
+// in inside an app's web view, so the app signs in in Chrome
+// (native-signin.html). The app kept a random verifier and only sent its
+// SHA-256 challenge, so a link intercepted on the way back is useless.
+async function nativeFinish (req, res) {
+  res.setHeader('Cache-Control', 'no-store');
+  const verifier = String(req.body?.verifier || '');
+  if (!/^[A-Za-z0-9_-]{43,128}$/.test(verifier)) return res.status(400).json({ error: 'Bad request' });
+  const challenge = require('crypto').createHash('sha256').update(verifier).digest('base64url');
+  try {
+    const a = getAdmin();
+    const ref = a.firestore().doc(`nativeSignins/${challenge}`);
+    const pending = (await ref.get()).data();
+    await ref.delete();
+    if (!pending || pending.exp < Date.now()) return res.status(404).json({ error: 'That sign-in expired. Please try again.' });
+    return res.status(200).json({ token: await a.auth().createCustomToken(pending.uid) });
+  } catch (err) {
+    console.error('[FTB] native sign-in error:', err.message);
+    return res.status(500).json({ error: 'Sign-in did not finish. Please try again.' });
+  }
+}
+
 async function accountAction (req, res) {
   res.setHeader('Cache-Control', 'no-store');
+  if (req.body?.action === 'native-finish') return nativeFinish(req, res);
   const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   if (!token) return res.status(401).json({ error: 'Sign in first' });
   let uid;
@@ -42,6 +67,14 @@ async function accountAction (req, res) {
   const stripe = key ? Stripe(key) : null;
   const db = a.firestore();
   try {
+    // Android app, step 1 (in Chrome, signed in): remember who signed in for
+    // this challenge. See nativeFinish for step 2.
+    if (req.body?.action === 'native-start') {
+      const challenge = String(req.body.challenge || '');
+      if (!/^[A-Za-z0-9_-]{43}$/.test(challenge)) return res.status(400).json({ error: 'Bad request' });
+      await db.doc(`nativeSignins/${challenge}`).set({ uid, exp: Date.now() + 5 * 60 * 1000 });
+      return res.status(200).json({ ok: true });
+    }
     if (req.body?.action === 'portal') {
       const profile = (await db.doc(`users/${uid}/meta/profile`).get()).data() || {};
       if (!stripe || !profile.stripeCustomerId) return res.status(404).json({ error: 'No subscription on this account.' });
