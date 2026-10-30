@@ -78,7 +78,7 @@ const call = (body, headers = {}) => new Promise(resolve => {
     return rt.fulfill({ json: body.action === 'native-finish' ? { token: 'custom-abc' } : {} });
   });
   await p.goto(`${BASE}/app.html`);
-  await p.waitForTimeout(3500);
+  await p.waitForFunction(() => window.__native.setSpots.length > 0, null, { timeout: 10000 }).catch(() => {});
   const first = await p.evaluate(() => window.__native.setSpots.at(-1));
   check(first?.enabled === true && first.radiusMeters === 16093, `Android gets alerts on, at 10 miles (${JSON.stringify(first && { enabled: first.enabled, r: first.radiusMeters })})`);
   check(first?.spots.map(s => s.id).join() === 'near,far', `only pinned Want to Try spots go to Android, nearest first (${first?.spots.map(s => s.id)})`);
@@ -88,7 +88,7 @@ const call = (body, headers = {}) => new Promise(resolve => {
   await p.click('#account-nearalerts-row');
   check(/Pick a distance to set up alerts when it is closed too/.test(await p.locator('#nearalerts-note').innerText()), 'the chooser explains the closed-app option');
   await p.click('#nearalerts-choices [data-miles="25"]');
-  await p.waitForTimeout(2200);
+  await p.waitForFunction(() => window.__native.setSpots.at(-1)?.radiusMeters === 40234, null, { timeout: 8000 }).catch(() => {});
   check(await p.evaluate(() => window.__native.setSpots.at(-1).radiusMeters) === 40234, 'a new distance is handed to Android');
   check(await p.locator('#bg-location-overlay').isVisible() && /does not store it, share it, or use it for ads/.test(await p.locator('#bg-location-overlay').innerText()), 'background location is explained before Android asks');
   await p.click('#bg-location-allow');
@@ -100,7 +100,7 @@ const call = (body, headers = {}) => new Promise(resolve => {
 
   // Saving a new Want to Try spot updates Android.
   await p.evaluate(() => { state.restaurants.push({ id: 'new', name: 'New Taco', status: 'want-to-try', lat: 33.50, lng: -111.93, tags: [], visits: [] }); saveData(); });
-  await p.waitForTimeout(2000);
+  await p.waitForFunction(() => window.__native.setSpots.at(-1)?.spots.some(s => s.id === 'new'), null, { timeout: 8000 }).catch(() => {});
   check(await p.evaluate(() => window.__native.setSpots.at(-1).spots.some(s => s.id === 'new')), 'a newly saved spot is handed to Android');
 
   // ── Google sign-in goes through Chrome ──
