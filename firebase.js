@@ -108,6 +108,115 @@ async function _reauthForDelete (user) {
   await user.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(user.email, password));
 }
 
+// ─── EMAIL, PASSWORD & PHONE ──────────────────────────────────
+function _usesGoogle (user) {
+  return user.providerData.some(p => p.providerId === 'google.com') && !user.providerData.some(p => p.providerId === 'password');
+}
+
+function openSecurity () {
+  const user = _auth?.currentUser;
+  if (!user) { openAuthModal(); return; }
+  const el = id => document.getElementById(id);
+  const google = _usesGoogle(user);
+  el('security-email').textContent = user.email || 'No email on file';
+  el('security-google-note').classList.toggle('hidden', !google);
+  el('security-email-form').classList.toggle('hidden', google);
+  el('security-current-wrap').classList.toggle('hidden', google);
+  el('security-password-section').classList.toggle('hidden', google);
+  ['security-new-email', 'security-new-password', 'security-current-password'].forEach(id => { el(id).value = ''; });
+  el('security-phone').value = (typeof loadUserProfile === 'function' && loadUserProfile()?.phone) || '';
+  el('security-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+
+function closeSecurity () {
+  document.getElementById('security-overlay')?.classList.add('hidden');
+  maybeHideOverlay();
+}
+
+function _securityError (err) {
+  const code = err?.code || '';
+  if (code === 'auth/wrong-password' || code === 'auth/invalid-credential' || code === 'auth/invalid-login-credentials') return 'That current password is not right.';
+  if (code === 'auth/invalid-email') return 'That email address does not look right.';
+  if (code === 'auth/email-already-in-use') return 'Another account already uses that email.';
+  if (code === 'auth/weak-password') return 'Use at least 6 characters.';
+  if (code === 'auth/too-many-requests') return 'Too many tries. Wait a few minutes and try again.';
+  if (code === 'auth/operation-not-allowed') return 'Email changes are turned off for this app right now.';
+  return err?.message || 'Something went wrong. Please try again.';
+}
+
+async function _reauthWithCurrentPassword (user) {
+  const current = document.getElementById('security-current-password').value;
+  if (!current) throw Object.assign(new Error('Enter your current password first.'), { code: 'ftb/need-password' });
+  await user.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(user.email, current));
+}
+
+async function _withBusy (btnId, busyText, fn) {
+  const btn = document.getElementById(btnId);
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = busyText;
+  try { await fn(); } finally { btn.disabled = false; btn.textContent = label; }
+}
+
+function fbChangeEmail () {
+  const user = _auth?.currentUser;
+  if (!user) return;
+  const next = document.getElementById('security-new-email').value.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next)) { showToast('Check the email', 'Enter the new email address.', 'error'); return; }
+  if (next.toLowerCase() === (user.email || '').toLowerCase()) { showToast('Same email', 'That is already your email.', 'info'); return; }
+  return _withBusy('security-email-save', 'Sending…', async () => {
+    try {
+      await _reauthWithCurrentPassword(user);
+      await user.verifyBeforeUpdateEmail(next);
+      document.getElementById('security-new-email').value = '';
+      showToast('Check your inbox', `We sent a link to ${next}. Tap it to finish changing your email.`, 'success');
+    } catch (err) {
+      showToast('Email not changed', _securityError(err), 'error');
+    }
+  });
+}
+
+function fbChangePassword () {
+  const user = _auth?.currentUser;
+  if (!user) return;
+  const next = document.getElementById('security-new-password').value;
+  if (next.length < 6) { showToast('Too short', 'Use at least 6 characters.', 'error'); return; }
+  return _withBusy('security-password-save', 'Saving…', async () => {
+    try {
+      await _reauthWithCurrentPassword(user);
+      await user.updatePassword(next);
+      document.getElementById('security-new-password').value = '';
+      document.getElementById('security-current-password').value = '';
+      showToast('Password changed', 'Use your new password next time you sign in.', 'success');
+    } catch (err) {
+      showToast('Password not changed', _securityError(err), 'error');
+    }
+  });
+}
+
+function fbSendPasswordReset () {
+  const user = _auth?.currentUser;
+  if (!user?.email) return;
+  return _withBusy('security-reset-email', 'Sending…', async () => {
+    try {
+      await _auth.sendPasswordResetEmail(user.email);
+      showToast('Reset link sent', `Check ${user.email} for a link to set a new password.`, 'success');
+    } catch (err) {
+      showToast('Could not send it', _securityError(err), 'error');
+    }
+  });
+}
+
+function savePhone () {
+  const raw = document.getElementById('security-phone').value.trim();
+  const digits = raw.replace(/\D/g, '');
+  if (raw && (digits.length < 7 || digits.length > 15)) { showToast('Check the number', 'That phone number does not look right.', 'error'); return; }
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || { name: 'Foodie', joinDate: new Date().toISOString() };
+  saveUserProfile({ ...profile, phone: raw });
+  showToast(raw ? 'Phone saved' : 'Phone removed', raw ? 'Your phone number is saved to your account.' : 'Your phone number was removed.', 'success');
+}
+
 function eraseLocalData () {
   try {
     Object.keys(localStorage).filter(k => k.startsWith('ftb_') || k.startsWith('ftb-')).forEach(k => localStorage.removeItem(k));
@@ -657,6 +766,11 @@ function updateAuthUI (user) {
   if (el('account-signin-row'))  el('account-signin-row').classList.toggle('hidden', !!user);
   if (el('account-signout-row')) el('account-signout-row').classList.toggle('hidden', !user);
   if (el('account-delete-row')) el('account-delete-row').classList.toggle('hidden', !user);
+  if (el('account-security-row')) el('account-security-row').classList.toggle('hidden', !user);
+  if (el('account-email-display')) {
+    el('account-email-display').textContent = user?.email || '';
+    el('account-email-display').classList.toggle('hidden', !user?.email);
+  }
   if (el('account-upgrade-row')) el('account-upgrade-row').classList.toggle('hidden', isPremium());
   if (el('account-sync-badge')) {
     const synced = !!user;
@@ -691,6 +805,15 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('account-signin-row')?.addEventListener('click',  () => { closeAccountModal(); setTimeout(() => openAuthModal(), 150); });
   document.getElementById('account-signout-row')?.addEventListener('click', () => { closeAccountModal(); setTimeout(fbSignOut,          150); });
   document.getElementById('account-delete-row')?.addEventListener('click', () => { closeAccountModal(); setTimeout(openDeleteAccount, 150); });
+
+  // Email, password & phone
+  document.getElementById('account-security-row')?.addEventListener('click', () => { closeAccountModal(); setTimeout(openSecurity, 150); });
+  document.getElementById('security-close')?.addEventListener('click', closeSecurity);
+  document.getElementById('security-overlay')?.addEventListener('click', e => { if (e.target.id === 'security-overlay') closeSecurity(); });
+  document.getElementById('security-email-save')?.addEventListener('click', fbChangeEmail);
+  document.getElementById('security-password-save')?.addEventListener('click', fbChangePassword);
+  document.getElementById('security-reset-email')?.addEventListener('click', fbSendPasswordReset);
+  document.getElementById('security-phone-save')?.addEventListener('click', savePhone);
 
   // Delete account
   document.getElementById('delete-account-close')?.addEventListener('click', closeDeleteAccount);

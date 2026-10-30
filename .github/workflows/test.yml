@@ -110,3 +110,6 @@ jobs:
       - name: Payments
         working-directory: tests
         run: node payments.test.js
+      - name: Account security and nearby alerts
+        working-directory: tests
+        run: node security.test.js

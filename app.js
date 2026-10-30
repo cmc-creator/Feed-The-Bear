@@ -1642,6 +1642,8 @@ function openAccountModal () {
   if (btn('account-review-link-btn'))   btn('account-review-link-btn').onclick   = () => gotoAndClose(() => (typeof requiresPremium === 'function' ? requiresPremium('Year in Review ', openYearReview) : openYearReview()));
   if (btn('account-ach-link-btn'))      btn('account-ach-link-btn').onclick      = () => gotoAndClose(() => (typeof requiresPremium === 'function' ? requiresPremium('Achievements ', openAchievements) : openAchievements()));
   if (btn('account-export-link-btn'))   btn('account-export-link-btn').onclick   = () => gotoAndClose(openExport2);
+  if (btn('account-nearalerts-row'))    btn('account-nearalerts-row').onclick    = toggleNearAlerts;
+  renderNearAlertsRow();
 
   // Hide lock icons on premium features if user is Grizzly
   const prem = typeof isPremium === 'function' && isPremium();
@@ -1837,6 +1839,7 @@ function enableLocation () {
       // Decision Mode ignores distance without location, so refresh an open shortlist.
       if (!document.getElementById('decision-mode-overlay')?.classList.contains('hidden')) runDecisionMode();
       showToast('Location enabled', 'You\'ll get a nudge when you\'re near spots on your list!', 'success');
+      renderNearAlertsRow();
       // Request notification permission
       if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
@@ -1917,6 +1920,7 @@ function disableLocation () {
   updateLocationBtn();
   renderCards();
   showToast('Location Off', 'Location tracking disabled.', 'info');
+  renderNearAlertsRow();
 }
 
 function updateLocationBtn () {
@@ -1982,8 +1986,13 @@ function noteNearAlert (id, until) {
   try { localStorage.setItem(NEAR_ALERTS_KEY, JSON.stringify(log)); } catch { /* storage full */ }
 }
 
+// Nearby alerts are on unless switched off in My Account.
+function nearAlertsOn () {
+  return state.settings.nearAlerts !== false;
+}
+
 function checkProximity () {
-  if (!state.locationEnabled) return;
+  if (!state.locationEnabled || !nearAlertsOn()) return;
   const now = Date.now();
   const craving = findNearbyCraving();
   if (craving) {
@@ -1997,12 +2006,15 @@ function checkProximity () {
   }
   if (craving) return;
   // Otherwise at most one alert: the closest saved spot that isn't resting.
+  // A Want to Try spot always wins over a place you have already been.
   const quietUntil = getNearAlertLog();
   let near = null;
+  const better = (a, b) => !b || (a.want !== b.want ? a.want : a.d < b.d);
   state.restaurants.forEach(r => {
     if (!r.lat || !r.lng || (quietUntil[r.id] || 0) > now || (state.notifiedAt[r.id] || 0) > now - NOTIFY_COOLDOWN) return;
     const d = haversine(state.userLat, state.userLng, r.lat, r.lng);
-    if (d <= NOTIFY_RADIUS && (!near || d < near.d)) near = { r, d };
+    const cand = { r, d, want: r.status === 'want-to-try' };
+    if (d <= NOTIFY_RADIUS && better(cand, near)) near = cand;
   });
   if (!near) return;
   state.notifiedAt[near.r.id] = now;
@@ -2019,7 +2031,7 @@ function showProximityAlert (r, distM, crave = null) {
   document.getElementById('proximity-name').textContent = crave ? `${crave.name} is ${fmtDist(distM)} away` : r.name;
   document.getElementById('proximity-msg').textContent = crave
     ? `At ${r.name}. It's on your Crave List.`
-    : `${r.status === 'want-to-try' ? 'Saved for later.' : 'Previously visited.'} ${fmtDist(distM)} away`;
+    : `${r.status === 'want-to-try' ? 'On your Want to Try list.' : 'Previously visited.'} ${fmtDist(distM)} away`;
 
   const dirBtn = document.getElementById('proximity-directions');
   dirBtn.onclick = () => openDirections(r);
@@ -2032,20 +2044,79 @@ function showProximityAlert (r, distM, crave = null) {
   alert._timeout = setTimeout(() => alert.classList.add('hidden'), 15000);
 }
 
-function sendBrowserNotification (r, distM, crave = null) {
+// Phones only show notifications through the service worker: on Android
+// `new Notification()` throws, so that path is just the desktop fallback.
+async function sendBrowserNotification (r, distM, crave = null) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   const tag = `ftb-${r.id}`;
   // The old GitHub bear-icon.png doesn't exist; use the bundled icon.
   const icon = new URL('icon-192.png', location.href).href;
-  const n = new Notification(crave ? 'Your craving is nearby' : `Feed The Bear: ${r.name}`, {
-    body: crave
-      ? `${crave.name} at ${r.name} · ${fmtDist(distM)} away`
-      : `${r.status === 'want-to-try' ? 'Saved on your list.' : 'Previously visited.'} ${fmtDist(distM)} away`,
-    tag,
-    icon,
-    badge: icon,
-  });
-  n.onclick = () => { window.focus(); openDetailModal(r.id); n.close(); };
+  const title = crave ? 'Your craving is nearby' : r.status === 'want-to-try' ? `${r.name} is ${fmtDist(distM)} away` : `Feed The Bear: ${r.name}`;
+  const body = crave
+    ? `${crave.name} at ${r.name} · ${fmtDist(distM)} away`
+    : r.status === 'want-to-try' ? 'It is on your Want to Try list. Tap to see it.' : `Previously visited. ${fmtDist(distM)} away`;
+  const opts = { body, tag, icon, badge: icon, data: { url: new URL(`app.html?spot=${encodeURIComponent(r.id)}`, location.href).href, spot: r.id } };
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    if (reg?.showNotification) { await reg.showNotification(title, opts); return; }
+  } catch { /* fall back below */ }
+  try {
+    const n = new Notification(title, opts);
+    n.onclick = () => { window.focus(); openDetailModal(r.id); n.close(); };
+  } catch { /* this browser cannot show notifications from a page */ }
+}
+
+// Want to Try spots saved without a map pin can't alert; look them up once.
+let _pinLookupRunning = false;
+async function pinWantToTrySpots () {
+  if (_pinLookupRunning) return;
+  _pinLookupRunning = true;
+  const missing = state.restaurants.filter(r => r.status === 'want-to-try' && !(r.lat && r.lng) && r.address);
+  for (const r of missing.slice(0, 25)) {
+    await geocodeAddress(r.id, r.address);
+    await new Promise(res => setTimeout(res, 1100)); // Nominatim allows one request a second
+  }
+  _pinLookupRunning = false;
+}
+
+function renderNearAlertsRow () {
+  const el = document.getElementById('account-nearalerts-state');
+  if (!el) return;
+  const on = nearAlertsOn() && state.settings.locationEnabled;
+  const blocked = 'Notification' in window && Notification.permission === 'denied';
+  el.textContent = !on ? 'Off. Tap to get a heads-up near spots you want to try.'
+    : blocked ? 'On in the app. Phone notifications are blocked in settings.'
+    : 'On. Within 1 mile, while Feed The Bear is open.';
+}
+
+async function toggleNearAlerts () {
+  const on = nearAlertsOn() && state.settings.locationEnabled;
+  if (on) {
+    state.settings.nearAlerts = false;
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+    renderNearAlertsRow();
+    showToast('Nearby alerts off', 'You will not get a heads-up near your Want to Try spots.', 'info');
+    return;
+  }
+  state.settings.nearAlerts = true;
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+  if ('Notification' in window && Notification.permission === 'default') {
+    try { await Notification.requestPermission(); } catch { /* older browsers */ }
+  }
+  if (!state.locationEnabled) enableLocation();
+  else checkProximity();
+  pinWantToTrySpots();
+  renderNearAlertsRow();
+  const want = state.restaurants.filter(r => r.status === 'want-to-try');
+  const pinned = want.filter(r => r.lat && r.lng).length;
+  showToast('Nearby alerts on', want.length
+    ? `We will tell you when you are within a mile of a Want to Try spot (${pinned} of ${want.length} have a map pin so far).`
+    : 'Add spots to your Want to Try list and we will tell you when you are close.', 'success');
+}
+
+function openSpotFromLink (id) {
+  if (!id || !state.restaurants.some(r => r.id === id)) return;
+  setTimeout(() => openDetailModal(id), 300);
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -6849,6 +6920,10 @@ document.addEventListener('DOMContentLoaded', () => {
   initDetailQuickCapture();
   initReminders();
   initInstallPrompt();
+  // A tapped "near a spot" notification opens that spot.
+  openSpotFromLink(new URLSearchParams(window.location.search).get('spot'));
+  navigator.serviceWorker?.addEventListener('message', e => { if (e.data?.type === 'OPEN_SPOT') openSpotFromLink(e.data.id); });
+  if (state.settings.locationEnabled && nearAlertsOn()) setTimeout(pinWantToTrySpots, 8000);
   initBearRoarInteractions();
   checkAndNudge();
   checkAchievements();

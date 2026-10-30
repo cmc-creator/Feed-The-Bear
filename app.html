@@ -74,6 +74,7 @@
       <div class="account-portal-hero">
         <div id="account-avatar-display" class="account-avatar-display"></div>
         <h2 id="account-name-display" class="account-name-display">Foodie</h2>
+        <div id="account-email-display" class="account-email-display hidden"></div>
         <div id="account-since-display" class="account-since-display">Foodie since today</div>
         <div class="account-badges-row">
           <span id="account-plan-badge" class="account-plan-badge badge-cub">Cub - Complimentary</span>
@@ -88,6 +89,13 @@
         </button>
         <button class="account-action-row" id="account-edit-btn">
           <span class="aar-icon" aria-hidden="true">✏️</span><span class="aar-label">Edit Profile</span><span class="aar-chevron">›</span>
+        </button>
+        <!-- Email, password, phone - signed in only -->
+        <button class="account-action-row hidden" id="account-security-row">
+          <span class="aar-icon" aria-hidden="true">🔐</span><span class="aar-label">Email, Password &amp; Phone</span><span class="aar-chevron">›</span>
+        </button>
+        <button class="account-action-row" id="account-nearalerts-row">
+          <span class="aar-icon" aria-hidden="true">📍</span><span class="aar-label">Nearby Want to Try alerts<small id="account-nearalerts-state" class="aar-sub">Off</small></span><span class="aar-chevron">›</span>
         </button>
         <button class="account-action-row" id="account-personalize-btn">
           <span class="aar-icon" aria-hidden="true">🎨</span><span class="aar-label">Themes &amp; Personalize</span><span class="aar-chevron">›</span>
@@ -148,6 +156,48 @@
         <button type="button" class="btn-ghost" id="delete-account-cancel">Keep my account</button>
         <button type="button" class="btn-danger" id="delete-account-go" disabled>Delete forever</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ── Email, Password & Phone ───────────────────────────── -->
+  <div id="security-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="security-title">
+    <div class="modal-card security-card">
+      <div class="modal-header">
+        <h2 id="security-title">Email, Password &amp; Phone</h2>
+        <button id="security-close" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+
+      <section class="security-section">
+        <h3>Email</h3>
+        <p class="security-current">Signed in as <strong id="security-email"></strong></p>
+        <p id="security-google-note" class="security-note hidden">You sign in with Google, so your email and password are managed in your Google account.</p>
+        <div id="security-current-wrap">
+          <label class="form-label" for="security-current-password">Current password (to change your email or password)</label>
+          <input id="security-current-password" class="form-input" type="password" autocomplete="current-password" />
+        </div>
+        <div id="security-email-form">
+          <label class="form-label" for="security-new-email">New email</label>
+          <input id="security-new-email" class="form-input" type="email" autocomplete="email" inputmode="email" />
+          <button type="button" class="btn-primary" id="security-email-save">Change email</button>
+          <p class="security-note">We send a link to the new address. Your email changes when you tap it.</p>
+        </div>
+      </section>
+
+      <section class="security-section" id="security-password-section">
+        <h3>Password</h3>
+        <label class="form-label" for="security-new-password">New password</label>
+        <input id="security-new-password" class="form-input" type="password" autocomplete="new-password" minlength="6" />
+        <button type="button" class="btn-primary" id="security-password-save">Change password</button>
+        <button type="button" class="btn-ghost" id="security-reset-email">Email me a reset link instead</button>
+      </section>
+
+      <section class="security-section">
+        <h3>Phone number</h3>
+        <label class="form-label" for="security-phone">Phone (optional)</label>
+        <input id="security-phone" class="form-input" type="tel" autocomplete="tel" inputmode="tel" placeholder="(555) 123-4567" />
+        <button type="button" class="btn-primary" id="security-phone-save">Save phone</button>
+        <p class="security-note">Kept with your account. It is not used to sign in.</p>
+      </section>
     </div>
   </div>
 

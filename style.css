@@ -7768,19 +7768,30 @@ body[data-theme-accent='neon'] {
   }
   #account-overlay.modal-overlay {
     align-items: flex-end;
+    padding: 12px 0 0;
   }
+  #account-overlay .account-portal-hero { padding: 16px 20px 14px; }
+  #account-overlay .account-avatar-display { transform: scale(.8); margin: -8px auto; }
 }
 
 /* ════════════════════════════════════════════════════════════
    ACCOUNT PORTAL (full dashboard modal)
    ════════════════════════════════════════════════════════════ */
+/* A column whose action list scrolls, so the bottom rows are never cut off.
+   dvh is the visible height on phones (vh includes the hidden browser bars). */
 .account-portal-card {
   max-width: 420px;
   width: min(420px, 96vw);
   max-height: min(92vh, 760px);
+  max-height: min(92dvh, 760px);
   padding: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
+.account-portal-topbar,
+.account-portal-hero,
+.account-stats-row { flex-shrink: 0; }
 .account-portal-topbar {
   display: flex;
   align-items: center;
@@ -7804,8 +7815,10 @@ body[data-theme-accent='neon'] {
 .account-portal-actions {
   display: flex;
   flex-direction: column;
-  padding: 8px 0 16px;
+  padding: 8px 0 calc(16px + env(safe-area-inset-bottom, 0px));
   overflow-y: auto;
+  overscroll-behavior: contain;
+  flex: 1 1 auto;
   min-height: 0;
 }
 .account-action-row {
@@ -8645,5 +8658,15 @@ body.light-mode .mood-picks-home .home-mood-chip:not(.active) { background: rgba
 .delete-account-card p { margin: 0; font-size: .92rem; line-height: 1.45; }
 .delete-account-check { display: flex; gap: 8px; align-items: center; font-size: .9rem; }
 .delete-account-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; flex-wrap: wrap; }
+.account-email-display { font-size: .82rem; color: var(--text); opacity: .85; margin: 2px 0 2px; overflow-wrap: anywhere; }
+.aar-sub { display: block; font-size: .74rem; font-weight: 500; color: var(--text-dim); margin-top: 2px; }
+.security-card { max-width: 440px; display: grid; gap: 14px; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); max-height: 90dvh; }
+.security-section { display: grid; gap: 8px; padding: 0 20px; }
+.security-section .btn-primary, .security-section .btn-ghost { justify-content: center; text-align: center; }
+.security-section + .security-section { border-top: 1px solid var(--border); padding-top: 12px; }
+.security-section h3 { margin: 0; font-size: 1rem; }
+#security-email-form, #security-current-wrap { display: grid; gap: 8px; }
+.security-current, .security-note { margin: 0; font-size: .85rem; line-height: 1.4; color: var(--text-dim); }
+.security-current strong { color: var(--text); overflow-wrap: anywhere; }
 .btn-danger:disabled { opacity: .45; cursor: not-allowed; }
 .app-footer-legal a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
