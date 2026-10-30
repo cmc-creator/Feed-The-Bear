@@ -113,3 +113,9 @@ jobs:
       - name: Account security and nearby alerts
         working-directory: tests
         run: node security.test.js
+      - name: Free trial and invite rewards (server)
+        working-directory: tests
+        run: node trial.test.js
+      - name: Free trial and invites (app)
+        working-directory: tests
+        run: node invite.test.js

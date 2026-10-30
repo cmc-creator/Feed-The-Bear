@@ -19,6 +19,7 @@
 
 const Stripe = require('stripe');
 const admin  = require('firebase-admin');
+const { rewardInviter } = require('./_referral');
 
 function getAdmin () {
   if (!admin.apps.length) {
@@ -73,7 +74,10 @@ module.exports = async function handler (req, res) {
 
     if (event.type === 'checkout.session.completed') {
       const uid = obj.metadata?.uid || obj.client_reference_id;
-      if (uid && obj.payment_status === 'paid') {
+      // A free-trial checkout completes with nothing charged yet.
+      const done = obj.payment_status === 'paid' || (obj.payment_status === 'no_payment_required' && obj.status === 'complete');
+      if (uid && done) {
+        await db.doc(`trials/${uid}`).set({ at: new Date().toISOString(), sessionId: obj.id }, { merge: true });
         await setPlan(db, uid, {
           plan:             'grizzly',
           stripeCustomerId: obj.customer,
@@ -81,6 +85,8 @@ module.exports = async function handler (req, res) {
           upgradedAt:       new Date().toISOString(),
         });
         if (obj.customer) await db.doc(`stripeCustomers/${obj.customer}`).set({ uid }, { merge: true });
+        // Came from a friend's invite: they get their free month (only ever once per friend).
+        if (obj.metadata?.ref) await rewardInviter({ db, stripe, inviterUid: obj.metadata.ref, friendUid: uid });
       }
     }
 
