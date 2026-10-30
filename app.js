@@ -2873,6 +2873,8 @@ function openDetailModal (id) {
   document.getElementById('detail-website-btn').style.display = r.website ? '' : 'none';
   document.getElementById('detail-website-btn').onclick = () => openWebsite(r);
   document.getElementById('detail-maps-search-btn').onclick = () => openMapsSearch(r);
+  document.getElementById('detail-book-btn').onclick = () => openPartnerSheet('book', r);
+  document.getElementById('detail-order-btn').onclick = () => openPartnerSheet('order', r);
   document.getElementById('detail-edit-btn').onclick = () => { closeDetailModal(); openEditModal(r.id); };
   document.getElementById('detail-delete-btn').onclick = () => {
     if (confirm(`Delete "${r.name}"? This cannot be undone.`)) {
@@ -3349,6 +3351,53 @@ function openWebsite (r) {
 function openMapsSearch (r) {
   const q = r.address || r.name;
   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`, '_blank', 'noopener');
+}
+
+/* ── Book a table / Order delivery ────────────────────────── */
+// Each service's own search for this spot. Add an affiliate code to
+// PARTNER_REFS once a program approves the app (it is appended as-is).
+const PARTNER_REFS = { opentable: '', resy: '', yelp: '', doordash: '', ubereats: '', grubhub: '' };
+function partnerLinks (kind, r) {
+  const name = encodeURIComponent(r.name || '');
+  const city = String(r.address || '').split(',').slice(-3, -1).join(',').trim();
+  const where = encodeURIComponent(city || r.address || '');
+  const near = Number.isFinite(Number(r.lat)) && r.lat != null ? `&latitude=${Number(r.lat)}&longitude=${Number(r.lng)}` : '';
+  const ref = key => PARTNER_REFS[key] ? `&${PARTNER_REFS[key]}` : '';
+  if (kind === 'book') {
+    return [
+      { key: 'opentable', label: 'OpenTable', url: `https://www.opentable.com/s?term=${name}${near}${ref('opentable')}` },
+      { key: 'resy', label: 'Resy', url: `https://resy.com/search?query=${name}${ref('resy')}` },
+      { key: 'yelp', label: 'Yelp', url: `https://www.yelp.com/search?find_desc=${name}&find_loc=${where}${ref('yelp')}` },
+      r.phone ? { key: 'call', label: 'Call them', url: `tel:${String(r.phone).replace(/[^\d+]/g, '')}`, note: r.phone } : null,
+    ].filter(Boolean);
+  }
+  return [
+    { key: 'doordash', label: 'DoorDash', url: `https://www.doordash.com/search/store/${name}/${ref('doordash').replace(/^&/, '?')}` },
+    { key: 'ubereats', label: 'Uber Eats', url: `https://www.ubereats.com/search?q=${name}${ref('ubereats')}` },
+    { key: 'grubhub', label: 'Grubhub', url: `https://www.grubhub.com/search?queryText=${name}${ref('grubhub')}` },
+  ];
+}
+
+function openPartnerSheet (kind, r) {
+  if (!r?.name) return;
+  const links = partnerLinks(kind, r);
+  document.getElementById('partner-title').textContent = kind === 'book' ? `Book ${r.name}` : `Order from ${r.name}`;
+  document.getElementById('partner-sub').textContent = kind === 'book'
+    ? 'Pick where to reserve. Not every spot takes reservations online.'
+    : 'Pick an app. Not every spot delivers, so the app may show similar places.';
+  const box = document.getElementById('partner-links');
+  box.innerHTML = links.map(l => `<a href="${escHtml(l.url)}" target="_blank" rel="noopener" data-partner="${l.key}">${escHtml(l.label)}${l.note ? `<span>${escHtml(l.note)}</span>` : '<span>›</span>'}</a>`).join('');
+  box.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+    trackProductEvent('partner_click', { kind, partner: a.dataset.partner });
+    setTimeout(closePartnerSheet, 200);
+  }));
+  document.getElementById('partner-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+
+function closePartnerSheet () {
+  document.getElementById('partner-overlay')?.classList.add('hidden');
+  if (document.getElementById('detail-overlay')?.classList.contains('hidden')) maybeHideOverlay();
 }
 
 /* ── Reminder scheduling ──────────────────────────────────── */
@@ -6967,6 +7016,8 @@ document.addEventListener('DOMContentLoaded', () => {
   navigator.serviceWorker?.addEventListener('message', e => { if (e.data?.type === 'OPEN_SPOT') openSpotFromLink(e.data.id); });
   if (state.settings.locationEnabled) setTimeout(pinWantToTrySpots, 8000);
   document.getElementById('nearalerts-close')?.addEventListener('click', closeNearAlerts);
+  document.getElementById('partner-close')?.addEventListener('click', closePartnerSheet);
+  document.getElementById('partner-overlay')?.addEventListener('click', e => { if (e.target.id === 'partner-overlay') closePartnerSheet(); });
   document.getElementById('nearalerts-overlay')?.addEventListener('click', e => { if (e.target.id === 'nearalerts-overlay') closeNearAlerts(); });
   initBearRoarInteractions();
   checkAndNudge();

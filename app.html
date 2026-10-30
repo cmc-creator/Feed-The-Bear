@@ -208,6 +208,18 @@
     </div>
   </div>
 
+  <!-- ── Book a table / Order delivery ─────────────────────── -->
+  <div id="partner-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="partner-title">
+    <div class="modal-card nearalerts-card">
+      <div class="modal-header">
+        <h2 id="partner-title">Book a table</h2>
+        <button id="partner-close" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p id="partner-sub" class="security-note"></p>
+      <div id="partner-links" class="partner-links"></div>
+    </div>
+  </div>
+
   <!-- ── Nearby Want to Try alerts ─────────────────────────── -->
   <div id="nearalerts-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="nearalerts-title">
     <div class="modal-card nearalerts-card">
@@ -1540,6 +1552,8 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
             Directions
           </button>
+          <button id="detail-book-btn" class="btn-secondary">🍽️ Book a table</button>
+          <button id="detail-order-btn" class="btn-secondary">🛵 Order delivery</button>
           <button id="detail-website-btn" class="btn-secondary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
             Website

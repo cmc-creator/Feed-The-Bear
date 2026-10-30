@@ -125,3 +125,6 @@ jobs:
       - name: Add from TikTok or Instagram (app)
         working-directory: tests
         run: node linkadd.test.js
+      - name: Book a table and order delivery
+        working-directory: tests
+        run: node partner.test.js
