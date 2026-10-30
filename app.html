@@ -201,6 +201,26 @@
     </div>
   </div>
 
+  <!-- ── Nearby Want to Try alerts ─────────────────────────── -->
+  <div id="nearalerts-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="nearalerts-title">
+    <div class="modal-card nearalerts-card">
+      <div class="modal-header">
+        <h2 id="nearalerts-title">Nearby Want to Try alerts</h2>
+        <button id="nearalerts-close" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="security-note">Get a heads-up when a spot on your Want to Try list is this close.</p>
+      <div id="nearalerts-choices" class="nearalerts-choices">
+        <button type="button" data-miles="1">1 mile</button>
+        <button type="button" data-miles="5">5 miles</button>
+        <button type="button" data-miles="10">10 miles</button>
+        <button type="button" data-miles="25">25 miles</button>
+        <button type="button" data-miles="50">50 miles</button>
+        <button type="button" data-miles="off">Off</button>
+      </div>
+      <p class="security-note">Works while Feed The Bear is open on your phone.</p>
+    </div>
+  </div>
+
   <!-- ── Edit Profile ──────────────────────────────────────── -->
   <div id="edit-profile-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">
     <div class="modal-card profile-setup-card">
@@ -1426,7 +1446,7 @@
               <button type="button" class="yo-btn yo-again" data-verdict="again">Order again</button>
               <button type="button" class="yo-btn yo-ok" data-verdict="ok">Fine</button>
               <button type="button" class="yo-btn yo-skip" data-verdict="skip">Skip</button>
-              <button type="button" class="yo-btn yo-want" data-verdict="want">Want to try</button>
+              <button type="button" class="yo-btn yo-want" data-verdict="want">Next time</button>
             </div>
           </div>
         </section>
