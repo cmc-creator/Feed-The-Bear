@@ -119,3 +119,9 @@ jobs:
       - name: Free trial and invites (app)
         working-directory: tests
         run: node invite.test.js
+      - name: Restaurant from a link (server)
+        working-directory: tests
+        run: node linkspot.test.js
+      - name: Add from TikTok or Instagram (app)
+        working-directory: tests
+        run: node linkadd.test.js

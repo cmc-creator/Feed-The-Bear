@@ -1,6 +1,6 @@
 /* ════════════════════════════════════════════════════════════
    Feed The Bear - the Cub: quick add + buddy
-   1. Quick Add: type a name (or paste a Maps link), pick a nearby match,
+   1. Quick Add: type a name (or paste a Maps, TikTok or Instagram link), pick a match,
       tap "Been there" or "Want to try", done. The cub fills in cuisine,
       address, and location; Grizzly members can let AI fill the rest.
       The full form is still one tap away ("More details").
@@ -44,6 +44,10 @@ window.Cub = (() => {
     if (/ice_cream/.test(amenity)) return 'Dessert';
     return '';
   }
+
+  // A post on social media: the server reads its caption to find the restaurant.
+  const SOCIAL_LINK = /https?:\/\/(?:[\w-]+\.)*(?:tiktok\.com|instagram\.com|youtube\.com|youtu\.be|facebook\.com|fb\.watch|x\.com|twitter\.com|threads\.net|yelp\.com)\/\S*/i;
+  const isSocialLink = text => SOCIAL_LINK.test(String(text || ''));
 
   // Pull a place name (and coordinates if present) out of a Google Maps link.
   function parseMapsLink (text) {
@@ -120,7 +124,7 @@ window.Cub = (() => {
     }).slice(0, 7);
     box.innerHTML = suggestions.map(suggestionHtml).join('') +
       (q ? `<button type="button" class="qa-sugg qa-sugg-new" data-typed="1"><strong>Add “${esc(typed.trim())}”</strong><span>Not listed? Use this name</span></button>` : '');
-    if (!q && !near.length) box.innerHTML = '<div class="qa-hint">Type a name, or paste a Google Maps link.</div>';
+    if (!q && !near.length) box.innerHTML = '<div class="qa-hint">Type a name, or paste a TikTok, Instagram or Google Maps link.</div>';
   }
 
   // Nominatim for places not in the nearby list (one request at a time, debounced).
@@ -151,6 +155,42 @@ window.Cub = (() => {
     }, 600);
   }
 
+  let linkSeq = 0;
+  async function lookupLink (text) {
+    clearTimeout(searchTimer);
+    const seq = ++linkSeq;
+    const box = sheet.querySelector('.qa-suggs');
+    box.innerHTML = '<div class="qa-hint qa-link-wait">Watching that post for the restaurant… 🍿</div>';
+    say('Ooh, a food post! Let me see where that is.');
+    track('quick_add_link_pasted', { site: (String(text).match(/tiktok|instagram|youtube|youtu\.be|facebook|fb\.watch|x\.com|twitter|threads|yelp/i) || [''])[0].toLowerCase() });
+    try {
+      const s = state;
+      const q = new URLSearchParams({ q: String(text).slice(0, 600) });
+      if (Number.isFinite(s.userLat)) { q.set('lat', s.userLat); q.set('lng', s.userLng); }
+      const resp = await fetch(`/api/link-spot?${q}`);
+      const data = await resp.json().catch(() => ({}));
+      if (seq !== linkSeq || !sheet) return;
+      const dish = data.guess?.dish || '';
+      suggestions = (data.places || []).slice(0, 3).map(pl => ({
+        name: pl.name, address: pl.address || '', lat: Number(pl.lat), lng: Number(pl.lng), website: pl.website || '',
+        cuisine: guessCuisine(pl.name, '', pl.type), dish, source: 'social',
+        dist: Number.isFinite(s.userLat) && Number.isFinite(Number(pl.lat)) ? app().haversine(s.userLat, s.userLng, Number(pl.lat), Number(pl.lng)) : undefined,
+      }));
+      if (!suggestions.length) {
+        box.innerHTML = `<div class="qa-hint">${esc(data.error || 'We could not tell which restaurant that is. Try typing its name.')}</div>`;
+        say("Hmm, I couldn't spot the restaurant in that one. Type its name?");
+        sheet.querySelector('.qa-input').value = '';
+        return;
+      }
+      box.innerHTML = suggestions.map(suggestionHtml).join('');
+      say(suggestions.length === 1 ? `Found it! Is it ${suggestions[0].name}?` : `I think it's one of these. Which one?`);
+      track('quick_add_link_found', { results: suggestions.length });
+    } catch {
+      if (seq !== linkSeq || !sheet) return;
+      box.innerHTML = '<div class="qa-hint">Could not read that link right now. Try typing the restaurant name.</div>';
+    }
+  }
+
   function choose (place) {
     const existing = savedMatch(place.name);
     if (existing) {
@@ -165,6 +205,12 @@ window.Cub = (() => {
     sheet.querySelector('.qa-place-meta').textContent = [pick.address, Number.isFinite(pick.dist) ? app().fmtDist(pick.dist) + ' away' : ''].filter(Boolean).join(' · ');
     const flavor = pick.cuisine ? `${pick.cuisine}! ` : '';
     say(`${flavor}Have you been, or is it on your hit list?`);
+    // From a food post: you haven't been yet, so default to Want to Try with the dish from the video.
+    if (pick.source === 'social') {
+      setStatus('want-to-try');
+      if (pick.dish) sheet.querySelector('.qa-dish').value = pick.dish;
+      say(pick.dish ? `Saving it to Want to Try, with the ${pick.dish} on your Crave List.` : 'Saving it to your Want to Try list. Been already? Tap Been there.');
+    }
     track('quick_add_place_picked', { source: pick.source, hasCuisine: !!pick.cuisine });
   }
 
@@ -263,7 +309,7 @@ window.Cub = (() => {
         <h2 id="qa-title" class="qa-title">Add a spot</h2>
         <div class="qa-step-1">
           <input class="form-input qa-input" type="text" maxlength="120" autocomplete="off" enterkeyhint="search"
-            placeholder="Restaurant name or Google Maps link" aria-label="Restaurant name or Google Maps link" />
+            placeholder="Name, or paste a TikTok, Instagram or Maps link" aria-label="Restaurant name, or a TikTok, Instagram or Google Maps link" />
           <div class="qa-suggs"></div>
         </div>
         <div class="qa-step-2">
@@ -300,6 +346,8 @@ window.Cub = (() => {
     input.addEventListener('input', () => {
       const link = parseMapsLink(input.value);
       if (link) { choose(link); return; }
+      if (isSocialLink(input.value)) { lookupLink(input.value); return; }
+      linkSeq++;
       renderSuggestions(input.value);
       searchMore(input.value);
     });
@@ -337,7 +385,7 @@ window.Cub = (() => {
     return el;
   }
 
-  function openAdd () {
+  function openAdd (prefill = '') {
     sheet = sheet || build();
     pick = null; status = null; stars = 0; verdict = null; photo = ''; video = '';
     sheet.classList.remove('step-2', 'been', 'want');
@@ -355,6 +403,16 @@ window.Cub = (() => {
     hideBubble();
     track('quick_add_opened', {});
     setTimeout(() => sheet.querySelector('.qa-input').focus(), 60);
+    // Shared to the app or pasted in: look it up right away.
+    const shared = String(prefill || '').trim();
+    if (shared) {
+      const input = sheet.querySelector('.qa-input');
+      const maps = parseMapsLink((shared.match(/https?:\/\/\S+/) || [shared])[0]);
+      if (maps) { choose(maps); return; }
+      input.value = isSocialLink(shared) ? (shared.match(SOCIAL_LINK) || [shared])[0] : shared;
+      if (isSocialLink(shared)) lookupLink(shared);
+      else input.dispatchEvent(new Event('input'));
+    }
   }
 
   function close () {

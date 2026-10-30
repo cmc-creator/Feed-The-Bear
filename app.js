@@ -9100,6 +9100,12 @@ function handleWebShareTarget () {
   const sharedUrl = url || (looksLikeSharedUrl(text) ? text.trim().split(/\s+/).find(looksLikeSharedUrl) || '' : '');
   if (!title && !sharedUrl && !text) return;
   history.replaceState(null,'', window.location.pathname);
+  // A TikTok/Instagram/YouTube post: the Cub reads it and finds the restaurant.
+  const shared = [sharedUrl, text, title].filter(Boolean).join(' ');
+  if (window.Cub && /tiktok\.com|instagram\.com|youtube\.com|youtu\.be|facebook\.com|fb\.watch|x\.com|twitter\.com|threads\.net|yelp\.com/i.test(shared)) {
+    window.Cub.openAdd(shared);
+    return;
+  }
   const name = title.replace(/\s*[-|].*$/, '').trim() || (text && !looksLikeSharedUrl(text) ? text.trim() : '') || 'Shared Place';
   openAddModal();
   document.getElementById('form-name').value = name;
