@@ -5,6 +5,10 @@ const { BASE, check, launch, newPage, finish } = require('./lib');
 const spots = [
   { id: 'v1', name: 'Old Faithful Diner', cuisine: 'American', status: 'visited', lat: 33.4946, lng: -111.9261, tags: [], visits: [] },
   { id: 'w1', name: 'Nobu', cuisine: 'Japanese', status: 'want-to-try', lat: 33.4975, lng: -111.9261, tags: [], visits: [] },
+  // About 6 miles north: only alerts when the chosen distance reaches it.
+  { id: 'w2', name: 'Far Noodle', cuisine: 'Thai', status: 'want-to-try', lat: 33.5810, lng: -111.9261, tags: [], visits: [] },
+  // Tucson, about 110 miles away: a trip spot that should not be suggested at home.
+  { id: 'v2', name: 'Crosswinds', cuisine: 'American', status: 'visited', myRating: 5, isFavorite: true, lat: 32.2226, lng: -110.9747, tags: [], visits: [] },
 ];
 
 (async () => {
@@ -79,11 +83,36 @@ const spots = [
 
   await p.evaluate(() => openAccountModal());
   await p.click('#account-nearalerts-row');
+  await p.waitForTimeout(300);
+  check(await p.locator('#nearalerts-overlay').isVisible() && await p.locator('#nearalerts-choices [data-miles=off]').evaluate(b => b.classList.contains('active')), 'the row opens a distance chooser showing Off');
+  await p.click('#nearalerts-choices [data-miles="10"]');
   await p.waitForTimeout(1500);
-  check(await p.evaluate(() => state.settings.nearAlerts === true && JSON.parse(localStorage.getItem('ftb_settings_v1')).nearAlerts === true), 'tapping the row turns alerts on and remembers it');
-  check(/^On/.test(await p.locator('#account-nearalerts-state').innerText()), 'the row then says alerts are on');
+  check(await p.evaluate(() => state.settings.nearAlerts === true && JSON.parse(localStorage.getItem('ftb_settings_v1')).nearAlertMiles === 10), 'choosing 10 miles turns alerts on and remembers the distance');
+  check(/^On, within 10 miles/.test(await p.locator('#account-nearalerts-state').innerText()), 'the row then says alerts are on within 10 miles');
   const alert = (await p.locator('#proximity-alert').innerText().catch(() => '')).replace(/\s+/g, ' ');
   check(await p.locator('#proximity-alert').isVisible() && /Nobu/.test(alert) && /Want to Try/.test(alert), `a Want to Try spot wins over a closer visited one ("${alert}")`);
+  // The chosen distance decides which Want to Try spots alert.
+  const alertFor = miles => p.evaluate(m => {
+    document.getElementById('proximity-alert').classList.add('hidden');
+    state.settings.nearAlertMiles = m;
+    state.notifiedAt = {};
+    localStorage.setItem('ftb_near_alerts_v1', JSON.stringify({ w1: Date.now() + 1e9, v1: Date.now() + 1e9 }));
+    checkProximity();
+    const a = document.getElementById('proximity-alert');
+    return a.classList.contains('hidden') ? '' : a.textContent;
+  }, miles);
+  check(!/Far Noodle/.test(await alertFor(1)), 'at 1 mile, a Want to Try spot 6 miles away stays quiet');
+  check(/Far Noodle/.test(await alertFor(10)), 'at 10 miles, the spot 6 miles away alerts');
+  check(await p.evaluate(() => { localStorage.setItem('ftb_near_alerts_v1', JSON.stringify({ _last: Date.now() })); state.notifiedAt = {}; document.getElementById('proximity-alert').classList.add('hidden'); checkProximity(); return document.getElementById('proximity-alert').classList.contains('hidden'); }), 'a wide radius alerts at most once per half hour');
+
+  // A spot 110 miles away is not suggested at home.
+  const suggested = await p.evaluate(() => {
+    renderForYouHome(); renderMoodPicksHome();
+    return [...document.querySelectorAll('#for-you-home-list, #mood-picks-list, #open-now-home-list')].map(e => e.textContent).join(' ');
+  });
+  check(!/Crosswinds/.test(suggested) && await p.evaluate(() => !openNowPicks().some(x => x.r.id === 'v2')), 'a favorite 110 miles away is left out of home suggestions');
+  check(await p.evaluate(() => state.restaurants.some(r => r.name === 'Crosswinds')), 'it is still saved in your diary');
+  check(await p.evaluate(() => DISH_VERDICT_LABEL.want) === 'Next time', 'the dish button says "Next time", not "Want to try"');
   check(p.errors.length === 0, `no page errors (${p.errors.slice(0, 2).join(' | ')})`);
 
   // ── The phone notification goes through the service worker ──

@@ -1642,7 +1642,7 @@ function openAccountModal () {
   if (btn('account-review-link-btn'))   btn('account-review-link-btn').onclick   = () => gotoAndClose(() => (typeof requiresPremium === 'function' ? requiresPremium('Year in Review ', openYearReview) : openYearReview()));
   if (btn('account-ach-link-btn'))      btn('account-ach-link-btn').onclick      = () => gotoAndClose(() => (typeof requiresPremium === 'function' ? requiresPremium('Achievements ', openAchievements) : openAchievements()));
   if (btn('account-export-link-btn'))   btn('account-export-link-btn').onclick   = () => gotoAndClose(openExport2);
-  if (btn('account-nearalerts-row'))    btn('account-nearalerts-row').onclick    = toggleNearAlerts;
+  if (btn('account-nearalerts-row'))    btn('account-nearalerts-row').onclick    = openNearAlerts;
   renderNearAlertsRow();
 
   // Hide lock icons on premium features if user is Grizzly
@@ -1991,6 +1991,16 @@ function nearAlertsOn () {
   return state.settings.nearAlerts !== false;
 }
 
+// How far away a Want to Try spot can be and still alert, chosen in My
+// Account. Visited spots and cravings stay at NOTIFY_RADIUS.
+const NEAR_ALERT_MILES = [1, 5, 10, 25, 50];
+const NEAR_ALERT_DEFAULT_MILES = 10;
+const NEAR_ALERT_GAP = 30 * 60 * 1000; // a wide radius holds many spots: one alert per half hour
+function nearAlertMiles () {
+  const m = Number(state.settings.nearAlertMiles);
+  return NEAR_ALERT_MILES.includes(m) ? m : NEAR_ALERT_DEFAULT_MILES;
+}
+
 function checkProximity () {
   if (!state.locationEnabled || !nearAlertsOn()) return;
   const now = Date.now();
@@ -2008,17 +2018,20 @@ function checkProximity () {
   // Otherwise at most one alert: the closest saved spot that isn't resting.
   // A Want to Try spot always wins over a place you have already been.
   const quietUntil = getNearAlertLog();
+  if ((quietUntil._last || 0) > now - NEAR_ALERT_GAP) return;
+  const wantRadius = nearAlertMiles() * 1609.344;
   let near = null;
   const better = (a, b) => !b || (a.want !== b.want ? a.want : a.d < b.d);
   state.restaurants.forEach(r => {
     if (!r.lat || !r.lng || (quietUntil[r.id] || 0) > now || (state.notifiedAt[r.id] || 0) > now - NOTIFY_COOLDOWN) return;
     const d = haversine(state.userLat, state.userLng, r.lat, r.lng);
     const cand = { r, d, want: r.status === 'want-to-try' };
-    if (d <= NOTIFY_RADIUS && better(cand, near)) near = cand;
+    if (d <= (cand.want ? wantRadius : NOTIFY_RADIUS) && better(cand, near)) near = cand;
   });
   if (!near) return;
   state.notifiedAt[near.r.id] = now;
   noteNearAlert(near.r.id, now + NOTIFY_COOLDOWN);
+  noteNearAlert('_last', now);
   showProximityAlert(near.r, near.d);
   sendBrowserNotification(near.r, near.d);
 }
@@ -2066,12 +2079,14 @@ async function sendBrowserNotification (r, distM, crave = null) {
   } catch { /* this browser cannot show notifications from a page */ }
 }
 
-// Want to Try spots saved without a map pin can't alert; look them up once.
+// Spots saved without a map pin can't alert or be judged near or far;
+// look them up once, Want to Try spots first.
 let _pinLookupRunning = false;
 async function pinWantToTrySpots () {
   if (_pinLookupRunning) return;
   _pinLookupRunning = true;
-  const missing = state.restaurants.filter(r => r.status === 'want-to-try' && !(r.lat && r.lng) && r.address);
+  const missing = state.restaurants.filter(r => !(r.lat && r.lng) && r.address)
+    .sort((a, b) => (b.status === 'want-to-try') - (a.status === 'want-to-try'));
   for (const r of missing.slice(0, 25)) {
     await geocodeAddress(r.id, r.address);
     await new Promise(res => setTimeout(res, 1100)); // Nominatim allows one request a second
@@ -2079,19 +2094,37 @@ async function pinWantToTrySpots () {
   _pinLookupRunning = false;
 }
 
+const milesLabel = m => `${m} mile${m === 1 ? '' : 's'}`;
+
 function renderNearAlertsRow () {
   const el = document.getElementById('account-nearalerts-state');
   if (!el) return;
   const on = nearAlertsOn() && state.settings.locationEnabled;
   const blocked = 'Notification' in window && Notification.permission === 'denied';
   el.textContent = !on ? 'Off. Tap to get a heads-up near spots you want to try.'
-    : blocked ? 'On in the app. Phone notifications are blocked in settings.'
-    : 'On. Within 1 mile, while Feed The Bear is open.';
+    : blocked ? `On, within ${milesLabel(nearAlertMiles())}. Phone notifications are blocked in settings.`
+    : `On, within ${milesLabel(nearAlertMiles())}, while Feed The Bear is open.`;
 }
 
-async function toggleNearAlerts () {
+// The row opens a chooser: Off, or how far away a spot can be.
+function openNearAlerts () {
   const on = nearAlertsOn() && state.settings.locationEnabled;
-  if (on) {
+  document.querySelectorAll('#nearalerts-choices [data-miles]').forEach(b => {
+    const m = b.dataset.miles === 'off' ? 'off' : Number(b.dataset.miles);
+    b.classList.toggle('active', on ? m === nearAlertMiles() : m === 'off');
+    b.onclick = () => { closeNearAlerts(); setNearAlerts(m); };
+  });
+  document.getElementById('nearalerts-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+
+function closeNearAlerts () {
+  document.getElementById('nearalerts-overlay')?.classList.add('hidden');
+  if (document.getElementById('account-overlay')?.classList.contains('hidden')) maybeHideOverlay();
+}
+
+async function setNearAlerts (miles) {
+  if (miles === 'off') {
     state.settings.nearAlerts = false;
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
     renderNearAlertsRow();
@@ -2099,6 +2132,7 @@ async function toggleNearAlerts () {
     return;
   }
   state.settings.nearAlerts = true;
+  state.settings.nearAlertMiles = miles;
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
   if ('Notification' in window && Notification.permission === 'default') {
     try { await Notification.requestPermission(); } catch { /* older browsers */ }
@@ -2110,7 +2144,7 @@ async function toggleNearAlerts () {
   const want = state.restaurants.filter(r => r.status === 'want-to-try');
   const pinned = want.filter(r => r.lat && r.lng).length;
   showToast('Nearby alerts on', want.length
-    ? `We will tell you when you are within a mile of a Want to Try spot (${pinned} of ${want.length} have a map pin so far).`
+    ? `We will tell you when you are within ${milesLabel(miles)} of a Want to Try spot (${pinned} of ${want.length} have a map pin so far).`
     : 'Add spots to your Want to Try list and we will tell you when you are close.', 'success');
 }
 
@@ -2205,6 +2239,14 @@ function getFiltered () {
 function distOf (r) {
   if (!state.locationEnabled || !r.lat || !r.lng) return Infinity;
   return haversine(state.userLat, state.userLng, r.lat, r.lng);
+}
+
+// Suggestions (For You, Open Now, picks) skip spots too far to go to today,
+// like a place you tried once on a trip. Lists and the diary still show them.
+const SUGGEST_MAX_METERS = 30 * 1609.344;
+function nearEnoughToSuggest (r) {
+  if (!state.locationEnabled || !r.lat || !r.lng) return true; // distance unknown
+  return distOf(r) <= SUGGEST_MAX_METERS;
 }
 
 function renderStats () {
@@ -6923,7 +6965,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // A tapped "near a spot" notification opens that spot.
   openSpotFromLink(new URLSearchParams(window.location.search).get('spot'));
   navigator.serviceWorker?.addEventListener('message', e => { if (e.data?.type === 'OPEN_SPOT') openSpotFromLink(e.data.id); });
-  if (state.settings.locationEnabled && nearAlertsOn()) setTimeout(pinWantToTrySpots, 8000);
+  if (state.settings.locationEnabled) setTimeout(pinWantToTrySpots, 8000);
+  document.getElementById('nearalerts-close')?.addEventListener('click', closeNearAlerts);
+  document.getElementById('nearalerts-overlay')?.addEventListener('click', e => { if (e.target.id === 'nearalerts-overlay') closeNearAlerts(); });
   initBearRoarInteractions();
   checkAndNudge();
   checkAchievements();
@@ -8072,7 +8116,7 @@ function checkWeeklySuggestion () {
   // At most once a week.
   if (now - last < WEEK_MS) return;
 
-  const wantToTry = state.restaurants.filter(r => r.status === 'want-to-try');
+  const wantToTry = state.restaurants.filter(r => r.status === 'want-to-try' && nearEnoughToSuggest(r));
   if (!wantToTry.length) return;
 
   // Find favourite cuisine type from visited restaurants
@@ -9630,7 +9674,7 @@ function saveMenuNotes (data) { localStorage.setItem(MENU_NOTES_KEY, JSON.string
    verdict: 'again' | 'ok' | 'skip' | 'want'                        */
 const DISHES_MERGED_KEY = 'ftb_dishes_merged_v1';
 const DISH_VERDICTS = ['again', 'ok', 'skip', 'want'];
-const DISH_VERDICT_LABEL = { again: 'Order again', ok: 'Fine', skip: 'Skip', want: 'Want to try' };
+const DISH_VERDICT_LABEL = { again: 'Order again', ok: 'Fine', skip: 'Skip', want: 'Next time' };
 
 function dishesOf (r) { return Array.isArray(r?.dishes) ? r.dishes : []; }
 function dishKey (name) { return String(name || '').trim().toLowerCase(); }
@@ -9977,8 +10021,8 @@ function logYourOrder (verdict) {
   setYourOrderPendingPhoto('');
   renderYourOrder(r.id);
   renderAll();
-  const msg = verdict === 'want' ? `${dish.name} is on your Crave List.`
-    : verdict === 'again' ? `Next time here: ${dish.name}.`
+  const msg = verdict === 'want' ? `${dish.name} is on your Crave List for next time.`
+    : verdict === 'again' ? `Saved: get the ${dish.name} again.`
     : verdict === 'skip' ? `Noted. You'll pass on the ${dish.name}.`
     : `${dish.name} logged.`;
   showToast(DISH_VERDICT_LABEL[verdict], msg, 'success');
@@ -10915,14 +10959,14 @@ function renderMoodPicksHome (selectedMood = null) {
   const mood = selectedMood || activeChip?.dataset.mood || 'quick';
   chipsWrap.querySelectorAll('.home-mood-chip').forEach(ch => ch.classList.toggle('active', ch.dataset.mood === mood));
 
-  const picks = [...state.restaurants]
+  const picks = state.restaurants.filter(nearEnoughToSuggest)
     .map(r => ({ ...r, _moodScore: scoreMoodPick(r, mood) }))
     .sort((a, b) => b._moodScore - a._moodScore)
     .slice(0, 3);
 
-  section.classList.remove('hidden');
+  section.classList.toggle('hidden', !picks.length);
   if (!picks.length) {
-    list.innerHTML = '<div class="for-you-empty">Add more restaurants to unlock mood picks.</div>';
+    list.innerHTML = '';
     return;
   }
 
@@ -11137,13 +11181,14 @@ function miniHash (str) {
   return Math.abs(h);
 }
 
-// Dishes marked "Want to try" across every saved spot, nearest first.
+// Dishes marked "Next time" across every saved spot, nearest first.
 // Your saved spots that are open right now: cravings first, then your
 // want-to-try list, then favorites. Uses hours from Google place info.
 function openNowPicks (now = new Date()) {
   const score = r => (dishesOf(r).some(d => d.verdict === 'want') ? 3 : 0)
     + (r.status === 'want-to-try' ? 2 : 0) + (r.isFavorite ? 1 : 0) + (r.myRating >= 4 ? 1 : 0);
   return (state.restaurants || [])
+    .filter(nearEnoughToSuggest)
     .map(r => ({ r, st: openStatus(r, now) }))
     .filter(x => x.st?.open)
     .sort((a, b) => (score(b.r) - score(a.r)) || (distOf(a.r) - distOf(b.r)) || a.r.name.localeCompare(b.r.name));
@@ -11191,7 +11236,7 @@ function renderCraveHome () {
   const count = document.getElementById('crave-home-count');
   if (count) count.textContent = craves.length ? `${craves.length} dish${craves.length === 1 ? '' : 'es'}` : '';
   if (!craves.length) {
-    list.innerHTML = '<div class="crave-empty">Saw a dish you have to try? Open any spot and tap <strong>Want to try</strong> under Your Order.</div>';
+    list.innerHTML = '<div class="crave-empty">Dishes you want to order next time. Heard about a great one? Open the spot, type it under Your Order and tap <strong>Next time</strong>.</div>';
     return;
   }
   list.innerHTML = craves.slice(0, 8).map(({ r, d, dist }) => `
@@ -11405,7 +11450,7 @@ function renderForYouHome () {
     return;
   }
 
-  const scored = all.map(r => {
+  const scored = all.filter(nearEnoughToSuggest).map(r => {
     const dishes = dishesOf(r);
     const likedCount = dishes.filter(d => d.verdict === 'again').length;
     const dislikedCount = dishes.filter(d => d.verdict === 'skip').length;
@@ -11422,9 +11467,10 @@ function renderForYouHome () {
     return { ...r, _score: score, _distMeters: dist };
   }).sort((a, b) => b._score - a._score).slice(0, 3);
 
-  section.classList.remove('hidden');
+  // Every saved spot is far away (say, you're traveling): nothing to suggest.
+  section.classList.toggle('hidden', !scored.length);
   if (!scored.length) {
-    list.innerHTML = '<div class="for-you-empty">Add a few restaurants and ratings to unlock your personalized picks.</div>';
+    list.innerHTML = '';
     return;
   }
 
@@ -12852,7 +12898,7 @@ async function loadAiRec (discData) {
   textEl.textContent = 'Thinking…';
   try {
     const topSaved = state.restaurants
-      .filter(r => r.myRating >= 4)
+      .filter(r => r.myRating >= 4 && nearEnoughToSuggest(r))
       .sort((a, b) => (b.myRating || 0) - (a.myRating || 0))
       .slice(0, 5)
       .map(r => `${r.name} (${r.cuisine || 'various'})`).join(', ');

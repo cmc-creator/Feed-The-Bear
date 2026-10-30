@@ -8666,6 +8666,14 @@ body.light-mode .mood-picks-home .home-mood-chip:not(.active) { background: rgba
 .security-section + .security-section { border-top: 1px solid var(--border); padding-top: 12px; }
 .security-section h3 { margin: 0; font-size: 1rem; }
 #security-email-form, #security-current-wrap { display: grid; gap: 8px; }
+.nearalerts-card { max-width: 400px; display: grid; gap: 12px; padding-bottom: 20px; }
+.nearalerts-card > p { padding: 0 20px; }
+.nearalerts-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 20px; }
+.nearalerts-choices button {
+  padding: 12px 6px; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--surface2); color: var(--text); font: 700 .9rem var(--font); cursor: pointer;
+}
+.nearalerts-choices button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 .security-current, .security-note { margin: 0; font-size: .85rem; line-height: 1.4; color: var(--text-dim); }
 .security-current strong { color: var(--text); overflow-wrap: anywhere; }
 .btn-danger:disabled { opacity: .45; cursor: not-allowed; }
