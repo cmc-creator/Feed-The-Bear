@@ -1,0 +1,17 @@
+{
+  "name": "feed-the-bear-native",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Android app: the live site plus native geofencing for Want to Try alerts.",
+  "scripts": {
+    "sync": "cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/browser": "8.0.5",
+    "@capacitor/core": "8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}
