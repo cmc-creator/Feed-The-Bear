@@ -8674,6 +8674,14 @@ body.light-mode .mood-picks-home .home-mood-chip:not(.active) { background: rgba
   background: var(--surface2); color: var(--text); font: 700 .9rem var(--font); cursor: pointer;
 }
 .nearalerts-choices button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+#partner-overlay { z-index: 260; } /* opens on top of a spot's detail screen */
+.partner-links { display: grid; gap: 8px; padding: 0 20px; }
+.partner-links a {
+  display: flex; align-items: center; gap: 10px; padding: 13px 14px; border-radius: 12px;
+  border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+  font: 700 .95rem var(--font); text-decoration: none;
+}
+.partner-links a span { margin-left: auto; font-weight: 500; font-size: .8rem; color: var(--text-dim); }
 .security-current, .security-note { margin: 0; font-size: .85rem; line-height: 1.4; color: var(--text-dim); }
 .security-current strong { color: var(--text); overflow-wrap: anywhere; }
 .btn-danger:disabled { opacity: .45; cursor: not-allowed; }
