@@ -844,6 +844,53 @@ async function _checkInviteRewards () {
   } catch { /* offline: try next time */ }
 }
 
+// ─── WEEKLY PICKS EMAIL (opt-in, api/digest.js) ──────────────
+let _digestOn = null;
+function _renderDigestRow () {
+  const el = document.getElementById('account-digest-state');
+  if (!el) return;
+  el.textContent = _digestOn ? 'On. 3 spots from your list every Thursday. Tap to stop.' : 'Off. Tap for 3 spots from your list every Thursday.';
+}
+
+async function _loadDigestStatus () {
+  const user = _auth?.currentUser;
+  if (!user || _digestOn !== null) return;
+  try {
+    const token = await user.getIdToken();
+    const resp = await fetch('/api/digest?status=1', { headers: { Authorization: `Bearer ${token}` } });
+    if (resp.ok) _digestOn = !!(await resp.json()).on;
+  } catch { /* offline */ }
+  _renderDigestRow();
+}
+
+async function toggleDigest () {
+  const user = _auth?.currentUser;
+  if (!user) { openAuthModal(); return; }
+  const next = !_digestOn;
+  const row = document.getElementById('account-digest-row');
+  if (row) row.disabled = true;
+  try {
+    const token = await user.getIdToken();
+    const resp = await fetch('/api/digest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ on: next }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Please try again.');
+    _digestOn = data.on;
+    _renderDigestRow();
+    if (typeof trackProductEvent === 'function') trackProductEvent(data.on ? 'digest_on' : 'digest_off');
+    showToast(data.on ? 'Weekly picks on' : 'Weekly picks off', data.on
+      ? `Every Thursday we'll email ${user.email} a few spots from your list.`
+      : 'No more weekly emails.', 'success');
+  } catch (err) {
+    showToast('Could not change it', err.message || 'Please try again.', 'error');
+  } finally {
+    if (row) row.disabled = false;
+  }
+}
+
 async function openBilling () {
   const btn = document.getElementById('account-billing-row');
   if (btn) btn.disabled = true;
@@ -901,6 +948,11 @@ function updateAuthUI (user) {
     el('account-email-display').classList.toggle('hidden', !user?.email);
   }
   if (el('account-upgrade-row')) el('account-upgrade-row').classList.toggle('hidden', isPremium());
+  if (el('account-digest-row')) {
+    el('account-digest-row').classList.toggle('hidden', !user?.email);
+    if (user?.email) _loadDigestStatus();
+  }
+  if (!user) _digestOn = null;
   if (el('account-billing-row')) el('account-billing-row').classList.toggle('hidden', !user || !isPremium() || !!window._ftbRewardUntil);
   if (el('account-invite-state') && window._ftbInvites) {
     el('account-invite-state').textContent = `${window._ftbInvites} friend${window._ftbInvites === 1 ? '' : 's'} joined so far.`
@@ -960,6 +1012,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('account-upgrade-row')?.addEventListener('click', () => { closeAccountModal(); setTimeout(openUpgradeModal,   150); });
   document.getElementById('account-invite-row')?.addEventListener('click', shareInvite);
   document.getElementById('account-billing-row')?.addEventListener('click', openBilling);
+  document.getElementById('account-digest-row')?.addEventListener('click', toggleDigest);
 });
 
 // ─── KICK IT OFF ──────────────────────────────────────────────
