@@ -3,7 +3,7 @@
    Offline-first cache strategy
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-const CACHE  = 'ftb-v86';
+const CACHE  = 'ftb-v87';
 const ASSETS = [
   './',
   './index.html',
@@ -122,9 +122,21 @@ self.addEventListener('fetch', e => {
 });
 
 /* â”€â”€ Push notification scheduling â”€â”€ */
+// A "near a spot" notification carries the spot: show it in an open app
+// window if there is one, otherwise open the app on that spot.
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  e.waitUntil(clients.openWindow(self.registration.scope));
+  const { url, spot } = e.notification.data || {};
+  e.waitUntil((async () => {
+    const wins = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const win = wins.find(w => w.url.startsWith(self.registration.scope));
+    if (win) {
+      await win.focus();
+      if (spot) win.postMessage({ type: 'OPEN_SPOT', id: spot });
+      return;
+    }
+    await clients.openWindow(url || self.registration.scope);
+  })());
 });
 
 self.addEventListener('message', e => {
