@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dinner Vote · Feed The Bear</title>
+  <meta name="description" content="Where should we eat? Vote yes or no on each spot. No app or account needed." />
+  <meta property="og:title" content="Where should we eat? Cast your vote 🐻" />
+  <meta property="og:description" content="Tap yes or no on each spot. Takes 10 seconds, no app needed." />
+  <meta property="og:image" content="https://www.feed-the-bear.com/og-image.jpg" />
+  <link rel="icon" href="favicon-48.png" />
+  <link rel="stylesheet" href="vote.css" />
+</head>
+<body>
+  <main class="vote">
+    <a class="vote-brand" href="index.html"><img src="feedbear.jpg" alt="" /> Feed The Bear</a>
+    <h1 id="vote-title">Where should we eat?</h1>
+    <p id="vote-sub" class="vote-muted">Loading the vote…</p>
+
+    <section id="vote-form" class="hidden">
+      <label class="vote-label" for="vote-name">Your name</label>
+      <input id="vote-name" class="vote-input" maxlength="24" autocomplete="given-name" placeholder="So everyone knows who voted" />
+      <p class="vote-muted">Tap yes on every spot you'd be happy with.</p>
+      <div id="vote-options" class="vote-options"></div>
+      <button id="vote-submit" class="vote-btn" type="button">Send my vote</button>
+    </section>
+
+    <section id="vote-results" class="hidden">
+      <div id="vote-winner" class="vote-winner"></div>
+      <div id="vote-tally" class="vote-tally"></div>
+      <p id="vote-voters" class="vote-muted"></p>
+      <button id="vote-change" class="vote-link" type="button">Change my vote</button>
+    </section>
+
+    <aside class="vote-promo">
+      <strong>Track every spot you want to try.</strong>
+      <span>Feed The Bear remembers what to order, pings you near spots on your list, and runs votes like this one.</span>
+      <a class="vote-btn vote-btn-alt" href="app.html">Get Feed The Bear free</a>
+    </aside>
+  </main>
+  <script src="vote.js"></script>
+</body>
+</html>

@@ -5642,28 +5642,32 @@ function buildSmartItinerary () {
   });
 }
 
-function _persistDinnerRooms () {
-  state.settings.dinnerRooms = state.dinnerRooms;
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+/* ── Dinner Vote ──────────────────────────────────────────
+   Pick 2-6 spots, share vote.html?v=CODE, friends vote yes/no without the
+   app. Rooms live on the server (api/vote.js); recent ones are listed here. */
+const DV_MAX = 6;
+const DV_RECENT_KEY = 'ftb_dinner_votes_v1';
+const _dvSelected = new Set();
+
+function _dvRecent () {
+  try { return JSON.parse(localStorage.getItem(DV_RECENT_KEY)) || []; } catch { return []; }
+}
+function _dvLink (code) {
+  return `https://www.feed-the-bear.com/vote.html?v=${code}`;
 }
 
-function _getDinnerRoomInvite (code) {
-  const url = new URL(window.location.href);
-  url.searchParams.set('room', code);
-  return url.toString();
-}
-
-function _createDinnerRoomCode () {
-  const alpha = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let out = '';
-  for (let i = 0; i < 6; i++) out += alpha[Math.floor(Math.random() * alpha.length)];
-  return out;
+// Good candidates first: Want to Try and favorites close enough to go to tonight.
+function _dvCandidates () {
+  const score = r => (r.status === 'want-to-try' ? 3 : 0) + (r.isFavorite ? 2 : 0) + (r.myRating || 0) / 2 - (Number.isFinite(distOf(r)) ? distOf(r) / 16093 : 0);
+  return state.restaurants.filter(nearEnoughToSuggest).sort((a, b) => score(b) - score(a)).slice(0, 30);
 }
 
 function openDinnerRooms () {
+  _dvSelected.clear();
+  _dvCandidates().slice(0, 3).forEach(r => _dvSelected.add(r.id));
+  renderDinnerVote();
   document.getElementById('dinner-rooms-overlay')?.classList.remove('hidden');
   document.body.classList.add('overlay-open');
-  renderDinnerRoom();
 }
 
 function closeDinnerRooms () {
@@ -5671,125 +5675,80 @@ function closeDinnerRooms () {
   maybeHideOverlay();
 }
 
-function createDinnerRoom () {
-  if (!state.restaurants.length) {
-    showToast('No restaurants yet', 'Add a few spots before creating a room.', 'info');
-    return;
+function renderDinnerVote () {
+  const picker = document.getElementById('dv-picker');
+  if (!picker) return;
+  const list = _dvCandidates();
+  picker.innerHTML = list.length
+    ? list.map(r => `<button type="button" class="dv-pick${_dvSelected.has(r.id) ? ' on' : ''}" data-id="${escHtml(r.id)}" aria-pressed="${_dvSelected.has(r.id)}">
+        <span class="dv-check" aria-hidden="true">${_dvSelected.has(r.id) ? '✓' : ''}</span>
+        <span class="dv-name">${escHtml(r.name)}</span>
+        <small>${escHtml([r.cuisine, r.status === 'want-to-try' ? 'Want to Try' : r.myRating ? `${r.myRating}★` : '', Number.isFinite(distOf(r)) ? fmtDist(distOf(r)) : ''].filter(Boolean).join(' · '))}</small>
+      </button>`).join('')
+    : '<div class="for-you-empty">Save a few spots first, then start a vote.</div>';
+  picker.querySelectorAll('.dv-pick').forEach(b => b.addEventListener('click', () => {
+    const id = b.dataset.id;
+    if (_dvSelected.has(id)) _dvSelected.delete(id);
+    else if (_dvSelected.size >= DV_MAX) { showToast(`Up to ${DV_MAX} spots`, 'Unpick one first.', 'info'); return; }
+    else _dvSelected.add(id);
+    renderDinnerVote();
+  }));
+  const start = document.getElementById('dv-start');
+  if (start) {
+    start.disabled = _dvSelected.size < 2;
+    start.textContent = _dvSelected.size < 2 ? 'Pick at least 2 spots' : `Start the vote (${_dvSelected.size} spots)`;
   }
-  let code = _createDinnerRoomCode();
-  while (state.dinnerRooms[code]) code = _createDinnerRoomCode();
-  const options = [...state.restaurants]
-    .sort((a, b) => (b.myRating || 0) - (a.myRating || 0))
-    .slice(0, 6)
-    .map(r => r.id);
-  state.dinnerRooms[code] = {
-    code,
-    createdAt: new Date().toISOString(),
-    options,
-    votes: {},
-    lockedChoice: '',
-  };
-  state.activeDinnerRoomCode = code;
-  _persistDinnerRooms();
-  renderDinnerRoom();
-  showToast('Room created', `Code ${code} is ready to share.`, 'success');
-}
-
-function joinDinnerRoom () {
-  const input = document.getElementById('dinner-room-code-input');
-  const code = String(input?.value || '').trim().toUpperCase();
-  if (!code) return;
-  if (!state.dinnerRooms[code]) {
-    showToast('Room not found', 'That room code does not exist on this device yet.', 'error');
-    return;
-  }
-  state.activeDinnerRoomCode = code;
-  renderDinnerRoom();
-}
-
-function renderDinnerRoom () {
-  const shell = document.getElementById('dinner-room-shell');
-  const meta = document.getElementById('dinner-room-meta');
-  const list = document.getElementById('dinner-room-options');
-  const result = document.getElementById('dinner-room-result');
-  if (!shell || !meta || !list || !result) return;
-
-  const code = state.activeDinnerRoomCode;
-  const room = code ? state.dinnerRooms[code] : null;
-  if (!room) {
-    shell.classList.add('hidden');
-    return;
-  }
-  shell.classList.remove('hidden');
-  meta.textContent = `Room ${room.code} • ${room.options.length} options`;
-
-  const votesByOption = {};
-  Object.values(room.votes || {}).forEach(id => { votesByOption[id] = (votesByOption[id] || 0) + 1; });
-
-  list.innerHTML = room.options.map(id => {
-    const r = state.restaurants.find(x => x.id === id);
-    if (!r) return '';
-    const votes = votesByOption[id] || 0;
-    return `<label class="dinner-room-option">
-      <input type="radio" name="dinner-room-vote" value="${id}" ${room.lockedChoice === id ? 'checked' : ''} />
-      <span class="dinner-room-option-main">
-        <strong>${escHtml(r.name)}</strong>
-        <small>${escHtml(r.cuisine || 'Restaurant')} • ${(r.myRating || 0) ? `${r.myRating}★` : 'unrated'}</small>
-      </span>
-      <span class="dinner-room-votes">${votes} vote${votes === 1 ? '' : 's'}</span>
-    </label>`;
-  }).join('');
-
-  if (room.lockedChoice) {
-    const winner = state.restaurants.find(r => r.id === room.lockedChoice);
-    result.innerHTML = winner
-      ? `<div class="dinner-room-locked">Locked winner: <strong>${escHtml(winner.name)}</strong></div>`
+  const recent = _dvRecent().filter(v => Date.parse(v.expiresAt) > Date.now());
+  const box = document.getElementById('dv-recent');
+  if (box) {
+    box.innerHTML = recent.length
+      ? `<h3>Your votes</h3>${recent.map(v => `<a class="dv-recent" href="${escHtml(_dvLink(v.code))}" target="_blank" rel="noopener">${escHtml(v.title)}<span>See results ›</span></a>`).join('')}`
       : '';
-  } else {
-    result.innerHTML = '<div class="dinner-room-hint">Vote first, then lock the winner when everyone agrees.</div>';
   }
 }
 
-function voteDinnerRoom () {
-  const code = state.activeDinnerRoomCode;
-  const room = code ? state.dinnerRooms[code] : null;
-  if (!room) return;
-  const selected = document.querySelector('input[name="dinner-room-vote"]:checked');
-  if (!selected) {
-    showToast('Pick an option', 'Choose a restaurant before voting.', 'info');
-    return;
+async function startDinnerVote () {
+  const spots = [..._dvSelected].map(id => state.restaurants.find(r => r.id === id)).filter(Boolean);
+  if (spots.length < 2) return;
+  const btn = document.getElementById('dv-start');
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+  try {
+    const resp = await fetch('/api/vote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'create',
+        host: (loadUserProfile()?.name || '').slice(0, 30),
+        options: spots.map(r => ({ name: r.name, cuisine: r.cuisine || '', address: r.address || '', lat: r.lat ?? null, lng: r.lng ?? null, rating: r.myRating || r.googleRating || 0 })),
+      }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.code) throw new Error(data.error || 'Could not start the vote.');
+    const recent = _dvRecent();
+    recent.unshift({ code: data.code, title: spots.map(r => r.name).slice(0, 3).join(', ') + (spots.length > 3 ? '…' : ''), expiresAt: new Date(Date.now() + 3 * 864e5).toISOString() });
+    try { localStorage.setItem(DV_RECENT_KEY, JSON.stringify(recent.slice(0, 10))); } catch { /* storage full */ }
+    trackProductEvent('dinner_vote_started', { options: spots.length });
+    await shareDinnerVote(data.code);
+    renderDinnerVote();
+  } catch (err) {
+    showToast('Vote not started', err.message || 'Please try again.', 'error');
+    renderDinnerVote();
   }
-  const voter = (loadUserProfile()?.name || 'Guest').slice(0, 24);
-  room.votes[voter] = selected.value;
-  _persistDinnerRooms();
-  renderDinnerRoom();
 }
 
-function lockDinnerRoomWinner () {
-  const code = state.activeDinnerRoomCode;
-  const room = code ? state.dinnerRooms[code] : null;
-  if (!room) return;
-
-  const tally = {};
-  Object.values(room.votes || {}).forEach(id => { tally[id] = (tally[id] || 0) + 1; });
-  const winnerId = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0];
-  if (!winnerId) {
-    showToast('No votes yet', 'Collect a few votes before locking.', 'info');
-    return;
+async function shareDinnerVote (code) {
+  const url = _dvLink(code);
+  const text = 'Where should we eat? Vote yes or no on each spot (takes 10 seconds):';
+  try {
+    if (navigator.share) { await navigator.share({ title: 'Dinner Vote', text, url }); return; }
+  } catch (err) { if (err?.name === 'AbortError') return; }
+  try {
+    await navigator.clipboard.writeText(`${text} ${url}`);
+    showToast('Vote link copied', 'Paste it in your group chat. Results update as friends vote.', 'success');
+  } catch {
+    prompt('Copy the vote link:', url);
   }
-  room.lockedChoice = winnerId;
-  _persistDinnerRooms();
-  renderDinnerRoom();
-  const winner = state.restaurants.find(r => r.id === winnerId);
-  if (winner) showToast('Winner locked', `${winner.name} wins dinner night.`, 'success');
-}
-
-function shareDinnerRoomInvite () {
-  const code = state.activeDinnerRoomCode;
-  if (!code) return;
-  const url = _getDinnerRoomInvite(code);
-  navigator.clipboard?.writeText(url);
-  showToast('Invite copied', 'Room invite link copied to clipboard.', 'success');
 }
 
 function openShareHighlights () {
@@ -7073,11 +7032,8 @@ document.addEventListener('DOMContentLoaded', () => {
   checkGuestProfile();
   handleWebShareTarget();
   handleLaunchActions();
-  const roomCodeFromUrl = new URLSearchParams(window.location.search).get('room');
-  if (roomCodeFromUrl) {
-    state.activeDinnerRoomCode = String(roomCodeFromUrl).toUpperCase();
-    openDinnerRooms();
-  }
+  // Old Dinner Room links (?room=) open the new Dinner Vote.
+  if (new URLSearchParams(window.location.search).has('room')) openDinnerRooms();
   // Post-render: add compare checkboxes if mode was active
   if (_compareMode) addCompareCheckboxes();
   // Wire home discovery buttons
@@ -7198,14 +7154,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('dinner-rooms-overlay')?.addEventListener('click', e => {
     if (e.target === document.getElementById('dinner-rooms-overlay')) closeDinnerRooms();
   });
-  document.getElementById('dinner-room-create-btn')?.addEventListener('click', createDinnerRoom);
-  document.getElementById('dinner-room-join-btn')?.addEventListener('click', joinDinnerRoom);
-  document.getElementById('dinner-room-code-input')?.addEventListener('keydown', e => {
-    if (e.key === 'Enter') joinDinnerRoom();
-  });
-  document.getElementById('dinner-room-share-btn')?.addEventListener('click', shareDinnerRoomInvite);
-  document.getElementById('dinner-room-vote-btn')?.addEventListener('click', voteDinnerRoom);
-  document.getElementById('dinner-room-lock-btn')?.addEventListener('click', lockDinnerRoomWinner);
+  document.getElementById('dv-start')?.addEventListener('click', startDinnerVote);
   document.getElementById('settings-btn')?.addEventListener('click', openPersonalizeSettings);
   document.getElementById('command-palette-close-btn')?.addEventListener('click', closeCommandPalette);
   document.getElementById('command-palette-overlay')?.addEventListener('click', e => {
@@ -9222,7 +9171,7 @@ const COMMAND_PALETTE_ACTIONS = [
   { label: 'Action: Decision Mode', hint: 'Top 3 in under a minute', keys: 'decision mode winner shortlist quick', run: openDecisionMode },
   { label: 'Action: Smart Planner', hint: 'Build tonight plan', keys: 'planner plan tonight', run: openSmartPlanner },
   { label: 'Action: Smart Itinerary', hint: 'Generate multi-stop route', keys: 'itinerary route crawl', run: openSmartItinerary },
-  { label: 'Action: Dinner Rooms', hint: 'Create or join voting room', keys: 'room rooms vote social', run: openDinnerRooms },
+  { label: 'Action: Dinner Vote', hint: 'Friends vote on where to eat', keys: 'room rooms vote group social friends', run: openDinnerRooms },
   { label: 'Action: Share Highlights', hint: 'Generate social card', keys: 'share highlight recap card', run: openShareHighlights },
   { label: 'Action: Discover Nearby', hint: 'Find local spots', keys: 'nearby discover find local', run: openDiscover },
   { label: 'Action: Craving Engine', hint: 'Get recommendation now', keys: 'craving recommend', run: openCravingEngine },
@@ -9370,7 +9319,7 @@ const TOOL_ACTIONS = {
   'spend':            openSpendTracker,
   'beenawhile':       openBeenaWhile,
   'mealplanner':      openMealPlanner,
-  'groupvote':        openGroupVote,
+  'groupvote':        openDinnerRooms,
   'wrap':             () => document.getElementById('wrap-btn').click(),
   'export':           () => document.getElementById('export-btn').click(),
   'import':           () => document.getElementById('import-file-input').click(),
