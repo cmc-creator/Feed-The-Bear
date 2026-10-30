@@ -10,7 +10,7 @@ import com.getcapacitor.BridgeActivity;
  * Loads the live site (capacitor.config.json server.url) and routes what
  * opens the app into it:
  *   - a tapped nearby notification   → app.html?spot=<id>
- *   - back from Google sign-in       → app.html#native-auth=<token> (firebase.js signs in)
+ *   - back from Google sign-in       → app.html#native-signin-done (firebase.js finishes)
  *   - a Feed The Bear link            → that page
  *   - a post shared from TikTok etc. → app.html?text=<shared text> (Add a spot reads it)
  */
@@ -68,8 +68,8 @@ public class MainActivity extends BridgeActivity {
         if (data == null) return;
         intent.setData(null);
         if ("com.feedthebear.app".equals(data.getScheme()) && "signin".equals(data.getHost())) {
-            String token = data.getQueryParameter("t");
-            if (token != null && token.matches("[A-Za-z0-9._-]{20,4000}")) load(APP_URL + "#native-auth=" + token);
+            // Signed in with Google in Chrome; firebase.js finishes with its saved verifier.
+            load(APP_URL + "#native-signin-done");
         } else if ("https".equals(data.getScheme()) && "www.feed-the-bear.com".equals(data.getHost())) {
             load(data.toString());
         }

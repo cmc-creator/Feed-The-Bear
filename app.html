@@ -212,6 +212,23 @@
     </div>
   </div>
 
+  <!-- ── Android app: background location explained before asking (Google Play requirement) -->
+  <div id="bg-location-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="bg-location-title">
+    <div class="modal-card nearalerts-card">
+      <div class="modal-header">
+        <h2 id="bg-location-title">Alerts even when the app is closed</h2>
+        <button id="bg-location-close" class="icon-btn" aria-label="Close" onclick="closeBgLocation()">✕</button>
+      </div>
+      <p class="security-note">Feed The Bear can tell you when you're near a spot on your Want to Try list, even when the app is closed. To do that, it uses your location in the background.</p>
+      <p class="security-note">Your background location is only checked on your phone against your Want to Try spots. Feed The Bear does not store it, share it, or use it for ads. You can turn this off any time in My Account or in your phone's settings.</p>
+      <p class="security-note">Next, Android will ask for location and notifications. For alerts when the app is closed, choose <strong>Allow all the time</strong>.</p>
+      <div class="nearalerts-choices" style="grid-template-columns:1fr 1fr">
+        <button type="button" id="bg-location-later">Not now</button>
+        <button type="button" id="bg-location-allow" class="active">Continue</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Book a table / Order delivery ─────────────────────── -->
   <div id="partner-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="partner-title">
     <div class="modal-card nearalerts-card">
@@ -240,7 +257,7 @@
         <button type="button" data-miles="50">50 miles</button>
         <button type="button" data-miles="off">Off</button>
       </div>
-      <p class="security-note">Works while Feed The Bear is open on your phone.</p>
+      <p id="nearalerts-note" class="security-note">Works while Feed The Bear is open on your phone.</p>
     </div>
   </div>
 
