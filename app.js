@@ -4236,28 +4236,35 @@ function openDiscoverSearch (term) {
 }
 
 /* ── Phone Back button ────────────────────────────────────────
-   Each panel, tab or search you open adds a step to the browser history,
-   so Back closes the top one (like a native app) instead of leaving.
-   Home with nothing open: Back leaves the app as usual. */
+   While any panel, non-Home tab or search is open, the app keeps exactly
+   one extra history step. Back uses it up: the top thing closes, and the
+   step is put back if more is still open. Home with nothing open: Back
+   leaves the app as usual. One step at most, so Back can never overshoot
+   out of the app however many panels close at once. */
 const BackNav = (() => {
   const OVERLAYS = '.modal-overlay, #chat-panel';
   const stack = []; // { kind: 'overlay', el } | { kind: 'view' } | { kind: 'search' }
-  let ignorePops = 0;
-  let undoing = null;
+  let armed = false;       // our history step is in place
+  let backPending = false; // we asked to remove it ourselves
   let ready = false;
 
+  function arm () {
+    if (armed || backPending || !stack.length) return;
+    try { history.pushState({ ftbBack: 1 }, ''); armed = true; } catch { /* sandboxed */ }
+  }
   function push (entry) {
     stack.push(entry);
-    try { history.pushState({ ftbBack: stack.length }, ''); } catch { /* sandboxed */ }
+    arm();
   }
-  // Closed by a tap, not by Back: drop its history step quietly.
+  // Closed by a tap, not by Back: once nothing is open, remove our step.
   function drop (match) {
     const i = stack.findIndex(match);
     if (i === -1) return;
     stack.splice(i, 1);
-    if (undoing && match(undoing)) return; // Back already used up its step
-    ignorePops++;
-    history.back();
+    if (!stack.length && armed && !backPending) {
+      backPending = true;
+      history.back();
+    }
   }
 
   function closeOverlay (el) {
@@ -4268,15 +4275,15 @@ const BackNav = (() => {
   }
 
   function onPop () {
-    if (ignorePops > 0) { ignorePops--; return; }
+    armed = false;
+    if (backPending) { backPending = false; arm(); return; } // our own clean-up (re-arm if something opened meanwhile)
     const top = stack.pop();
-    if (!top) return;
-    undoing = top;
-    try {
+    if (top) {
       if (top.kind === 'overlay') closeOverlay(top.el);
       else if (top.kind === 'view') setView('all');
       else if (top.kind === 'search') clearSearch();
-    } finally { undoing = null; }
+    }
+    arm();
   }
 
   function watchOverlays () {

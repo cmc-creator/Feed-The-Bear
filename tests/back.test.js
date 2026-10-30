@@ -59,6 +59,16 @@ const { BASE, check, launch, newPage, finish } = require('./lib');
   check(onApp() && await p.evaluate(() => state.currentView) === 'all', 'then Back returns to Home');
   check(await p.evaluate(() => BackNav.depth()) === 0, 'at Home with nothing open, the next Back leaves as usual');
 
+  // Several panels closing at once must never step back out of the app.
+  await p.evaluate(() => { setView('visited'); openAccountModal(); openDetailModal('b'); window.Cub.openAdd(); });
+  await p.waitForTimeout(300);
+  await p.evaluate(() => {
+    document.querySelectorAll('.modal-overlay').forEach(e => e.classList.add('hidden'));
+    setView('all');
+  });
+  await p.waitForTimeout(800);
+  check(onApp() && await p.evaluate(() => BackNav.depth() === 0 && !history.state?.ftbBack), 'closing many panels at once stays in the app and cleans up its Back step');
+
   // The Cub's quick add sheet (added to the page later) also closes on Back.
   await p.evaluate(() => window.Cub.openAdd());
   await p.waitForTimeout(300);
