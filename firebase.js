@@ -444,6 +444,7 @@ window.fbSharedListSubscribe = fbSharedListSubscribe;
 // ─── AUTH STATE OBSERVER ──────────────────────────────────────
 function initFirebaseAuth () {
   _capturePaidSession();
+  _captureInviteRef();
   _auth.onAuthStateChanged(async user => {
     window._ftbAuthReady = true;
     if (user) {
@@ -531,6 +532,7 @@ function initFirebaseAuth () {
 
       updateAuthUI(user);
       if (typeof refreshSharedRealtimeSubscriptions === 'function') refreshSharedRealtimeSubscriptions();
+      _checkInviteRewards();
 
       // A Stripe payment to finish (saved by _capturePaidSession, maybe on an earlier visit)
       const pendingSession = _getPendingSession();
@@ -541,7 +543,10 @@ function initFirebaseAuth () {
           if (typeof renderGrizzlyUi === 'function') renderGrizzlyUi();
           updateAuthUI(user);
           if (typeof trackProductEvent === 'function') trackProductEvent('grizzly_upgraded');
-          showToast('Welcome to Grizzly!', 'Unlimited restaurants, AI recs, and more are now unlocked.', 'success');
+          const trialEnd = window._ftbTrialEnd ? new Date(window._ftbTrialEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : '';
+          showToast(trialEnd ? 'Your free trial has started!' : 'Welcome to Grizzly!', trialEnd
+            ? `Everything is unlocked. Nothing is charged until ${trialEnd}, and you can cancel any time in My Account.`
+            : 'Unlimited restaurants, AI recs, and more are now unlocked.', 'success');
         } else if (result === 'wrong-account') {
           _clearPendingSession();
           showToast('Different account', 'That Grizzly payment belongs to another account. Sign in with the one you upgraded.', 'error');
@@ -593,6 +598,8 @@ async function _verifyAndActivatePlan (sessionId, uid) {
     const data = await resp.json().catch(() => ({}));
     if (data.plan === 'grizzly') {
       window._ftbPlan = 'grizzly';
+      window._ftbTrialEnd = data.trialEnd || null;
+      try { localStorage.removeItem(REF_KEY); } catch { /* private mode */ }
       localStorage.setItem('ftb_plan_v1', 'grizzly');
       // First cloud push now that sync is unlocked
       if (state?.restaurants?.length) fbSaveRestaurants(uid, state.restaurants);
@@ -713,6 +720,7 @@ function openUpgradeModal (highlightFeature) {
   overlay.classList.remove('hidden');
   document.body.classList.add('overlay-open');
   _setUpgradePlan(pitch?.period || 'yearly'); // default to yearly (best value)
+  _refreshTrialOffer();
   if (typeof trackProductEvent === 'function') trackProductEvent('upgrade_modal_opened', { feature: pitch?.key || String(highlightFeature || 'general').slice(0, 40) });
 }
 
@@ -729,6 +737,127 @@ function _setUpgradePlan (period) {
   if (el('upgrade-price-main')) el('upgrade-price-main').textContent = isYearly ? '$53.89' : '$4.99';
   if (el('upgrade-price-sub'))  el('upgrade-price-sub').textContent  = isYearly ? '/ year • about $4.49/mo (10% off)' : '/ month';
   if (el('upgrade-cta-btn'))    el('upgrade-cta-btn').dataset.period = period;
+  _renderTrialOffer();
+}
+
+// ─── FREE TRIAL & INVITES ─────────────────────────────────────
+// New members get 7 days free (30 from a friend's invite link). The server
+// decides who is eligible (api/create-checkout.js); signed out, we assume yes.
+const REF_KEY = 'ftb_ref_v1';
+let _trialOffer = { trial: true, days: 7 };
+
+function _inviteRef () {
+  try { return localStorage.getItem(REF_KEY) || ''; } catch { return ''; }
+}
+
+// app.html?ref=<uid> from a friend's invite: remember it until they upgrade.
+function _captureInviteRef () {
+  const params = new URLSearchParams(window.location.search);
+  const ref = params.get('ref');
+  if (!ref || !/^[A-Za-z0-9]{10,64}$/.test(ref)) return;
+  try { localStorage.setItem(REF_KEY, ref); } catch { /* private mode */ }
+  params.delete('ref');
+  const rest = params.toString();
+  history.replaceState({}, '', window.location.pathname + (rest ? `?${rest}` : ''));
+  setTimeout(() => showToast?.('A friend invited you!', 'You get 30 days of Grizzly free when you upgrade.', 'success'), 1500);
+}
+
+function _upgradeLabel () {
+  return _trialOffer.trial ? `Start my ${_trialOffer.days}-day free trial` : 'Upgrade to Grizzly';
+}
+
+function _renderTrialOffer () {
+  const el = id => document.getElementById(id);
+  const btn = el('upgrade-cta-btn');
+  if (!btn || btn.disabled) return;
+  const yearly = btn.dataset.period !== 'monthly';
+  btn.textContent = _upgradeLabel();
+  if (el('upgrade-plan-badge')) el('upgrade-plan-badge').textContent = _trialOffer.trial ? `${_trialOffer.days} days free` : 'Most popular';
+  if (el('upgrade-footer')) {
+    el('upgrade-footer').textContent = _trialOffer.trial
+      ? `Free for ${_trialOffer.days} days, then ${yearly ? '$53.89 a year' : '$4.99 a month'}. Cancel before then and you pay nothing. Billed securely by Stripe.`
+      : 'Cancel anytime. Billed securely by Stripe. No hidden fees.';
+  }
+}
+
+async function _refreshTrialOffer () {
+  const user = _auth?.currentUser;
+  const ref = _inviteRef();
+  if (!user) { _trialOffer = { trial: true, days: ref ? 30 : 7 }; _renderTrialOffer(); return; }
+  try {
+    const q = new URLSearchParams({ uid: user.uid, email: user.email || '', ref });
+    const data = await (await fetch(`/api/create-checkout?${q}`)).json();
+    if (typeof data.trial === 'boolean') _trialOffer = { trial: data.trial, days: Number(data.days) || 7 };
+  } catch { /* keep the last offer */ }
+  _renderTrialOffer();
+}
+
+function _inviteLink () {
+  const uid = _auth?.currentUser?.uid;
+  return uid ? `https://www.feed-the-bear.com/app.html?ref=${encodeURIComponent(uid)}` : '';
+}
+
+async function shareInvite () {
+  const url = _inviteLink();
+  if (!url) { openAuthModal(); return; }
+  const text = 'I track every restaurant I want to try with Feed The Bear. Join with my link and get 30 days of Grizzly free:';
+  if (typeof trackProductEvent === 'function') trackProductEvent('invite_shared');
+  try {
+    if (navigator.share) { await navigator.share({ title: 'Feed The Bear', text, url }); return; }
+  } catch (err) { if (err?.name === 'AbortError') return; }
+  try {
+    await navigator.clipboard.writeText(`${text} ${url}`);
+    showToast('Invite link copied', 'Paste it to a friend. You get a free month when they join Grizzly.', 'success');
+  } catch {
+    prompt('Copy your invite link:', url);
+  }
+}
+
+// Signed-in account actions on the server (api/verify-session.js POST).
+async function _accountAction (action) {
+  const user = _auth?.currentUser;
+  if (!user) throw new Error('Sign in first');
+  const token = await user.getIdToken();
+  const resp = await fetch('/api/verify-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ action }),
+  });
+  const data = await resp.json().catch(() => ({}));
+  return { ok: resp.ok, status: resp.status, data };
+}
+
+// A free month from invites: show it, and drop back to free when it ends.
+async function _checkInviteRewards () {
+  try {
+    const { ok, data } = await _accountAction('rewards');
+    if (!ok) return;
+    window._ftbRewardUntil = data.grizzlyUntil || null;
+    window._ftbInvites = data.invites || 0;
+    if (data.expired && window._ftbPlan === 'grizzly') {
+      const snap = await _db.doc(`users/${_auth.currentUser.uid}/meta/profile`).get();
+      window._ftbPlan = snap.data()?.plan || 'free';
+      localStorage.setItem('ftb_plan_v1', window._ftbPlan);
+      if (window._ftbPlan !== 'grizzly') showToast('Your free month ended', 'Thanks for spreading the word! Invite another friend for another month.', 'info');
+    }
+    updateAuthUI(_auth.currentUser);
+  } catch { /* offline: try next time */ }
+}
+
+async function openBilling () {
+  const btn = document.getElementById('account-billing-row');
+  if (btn) btn.disabled = true;
+  try {
+    const { ok, status, data } = await _accountAction('portal');
+    if (ok && data.url) { window.location.href = data.url; return; }
+    showToast('Nothing to manage', status === 404
+      ? (window._ftbRewardUntil ? 'Your Grizzly is a free month from invites, so there is no bill.' : 'There is no subscription on this account.')
+      : (data.error || 'Please try again.'), 'info');
+  } catch (err) {
+    showToast('Could not open billing', err.message || 'Please try again.', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 async function _handleUpgradeClick () {
@@ -749,14 +878,14 @@ async function _handleUpgradeClick () {
     const resp = await fetch('/api/create-checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid: user.uid, email: user.email, priceId }),
+      body: JSON.stringify({ uid: user.uid, email: user.email, priceId, ref: _inviteRef() }),
     });
     const { url, error } = await resp.json();
     if (error) throw new Error(error);
     window.location.href = url;
   } catch (err) {
     showToast('Checkout failed', err.message || 'Please try again.', 'error');
-    if (btn) { btn.disabled = false; btn.textContent = 'Upgrade to Grizzly'; }
+    if (btn) { btn.disabled = false; btn.textContent = _upgradeLabel(); }
   }
 }
 
@@ -772,6 +901,11 @@ function updateAuthUI (user) {
     el('account-email-display').classList.toggle('hidden', !user?.email);
   }
   if (el('account-upgrade-row')) el('account-upgrade-row').classList.toggle('hidden', isPremium());
+  if (el('account-billing-row')) el('account-billing-row').classList.toggle('hidden', !user || !isPremium() || !!window._ftbRewardUntil);
+  if (el('account-invite-state') && window._ftbInvites) {
+    el('account-invite-state').textContent = `${window._ftbInvites} friend${window._ftbInvites === 1 ? '' : 's'} joined so far.`
+      + (window._ftbRewardUntil ? ` Free Grizzly until ${new Date(window._ftbRewardUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.` : '');
+  }
   if (el('account-sync-badge')) {
     const synced = !!user;
     el('account-sync-badge').textContent = synced ? '☁️ Cloud synced' : '📱 Device only';
@@ -779,7 +913,7 @@ function updateAuthUI (user) {
   }
   if (el('account-plan-badge')) {
     const plan = window._ftbPlan || 'free';
-    el('account-plan-badge').textContent = plan === 'grizzly' ? 'Grizzly' : 'Cub - Complimentary';
+    el('account-plan-badge').textContent = plan !== 'grizzly' ? 'Cub - Complimentary' : window._ftbRewardUntil ? 'Grizzly - free month' : 'Grizzly';
     el('account-plan-badge').className   = 'account-plan-badge' + (plan === 'grizzly' ? ' badge-grizzly' : ' badge-cub');
   }
   if (typeof renderGrizzlyUi === 'function') renderGrizzlyUi();
@@ -824,6 +958,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('delete-account-go')?.addEventListener('click', fbDeleteAccount);
   document.getElementById('account-upgrade-row')?.addEventListener('click', () => { closeAccountModal(); setTimeout(openUpgradeModal,   150); });
+  document.getElementById('account-invite-row')?.addEventListener('click', shareInvite);
+  document.getElementById('account-billing-row')?.addEventListener('click', openBilling);
 });
 
 // ─── KICK IT OFF ──────────────────────────────────────────────

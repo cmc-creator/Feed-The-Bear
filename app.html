@@ -122,6 +122,13 @@
           <span class="aar-icon" aria-hidden="true">📤</span><span class="aar-label">Export My Data</span><span class="aar-chevron">›</span>
         </button>
         <!-- Upgrade row - hidden for Grizzly members -->
+        <button class="account-action-row" id="account-invite-row">
+          <span class="aar-icon" aria-hidden="true">🎁</span><span class="aar-label">Invite friends, get a free month<small id="account-invite-state" class="aar-sub">They get 30 days of Grizzly free. You get a month when they join.</small></span><span class="aar-chevron">›</span>
+        </button>
+        <!-- Manage subscription - Grizzly members -->
+        <button class="account-action-row hidden" id="account-billing-row">
+          <span class="aar-icon" aria-hidden="true">💳</span><span class="aar-label">Manage subscription<small class="aar-sub">Change plan, update card or cancel</small></span><span class="aar-chevron">›</span>
+        </button>
         <button class="account-action-row account-upgrade-row" id="account-upgrade-row">
           <span class="aar-icon" aria-hidden="true">👑</span><span class="aar-label"><strong>Upgrade to Grizzly</strong> - unlock the full tasting suite</span><span class="aar-chevron">›</span>
         </button>
@@ -389,7 +396,7 @@
             </ul>
           </div>
           <div class="upgrade-plan upgrade-plan-paid">
-            <div class="upgrade-plan-badge">Most popular</div>
+            <div class="upgrade-plan-badge" id="upgrade-plan-badge">Most popular</div>
             <div class="upgrade-plan-name">Grizzly</div>
             <div class="upgrade-price-row">
               <span id="upgrade-price-main" class="upgrade-price-main">$53.89</span>
@@ -409,7 +416,7 @@
           <button id="upgrade-yearly-btn"  class="upgrade-period-btn active">Yearly</button>
         </div>
         <button id="upgrade-cta-btn" class="btn-primary upgrade-cta-btn" data-period="yearly">Upgrade to Grizzly</button>
-        <p class="upgrade-footer">Cancel anytime. Billed securely by Stripe. No hidden fees.</p>
+        <p class="upgrade-footer" id="upgrade-footer">Cancel anytime. Billed securely by Stripe. No hidden fees.</p>
       </div>
     </div>
   </div>
