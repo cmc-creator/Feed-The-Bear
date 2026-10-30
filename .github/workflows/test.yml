@@ -128,3 +128,6 @@ jobs:
       - name: Book a table and order delivery
         working-directory: tests
         run: node partner.test.js
+      - name: Dinner Vote
+        working-directory: tests
+        run: node vote.test.js

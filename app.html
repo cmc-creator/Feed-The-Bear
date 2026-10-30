@@ -863,7 +863,7 @@
           <span class="home-quick-emoji" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="6" width="7" height="12" rx="1.5"/><rect x="13" y="8" width="7" height="10" rx="1.5"/><path d="M11 12h2"/></svg>
           </span>
-          <span class="home-quick-label">Dinner Rooms</span>
+          <span class="home-quick-label">Dinner Vote</span>
         </button>
       </div>
       <div id="today-vibe-row" class="today-vibe-row home-module" aria-label="Tonight vibe"></div>
@@ -1206,29 +1206,13 @@
   <div id="dinner-rooms-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="dinner-rooms-title">
     <div class="modal-card dinner-rooms-card">
       <div class="modal-header">
-        <h2 id="dinner-rooms-title">Dinner Rooms</h2>
+        <h2 id="dinner-rooms-title">Dinner Vote</h2>
         <button id="dinner-rooms-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
-      <p class="dish-board-subtitle">Create a room, invite people, vote on options, and lock the final pick.</p>
-      <div class="dinner-rooms-topbar">
-        <button id="dinner-room-create-btn" class="btn-secondary">Create Room</button>
-        <div class="dinner-room-join-row">
-          <input id="dinner-room-code-input" class="form-input" type="text" maxlength="8" placeholder="Room code" />
-          <button id="dinner-room-join-btn" class="btn-ghost">Join</button>
-        </div>
-      </div>
-      <div id="dinner-room-shell" class="dinner-room-shell hidden">
-        <div class="dinner-room-meta-row">
-          <div id="dinner-room-meta" class="dinner-room-meta"></div>
-          <button id="dinner-room-share-btn" class="btn-ghost btn-sm">Copy Invite</button>
-        </div>
-        <div id="dinner-room-options" class="dinner-room-options"></div>
-        <div class="dinner-room-actions">
-          <button id="dinner-room-vote-btn" class="btn-secondary">Vote</button>
-          <button id="dinner-room-lock-btn" class="btn-primary">Lock Winner</button>
-        </div>
-        <div id="dinner-room-result" class="dinner-room-result"></div>
-      </div>
+      <p class="dish-board-subtitle">Pick 2 to 6 spots and share the link. Friends tap yes or no on each one, no app needed, and everyone sees the winner.</p>
+      <div id="dv-picker" class="dv-picker"></div>
+      <button id="dv-start" class="btn-primary dv-start" type="button" disabled>Pick at least 2 spots</button>
+      <div id="dv-recent" class="dv-recent-list"></div>
     </div>
   </div>
 

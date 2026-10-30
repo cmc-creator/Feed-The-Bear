@@ -533,6 +533,7 @@ window.Cub = (() => {
     ['add', 'Add a spot', () => openAdd()],
     ['ate', 'I just ate', () => app().openJustAte?.()],
     ['pick', 'Pick for me', () => app().openDecisionMode?.()],
+    ['vote', 'Dinner vote with friends', () => app().openDinnerRooms?.()],
     ['swipe', 'Bear Swipe', () => { const m = document.getElementById('bear-swipe-home'); m?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }],
     ['hide', 'Hide the cub for a week', () => hideBuddy()],
   ];

@@ -1,0 +1,47 @@
+/* Dinner Vote page (vote.html): opened by friends who may not have the app. */
+:root {
+  --bg: #f7f3ec;
+  --card: #fffaf2;
+  --text: #2a1d16;
+  --muted: #6b5a4c;
+  --accent: #c8803a;
+  --accent-ink: #fff;
+  --yes: #3f8f5a;
+  --no: #a8574a;
+  --rule: rgba(42, 29, 22, .14);
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1b1410; --card: #261c16; --text: #f6ecdc; --muted: #c9b59a; --accent: #e8b15a; --accent-ink: #2a1d16; --yes: #6cc38a; --no: #e08a7b; --rule: rgba(246, 236, 220, .16); }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.hidden { display: none !important; }
+.vote { max-width: 520px; margin: 0 auto; padding: 24px 16px 48px; }
+.vote-brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 800; color: var(--text); text-decoration: none; }
+.vote-brand img { width: 36px; height: 36px; border-radius: 10px; object-fit: cover; }
+h1 { font-size: 1.8rem; line-height: 1.2; margin: 20px 0 4px; }
+.vote-muted { color: var(--muted); margin: 6px 0 12px; }
+.vote-label { display: block; font-weight: 700; margin: 12px 0 6px; }
+.vote-input { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--rule); background: var(--card); color: var(--text); font: inherit; }
+.vote-options, .vote-tally { display: grid; gap: 10px; margin: 8px 0 16px; }
+.vote-option { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--rule); }
+.vote-option strong { display: block; font-size: 1.05rem; }
+.vote-option small { color: var(--muted); }
+.vote-yn { display: flex; gap: 6px; }
+.vote-yn button { min-width: 56px; padding: 10px 12px; border-radius: 999px; border: 1px solid var(--rule); background: transparent; color: var(--text); font: 700 .95rem system-ui, sans-serif; cursor: pointer; }
+.vote-yn button[aria-pressed="true"].yes { background: var(--yes); border-color: var(--yes); color: #fff; }
+.vote-yn button[aria-pressed="true"].no { background: var(--no); border-color: var(--no); color: #fff; }
+.vote-btn { display: block; width: 100%; padding: 14px; border: 0; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font: 800 1rem system-ui, sans-serif; text-align: center; text-decoration: none; cursor: pointer; }
+.vote-btn:disabled { opacity: .5; cursor: default; }
+.vote-btn-alt { margin-top: 10px; }
+.vote-link { background: none; border: 0; color: var(--accent); font: 700 .95rem system-ui, sans-serif; text-decoration: underline; cursor: pointer; padding: 6px 0; }
+.vote-winner { padding: 16px; border-radius: 14px; background: var(--card); border: 2px solid var(--yes); font-size: 1.1rem; margin-top: 8px; }
+.vote-winner small { display: block; color: var(--muted); font-size: .85rem; margin-top: 4px; }
+.vote-winner a { color: var(--accent); }
+.vote-row { padding: 10px 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--rule); }
+.vote-row-top { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; }
+.vote-bar { height: 8px; border-radius: 999px; background: var(--rule); margin-top: 8px; overflow: hidden; }
+.vote-bar span { display: block; height: 100%; background: var(--yes); border-radius: 999px; }
+.vote-promo { margin-top: 32px; padding: 16px; border-radius: 14px; border: 1px dashed var(--rule); display: grid; gap: 4px; }
+.vote-promo span { color: var(--muted); font-size: .92rem; }
