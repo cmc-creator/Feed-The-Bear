@@ -95,6 +95,8 @@ const spots = [
   check(await n.locator('#detail-overlay').isVisible(), 'a notification link (?spot=) opens that spot');
   const shown = await n.evaluate(async () => {
     const got = [];
+    // Headless Chromium on CI never grants notifications, so stand in for the "Allow".
+    Object.defineProperty(Notification, 'permission', { configurable: true, get: () => 'granted' });
     Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { getRegistration: async () => ({ showNotification: async (t, o) => got.push({ t, o }) }) } });
     await sendBrowserNotification(state.restaurants.find(r => r.id === 'w1'), 380);
     return got;
