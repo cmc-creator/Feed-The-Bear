@@ -62,12 +62,14 @@ const { BASE, check, launch, newPage, finish } = require('./lib');
   const shared = await p.evaluate(async () => {
     const u = { uid: 'me000000001', email: 'me@example.com', providerData: [{ providerId: 'password' }], getIdToken: async () => 'tok' };
     _auth = { currentUser: u };
+    localStorage.setItem('ftb_user_v1', JSON.stringify({ name: 'Connie' }));
     let got = null;
     navigator.share = async d => { got = d; };
     await shareInvite();
     return got;
   });
-  check(/app\.html\?ref=me000000001$/.test(shared?.url || '') && /30 days of Grizzly free/.test(shared?.text || ''), `the invite shares your personal link (${shared?.url})`);
+  // One link: the free-month code plus your profile so they can follow you.
+  check(/app\.html\?ref=me000000001#profile=/.test(shared?.url || '') && /30 days of Grizzly free/.test(shared?.text || ''), `the invite shares your personal link (${shared?.url})`);
 
   // A free month from invites shows on the account.
   rewards = { grizzlyUntil: new Date(Date.now() + 20 * 864e5).toISOString(), invites: 2 };

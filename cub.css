@@ -46,7 +46,12 @@
 }
 .qa-ai-badge { font-size: .5rem; padding: 2px 5px; }
 .qa-ai-badge.hidden { display: none; }
-.qa-change { justify-self: start; background: none; border: 0; padding: 0; font: inherit; font-size: .74rem; color: var(--text-dim); text-decoration: underline; cursor: pointer; }
+.qa-import {
+  margin-top: 10px; width: 100%; padding: 10px 12px; border-radius: 12px; cursor: pointer; text-align: left;
+  font: inherit; font-size: .82rem; color: var(--text); background: var(--surface2); border: 1px dashed var(--border);
+}
+.qa-import strong { color: var(--primary); }
+.qa-change {justify-self: start; background: none; border: 0; padding: 0; font: inherit; font-size: .74rem; color: var(--text-dim); text-decoration: underline; cursor: pointer; }
 .qa-statuses { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .qa-status {
   font: inherit; font-size: .95rem; font-weight: 800; cursor: pointer; min-height: 52px; border-radius: var(--radius);

@@ -354,9 +354,53 @@ async function fbSaveRestaurants (uid, restaurants) {
 async function fbSaveProfileCloud (uid, profile) {
   if (!uid || !profile) return;
   // Billing fields are server-owned (see firestore.rules) — never send them
-  // from the client or the whole write gets rejected.
-  const { plan, stripeCustomerId, stripeSessionId, upgradedAt, ...safe } = profile;
+  // from the client or the whole write gets rejected. Friends sync on their
+  // own (fbSaveFriendsCloud), so a stale copy here can't overwrite them.
+  const { plan, stripeCustomerId, stripeSessionId, upgradedAt, friends, friendsAt, profileShareId, ...safe } = profile;
   try { await _db.doc(`users/${uid}/meta/profile`).set(safe, { merge: true }); } catch {}
+}
+
+// ─── FRIENDS YOU FOLLOW ───────────────────────────────────────
+// Kept on meta/profile so they follow you to every device. Whichever side
+// changed the list last wins, so an unfollow on one phone sticks everywhere.
+let _friendsSyncTimer = null;
+function fbSaveFriendsCloud () {
+  const uid = window._ftbUid;
+  if (!uid || !_db || typeof getFriends !== 'function') return;
+  clearTimeout(_friendsSyncTimer);
+  _friendsSyncTimer = setTimeout(() => {
+    const friends = getFriends().map(({ recent, liveAt, ...f }) => f);
+    _db.doc(`users/${uid}/meta/profile`).set({
+      friends, friendsAt: friendsUpdatedAt() || Date.now(),
+      ...(state.settings.profileShareId ? { profileShareId: state.settings.profileShareId } : {}),
+    }, { merge: true }).catch(err => console.warn('[FTB] friends sync failed:', err.code || err));
+  }, 1500);
+}
+window.fbSaveFriendsCloud = fbSaveFriendsCloud;
+
+function _mergeFriendsFromCloud (cloud) {
+  if (typeof getFriends !== 'function') return;
+  // One share id per person, so a friend's follow works from any of your devices.
+  if (cloud?.profileShareId && (!state.settings.profileShareId || !state.settings.shareLive)) {
+    state.settings.profileShareId = String(cloud.profileShareId).slice(0, 40);
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); } catch { /* storage full */ }
+  }
+  const cloudAt = Number(cloud?.friendsAt) || 0;
+  const localAt = friendsUpdatedAt();
+  if (Array.isArray(cloud?.friends) && cloudAt > localAt) {
+    const list = cloud.friends.slice(0, 50).filter(f => f && f.key && f.data).map(f => {
+      const data = sanitizeFriendData(f.data);
+      return { key: String(f.key).slice(0, 80), name: String(f.name || data.u || 'Friend').slice(0, 30), data, savedAt: Number(f.savedAt) || 0 };
+    });
+    try {
+      localStorage.setItem(FRIENDS_KEY, JSON.stringify(list));
+      localStorage.setItem(FRIENDS_AT_KEY, String(cloudAt));
+    } catch { /* storage full */ }
+    if (typeof refreshFriendsLive === 'function') refreshFriendsLive(true);
+    if (typeof renderAll === 'function') renderAll();
+  } else if (localAt > cloudAt || (!cloud?.profileShareId && state.settings.profileShareId)) {
+    fbSaveFriendsCloud();
+  }
 }
 
 // Delete restaurant docs from Firestore so deletions propagate across devices
@@ -519,10 +563,13 @@ function initFirebaseAuth () {
         }
       }
 
+      _mergeFriendsFromCloud(cloudProfile);
+
       // Merge profile (cloud wins for plan fields)
       if (cloudProfile) {
         const localProf = loadUserProfile() || {};
-        saveUserProfile({ ...localProf, ...cloudProfile });
+        const { friends, friendsAt, profileShareId, ...cloudRest } = cloudProfile;
+        saveUserProfile({ ...localProf, ...cloudRest });
         updateHeaderAvatar(cloudProfile.avatar || localProf.avatar || 'FTB');
 
         const appearance = cloudProfile.appearance || null;
@@ -815,8 +862,12 @@ function _captureInviteRef () {
   try { localStorage.setItem(REF_KEY, ref); } catch { /* private mode */ }
   params.delete('ref');
   const rest = params.toString();
-  history.replaceState({}, '', window.location.pathname + (rest ? `?${rest}` : ''));
-  setTimeout(() => showToast?.('A friend invited you!', 'You get 30 days of Grizzly free when you upgrade.', 'success'), 1500);
+  // Keep the #profile= part: it's the inviter's picks for the welcome preview.
+  history.replaceState({}, '', window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash);
+  // The profile preview already says who invited them and about the free month.
+  if (!window.location.hash.startsWith('#profile=')) {
+    setTimeout(() => showToast?.('A friend invited you!', 'You get 30 days of Grizzly free when you upgrade.', 'success'), 1500);
+  }
 }
 
 function _upgradeLabel () {
@@ -857,6 +908,8 @@ function _inviteLink () {
 async function shareInvite () {
   const url = _inviteLink();
   if (!url) { openAuthModal(); return; }
+  // Same link as Invite in Friends: your picks to follow plus the free month.
+  if (typeof inviteFriend === 'function') { await inviteFriend({ ref: _auth.currentUser.uid }); return; }
   const text = 'I track every restaurant I want to try with Feed The Bear. Join with my link and get 30 days of Grizzly free:';
   if (typeof trackProductEvent === 'function') trackProductEvent('invite_shared');
   try {

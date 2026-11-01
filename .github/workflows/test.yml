@@ -149,3 +149,6 @@ jobs:
       - name: Import lists from notes apps
         working-directory: tests
         run: node notesimport.test.js
+      - name: Invites work for the friend; Add button is easy to find
+        working-directory: tests
+        run: node invitefix.test.js

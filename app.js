@@ -3802,7 +3802,13 @@ function renderStatsView () {
 }
 
 /* ── Full render ──────────────────────────────────────────── */
+function openAddPlace () {
+  if (window.Cub) window.Cub.openAdd(); else openAddModal();
+}
+
 function renderAll () {
+  // A soft ring on the Add button until someone has saved a few places.
+  document.body.classList.toggle('add-hint', (state.restaurants || []).length < 3);
   renderStats();
   renderCuisineFilter();
   if (state.currentView === 'map') {
@@ -6358,6 +6364,7 @@ function setupEvents () {
   document.getElementById('add-btn')?.addEventListener('click', openQuickAdd);
   document.getElementById('empty-add-btn')?.addEventListener('click', openQuickAdd);
   document.getElementById('empty-import-btn')?.addEventListener('click', () => showImportBookmarks());
+  document.getElementById('home-add-bar')?.addEventListener('click', () => { hapticTap('medium'); openAddPlace(); });
 
   // Modal close
   document.getElementById('modal-close-btn').addEventListener('click', closeModal);
@@ -6508,7 +6515,7 @@ function setupEvents () {
   document.getElementById('mobile-bottom-nav').addEventListener('click', e => {
     const btn = e.target.closest('.mobile-nav-btn, .mobile-nav-fab');
     if (!btn) return;
-    if (btn.id === 'mobile-add-btn')  { hapticTap('medium'); (window.Cub ? window.Cub.openAdd() : openAddModal()); return; }
+    if (btn.id === 'mobile-add-btn')  { hapticTap('medium'); openAddPlace(); return; }
     if (btn.id === 'mobile-play-btn') { openMobileHub(); return; }
     if (!btn.dataset.view) return;
     hapticTap('light');
@@ -9371,14 +9378,37 @@ function renderFriendsLiveNote () {
   el.querySelector('#friends-live-signin')?.addEventListener('click', () => { closeFoodieFriends(); setTimeout(() => openAuthModal(), 150); });
 }
 
-async function inviteFriend () {
+// Friends see your name on the invite, so ask for one the first time.
+function ensureInviteName () {
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
+  // "Foodie" is the placeholder every new profile starts with, not a real name.
+  const current = String(profile.name || '').trim();
+  if (current && current.toLowerCase() !== 'foodie') return true;
+  const name = String(window.prompt('What name should your friends see on your invite?') || '').trim().slice(0, 30);
+  if (!name) return false;
+  saveUserProfile({ ...profile, name });
+  return true;
+}
+
+// The one invite link: your picks to follow (or just your name, before you've
+// rated anything), plus your free-month invite code when you're signed in.
+function buildInviteLink (ref = window._ftbUid || '') {
+  const link = encodeProfileLink(buildProfileData());
+  return ref && /^[A-Za-z0-9]{10,64}$/.test(ref) ? link.replace('#profile=', `?ref=${ref}#profile=`) : link;
+}
+
+// `ref` is your account id for the free-month reward (firebase.js passes it).
+async function inviteFriend ({ ref = window._ftbUid || '' } = {}) {
+  if (!ensureInviteName()) return;
   const data = buildProfileData();
-  const url = profileHasContent(data) ? encodeProfileLink(data) : window.location.href.split('?')[0].split('#')[0];
-  const text = profileHasContent(data)
+  const url = buildInviteLink(ref);
+  const hasPicks = profileHasContent(data);
+  const text = (hasPicks
     ? "Here's where I eat and what I order. Follow me on Feed the Bear and send me yours!"
-    : 'Come track your favorite food spots with me on Feed the Bear!';
-  if (profileHasContent(data)) startSharingLive();
-  trackProductEvent('friend_invite', { withProfile: profileHasContent(data) });
+    : "I'm keeping track of every place I want to eat with Feed the Bear. Follow me and add yours!")
+    + (ref ? ' (You get 30 days of Grizzly free with this link.)' : '');
+  startSharingLive();
+  trackProductEvent('friend_invite', { withProfile: hasPicks, withRef: !!ref });
   try {
     if (navigator.share) { await navigator.share({ title: 'Feed the Bear', text, url }); return; }
   } catch (err) {
@@ -9421,7 +9451,7 @@ async function refreshFriendsLive (force = false) {
     changed = true;
   });
   if (changed) {
-    saveFriends(list);
+    saveFriends(list, { touch: false });
     renderFriendsFeedHome();
     if (!document.getElementById('friends-overlay')?.classList.contains('hidden')) renderFriendsList();
   }
@@ -9534,15 +9564,28 @@ function decodeProfileLink (input = '') {
   const m = encoded.match(/#profile=(.+)$/);
   if (m) encoded = m[1];
   const data = sanitizeFriendData(JSON.parse(decodeURIComponent(escape(atob(encoded)))));
-  if (!profileHasContent(data)) throw new Error('empty');
+  // An invite from someone who hasn't rated anything yet still names them,
+  // so they can be followed and their picks arrive later.
+  if (!profileHasContent(data) && !(data.id && data.u)) throw new Error('empty');
   return data;
 }
 
 function getFriends () {
   try { const list = JSON.parse(localStorage.getItem(FRIENDS_KEY)); return Array.isArray(list) ? list : []; } catch { return []; }
 }
-function saveFriends (list) {
-  try { localStorage.setItem(FRIENDS_KEY, JSON.stringify(list.slice(0, 50))); } catch { /* storage full */ }
+// Who you follow is backed up to your account (firebase.js), so it's there on
+// every device you sign in on. `touch: false` is for refreshing friends' data,
+// which isn't a change to who you follow.
+const FRIENDS_AT_KEY = 'ftb_friends_at_v1';
+function saveFriends (list, { touch = true } = {}) {
+  try {
+    localStorage.setItem(FRIENDS_KEY, JSON.stringify(list.slice(0, 50)));
+    if (touch) localStorage.setItem(FRIENDS_AT_KEY, String(Date.now()));
+  } catch { /* storage full */ }
+  if (touch && typeof fbSaveFriendsCloud === 'function') fbSaveFriendsCloud();
+}
+function friendsUpdatedAt () {
+  try { return Number(localStorage.getItem(FRIENDS_AT_KEY)) || 0; } catch { return 0; }
 }
 function friendKey (data) { return data.id ? `id:${data.id}` : `name:${String(data.u || '').toLowerCase()}`; }
 function isFollowing (data) { return getFriends().some(f => f.key === friendKey(data)); }
@@ -9718,13 +9761,25 @@ function renderGuestProfile (data) {
   const priceMap = ['','$','$$','$$$','$$$$'];
   const nameEl = document.getElementById('guest-profile-name');
   if (nameEl) nameEl.textContent = data.u ? `${data.u}'s food picks` : 'Foodie Profile';
+  // Opened from an invite: say who it's from and what the friend gets.
+  let invited = false;
+  try { invited = new URLSearchParams(window.location.search).has('ref') || !!localStorage.getItem('ftb_ref_v1'); } catch { /* private mode */ }
+  if (data.u) { try { localStorage.setItem('ftb_invited_by_v1', data.u); } catch { /* private mode */ } }
+  const subEl = document.getElementById('guest-profile-sub');
+  if (subEl) {
+    subEl.textContent = data.u
+      ? `${data.u} invited you to Feed The Bear${invited ? '. You get 30 days of Grizzly free when you join.' : '.'}`
+      : 'Top picks shared via Feed The Bear';
+  }
   const followBtn = document.getElementById('guest-profile-follow');
   if (followBtn) {
     followBtn.textContent = isFollowing(data) ? `Update ${data.u || 'friend'}` : `Follow ${data.u || 'this foodie'}`;
     followBtn.disabled = false;
     followBtn.onclick = () => { if (followFriend(data)) { followBtn.textContent = 'Following'; followBtn.disabled = true; } };
   }
-  list.innerHTML = data.picks.map((p,i) =>
+  list.innerHTML = !data.picks.length
+    ? `<div class="guest-empty">${escHtml(data.u || 'Your friend')} is just getting started. Follow them and their favorite spots and what to order will show up here as they add them.</div>`
+    : data.picks.map((p,i) =>
     '<div class="guest-item">'
     + '<div class="guest-item-photo">' + (safeUrl(p.p) ? `<img src="${escHtml(safeUrl(p.p))}" alt="${escHtml(p.n)}" style="width:100%;height:100%;object-fit:cover;border-radius:10px" />` : (CUISINE_EMOJI[(p.c||'').toLowerCase()] || '')) + '</div>'
     + '<div class="guest-item-body">'
@@ -9738,6 +9793,9 @@ function renderGuestProfile (data) {
   overlay.classList.remove('hidden');
   document.getElementById('guest-profile-close').addEventListener('click', () => {
     overlay.classList.add('hidden');
+    // The Cub welcome underneath was drawn before we knew the inviter's name.
+    const hi = document.querySelector('#cub-welcome[data-step="hi"] .cw-body');
+    if (hi && data.u) hi.textContent = hi.textContent.replace(/^A friend invited you!/, `${data.u} invited you!`);
     history.replaceState(null, '', window.location.pathname + window.location.search);
   });
 }

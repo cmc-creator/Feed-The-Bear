@@ -12,7 +12,7 @@ const { BASE, SHOTS, check, launch, newPage, finish } = require('./lib');
   const order = await p.$$eval('#home-discovery > [id], #home-discovery > .nearby-home-header', els => els.map(e => e.id || 'nearby'));
   const at = id => order.indexOf(id);
   check(at('home-quick-actions') < at('nearby') && at('nearby') < at('crave-home') && at('crave-home') < at('for-you-home'), `act now, then near you, then your lists (${order.join(' > ')})`);
-  check(at('bear-swipe-home') === 0 && at('grizzly-home') > at('for-you-home'), 'Bear Swipe leads the home screen; the Grizzly card comes after the useful stuff');
+  check(at('home-add-bar') === 0 && at('bear-swipe-home') === 1 && at('grizzly-home') > at('for-you-home'), 'Add a place, then Bear Swipe lead the home screen; the Grizzly card comes after the useful stuff');
   check(order[order.length - 1] === 'today-status-row', 'the stats row sits at the bottom');
 
   const qa = await p.$$eval('#home-quick-actions .home-quick-btn', bs => bs.filter(b => b.offsetHeight).map(b => b.getBoundingClientRect().top));

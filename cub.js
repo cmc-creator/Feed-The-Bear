@@ -311,6 +311,7 @@ window.Cub = (() => {
           <input class="form-input qa-input" type="text" maxlength="120" autocomplete="off" enterkeyhint="search"
             placeholder="Name, or paste a TikTok, Instagram or Maps link" aria-label="Restaurant name, or a TikTok, Instagram or Google Maps link" />
           <div class="qa-suggs"></div>
+          <button type="button" class="qa-import">Have a list in your notes? <strong>Import it all at once</strong></button>
         </div>
         <div class="qa-step-2">
           <div class="qa-place">
@@ -341,6 +342,12 @@ window.Cub = (() => {
         </div>
       </div>`;
     document.body.appendChild(el);
+
+    el.querySelector('.qa-import').addEventListener('click', () => {
+      track('quick_add_import', {});
+      close();
+      setTimeout(() => app().showImportBookmarks?.(), 120);
+    });
 
     const input = el.querySelector('.qa-input');
     input.addEventListener('input', () => {
@@ -464,12 +471,22 @@ window.Cub = (() => {
     return el;
   }
 
+  // Arrived from a friend's invite: say so first, so it doesn't look ignored.
+  function invitedWelcome (body) {
+    let by = '';
+    let ref = '';
+    try { by = localStorage.getItem('ftb_invited_by_v1') || ''; ref = localStorage.getItem('ftb_ref_v1') || ''; } catch { /* private mode */ }
+    if (!by && !ref) return body;
+    const who = by || 'A friend';
+    return `${who} invited you!${ref ? ' You get 30 days of Grizzly free when you upgrade.' : ''} ${body}`;
+  }
+
   function showWelcomeStep (i) {
     if (i >= WELCOME_STEPS.length) { finishWelcome(false); return; }
     welcomeStep = i;
     const s = WELCOME_STEPS[i];
     welcomeEl.querySelector('.cw-title').textContent = s.title;
-    welcomeEl.querySelector('.cw-body').textContent = s.body;
+    welcomeEl.querySelector('.cw-body').textContent = s.key === 'hi' ? invitedWelcome(s.body) : s.body;
     welcomeEl.querySelector('.cw-go').textContent = s.go;
     welcomeEl.querySelector('.cw-skip').textContent = s.skip;
     welcomeEl.querySelectorAll('.cw-dots i').forEach((d, n) => d.classList.toggle('on', n <= i));

@@ -797,6 +797,15 @@
 
     <!-- ── Home Discovery: Near You + AI Rec ─────────── -->
     <section id="home-discovery" class="home-discovery" aria-label="Restaurants near you">
+      <button type="button" class="home-add-bar" id="home-add-bar">
+        <span class="home-add-plus" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" width="22"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </span>
+        <span class="home-add-copy">
+          <strong>Add a place you want to try</strong>
+          <span>Type a name, paste a link, or import a list</span>
+        </span>
+      </button>
       <div id="bear-swipe-home" class="bear-swipe-home home-module hidden" aria-label="Bear swipe picks">
         <div class="bear-swipe-header">
           <div>
@@ -1654,8 +1663,11 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
       <span>Map</span>
     </button>
-    <button class="mobile-nav-fab" id="mobile-add-btn" aria-label="Add a restaurant">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="26"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <button class="mobile-nav-fab" id="mobile-add-btn" aria-label="Add a place">
+      <span class="mobile-nav-fab-circle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" width="28"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </span>
+      <span class="mobile-nav-fab-label">Add</span>
     </button>
     <button class="mobile-nav-btn" id="mobile-play-btn" aria-label="Discover and play">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22"><path d="M12 2l2.4 5.4L20 8.2l-4 4 1 5.8L12 15.4 7 18l1-5.8-4-4 5.6-.8z"/></svg>
