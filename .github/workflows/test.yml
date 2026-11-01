@@ -140,3 +140,6 @@ jobs:
       - name: Android app hand-off (alerts and sign-in)
         working-directory: tests
         run: node native.test.js
+      - name: Best bet, Explorer, smarter Decision Mode
+        working-directory: tests
+        run: node foodie.test.js

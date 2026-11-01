@@ -1129,6 +1129,7 @@
         <button id="decision-mode-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <p class="dish-board-subtitle">Set quick constraints, then get your top 3 with one clear winner.</p>
+      <div id="decision-mode-context" class="decision-mode-context" aria-live="polite"></div>
 
       <div id="decision-mode-grid" class="decision-mode-grid">
         <div class="decision-mode-group" id="decision-mode-mood" aria-label="Mood">
@@ -1168,6 +1169,11 @@
             <button class="decision-chip active" data-group="party" data-value="2" type="button">2</button>
             <button class="decision-chip" data-group="party" data-value="4" type="button">4+</button>
           </div>
+        </div>
+
+        <div class="decision-mode-group hidden" id="decision-mode-with" aria-label="Eating with">
+          <div class="decision-mode-label">Eating With</div>
+          <div class="decision-mode-chips" id="decision-with-chips"></div>
         </div>
       </div>
 
@@ -2616,6 +2622,7 @@
       </div>
       <p class="passport-sub">A rubber-stamp badge for every cuisine you've explored.</p>
       <div id="passport-stats-row" class="passport-stats-row"></div>
+      <section id="passport-explorer" class="passport-explorer" aria-label="Explorer"></section>
       <div id="passport-stamps" class="passport-stamps"></div>
       <button id="passport-share-btn" class="btn-primary" style="width:100%;margin-top:14px">Share Passport</button>
     </div>

@@ -5484,6 +5484,7 @@ let _decisionModeState = {
   budget: 0,
   miles: 5,
   party: 2,
+  with: [],
 };
 
 function resetDecisionModeState () {
@@ -5492,6 +5493,7 @@ function resetDecisionModeState () {
     budget: 0,
     miles: 5,
     party: 2,
+    with: [],
   };
 }
 
@@ -5500,13 +5502,115 @@ function syncDecisionModeChips () {
     const group = btn.dataset.group;
     const value = btn.dataset.value;
     const current = _decisionModeState[group];
-    btn.classList.toggle('active', String(current) === String(value));
+    const on = Array.isArray(current) ? current.includes(value) : String(current) === String(value);
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', String(on));
   });
+}
+
+/* ── Decision context: what time it is and what it's like out ── */
+function mealtimeOf (now = new Date()) {
+  const h = now.getHours() + now.getMinutes() / 60;
+  if (h >= 5 && h < 10.5) return 'breakfast';
+  if (h >= 10.5 && h < 15) return 'lunch';
+  if (h >= 15 && h < 21) return 'dinner';
+  return 'late';
+}
+const MEALTIME_LABEL = { breakfast: 'breakfast', lunch: 'lunch', dinner: 'dinner', late: 'late-night bite' };
+
+const WEATHER_TTL_MS = 30 * 60 * 1000;
+let _dmWeather = null; // { at, lat, lng, tempF, wet, snow }
+
+// Current weather from Open-Meteo (free, no key). Cached for half an hour;
+// any failure just means picks ignore the weather.
+async function fetchDecisionWeather () {
+  if (!state.locationEnabled || !Number.isFinite(state.userLat) || !Number.isFinite(state.userLng)) return null;
+  const near = _dmWeather && Math.abs(_dmWeather.lat - state.userLat) < 0.1 && Math.abs(_dmWeather.lng - state.userLng) < 0.1;
+  if (near && Date.now() - _dmWeather.at < WEATHER_TTL_MS) return _dmWeather;
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${state.userLat.toFixed(2)}&longitude=${state.userLng.toFixed(2)}&current=temperature_2m,precipitation,weather_code&temperature_unit=fahrenheit`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined });
+    if (!resp.ok) return null;
+    const cur = (await resp.json())?.current;
+    if (!cur || !Number.isFinite(cur.temperature_2m)) return null;
+    const code = Number(cur.weather_code) || 0;
+    _dmWeather = {
+      at: Date.now(), lat: state.userLat, lng: state.userLng,
+      tempF: Math.round(cur.temperature_2m),
+      snow: (code >= 71 && code <= 77) || code === 85 || code === 86,
+      wet: (cur.precipitation || 0) > 0 || (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95,
+    };
+    return _dmWeather;
+  } catch { return null; }
+}
+
+function weatherFeel (w) {
+  if (!w) return '';
+  if (w.snow) return 'snowy';
+  if (w.wet) return 'rainy';
+  if (w.tempF <= 50) return 'chilly';
+  if (w.tempF >= 90) return 'hot';
+  return '';
+}
+
+function renderDecisionContext () {
+  const el = document.getElementById('decision-mode-context');
+  if (!el) return;
+  const now = new Date();
+  const day = now.toLocaleDateString(undefined, { weekday: 'long' });
+  const w = _dmWeather && Date.now() - _dmWeather.at < WEATHER_TTL_MS ? _dmWeather : null;
+  const openCount = state.restaurants.filter(r => openStatus(r, now)?.open).length;
+  el.textContent = [
+    `${day} ${MEALTIME_LABEL[mealtimeOf(now)]}`,
+    w ? `${w.tempF}°F${weatherFeel(w) ? `, ${weatherFeel(w)}` : ''}` : '',
+    openCount ? `${openCount} of your spots open now` : '',
+  ].filter(Boolean).join(' · ');
+}
+
+// Friends you follow, as "Eating with" chips; their tastes join the scoring.
+function renderDecisionWithChips () {
+  const group = document.getElementById('decision-mode-with');
+  const wrap = document.getElementById('decision-with-chips');
+  if (!group || !wrap) return;
+  const friends = getFriends().slice(0, 8);
+  group.classList.toggle('hidden', !friends.length);
+  wrap.innerHTML = friends.map(f => `<button class="decision-chip" data-group="with" data-value="${escHtml(f.key)}" type="button" aria-pressed="false">${escHtml(f.name || 'Friend')}</button>`).join('');
+}
+
+// How the friends at the table feel about a spot: +/- score and a reason.
+function companionFit (r, keys = []) {
+  if (!keys.length) return { score: 0, reason: '' };
+  const spot = normalizeName(r.name || '');
+  let score = 0;
+  let reason = '';
+  getFriends().filter(f => keys.includes(f.key)).forEach(f => {
+    const pick = (f.data?.picks || []).find(p => normalizeName(p.n) === spot);
+    const want = (f.data?.w || []).find(x => normalizeName(x.at) === spot);
+    if (want) { score += 1.6; reason = reason || `${f.name} wants to try the ${want.d}`; }
+    if (!pick) return;
+    if (pick.r >= 4) { score += 1.4; reason = reason || `${f.name} loves it here`; }
+    else if (pick.r && pick.r <= 2) { score -= 2.5; }
+    if ((pick.g || []).length) score += 0.4;
+  });
+  return { score, reason };
+}
+
+function lastVisitOf (r) {
+  const dates = (r.visits || []).map(v => v.date).filter(Boolean);
+  if (r.dateVisited) dates.push(r.dateVisited);
+  return dates.sort().pop() || '';
 }
 
 function setDecisionModeConstraint (group, value) {
   if (!group) return;
-  if (group === 'mood') {
+  if (group === 'with') {
+    const key = String(value || '');
+    const list = _decisionModeState.with;
+    _decisionModeState.with = list.includes(key) ? list.filter(k => k !== key) : [...list, key];
+    // Picking friends sets the party size to match, you included.
+    const size = _decisionModeState.with.length + 1;
+    if (_decisionModeState.with.length) _decisionModeState.party = size >= 4 ? 4 : size;
+  } else if (group === 'mood') {
     _decisionModeState.mood = String(value || 'quick');
   } else if (group === 'budget') {
     _decisionModeState.budget = Math.max(0, Number(value || 0));
@@ -5520,7 +5624,10 @@ function setDecisionModeConstraint (group, value) {
 
 function openDecisionMode () {
   resetDecisionModeState();
+  renderDecisionWithChips();
   syncDecisionModeChips();
+  renderDecisionContext();
+  fetchDecisionWeather().then(w => { if (w) renderDecisionContext(); });
   const out = document.getElementById('decision-mode-results');
   if (out) out.innerHTML = '';
   document.getElementById('decision-mode-overlay')?.classList.remove('hidden');
@@ -5548,10 +5655,44 @@ function buildDecisionModeShortlist () {
   const budget = Number(_decisionModeState.budget || 0);
   const maxMeters = Math.max(1, Number(_decisionModeState.miles || 5)) * 1609.34;
   const party = Math.max(1, Number(_decisionModeState.party || 2));
+  const now = new Date();
+  const meal = mealtimeOf(now);
+  const w = _dmWeather && Date.now() - _dmWeather.at < WEATHER_TTL_MS ? _dmWeather : null;
+  const feel = weatherFeel(w);
+  const today = iso();
 
   const scored = state.restaurants.map(r => {
     const distance = distOf(r);
     let score = scoreMoodPick(r, mood);
+    const cuisineLc = String(r.cuisine || '').toLowerCase();
+    const contextReasons = [];
+
+    // Closed spots sink; known-open ones get a nudge.
+    const st = openStatus(r, now);
+    if (st && !st.open) score -= 4;
+    else if (st?.open) { score += st.soon ? 0.3 : 1; if (!st.soon) contextReasons.push('open now'); }
+
+    if (meal === 'breakfast' && /(breakfast|brunch|cafe|coffee|bakery|diner)/.test(cuisineLc)) { score += 1.6; contextReasons.push('a breakfast spot'); }
+    else if (meal === 'breakfast' && /(steak|bar|pub)/.test(cuisineLc)) score -= 1.2;
+    else if (meal === 'late' && /(pizza|burger|fast food|taco|mexican|bar|pub|diner)/.test(cuisineLc)) { score += 1.1; contextReasons.push('good late at night'); }
+
+    if (feel === 'rainy' || feel === 'snowy' || feel === 'chilly') {
+      if (/(ramen|pho|soup|indian|italian|bbq|korean|comfort|soul|chinese|vietnamese)/.test(cuisineLc)) { score += 0.9; contextReasons.push(`warm food for a ${feel} day`); }
+      if (Number.isFinite(distance) && distance > 8000) score -= 0.8;
+    } else if (feel === 'hot' && /(sushi|poke|salad|healthy|mediterranean|greek|ice cream|vietnamese|hawaiian)/.test(cuisineLc)) {
+      score += 0.8; contextReasons.push('light food for the heat');
+    }
+
+    // Just went? Give it a rest. A proven favorite you haven't had in a month? Bring it back.
+    const last = lastVisitOf(r);
+    const daysAgo = last ? Math.round((Date.parse(today) - Date.parse(last)) / 864e5) : null;
+    if (daysAgo !== null && daysAgo <= 1) score -= 2.5;
+    else if (daysAgo !== null && daysAgo <= 3) score -= 1.5;
+    else if (daysAgo !== null && daysAgo >= 30 && (r.myRating >= 4 || goToDishOf(r)?.verdict === 'again')) { score += 0.6; contextReasons.push(`haven't been in ${daysAgo >= 60 ? 'months' : 'a while'}`); }
+
+    const companions = companionFit(r, _decisionModeState.with);
+    score += companions.score;
+    if (companions.reason) contextReasons.unshift(companions.reason);
 
     if (budget > 0) {
       if ((r.priceRange || 0) > budget) score -= 3.2;
@@ -5571,7 +5712,7 @@ function buildDecisionModeShortlist () {
     const friendTip = friendTipsFor(r).find(t => t.get.length);
     if (friendTip) score += 0.5;
 
-    const cuisine = String(r.cuisine || '').toLowerCase();
+    const cuisine = cuisineLc;
     if (party >= 4) {
       if ((r.priceRange || 0) <= 2) score += 0.8;
       if (/(pizza|mexican|american|bbq|thai|chinese|italian)/.test(cuisine)) score += 0.8;
@@ -5589,6 +5730,7 @@ function buildDecisionModeShortlist () {
     if (crave) reasons.push(`you've been wanting the ${crave.name}`);
     else if (goTo && goTo.verdict === 'again') reasons.push(`your go-to: ${goTo.name}`);
     else if (friendTip) reasons.push(`${friendTip.name} says get the ${friendTip.get[0]}`);
+    reasons.push(...contextReasons.slice(0, 1));
     reasons.push(mood === 'date' ? 'date-night fit' : mood === 'comfort' ? 'comfort match' : mood === 'healthy' ? 'lighter option' : 'fast decision pick');
     if (budget > 0 && (r.priceRange || 0) > 0 && (r.priceRange || 0) <= budget) reasons.push('inside budget');
     if (Number.isFinite(distance) && distance <= maxMeters) reasons.push('close enough now');
@@ -5603,12 +5745,13 @@ function buildDecisionModeShortlist () {
       menuConfidence,
       distanceConfidence,
       reasons,
+      closed: !!(st && !st.open),
     };
   });
 
-  return scored
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3);
+  // Spots known to be closed only fill in when there aren't three others.
+  scored.sort((a, b) => b.score - a.score);
+  return [...scored.filter(x => !x.closed), ...scored.filter(x => x.closed)].slice(0, 3);
 }
 
 function renderDecisionModeResults (shortlist = []) {
@@ -5662,7 +5805,9 @@ function renderDecisionModeResults (shortlist = []) {
         <button class="btn-ghost btn-sm decision-result-action" data-action="directions" data-id="${r.id}" ${canDirections ? '' : 'disabled'} type="button">Directions</button>
       </div>
     </article>`;
-  }).join('');
+  }).join('') + (shortlist.length >= 2
+    ? `<button class="btn-secondary decision-vote-btn" type="button" data-ids="${escHtml(shortlist.map(x => x.r.id).join(','))}">Can't agree? Put these ${shortlist.length} to a group vote</button>`
+    : '');
 }
 
 function runDecisionMode () {
@@ -5888,9 +6033,12 @@ function _dvCandidates () {
   return state.restaurants.filter(nearEnoughToSuggest).sort((a, b) => score(b) - score(a)).slice(0, 30);
 }
 
-function openDinnerRooms () {
+// `presetIds` (e.g. Decision Mode's top 3) are pre-picked; otherwise the best candidates.
+function openDinnerRooms (presetIds = null) {
   _dvSelected.clear();
-  _dvCandidates().slice(0, 3).forEach(r => _dvSelected.add(r.id));
+  const preset = Array.isArray(presetIds) ? presetIds.filter(id => state.restaurants.some(r => r.id === id)).slice(0, DV_MAX) : [];
+  if (preset.length) preset.forEach(id => _dvSelected.add(id));
+  else _dvCandidates().slice(0, 3).forEach(r => _dvSelected.add(r.id));
   renderDinnerVote();
   document.getElementById('dinner-rooms-overlay')?.classList.remove('hidden');
   document.body.classList.add('overlay-open');
@@ -5904,7 +6052,11 @@ function closeDinnerRooms () {
 function renderDinnerVote () {
   const picker = document.getElementById('dv-picker');
   if (!picker) return;
-  const list = _dvCandidates();
+  const candidates = _dvCandidates();
+  // Pre-picked spots stay visible even if they wouldn't make the candidate list.
+  const extra = [..._dvSelected].filter(id => !candidates.some(r => r.id === id))
+    .map(id => state.restaurants.find(r => r.id === id)).filter(Boolean);
+  const list = [...extra, ...candidates];
   picker.innerHTML = list.length
     ? list.map(r => `<button type="button" class="dv-pick${_dvSelected.has(r.id) ? ' on' : ''}" data-id="${escHtml(r.id)}" aria-pressed="${_dvSelected.has(r.id)}">
         <span class="dv-check" aria-hidden="true">${_dvSelected.has(r.id) ? '✓' : ''}</span>
@@ -7375,6 +7527,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('decision-mode-run-btn')?.addEventListener('click', runDecisionMode);
   document.getElementById('decision-mode-results')?.addEventListener('click', e => {
     if (e.target.closest('.decision-location-btn')) { enableLocation(); return; }
+    const voteBtn = e.target.closest('.decision-vote-btn');
+    if (voteBtn) {
+      trackProductEvent('decision_to_vote', { options: voteBtn.dataset.ids.split(',').length });
+      closeDecisionMode();
+      setTimeout(() => openDinnerRooms(voteBtn.dataset.ids.split(',')), 120);
+      return;
+    }
     const btn = e.target.closest('.decision-result-action[data-action][data-id]');
     if (!btn) return;
     handleDecisionModeActionClick(btn);
@@ -9223,6 +9382,56 @@ function friendTipsHtml (r) {
     return `<div class="yo-friend"><strong>${escHtml(t.name)}</strong>${t.rating ? ` <span class="yo-dish-stars">${'★'.repeat(t.rating)}</span>` : ''}: ${bits.join(' · ')}</div>`;
   }).join('')}</div>`;
 }
+
+// Your verdicts and your friends' tips tallied into one answer per dish.
+// An "order again" outweighs a friend's "get", and any skip pulls a dish down.
+function orderPicksFor (r) {
+  const tally = new Map();
+  const vote = (name, pts, who, skip = false) => {
+    const key = dishKey(name);
+    if (!key) return;
+    const t = tally.get(key) || { name: String(name).trim(), score: 0, fans: [], skippers: [] };
+    t.score += pts;
+    if (skip) { if (!t.skippers.includes(who)) t.skippers.push(who); }
+    else if (pts > 0 && !t.fans.includes(who)) t.fans.push(who);
+    tally.set(key, t);
+  };
+  dishesOf(r).forEach(d => {
+    if (d.verdict === 'again') vote(d.name, 3, 'you');
+    else if (d.verdict === 'ok') vote(d.name, (d.rating || 0) >= 4 ? 1.5 : 0.5, 'you');
+    else if (d.verdict === 'skip') vote(d.name, -3, 'you', true);
+  });
+  friendTipsFor(r).forEach(t => {
+    t.get.forEach(n => vote(n, 2, t.name));
+    t.skip.forEach(n => vote(n, -2, t.name, true));
+    t.wants.forEach(n => vote(n, 0.5, t.name));
+  });
+  const all = [...tally.values()];
+  return {
+    get: all.filter(t => t.score > 0 && t.fans.length).sort((a, b) => b.score - a.score || b.fans.length - a.fans.length),
+    skip: all.filter(t => t.score < 0).sort((a, b) => a.score - b.score),
+  };
+}
+
+function whoSaid (names) {
+  if (names.length <= 2) return names.join(' + ');
+  return `${names.slice(0, 2).join(', ')} + ${names.length - 2} more`;
+}
+
+// The one-line answer to "what should I get here?". Only shown once friends
+// weigh in; your own verdicts alone are already grouped right below it.
+function bestBetHtml (r) {
+  if (!friendTipsFor(r).length) return '';
+  const { get, skip } = orderPicksFor(r);
+  if (!get.length && !skip.length) return '';
+  const top = get[0];
+  const also = get.slice(1, 3);
+  return `<div class="yo-best-bet" id="yo-best-bet">
+    ${top ? `<div class="ybb-top"><span class="ybb-label">Best bet</span> <strong>${escHtml(top.name)}</strong> <span class="ybb-who">${escHtml(whoSaid(top.fans))}</span></div>` : ''}
+    ${also.length ? `<div class="ybb-also">Also good: ${also.map(t => escHtml(t.name)).join(', ')}</div>` : ''}
+    ${skip.length ? `<div class="ybb-skip">Heads up: skip the ${skip.slice(0, 2).map(t => `${escHtml(t.name)} <span class="ybb-who">(${escHtml(whoSaid(t.skippers))})</span>`).join(', ')}</div>` : ''}
+  </div>`;
+}
 function openFoodieProfile () {
   const data = buildProfileData();
   if (!profileHasContent(data)) {
@@ -9969,6 +10178,9 @@ function cardOrderLine (r) {
   if (goTo) return `<div class="card-order"><span class="card-order-label">Get</span> ${escHtml(goTo.name)}</div>`;
   const crave = dishesOf(r).find(d => d.verdict === 'want');
   if (crave) return `<div class="card-order want"><span class="card-order-label">Try</span> ${escHtml(crave.name)}</div>`;
+  // Never ordered here yourself: lean on what friends say to get.
+  const friendPick = friendTipsFor(r).length ? orderPicksFor(r).get[0] : null;
+  if (friendPick) return `<div class="card-order friends"><span class="card-order-label">Friends</span> ${escHtml(friendPick.name)}</div>`;
   return '';
 }
 
@@ -10025,12 +10237,12 @@ function renderYourOrder (restaurantId) {
   document.getElementById('your-order-share')?.classList.toggle('hidden', !dishes.length);
 
   if (!dishes.length) {
-    listEl.innerHTML = friendTipsHtml(r) + `<div class="your-order-empty">${r?.status === 'want-to-try'
+    listEl.innerHTML = bestBetHtml(r) + friendTipsHtml(r) + `<div class="your-order-empty">${r?.status === 'want-to-try'
       ? 'Heard about a must-order dish here? Save it so you remember when you go.'
       : 'What did you order? Log it so next time you know exactly what to get.'}</div>`;
     return;
   }
-  listEl.innerHTML = ['again', 'want', 'ok', 'skip'].filter(g => counts[g]).map(g => `
+  listEl.innerHTML = bestBetHtml(r) + ['again', 'want', 'ok', 'skip'].filter(g => counts[g]).map(g => `
     <div class="yo-group yo-group-${g}">
       <div class="yo-group-label">${DISH_VERDICT_LABEL[g]}</div>
       ${dishes.filter(d => d.verdict === g).map(d => `
@@ -16155,20 +16367,95 @@ function closePassport () {
   document.getElementById('passport-overlay').classList.add('hidden');
   maybeHideOverlay();
 }
+// The first day you ate at a spot: its earliest check-in, else dateVisited.
+function firstVisitOf (r) {
+  const dates = (r.visits || []).map(v => v.date).filter(Boolean);
+  if (r.dateVisited) dates.push(r.dateVisited);
+  return dates.sort()[0] || '';
+}
+
+// Monday of the week a YYYY-MM-DD date falls in, as a day number.
+function weekNumberOf (dateStr) {
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (isNaN(d)) return NaN;
+  return Math.floor((d.getTime() / 864e5 - ((d.getDay() + 6) % 7)) / 7);
+}
+
+// Weeks in a row you tried somewhere new. Still alive if the last new spot
+// was this week or last week, so Monday doesn't wipe it out.
+function explorerStats (now = new Date()) {
+  const visited = state.restaurants.filter(r => r.status === 'visited');
+  const firsts = visited.map(firstVisitOf).filter(Boolean);
+  const weeks = [...new Set(firsts.map(weekNumberOf).filter(Number.isFinite))].sort((a, b) => b - a);
+  const thisWeek = weekNumberOf(iso());
+  let streak = 0;
+  if (weeks.length && thisWeek - weeks[0] <= 1) {
+    streak = 1;
+    while (streak < weeks.length && weeks[streak - 1] - weeks[streak] === 1) streak++;
+  }
+  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  return {
+    streak,
+    newThisWeek: weeks[0] === thisWeek,
+    newThisMonth: firsts.filter(d => d.slice(0, 7) === month).length,
+  };
+}
+
+// The next cuisine to stamp: one already waiting on your Want to Try list
+// (nearest first), else a daily pick from the cuisines you haven't tried.
+function nextPassportStamp (earned) {
+  const missing = _PASSPORT_CUISINES.filter(p => !earned.has(p.n.toLowerCase()));
+  if (!missing.length) return null;
+  const queued = state.restaurants
+    .filter(r => r.status === 'want-to-try' && r.cuisine && missing.some(p => p.n.toLowerCase() === r.cuisine.toLowerCase()))
+    .sort((a, b) => (Number.isFinite(distOf(a)) ? distOf(a) : Infinity) - (Number.isFinite(distOf(b)) ? distOf(b) : Infinity))[0];
+  if (queued) return { cuisine: missing.find(p => p.n.toLowerCase() === queued.cuisine.toLowerCase()), spot: queued };
+  return { cuisine: missing[miniHash(iso()) % missing.length], spot: null };
+}
+
+function renderPassportExplorer (earned) {
+  const el = document.getElementById('passport-explorer');
+  if (!el) return;
+  const { streak, newThisWeek, newThisMonth } = explorerStats();
+  const next = nextPassportStamp(earned);
+  const streakText = streak
+    ? `${streak} week${streak === 1 ? '' : 's'} in a row trying somewhere new${newThisWeek ? '' : '. Try a new spot this week to keep it going'}`
+    : 'Try a new spot this week to start an explorer streak';
+  el.innerHTML = `
+    <div class="pe-row">
+      <span class="pe-flame${streak >= 3 ? ' hot' : ''}" aria-hidden="true">${streak >= 3 ? '🔥' : '🧭'}</span>
+      <div class="pe-text"><strong>${escHtml(streakText)}</strong>
+        <span>${newThisMonth} new spot${newThisMonth === 1 ? '' : 's'} this month</span></div>
+    </div>
+    ${next ? `<div class="pe-next">
+      <span class="pe-next-label">Next stamp</span>
+      <span class="pe-next-what">${next.cuisine.e} ${escHtml(next.cuisine.n)}${next.spot ? `: ${escHtml(next.spot.name)} is on your list` : ''}</span>
+      <button type="button" class="btn-secondary btn-sm" id="pe-next-btn">${next.spot ? 'Open' : 'Find one'}</button>
+    </div>` : '<div class="pe-next"><span class="pe-next-what">Every stamp collected. Legendary bear.</span></div>'}`;
+  document.getElementById('pe-next-btn')?.addEventListener('click', () => {
+    closePassport();
+    if (next.spot) openDetailModal(next.spot.id);
+    else openDiscoverSearch(next.cuisine.n);
+  });
+}
+
 function _renderPassport () {
   const visitedCuisines = {};
-  state.restaurants.forEach(r => {
+  // Stamps are for places you've eaten, not ones still on your list.
+  state.restaurants.filter(r => r.status === 'visited').forEach(r => {
     if (r.cuisine) {
       visitedCuisines[r.cuisine] = (visitedCuisines[r.cuisine] || 0) + 1;
     }
   });
   const earnedCount = _PASSPORT_CUISINES.filter(p => visitedCuisines[p.n]).length;
   const totalCuisines = Object.keys(visitedCuisines).length;
+  const visitedCount = state.restaurants.filter(r => r.status === 'visited').length;
 
   document.getElementById('passport-stats-row').innerHTML =
     `<div class="passport-stat"><div class="passport-stat-num">${earnedCount}</div><div class="passport-stat-label">Stamps earned</div></div>` +
     `<div class="passport-stat"><div class="passport-stat-num">${totalCuisines}</div><div class="passport-stat-label">Cuisines tried</div></div>` +
-    `<div class="passport-stat"><div class="passport-stat-num">${state.restaurants.length}</div><div class="passport-stat-label">Restaurants</div></div>`;
+    `<div class="passport-stat"><div class="passport-stat-num">${visitedCount}</div><div class="passport-stat-label">Spots visited</div></div>`;
+  renderPassportExplorer(new Set(Object.keys(visitedCuisines).map(c => c.toLowerCase())));
 
   // Show all passport stamps (earned first, then unearned)
   const allStamps = [
@@ -16190,7 +16477,7 @@ function _renderPassport () {
   }).join('');
 
   document.getElementById('passport-share-btn').onclick = () => {
-    const txt = `🛂 My Foodie Passport: ${earnedCount} cuisine stamps, ${totalCuisines} cuisines explored, ${state.restaurants.length} restaurants. #FeedTheBear`;
+    const txt = `🛂 My Foodie Passport: ${earnedCount} cuisine stamps, ${totalCuisines} cuisines explored, ${visitedCount} spots visited. #FeedTheBear`;
     if (navigator.share) navigator.share({ title: 'My Foodie Passport', text: txt });
     else { navigator.clipboard?.writeText(txt); showToast('Copied!', 'Passport summary copied.', 'success'); }
   };

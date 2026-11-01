@@ -3,7 +3,7 @@
    Offline-first cache strategy
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-const CACHE  = 'ftb-v96';
+const CACHE  = 'ftb-v97';
 const ASSETS = [
   './',
   './index.html',
@@ -50,6 +50,14 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  // Hands off: our API (payments, place info, votes), live weather, and
+  // anything that isn't a GET. The cache-first fallback below would
+  // otherwise replay a stale answer for the same URL forever.
+  const reqUrl = new URL(e.request.url);
+  if (e.request.method !== 'GET' ||
+      (reqUrl.origin === self.location.origin && reqUrl.pathname.startsWith('/api/')) ||
+      reqUrl.hostname === 'api.open-meteo.com') return;
+
   // Network-first for Nominatim geocoding — results must always be fresh
   if (new URL(e.request.url).hostname === 'nominatim.openstreetmap.org') {
     const req = new Request(e.request, {

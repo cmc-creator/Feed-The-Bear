@@ -1390,6 +1390,7 @@ button:focus-visible,
   color: #a8d5a2; margin-right: 4px;
 }
 .card-order.want .card-order-label { color: #e7c48a; }
+.card-order.friends .card-order-label { color: #9cc7ef; }
 .card-order.skip .card-order-label { color: #f0a497; }
 .card-order.skip { color: #d8c4a7; text-decoration: line-through; text-decoration-color: rgba(240,164,151,.6); }
 .yo-dish-note { font-size: .78rem; color: var(--text-muted); font-style: italic; margin: -2px 0 4px; }
@@ -5267,6 +5268,21 @@ body.light-mode #profile-btn {
 .passport-stat { flex: 1; background: var(--surface2); border-radius: 10px; padding: 10px; text-align: center; }
 .passport-stat-num  { font-size: 1.4rem; font-weight: 800; color: var(--primary); }
 .passport-stat-label { font-size: .7rem; color: var(--text2); }
+.passport-explorer { display: grid; gap: 8px; margin-bottom: 16px; }
+.passport-explorer:empty { display: none; }
+.pe-row { display: flex; align-items: center; gap: 10px; background: var(--surface2); border-radius: 10px; padding: 10px 12px; }
+.pe-flame { font-size: 1.5rem; line-height: 1; }
+.pe-flame.hot { animation: pe-flicker 1.6s ease-in-out 2; }
+@keyframes pe-flicker { 50% { transform: scale(1.15) rotate(-4deg); } }
+.pe-text { display: grid; gap: 2px; font-size: .84rem; color: var(--text); line-height: 1.35; }
+.pe-text span { font-size: .74rem; color: var(--text2); }
+.pe-next {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border-radius: 10px;
+  border: 1px dashed rgba(var(--primary-rgb), .5);
+}
+.pe-next-label { font-size: .64rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--primary); }
+.pe-next-what { flex: 1; min-width: 140px; font-size: .86rem; color: var(--text); }
+@media (prefers-reduced-motion: reduce) { .pe-flame.hot { animation: none; } }
 .passport-stamps { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 10px; max-height: 360px; overflow-y: auto; }
 .passport-stamp { display: flex; flex-direction: column; align-items: center; gap: 4px; background: var(--surface2); border-radius: 12px; padding: 12px 8px; border: 2px solid transparent; position: relative; }
 .passport-stamp.earned { border-color: var(--primary); background: rgba(var(--primary-rgb),.1); }
@@ -5732,6 +5748,18 @@ body.light-mode .today-vibe-pill {
 .yo-friends .yo-group-label { color: var(--blue-lt, var(--blue)); }
 .yo-friend { font-size: .84rem; color: var(--text); line-height: 1.45; margin: 3px 0; }
 .yo-friend strong { font-weight: 800; }
+.yo-best-bet {
+  display: grid; gap: 4px; padding: 10px 12px; border-radius: var(--radius-sm);
+  border: 1px solid rgba(var(--primary-rgb), .45); background: rgba(var(--primary-rgb), .1);
+}
+.ybb-top { font-size: .95rem; color: var(--text); }
+.ybb-label {
+  font-size: .64rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--primary); margin-right: 4px;
+}
+.ybb-who { font-size: .74rem; color: var(--text-dim); font-weight: 600; }
+.ybb-also { font-size: .82rem; color: var(--text-muted); }
+.ybb-skip { font-size: .82rem; color: var(--red); }
 .friends-list { margin-top: 14px; display: grid; gap: 6px; }
 .friend-row {
   display: flex; align-items: center; gap: 8px; padding: 8px 10px;
@@ -6678,6 +6706,14 @@ body.light-mode .today-vibe-pill {
   display: grid;
   gap: 8px;
 }
+.decision-mode-context {
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin: -4px 0 10px;
+}
+.decision-mode-context:empty { display: none; }
+.decision-vote-btn { width: 100%; margin-top: 4px; }
 .decision-location-notice {
   display: flex;
   align-items: center;

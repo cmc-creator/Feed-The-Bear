@@ -1,5 +1,41 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-01
+
+### What to order
+- **Best bet** on every spot's Your Order section: your dish verdicts and your
+  friends' get/skip tips are tallied into one pick, with "also good" dishes and
+  a "heads up, skip the…" warning.
+- List cards fall back to your friends' top pick ("Friends: …") when you haven't
+  logged a dish there yet.
+
+### Foodie Passport
+- Fixed: stamps were counted for every saved spot, including ones you'd never
+  been to. Only visited spots earn stamps now.
+- New **Explorer** section: a streak of weeks in a row trying somewhere new,
+  new spots this month, and your **next stamp**, either a Want to Try spot of
+  a cuisine you're missing (opens it) or a daily idea (searches nearby).
+
+### Decision Mode
+- Knows the context: time of day (breakfast, lunch, dinner, late night), current
+  weather (Open-Meteo, cached 30 min), which spots are open now, and how
+  recently you went (skips the place you were at yesterday, brings back a
+  favorite you haven't had in a month).
+- **Eating with**: pick friends you follow; spots they love or want to try rise,
+  spots they rated low sink, and party size follows along.
+- **Put these to a group vote**: sends the top 3 straight to Dinner Vote.
+
+### Fixes and housekeeping
+- Service worker no longer intercepts `/api/` calls, non-GET requests, or live
+  weather. GET API responses (place info, payment verification, checkout) were
+  falling through to the cache-first branch and could be replayed stale.
+  Cache bumped to `ftb-v97`, which clears anything already cached.
+- `npm test` (in `tests/`) now runs every `*.test.js`, keeps going past
+  failures, and prints a summary. `node run-all.js <word>` runs a subset.
+- Removed the stale status docs (IMPROVEMENTS, PROGRESS_SUMMARY,
+  NEW_FEATURES_README, INTEGRATION_GUIDE); they described files that no longer
+  exist. This changelog is the history; the README explains running and testing.
+
 ## [2.0.0] - 2024 - Major Feature Release 🎉
 
 ### 🎯 NEW: Decision Mode (Phase 1 Complete)
