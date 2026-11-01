@@ -4656,6 +4656,16 @@ body.light-mode #profile-btn {
 .travel-card { max-width: 440px; }
 .travel-body { display: flex; flex-direction: column; gap: 12px; }
 .travel-hint { font-size: .8rem; color: var(--text-dim); margin: 0; }
+/* Trip guide inside Travel Mode */
+.travel-guide { margin: 12px 0 4px; padding: 12px; border-radius: 12px; background: var(--surface2); max-height: 320px; overflow-y: auto; }
+.travel-guide.hidden { display: none; }
+.tg-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 800; color: var(--text); }
+.tg-sec { margin: 12px 0 4px; font-size: .66rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--primary); }
+.travel-guide ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.travel-guide li { display: grid; gap: 1px; font-size: .86rem; color: var(--text); }
+.travel-guide li span { font-size: .74rem; color: var(--text-dim); }
+.tg-empty { margin: 8px 0 0; font-size: .82rem; color: var(--text-dim); line-height: 1.45; }
+
 .travel-active-banner {
   display: flex;
   align-items: center;
@@ -5395,7 +5405,16 @@ body.light-mode #profile-btn {
    ════════════════════════════════════════════════════════════ */
 .home-discovery {
   padding: 2px 4px 8px;
+  display: flex;
+  flex-direction: column;
 }
+/* Regulars (5+ spots, class set in renderAll) see today's pick, what's open
+   and friends first; Bear Swipe, a getting-to-know-you game, moves down. */
+body.home-regular #ai-rec-banner { order: -4; }
+body.home-regular #open-now-home { order: -3; }
+body.home-regular #friends-feed-home { order: -2; }
+body.home-regular #home-add-bar { order: -1; }
+body.home-regular #bear-swipe-home { order: 2; }
 
 .home-module {
   border: 1px solid rgba(194,157,115,.24);
@@ -5834,6 +5853,36 @@ body.light-mode .today-vibe-pill {
 .yo-friends .yo-group-label { color: var(--blue-lt, var(--blue)); }
 .yo-friend { font-size: .84rem; color: var(--text); line-height: 1.45; margin: 3px 0; }
 .yo-friend strong { font-weight: 800; }
+/* Who's been here (top of a spot) */
+.detail-friends {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; padding: 10px 12px;
+  border-radius: var(--radius-sm); background: rgba(var(--primary-rgb), .08); border: 1px solid rgba(var(--primary-rgb), .3);
+}
+.detail-friends.hidden { display: none; }
+.df-avatars { display: flex; }
+.df-avatars span {
+  width: 30px; height: 30px; margin-left: -8px; border-radius: 50%; display: grid; place-items: center;
+  font-size: .8rem; font-weight: 800; color: #2a1a05; background: linear-gradient(135deg, #ffd98a, #e8a93a);
+  border: 2px solid var(--surface);
+}
+.df-avatars span:first-child { margin-left: 0; }
+.df-text { flex: 1; min-width: 150px; font-size: .84rem; color: var(--text); line-height: 1.4; }
+
+/* "Share this meal?" right after logging one */
+.share-nudge {
+  position: fixed; left: 12px; right: 12px; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); z-index: 9000;
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px;
+  background: var(--surface); border: 1px solid rgba(var(--primary-rgb), .45); box-shadow: 0 12px 30px rgba(0,0,0,.35);
+  transform: translateY(24px) scale(.96); opacity: 0; transition: transform .35s cubic-bezier(.34,1.56,.64,1), opacity .25s ease;
+}
+.share-nudge.in { transform: none; opacity: 1; }
+.share-nudge img { width: 46px; height: 46px; border-radius: 10px; object-fit: cover; transform: rotate(-3deg); }
+.sn-emoji { font-size: 1.6rem; }
+.sn-text { flex: 1; min-width: 0; display: grid; gap: 1px; font-size: .78rem; color: var(--text-dim); }
+.sn-text strong { font-size: .92rem; color: var(--text); }
+.sn-x { background: none; border: 0; color: var(--text-dim); font-size: .9rem; padding: 6px; cursor: pointer; }
+@media (min-width: 769px) { .share-nudge { left: auto; right: 24px; bottom: 24px; width: 380px; } }
+
 .yo-best-bet {
   display: grid; gap: 4px; padding: 10px 12px; border-radius: var(--radius-sm);
   border: 1px solid rgba(var(--primary-rgb), .45); background: rgba(var(--primary-rgb), .1);

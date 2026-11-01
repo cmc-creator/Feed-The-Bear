@@ -2390,6 +2390,28 @@ function nearEnoughToSuggest (r) {
   return distOf(r) <= SUGGEST_MAX_METERS;
 }
 
+function prefersReducedMotion () {
+  return state.settings?.uiMotion === 'reduced' || !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+}
+
+// Header counts tick up to their new value and pop, so adding a place feels
+// like it landed. The first paint just sets the number.
+function setStatNumber (id, value) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const prev = Number(el.dataset.n);
+  el.dataset.n = String(value);
+  if (!Number.isFinite(prev) || prev === value || prefersReducedMotion()) { el.textContent = value; return; }
+  const start = performance.now();
+  const step = t => {
+    const k = Math.min(1, (t - start) / 450);
+    el.textContent = Math.round(prev + (value - prev) * (1 - Math.pow(1 - k, 3)));
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+  el.classList.remove('stat-pop'); void el.offsetWidth; el.classList.add('stat-pop');
+}
+
 function renderStats () {
   const all = state.restaurants;
   const visited = all.filter(r => r.status === 'visited');
@@ -2401,9 +2423,9 @@ function renderStats () {
     ? (rated.reduce((s,r) => s + (mine.length ? r.myRating : r.googleRating), 0) / rated.length).toFixed(1)
     : null;
 
-  document.getElementById('stat-total').textContent   = all.length;
-  document.getElementById('stat-visited').textContent = visited.length;
-  document.getElementById('stat-want').textContent    = want.length;
+  setStatNumber('stat-total', all.length);
+  setStatNumber('stat-visited', visited.length);
+  setStatNumber('stat-want', want.length);
   document.getElementById('stat-avg').textContent     = avg || '-';
   document.getElementById('stat-avg-stars').textContent = avg ? '★' : '';
   document.getElementById('stats-bar')?.classList.toggle('hidden', all.length === 0);
@@ -2600,6 +2622,12 @@ function buildCard (r) {
       const i = state.restaurants.findIndex(x => x.id === r.id);
       if (i !== -1) {
         state.restaurants[i].isFavorite = !state.restaurants[i].isFavorite;
+        // A little burst of stars when something becomes a favorite.
+        if (state.restaurants[i].isFavorite && window.MicroInteractions && !prefersReducedMotion()) {
+          const b = e.target.closest('[data-action]').getBoundingClientRect();
+          MicroInteractions.createParticleBurst(b.left + b.width / 2, b.top + b.height / 2, '#f0b850');
+        }
+        hapticTap(state.restaurants[i].isFavorite ? 'medium' : 'light');
         saveData();
         renderCards();
       }
@@ -3010,6 +3038,8 @@ function openDetailModal (id) {
   document.getElementById('detail-website-btn').style.display = r.website ? '' : 'none';
   document.getElementById('detail-website-btn').onclick = () => openWebsite(r);
   document.getElementById('detail-maps-search-btn').onclick = () => openMapsSearch(r);
+  document.getElementById('detail-together-btn').onclick = () => askFriendToGo(r);
+  renderDetailFriends(r);
   document.getElementById('detail-book-btn').onclick = () => openPartnerSheet('book', r);
   document.getElementById('detail-order-btn').onclick = () => openPartnerSheet('order', r);
   document.getElementById('detail-edit-btn').onclick = () => { closeDetailModal(); openEditModal(r.id); };
@@ -3804,7 +3834,9 @@ function openAddPlace () {
 
 function renderAll () {
   // A soft ring on the Add button until someone has saved a few places.
-  document.body.classList.toggle('add-hint', (state.restaurants || []).length < 3);
+  const spotCount = (state.restaurants || []).length;
+  document.body.classList.toggle('add-hint', spotCount < 3);
+  document.body.classList.toggle('home-regular', spotCount >= 5);
   // Today's pick doesn't wait for nearby results (Grizzly's AI pick does).
   try { if (!usesAiDailyPick()) showLocalDailyPick(); } catch (err) { console.warn('[FTB] daily pick:', err); }
   renderStats();
@@ -6524,6 +6556,11 @@ function setupEvents () {
     if (btn.id === 'mobile-play-btn') { openMobileHub(); return; }
     if (!btn.dataset.view) return;
     hapticTap('light');
+    // Tapping the tab you're already on scrolls back to the top.
+    if (btn.dataset.view === state.currentView && window.scrollY > 0) {
+      window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+      return;
+    }
     setView(btn.dataset.view);
   });
 
@@ -8472,16 +8509,48 @@ function renderWrapContent () {
   const nextBtn = document.getElementById('wrap-next-btn');
   if (nextBtn) nextBtn.disabled = _wrapOffset >= 0;
 }
-function shareWrap () {
+// One month in food: meals out, new spots, cuisines, best dish, favorite spot.
+function wrapStats (offset = 0) {
   const d = new Date();
-  const month = new Date(d.getFullYear(), d.getMonth() + _wrapOffset, 1)
-    .toLocaleString('default',{month:'long',year:'numeric'});
-  const all = state.restaurants;
-  const monthKey = new Date(d.getFullYear(), d.getMonth()+_wrapOffset, 1).toISOString().slice(0,7);
-  const total = all.flatMap(r=>(r.visits||[]).filter(v=>(v.date||'').slice(0,7)===monthKey)).length;
-  const text = 'My ' + month + ' foodie wrap: ' + total + ' meals out! Track yours with Feed The Bear.';
-  if (navigator.share) { navigator.share({ title: 'My Foodie Wrap', text }).catch(()=>{}); }
-  else { navigator.clipboard?.writeText(text); showToast('Copied!','Wrap text copied to clipboard','success'); }
+  const first = new Date(d.getFullYear(), d.getMonth() + offset, 1);
+  const monthKey = `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, '0')}`;
+  const inMonth = date => String(date || '').slice(0, 7) === monthKey;
+  const visitsBySpot = new Map();
+  state.restaurants.forEach(r => {
+    const n = (r.visits || []).filter(v => inMonth(v.date)).length || (!(r.visits || []).length && inMonth(r.dateVisited) ? 1 : 0);
+    if (n) visitsBySpot.set(r, n);
+  });
+  const meals = [...visitsBySpot.values()].reduce((a, b) => a + b, 0);
+  const newSpots = state.restaurants.filter(r => r.status === 'visited' && inMonth(firstVisitOf(r))).length;
+  const cuisines = new Set([...visitsBySpot.keys()].map(r => r.cuisine).filter(Boolean));
+  const topSpot = [...visitsBySpot.entries()].sort((a, b) => b[1] - a[1] || (b[0].myRating || 0) - (a[0].myRating || 0))[0]?.[0] || null;
+  const bestDish = state.restaurants.flatMap(r => dishesOf(r).filter(x => x.verdict === 'again' && inMonth(x.date)).map(x => ({ x, r })))
+    .sort((a, b) => (b.x.rating || 0) - (a.x.rating || 0))[0] || null;
+  const photo = bestDish?.x.photo || [...visitsBySpot.keys()].flatMap(r => (r.visits || []).filter(v => inMonth(v.date) && v.photo).map(v => v.photo))[0] || topSpot?.photo || '';
+  return { monthName: first.toLocaleString(undefined, { month: 'long' }), year: first.getFullYear(), meals, newSpots, cuisines: cuisines.size, topSpot, bestDish, photo };
+}
+
+async function shareWrap () {
+  const s = wrapStats(_wrapOffset);
+  if (!s.meals) { showToast('Nothing to wrap yet', `Log a meal in ${s.monthName} and your wrap fills in.`, 'info'); return; }
+  const text = `My ${s.monthName} in food: ${s.meals} meal${s.meals === 1 ? '' : 's'} out, ${s.newSpots} new spot${s.newSpots === 1 ? '' : 's'}`
+    + `${s.bestDish ? `, and the ${s.bestDish.x.name} at ${s.bestDish.r.name} was the best thing I ate` : ''}. Track yours with Feed The Bear https://www.feed-the-bear.com`;
+  trackProductEvent('wrap_shared', { meals: s.meals });
+  if (window.StoryCard) {
+    try {
+      await StoryCard.openStory({
+        kind: 'wrap', kicker: `${s.monthName} ${s.year}`, title: 'My month in food', photo: s.photo,
+        stats: [{ n: s.meals, label: s.meals === 1 ? 'meal out' : 'meals out' }, { n: s.newSpots, label: 'new spots' }, { n: s.cuisines, label: s.cuisines === 1 ? 'cuisine' : 'cuisines' }],
+        sections: [
+          s.bestDish ? { label: 'Best bite', items: [`${s.bestDish.x.name} · ${s.bestDish.r.name}`], tone: 'gold' } : null,
+          s.topSpot ? { label: 'Most visited', items: [s.topSpot.name], tone: 'soft' } : null,
+        ].filter(Boolean),
+      }, text, `my-${s.monthName}-in-food`);
+      return;
+    } catch (err) { console.warn('[FTB] wrap card failed:', err); }
+  }
+  if (navigator.share) { navigator.share({ title: 'My Foodie Wrap', text }).catch(() => {}); }
+  else { navigator.clipboard?.writeText(text); showToast('Copied!', 'Wrap text copied to clipboard', 'success'); }
 }
 
 /* ------------------------------------------------------------
@@ -9645,6 +9714,74 @@ function friendTipsHtml (r) {
   }).join('')}</div>`;
 }
 
+/* ── Who's been here: friends at the top of a spot, and "Go with a friend" ── */
+function renderDetailFriends (r) {
+  const el = document.getElementById('detail-friends');
+  if (!el) return;
+  const tips = friendTipsFor(r);
+  el.classList.toggle('hidden', !tips.length);
+  if (!tips.length) { el.innerHTML = ''; return; }
+  const been = tips.filter(t => t.rating || t.get.length || t.skip.length);
+  const wants = tips.filter(t => !been.includes(t) && t.wants.length);
+  const names = list => list.map(t => escHtml(t.name));
+  const join = list => list.length <= 2 ? list.join(' and ') : `${list.slice(0, 2).join(', ')} and ${list.length - 2} more`;
+  const lines = [];
+  if (been.length) lines.push(`<strong>${join(names(been))}</strong> ${been.length === 1 ? 'has' : 'have'} been here${been.length === 1 && been[0].rating ? ` <span class="yo-dish-stars">${'★'.repeat(been[0].rating)}</span>` : ''}`);
+  if (wants.length) lines.push(`<strong>${join(names(wants))}</strong> ${wants.length === 1 ? 'wants' : 'want'} to try it too`);
+  el.innerHTML = `<div class="df-avatars" aria-hidden="true">${tips.slice(0, 3).map(t => `<span>${escHtml((t.name || '?').charAt(0).toUpperCase())}</span>`).join('')}</div>
+    <div class="df-text">${lines.join('<br>')}</div>
+    <button type="button" class="btn-sm btn-primary df-go">Go together</button>`;
+  el.querySelector('.df-go').addEventListener('click', () => askFriendToGo(r, tips[0]?.name));
+}
+
+// A ready-to-send "want to go?" with the spot, a friend's tip, and a map link.
+async function askFriendToGo (r, friendName = '') {
+  const tip = orderPicksFor(r).get[0];
+  const map = buildGoogleDirectionsUrl({ name: r.name, address: r.address || '', lat: r.lat, lon: r.lng }) || '';
+  const text = [
+    `${friendName ? `${friendName}, want` : 'Want'} to go to ${r.name} together?${r.cuisine ? ` (${r.cuisine})` : ''}`,
+    tip ? `I hear the ${tip.name} is the move.` : '',
+    map,
+  ].filter(Boolean).join(' ');
+  trackProductEvent('go_together', { restaurantId: r.id, withFriend: !!friendName });
+  try {
+    if (navigator.share) { await navigator.share({ title: `Let's go to ${r.name}`, text }); return; }
+  } catch (err) { if (err?.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(text); showToast('Copied!', 'Paste it to a friend.', 'success'); }
+  catch { window.prompt('Send this to a friend:', text); }
+}
+
+/* ── Share moments: right after you log a meal ── */
+function offerShareMeal ({ r, dish = '', verdict = '', photo = '', note = '' }) {
+  if (!window.StoryCard || (!photo && !dish)) return;
+  document.querySelector('.share-nudge')?.remove();
+  const el = document.createElement('div');
+  el.className = 'share-nudge';
+  el.setAttribute('role', 'status');
+  el.innerHTML = `${safeUrl(photo) ? `<img src="${escHtml(safeUrl(photo))}" alt="" />` : '<span class="sn-emoji" aria-hidden="true">📸</span>'}
+    <span class="sn-text"><strong>Share this meal?</strong><span>Make a Story card for Instagram, TikTok and more</span></span>
+    <button type="button" class="btn-sm btn-primary sn-go">Share</button>
+    <button type="button" class="sn-x" aria-label="Not now">✕</button>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('in'));
+  const hide = () => { el.classList.remove('in'); setTimeout(() => el.remove(), 300); };
+  const timer = setTimeout(hide, 9000);
+  el.querySelector('.sn-x').addEventListener('click', () => { clearTimeout(timer); hide(); });
+  el.querySelector('.sn-go').addEventListener('click', async () => {
+    clearTimeout(timer); hide();
+    trackProductEvent('share_meal_clicked', { hasPhoto: !!photo });
+    const kicker = verdict === 'again' ? 'Order this again' : verdict === 'skip' ? 'Skip this one' : 'Just ate';
+    const text = `${dish ? `${dish} at ${r.name}` : `Just ate at ${r.name}`}${verdict === 'again' ? ' — 10/10 would order again' : ''}. Saved with Feed The Bear https://www.feed-the-bear.com`;
+    try {
+      await StoryCard.openStory({
+        kind: 'meal', kicker, title: dish || r.name, sub: dish ? `at ${r.name}` : (r.cuisine || ''), photo,
+        stars: r.myRating || 0,
+        sections: note ? [{ label: 'Note to self', items: [note], tone: 'soft' }] : [],
+      }, text, `${r.name}-${dish || 'meal'}`);
+    } catch (err) { console.warn('[FTB] meal card failed:', err); }
+  });
+}
+
 // Your verdicts and your friends' tips tallied into one answer per dish.
 // An "order again" outweighs a friend's "get", and any skip pulls a dish down.
 function orderPicksFor (r) {
@@ -10105,7 +10242,7 @@ const HUB_SECTIONS = [
     ['bingo','🎱','Cuisine Bingo'], ['feedbear','🐻','Feed the Bear'],
   ]},
   { title: 'Plan a food day', items: [
-    ['itinerary','🗺️','Smart Itinerary'], ['mealplanner','🥗','Meal Planner'], ['travel','✈️','Travel Mode'],
+    ['itinerary','🗺️','Smart Itinerary'], ['mealplanner','🥗','Meal Planner'], ['travel','✈️','Trip Guides'],
   ]},
   { title: 'More tools', layout: 'more', items: [
     ['ai-panel','🤖','Byte Cub'], ['collections','📋','My Lists'],
@@ -10277,6 +10414,11 @@ function initMobileHub () {
 
 /* Switch the main list/map/stats view from any control (nav, stat chips). */
 function setView (view) {
+  // A soft rise-in when switching between List, Map and Stats (CSS, instant state).
+  if (view !== state.currentView) {
+    const main = document.getElementById('main-content');
+    main?.classList.remove('view-enter'); void main?.offsetWidth; main?.classList.add('view-enter');
+  }
   document.querySelectorAll('.nav-btn, .mobile-nav-btn[data-view]').forEach(b => b.classList.remove('active'));
   document.querySelector(`.nav-btn[data-view="${view}"]`)?.classList.add('active');
   document.querySelector(`.mobile-nav-btn[data-view="${view}"]`)?.classList.add('active');
@@ -10714,6 +10856,8 @@ function saveJustAte () {
     dishName ? `${DISH_VERDICT_LABEL[verdict]}: ${dishName}` : (isNew ? 'New spot added to your den.' : 'Visit added to your history.'),
     'success');
   if (typeof celebrateMilestones === 'function') celebrateMilestones();
+  // The moment people actually post: offer a Story card once the photo has landed.
+  setTimeout(() => offerShareMeal({ r, dish: dishName, verdict: dishName ? verdict : '', photo, note }), photo ? 2200 : 600);
 }
 
 // "At The Mission get the guacamole, skip the churros" — the text a friend
@@ -15270,6 +15414,70 @@ function _refreshTravelUI () {
   document.querySelectorAll('.travel-city-btn').forEach(btn => {
     btn.classList.toggle('active', t && btn.dataset.city === t.city);
   });
+  renderTripGuide(t);
+}
+
+/* ── Trip guide: everything you and your friends know about a city ── */
+const TRIP_RADIUS_M = 40000;
+
+function tripGuideFor (t) {
+  const cityWord = String(t.city || '').split(',')[0].trim().toLowerCase();
+  const inCity = (lat, lng, address) => (Number.isFinite(lat) && Number.isFinite(lng) && haversine(t.lat, t.lng, lat, lng) <= TRIP_RADIUS_M)
+    || (cityWord.length > 2 && String(address || '').toLowerCase().includes(cityWord));
+  const here = state.restaurants.filter(r => inCity(r.lat, r.lng, r.address));
+  const loved = here.filter(r => r.status === 'visited' && (r.myRating >= 4 || goToDishOf(r)?.verdict === 'again'))
+    .sort((a, b) => (b.myRating || 0) - (a.myRating || 0));
+  const wants = here.filter(r => r.status === 'want-to-try');
+  const mine = new Set(here.map(r => normalizeName(r.name)));
+  const friends = [];
+  getFriends().forEach(f => (f.data?.picks || []).forEach(p => {
+    if (p.r >= 4 && inCity(NaN, NaN, p.a) && !mine.has(normalizeName(p.n)) && !friends.some(x => normalizeName(x.n) === normalizeName(p.n))) {
+      friends.push({ ...p, by: f.name });
+    }
+  }));
+  return { city: String(t.city).split(',')[0].trim(), loved, wants, friends };
+}
+
+function renderTripGuide (t) {
+  const el = document.getElementById('travel-guide');
+  if (!el) return;
+  if (!t) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+  const g = tripGuideFor(t);
+  const total = g.loved.length + g.wants.length + g.friends.length;
+  el.classList.remove('hidden');
+  const row = (name, sub) => `<li><strong>${escHtml(name)}</strong>${sub ? `<span>${escHtml(sub)}</span>` : ''}</li>`;
+  el.innerHTML = `<div class="tg-head"><span>Your ${escHtml(g.city)} food guide</span>${total ? '<button type="button" class="btn-sm btn-primary tg-share">Share guide</button>' : ''}</div>`
+    + (total ? '' : `<p class="tg-empty">Nothing saved in ${escHtml(g.city)} yet. Search nearby (Discovery is set to ${escHtml(g.city)} now) and save spots to build your guide.</p>`)
+    + (g.loved.length ? `<div class="tg-sec">Places you love</div><ul>${g.loved.map(r => row(r.name, [r.myRating ? '★'.repeat(r.myRating) : '', goToDishOf(r) ? `get the ${goToDishOf(r).name}` : ''].filter(Boolean).join(' · '))).join('')}</ul>` : '')
+    + (g.wants.length ? `<div class="tg-sec">On your list</div><ul>${g.wants.map(r => row(r.name, [r.cuisine, dishesOf(r).find(d => d.verdict === 'want')?.name ? `craving the ${dishesOf(r).find(d => d.verdict === 'want').name}` : ''].filter(Boolean).join(' · '))).join('')}</ul>` : '')
+    + (g.friends.length ? `<div class="tg-sec">Friends' picks</div><ul>${g.friends.map(p => row(p.n, [`${p.by} ${'★'.repeat(p.r)}`, p.g?.[0] ? `get the ${p.g[0]}` : ''].filter(Boolean).join(' · '))).join('')}</ul>` : '');
+  el.querySelector('.tg-share')?.addEventListener('click', () => shareTripGuide(g));
+}
+
+async function shareTripGuide (g) {
+  const lines = [`My ${g.city} food guide 🐻`];
+  if (g.loved.length) lines.push('', 'Places I love:', ...g.loved.map(r => `• ${r.name}${goToDishOf(r) ? ` (get the ${goToDishOf(r).name})` : ''}`));
+  if (g.wants.length) lines.push('', 'On my list:', ...g.wants.map(r => `• ${r.name}`));
+  if (g.friends.length) lines.push('', 'Friends recommend:', ...g.friends.map(p => `• ${p.n}${p.g?.[0] ? ` (get the ${p.g[0]})` : ''}`));
+  lines.push('', 'Made with Feed The Bear https://www.feed-the-bear.com');
+  const text = lines.join('\n');
+  trackProductEvent('trip_guide_shared', { spots: g.loved.length + g.wants.length + g.friends.length });
+  if (window.StoryCard) {
+    try {
+      await StoryCard.openStory({
+        kind: 'trip', kicker: 'Food guide', title: g.city,
+        photo: [...g.loved, ...g.wants].find(r => safeUrl(r.photo || ''))?.photo || '',
+        stats: [{ n: g.loved.length, label: 'I love' }, { n: g.wants.length, label: 'to try' }, { n: g.friends.length, label: "friends' picks" }],
+        sections: [
+          { label: 'Must eat', items: g.loved.slice(0, 4).map(r => r.name), tone: 'gold' },
+          { label: 'On my list', items: g.wants.slice(0, 3).map(r => r.name), tone: 'soft' },
+          { label: 'Friends say', items: g.friends.slice(0, 3).map(p => p.n), tone: 'soft' },
+        ],
+      }, text, `${g.city}-food-guide`);
+      return;
+    } catch (err) { console.warn('[FTB] trip card failed:', err); }
+  }
+  try { await navigator.clipboard.writeText(text); showToast('Copied!', 'Your guide is ready to paste.', 'success'); } catch { /* blocked */ }
 }
 
 function openTravelMode () {

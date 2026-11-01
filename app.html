@@ -1466,6 +1466,7 @@
         </div>
 
         <!-- Your Order: what to get again, what to skip, what to try next -->
+        <div id="detail-friends" class="detail-friends hidden" aria-live="polite"></div>
         <section class="your-order" id="your-order" aria-labelledby="your-order-title">
           <div class="your-order-head">
             <h4 id="your-order-title">Your Order</h4>
@@ -1573,6 +1574,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
             Directions
           </button>
+          <button id="detail-together-btn" class="btn-secondary">👯 Go with a friend</button>
           <button id="detail-book-btn" class="btn-secondary">🍽️ Book a table</button>
           <button id="detail-order-btn" class="btn-secondary">🛵 Order delivery</button>
           <button id="detail-website-btn" class="btn-secondary">
@@ -2340,6 +2342,7 @@
           Travel Mode active: <strong id="travel-active-city"></strong>
           <button id="travel-deactivate-btn" class="btn-sm" style="margin-left:auto">Turn Off</button>
         </div>
+        <div id="travel-guide" class="travel-guide hidden" aria-live="polite"></div>
         <div class="travel-quick-cities">
           <div class="travel-section-label">Quick picks</div>
           <div class="travel-city-grid" id="travel-city-grid">

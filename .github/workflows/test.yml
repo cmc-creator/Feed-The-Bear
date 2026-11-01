@@ -155,3 +155,6 @@ jobs:
       - name: First impressions (messages, cards, daily pick, place search)
         working-directory: tests
         run: node firstimpressions.test.js
+      - name: Share moments, who has been here, trip guides, effects
+        working-directory: tests
+        run: node sharemoments.test.js

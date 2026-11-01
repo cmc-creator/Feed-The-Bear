@@ -41,21 +41,12 @@ function haptic(type = 'light') {
 /**
  * Add satisfying press effect to any button
  */
+// The press itself is CSS (:active in micro-interactions.css), so it never
+// fights a button's own transform. A light tick on a real tap (click), not
+// on touchstart: starting a scroll over a button no longer buzzes the phone.
 function addButtonPressEffect(element) {
   if (!element) return;
-
-  element.addEventListener('touchstart', () => {
-    element.style.transform = 'scale(0.96)';
-    haptic('tap');
-  }, { passive: true });
-
-  element.addEventListener('touchend', () => {
-    element.style.transform = 'scale(1)';
-  }, { passive: true });
-
-  element.addEventListener('touchcancel', () => {
-    element.style.transform = 'scale(1)';
-  }, { passive: true });
+  element.addEventListener('click', () => haptic('tap'), { passive: true });
 }
 
 /**
@@ -428,10 +419,17 @@ function initMicroInteractions() {
   // Scroll reveals
   initScrollReveals();
 
-  // Re-enhance on DOM changes
+  // Re-enhance on DOM changes, at most once a frame: a list render makes
+  // hundreds of mutations and rescanning the page for each one was slow.
+  let queued = false;
   const observer = new MutationObserver(() => {
-    enhanceAllButtons();
-    enhanceRestaurantCards();
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => {
+      queued = false;
+      enhanceAllButtons();
+      enhanceRestaurantCards();
+    });
   });
 
   observer.observe(document.body, {

@@ -1,5 +1,42 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-01 (fourth drop)
+
+### Post to social media
+- Posting goes through the phone's share sheet with a Story-sized picture
+  (1080×1920), so people pick Instagram Stories, TikTok, Facebook, WhatsApp…
+  No per-network APIs (Instagram/TikTok need business accounts and app review).
+- **Share moments:** right after Just Ate, "Share this meal?" makes a Story
+  card of the dish photo, verdict, stars and note.
+- **Monthly wrap card:** "Share My Wrap" is now a Story card (meals out, new
+  spots, cuisines, best bite, most visited). Fixed the month being worked out
+  in UTC, which could pick the wrong month outside the US.
+- `StoryCard.openStory(spec)` draws any story (title, photo, stat tiles, lists).
+
+### Friends
+- **Who's been here:** a spot shows which friends have been (with stars) or
+  want to try it, and a "Go together" button writes the invite ("Sam, want to
+  go to Tacos Chiwas together? I hear the Birria is the move." + map link).
+- "Go with a friend" on every spot.
+
+### Trip guides
+- Travel Mode (now "Trip Guides" in Play) shows your guide to the city: places
+  you love (with what to get), your Want to Try there, and friends' 4-5★ picks
+  you haven't saved. "Share guide" makes a Story card or text.
+
+### Home
+- Regulars (5+ spots) see Today's Pick, Open now and friends first; Bear
+  Swipe moves lower.
+
+### Feel
+- Presses give way under your thumb (CSS, no more fighting transforms); a
+  light tick on tap, no longer a buzz when a scroll starts over a button.
+- Effects code rescans the page once a frame instead of on every DOM change.
+- Header counts tick up and pop; favoriting bursts gold stars; List/Map/Stats
+  rise in; dialogs slide up like native sheets on phones; the main action on
+  a screen has an occasional sheen; tapping the current tab scrolls to top.
+- All of it respects the app's "Reduce motion" setting and the phone's.
+
 ## [Unreleased] - 2026-11-01 (third drop)
 
 ### Friend invites that work on the friend's end

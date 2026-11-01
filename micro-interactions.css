@@ -412,6 +412,60 @@
   height: 200%;
 }
 
+/* ── Feel: presses, arrivals and little rewards ─────────────────────── */
+
+/* Press: everything tappable gives way a little under your thumb. */
+.btn-primary, .btn-secondary, .btn-orange, .btn-ghost, .btn-sm, .decision-chip,
+.home-quick-btn, .home-add-bar, .qa-sugg, .qa-status, .ja-place, .yo-btn, .hub-tile,
+.hub-card, .open-now-card, .import-row, .share-nudge .btn-sm, .friend-row {
+  transition: transform .14s cubic-bezier(.34, 1.56, .64, 1), filter .14s ease, box-shadow .2s ease;
+}
+.btn-primary:active, .btn-secondary:active, .btn-orange:active, .btn-ghost:active, .btn-sm:active,
+.decision-chip:active, .home-quick-btn:active, .home-add-bar:active, .qa-sugg:active, .qa-status:active,
+.ja-place:active, .yo-btn:active, .hub-tile:active, .hub-card:active, .open-now-card:active {
+  transform: scale(.96);
+  filter: brightness(.96);
+}
+.restaurant-card { transition: transform .18s ease, box-shadow .25s ease; }
+.restaurant-card:active { transform: scale(.985); }
+
+/* The main action on a screen gets a slow sheen now and then. */
+.home-add-bar, .friends-invite-big, .qa-save { position: relative; overflow: hidden; }
+.home-add-bar::after, .friends-invite-big::after, .qa-save:not(:disabled)::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .4) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: sheen 5.5s ease-in-out 1.2s infinite;
+}
+@keyframes sheen { 0%, 70% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+
+/* Switching List / Map / Stats rises in instead of snapping. */
+.main-content.view-enter { animation: view-rise .32s cubic-bezier(.2, .8, .2, 1); }
+@keyframes view-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* Header counts pop when they change. */
+.stat-pop { display: inline-block; animation: stat-pop .5s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes stat-pop { 40% { transform: scale(1.35); color: var(--gold, #f0b850); } }
+
+/* Phones: dialogs slide up from the bottom like a native sheet. */
+@media (max-width: 768px) {
+  .modal-card { animation: sheet-up .38s cubic-bezier(.2, .9, .25, 1.05); }
+  @keyframes sheet-up { from { opacity: .4; transform: translateY(60px); } to { opacity: 1; transform: none; } }
+}
+
+/* Saved stars and favorites spring. */
+.card-favorite-btn.active { animation: fav-pop .45s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes fav-pop { 40% { transform: scale(1.25); } }
+
+/* Clear keyboard focus without the browser's default box. */
+:focus-visible { outline: 3px solid rgba(var(--primary-rgb), .55); outline-offset: 2px; }
+
+/* The app's own "Reduce motion" setting switches all of the above off. */
+body[data-ui-motion="reduced"] *, body[data-ui-motion="reduced"] *::before, body[data-ui-motion="reduced"] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
 /* ── Mobile-Specific Enhancements ────────────────────────────────────── */
 
 @media (max-width: 768px) {
