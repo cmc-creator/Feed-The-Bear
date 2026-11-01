@@ -5922,6 +5922,67 @@ body.light-mode .today-vibe-pill {
 .ja-place-dist { font-size: .7rem; font-weight: 500; color: var(--text-dim); }
 .ja-place.active { border-color: var(--primary); background: rgba(var(--primary-rgb), .18); }
 .ja-place-new { border-style: dashed; }
+/* Real restaurants from search: full-width rows with rating and address. */
+.ja-place-real { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; border-radius: 12px; text-align: left; }
+.ja-place-real .ja-place-dist { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.ja-intro { margin: 0 0 4px; font-size: .82rem; color: var(--text-dim); line-height: 1.45; }
+.ja-stars { display: flex; gap: 4px; }
+.ja-star {
+  font-size: 1.9rem; line-height: 1; padding: 2px 4px; background: none; border: 0; cursor: pointer;
+  color: var(--border); transition: transform .15s cubic-bezier(.34,1.56,.64,1), color .15s ease;
+}
+.ja-star.on { color: #f0a92e; text-shadow: 0 2px 8px rgba(240, 169, 46, .45); }
+.ja-star:active { transform: scale(1.25); }
+
+/* ── My Lists: Want to Try / Been There ── */
+.list-header { padding: 6px 4px 12px; }
+.list-header.hidden { display: none; }
+.list-title { font-size: 1.3rem; font-weight: 800; color: #f6ecdc; margin: 0 0 10px; }
+.list-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.list-tab {
+  display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; cursor: pointer;
+  font: inherit; font-size: .98rem; font-weight: 800; color: #f6ecdc;
+  border-radius: 14px; border: 1px solid rgba(246, 236, 220, .25); background: rgba(13, 13, 26, .45);
+}
+.list-tab.active { color: #2a1a05; background: linear-gradient(135deg, #ffe2a3, #f0b850); border-color: #fff3d6; box-shadow: 0 6px 18px rgba(232, 169, 58, .35); }
+.list-tab-count { min-width: 26px; padding: 2px 8px; border-radius: 999px; font-size: .8rem; background: rgba(0, 0, 0, .25); }
+.list-tab.active .list-tab-count { background: rgba(42, 26, 5, .15); }
+/* On My Lists the home cards step aside: the list is the screen. */
+body[data-view="want-to-try"] #home-discovery,
+body[data-view="visited"] #home-discovery,
+body[data-view="want-to-try"] .weekly-suggest-banner,
+body[data-view="visited"] .weekly-suggest-banner { display: none; }
+.list-empty {
+  grid-column: 1 / -1; display: grid; justify-items: center; gap: 8px; text-align: center;
+  padding: 28px 18px; border-radius: 18px; background: var(--surface); border: 1px solid var(--border);
+}
+.list-empty-icon { font-size: 2.4rem; }
+.list-empty h3 { margin: 0; font-size: 1.05rem; color: var(--text); }
+.list-empty p { margin: 0 0 6px; font-size: .86rem; color: var(--text-dim); max-width: 320px; line-height: 1.45; }
+
+/* Cards: your photos, a bit of your notes, your links. */
+.card-media-strip { display: flex; gap: 6px; margin: 6px 0 8px; }
+.cms-item { position: relative; width: 56px; height: 56px; border-radius: 10px; overflow: hidden; flex: 0 0 auto; border: 2px solid rgba(255, 246, 230, .7); }
+.cms-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cms-more { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, .55); color: #fff; font-weight: 800; font-size: .85rem; }
+.card-note { font-size: .8rem; font-style: italic; color: #e9dcc6; margin: 0 0 8px; line-height: 1.4; }
+.link-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.link-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; text-decoration: none;
+  font-size: .74rem; font-weight: 700; color: #f6ecdc; background: rgba(255, 246, 230, .12); border: 1px solid rgba(255, 246, 230, .22);
+}
+.link-chip.more { opacity: .75; }
+
+/* Links on a spot */
+.detail-links { background: var(--surface2); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; }
+.detail-links h4 { margin: 0 0 8px; font-size: .95rem; color: var(--text); }
+.detail-links-list { display: grid; gap: 6px; margin-bottom: 10px; }
+.detail-link-row { display: flex; align-items: center; gap: 6px; }
+.detail-link-row a { flex: 1; min-width: 0; text-decoration: none; color: var(--text); font-size: .86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.detail-link-row a span { color: var(--text-dim); font-size: .76rem; }
+.detail-links-empty { font-size: .82rem; color: var(--text-dim); line-height: 1.45; }
+.detail-links-add { display: flex; gap: 8px; }
+.detail-links-add .form-input { flex: 1; min-width: 0; }
 .ja-verdicts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .ja-verdicts .yo-btn.active { outline: 2px solid var(--primary); outline-offset: 1px; }
 .ja-photo-btn {

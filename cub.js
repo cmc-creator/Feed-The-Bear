@@ -199,6 +199,8 @@ window.Cub = (() => {
       suggestions = (data.places || []).slice(0, 3).map(pl => ({
         name: pl.name, address: pl.address || '', lat: Number(pl.lat), lng: Number(pl.lng), website: pl.website || '',
         cuisine: guessCuisine(pl.name, '', pl.type), dish, source: 'social',
+        // Keep the post itself: it shows as a TikTok/Instagram link on the spot.
+        sourceUrl: (String(text).match(SOCIAL_LINK) || [''])[0],
         dist: Number.isFinite(s.userLat) && Number.isFinite(Number(pl.lat)) ? app().haversine(s.userLat, s.userLng, Number(pl.lat), Number(pl.lng)) : undefined,
       }));
       if (!suggestions.length) {
@@ -288,6 +290,7 @@ window.Cub = (() => {
       website: pick.website || '', photo: '', googleRating: pick.rating || 0, googleReviews: pick.reviews || 0,
       myRating: status === 'visited' ? stars : 0, notes: pick.notes || '', tags: pick.tags || [],
       collectionId: null, priority: '', status, dateAdded: today,
+      links: pick.sourceUrl ? [{ url: pick.sourceUrl.slice(0, 500), added: today }] : [],
       dateVisited: status === 'visited' ? today : null, updatedAt: Date.now(), visits: [],
     };
     if (status === 'visited') r.visits.push({ date: today, note: '', rating: stars, dish, photo, ...(video ? { video } : {}) });

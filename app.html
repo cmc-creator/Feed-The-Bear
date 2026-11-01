@@ -482,9 +482,9 @@
     </div>
 
     <nav class="header-nav" id="main-nav">
-      <button class="nav-btn active" data-view="all">All</button>
+      <button class="nav-btn active" data-view="all">Home</button>
       <button class="nav-btn" data-view="want-to-try">Want to Try</button>
-      <button class="nav-btn" data-view="visited">Visited</button>
+      <button class="nav-btn" data-view="visited">Been There</button>
       <button class="nav-btn" data-view="map">Map</button>
       <button class="nav-btn" data-view="stats">Stats</button>
     </nav>
@@ -587,7 +587,7 @@
 
   <!-- ── Stats Bar ─────────────────────────────────────────── -->
   <section class="stats-bar hidden" id="stats-bar">
-    <div class="stat-item tappable" data-view-filter="all" role="button" tabindex="0" aria-label="Show all saved">
+    <div class="stat-item tappable" data-view-filter="lists" role="button" tabindex="0" aria-label="Open my lists">
       <span class="stat-value" id="stat-total">0</span>
       <span class="stat-label">Saved</span>
     </div>
@@ -597,9 +597,9 @@
       <span class="stat-label">Want to Try</span>
     </div>
     <div class="stat-divider"></div>
-    <div class="stat-item tappable" data-view-filter="visited" role="button" tabindex="0" aria-label="Show visited">
+    <div class="stat-item tappable" data-view-filter="visited" role="button" tabindex="0" aria-label="Show places you have been">
       <span class="stat-value accent-green" id="stat-visited">0</span>
-      <span class="stat-label">Visited</span>
+      <span class="stat-label">Been There</span>
     </div>
     <div class="stat-divider"></div>
     <div class="stat-item">
@@ -984,6 +984,15 @@
       </div>
       <div id="today-status-row" class="today-status-row home-module" aria-label="Today status"></div>
     </section>
+
+    <!-- My Lists: Want to Try / Been There -->
+    <div id="list-header" class="list-header hidden">
+      <h2 class="list-title">My Lists</h2>
+      <div class="list-tabs" role="tablist" aria-label="My lists">
+        <button type="button" role="tab" class="list-tab" data-list="want-to-try"><span class="list-tab-name">Want to Try</span><b class="list-tab-count" id="list-count-want">0</b></button>
+        <button type="button" role="tab" class="list-tab" data-list="visited"><span class="list-tab-name">Been There</span><b class="list-tab-count" id="list-count-visited">0</b></button>
+      </div>
+    </div>
 
     <!-- Restaurant grid -->
     <div id="restaurant-grid" class="restaurant-grid"></div>
@@ -1534,6 +1543,15 @@
             placeholder="Jot the vibe, what to order, and who joined you" maxlength="2000"></textarea>
         </div>
 
+        <div class="detail-links" id="detail-links-wrap">
+          <h4>Links</h4>
+          <div id="detail-links-list" class="detail-links-list"></div>
+          <div class="detail-links-add">
+            <input id="detail-link-input" class="form-input" type="url" inputmode="url" placeholder="Paste a TikTok, Instagram, review or menu link" />
+            <button type="button" id="detail-link-add-btn" class="btn-sm btn-primary">Add</button>
+          </div>
+        </div>
+
         <div class="detail-visit-log" id="detail-visit-log-wrap">
           <div class="visit-log-header">
             <h4>Visit Log</h4>
@@ -1658,12 +1676,12 @@
   <!-- ── Mobile Bottom Nav ─────────────────────────────────── -->
   <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
     <button class="mobile-nav-btn active" data-view="all">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-      <span>List</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+      <span>Home</span>
     </button>
-    <button class="mobile-nav-btn" data-view="map">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
-      <span>Map</span>
+    <button class="mobile-nav-btn" data-view="lists" aria-label="My lists: Want to Try and Been There">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.3"/><circle cx="4.5" cy="12" r="1.3"/><circle cx="4.5" cy="18" r="1.3"/></svg>
+      <span>Lists</span>
     </button>
     <button class="mobile-nav-fab" id="mobile-add-btn" aria-label="Add a place">
       <span class="mobile-nav-fab-circle">
@@ -1675,9 +1693,9 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22"><path d="M12 2l2.4 5.4L20 8.2l-4 4 1 5.8L12 15.4 7 18l1-5.8-4-4 5.6-.8z"/></svg>
       <span>Play</span>
     </button>
-    <button class="mobile-nav-btn" data-view="stats">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      <span>Stats</span>
+    <button class="mobile-nav-btn" data-view="map">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+      <span>Map</span>
     </button>
   </nav>
 
@@ -2677,10 +2695,20 @@
         <button id="just-ate-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="just-ate-body">
-        <label class="ja-label" for="just-ate-place">Where?</label>
+        <p class="ja-intro">Log a place you ate at. It goes on your <strong>Been There</strong> list with your rating, photos and notes.</p>
+        <label class="ja-label" for="just-ate-place">Where did you eat?</label>
         <input id="just-ate-place" class="form-input" type="text" maxlength="80"
-          placeholder="Search your spots or type a new one" autocomplete="off" />
-        <div id="just-ate-places" class="ja-places" aria-label="Your spots"></div>
+          placeholder="Search any restaurant" autocomplete="off" enterkeyhint="search" />
+        <div id="just-ate-places" class="ja-places" aria-label="Restaurants"></div>
+
+        <div class="ja-label" id="just-ate-stars-label">Your rating</div>
+        <div class="ja-stars" id="just-ate-stars" role="radiogroup" aria-labelledby="just-ate-stars-label">
+          <button type="button" class="ja-star" data-n="1" role="radio" aria-checked="false" aria-label="1 star">★</button>
+          <button type="button" class="ja-star" data-n="2" role="radio" aria-checked="false" aria-label="2 stars">★</button>
+          <button type="button" class="ja-star" data-n="3" role="radio" aria-checked="false" aria-label="3 stars">★</button>
+          <button type="button" class="ja-star" data-n="4" role="radio" aria-checked="false" aria-label="4 stars">★</button>
+          <button type="button" class="ja-star" data-n="5" role="radio" aria-checked="false" aria-label="5 stars">★</button>
+        </div>
 
         <label class="ja-label" for="just-ate-dish">What did you have? <span class="ja-optional">optional</span></label>
         <input id="just-ate-dish" class="form-input" type="text" maxlength="80"
@@ -2692,12 +2720,15 @@
         </button>
         <div id="just-ate-photo-preview" class="ja-photo-preview hidden"></div>
 
-        <div class="ja-label" id="just-ate-verdict-label">How was it?</div>
+        <div class="ja-label" id="just-ate-verdict-label">How was that dish?</div>
         <div class="ja-verdicts" id="just-ate-verdicts" role="radiogroup" aria-labelledby="just-ate-verdict-label">
           <button type="button" class="yo-btn yo-again" data-verdict="again" role="radio" aria-checked="false">Order again</button>
           <button type="button" class="yo-btn yo-ok" data-verdict="ok" role="radio" aria-checked="false">Fine</button>
           <button type="button" class="yo-btn yo-skip" data-verdict="skip" role="radio" aria-checked="false">Skip</button>
         </div>
+
+        <label class="ja-label" for="just-ate-link">Link <span class="ja-optional">optional: the TikTok, Instagram post or review</span></label>
+        <input id="just-ate-link" class="form-input" type="url" inputmode="url" placeholder="https://" autocomplete="off" />
 
         <label class="ja-label" for="just-ate-note">Quick note <span class="ja-optional">optional</span></label>
         <div class="ja-tags" id="just-ate-tags" aria-label="Tap to add to your note">

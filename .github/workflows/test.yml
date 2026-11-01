@@ -158,3 +158,6 @@ jobs:
       - name: Share moments, who has been here, trip guides, effects
         working-directory: tests
         run: node sharemoments.test.js
+      - name: My Lists (Want to Try / Been There), links, Just Ate search and rating
+        working-directory: tests
+        run: node mylists.test.js

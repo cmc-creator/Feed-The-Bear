@@ -2491,10 +2491,13 @@ function renderCards () {
   noRes.classList.add('hidden');
 
   if (state.restaurants.length === 0) {
-    empty.classList.remove('hidden');
+    if (isListView(state.currentView)) grid.innerHTML = listEmptyHtml(state.currentView);
+    else empty.classList.remove('hidden');
     return;
   }
   if (list.length === 0) {
+    const filtering = state.filter.search || state.filter.cuisine || state.filter.price || state.filter.collection;
+    if (isListView(state.currentView) && !filtering) { grid.innerHTML = listEmptyHtml(state.currentView); return; }
     noRes.classList.remove('hidden');
     return;
   }
@@ -2550,7 +2553,7 @@ function buildCard (r) {
         : stockDishPhotoHtml(r)}
       <div class="card-img-overlay"></div>
       <span class="card-status-badge ${r.status === 'want-to-try' ? 'want' : 'visited'}">
-        ${r.status === 'want-to-try' ? 'Want to Try' : 'Visited'}
+        ${r.status === 'want-to-try' ? 'Want to Try' : 'Been There'}
       </span>
       <button class="card-favorite-btn ${r.isFavorite ? 'active' : ''}" data-action="toggle-favorite" aria-label="Toggle favorite restaurant">
         ${r.isFavorite ? '★ Favorite' : '☆ Favorite'}
@@ -2566,6 +2569,7 @@ function buildCard (r) {
         ${r.myRating ? `<span class="my-rating-row"><span class="my-stars">${'★'.repeat(r.myRating)}${'☆'.repeat(5-r.myRating)}</span> My Rating</span>` : ''}
       </div>
       ${cardOrderLine(r)}
+      ${cardExtrasHtml(r)}
       <div class="card-highlights">
         ${openChipHtml(r)}
         ${distStr ? `<span class="card-highlight neutral">📍 ${distStr}</span>` : ''}
@@ -2633,6 +2637,7 @@ function buildCard (r) {
       }
       return;
     }
+    if (action === 'open-link')    { e.stopPropagation(); return; } // the <a> opens it
     if (action === 'directions')   { e.stopPropagation(); openDirections(r);      return; }
     if (action === 'website')       { e.stopPropagation(); openWebsite(r);         return; }
     if (action === 'edit')          { e.stopPropagation(); openEditModal(r.id);    return; }
@@ -3040,6 +3045,7 @@ function openDetailModal (id) {
   document.getElementById('detail-maps-search-btn').onclick = () => openMapsSearch(r);
   document.getElementById('detail-together-btn').onclick = () => askFriendToGo(r);
   renderDetailFriends(r);
+  renderDetailLinks(r);
   document.getElementById('detail-book-btn').onclick = () => openPartnerSheet('book', r);
   document.getElementById('detail-order-btn').onclick = () => openPartnerSheet('order', r);
   document.getElementById('detail-edit-btn').onclick = () => { closeDetailModal(); openEditModal(r.id); };
@@ -6401,6 +6407,42 @@ function setupEvents () {
   document.getElementById('add-btn')?.addEventListener('click', openQuickAdd);
   document.getElementById('empty-add-btn')?.addEventListener('click', openQuickAdd);
   document.getElementById('empty-import-btn')?.addEventListener('click', () => showImportBookmarks());
+  // Links on a spot (detail page)
+  const addDetailLink = () => {
+    const input = document.getElementById('detail-link-input');
+    const r = state.restaurants.find(x => x.id === state.detailId);
+    if (!input || !r) return;
+    if (!addLinkTo(r, input.value)) { showToast('Paste a web link', 'Something starting with https://', 'info'); input.focus(); return; }
+    input.value = '';
+    saveData();
+    renderDetailLinks(r);
+    renderCards();
+    trackProductEvent('link_added', { kind: linkKind(r.links[0].url).label });
+    showToast('Link saved', `${linkKind(r.links[0].url).label} link added to ${r.name}.`, 'success');
+  };
+  document.getElementById('detail-link-add-btn')?.addEventListener('click', addDetailLink);
+  document.getElementById('detail-link-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addDetailLink(); } });
+  document.getElementById('detail-links-list')?.addEventListener('click', e => {
+    const btn = e.target.closest('.detail-link-remove[data-url]');
+    const r = state.restaurants.find(x => x.id === state.detailId);
+    if (!btn || !r) return;
+    r.links = linksOf(r).filter(l => l.url !== btn.dataset.url);
+    r.updatedAt = Date.now();
+    saveData();
+    renderDetailLinks(r);
+    renderCards();
+  });
+  document.getElementById('list-header')?.addEventListener('click', e => {
+    const tab = e.target.closest('.list-tab[data-list]');
+    if (tab) { hapticTap('light'); setView(tab.dataset.list); }
+  });
+  document.getElementById('restaurant-grid')?.addEventListener('click', e => {
+    const b = e.target.closest('[data-list-empty]');
+    if (!b) return;
+    if (b.dataset.listEmpty === 'add') openAddPlace();
+    else if (b.dataset.listEmpty === 'import') showImportBookmarks();
+    else if (b.dataset.listEmpty === 'justate') openJustAte();
+  });
   document.getElementById('home-add-bar')?.addEventListener('click', () => { hapticTap('medium'); openAddPlace(); });
 
   // Modal close
@@ -6864,15 +6906,28 @@ function setupEvents () {
   document.getElementById('home-quick-justate-btn')?.addEventListener('click', () => { hapticTap('medium'); openJustAte(); });
   document.getElementById('just-ate-close-btn')?.addEventListener('click', closeJustAte);
   document.getElementById('just-ate-overlay')?.addEventListener('click', e => { if (e.target.id === 'just-ate-overlay') closeJustAte(); });
-  document.getElementById('just-ate-place')?.addEventListener('input', () => { _justAte.placeId = null; renderJustAtePlaces(); });
+  document.getElementById('just-ate-place')?.addEventListener('input', () => {
+    _justAte.placeId = null; _justAte.found = null;
+    renderJustAtePlaces();
+    searchJustAtePlaces();
+  });
   document.getElementById('just-ate-places')?.addEventListener('click', e => {
     const btn = e.target.closest('.ja-place');
     if (!btn) return;
     const r = btn.dataset.id ? state.restaurants.find(x => x.id === btn.dataset.id) : null;
+    const real = btn.dataset.g != null ? _justAte.results[Number(btn.dataset.g)] : null;
     _justAte.placeId = r?.id || null;
-    if (r) document.getElementById('just-ate-place').value = r.name;
+    _justAte.found = real || null;
+    if (r || real) document.getElementById('just-ate-place').value = (r || real).name;
+    // Rated it before? Start from that rating.
+    if (r?.myRating && !_justAte.stars) setJustAteStars(r.myRating);
     renderJustAtePlaces();
-    document.getElementById('just-ate-dish')?.focus();
+  });
+  document.getElementById('just-ate-stars')?.addEventListener('click', e => {
+    const b = e.target.closest('.ja-star[data-n]');
+    if (!b) return;
+    hapticTap('light');
+    setJustAteStars(Number(b.dataset.n) === _justAte.stars ? 0 : Number(b.dataset.n));
   });
   document.getElementById('just-ate-verdicts')?.addEventListener('click', e => {
     const btn = e.target.closest('.yo-btn[data-verdict]');
@@ -9714,6 +9769,79 @@ function friendTipsHtml (r) {
   }).join('')}</div>`;
 }
 
+/* ── Links on a spot: the TikTok you found it on, reviews, the menu ── */
+const LINK_KINDS = [
+  [/tiktok\.com/i, 'TikTok', '🎵'], [/instagram\.com/i, 'Instagram', '📸'], [/youtube\.com|youtu\.be/i, 'YouTube', '▶️'],
+  [/yelp\.com/i, 'Yelp', '⭐'], [/facebook\.com|fb\.watch/i, 'Facebook', '👍'], [/(?:^|\.)x\.com|twitter\.com/i, 'X', '✖️'],
+  [/threads\.net/i, 'Threads', '🧵'], [/google\.[a-z.]+\/maps|maps\.app\.goo\.gl|goo\.gl\/maps/i, 'Google Maps', '📍'],
+  [/tripadvisor\./i, 'Tripadvisor', '🦉'], [/opentable\.|resy\.com/i, 'Reservations', '🍽️'],
+];
+const LINKS_MAX = 12;
+
+function linkKind (url) {
+  let host = '';
+  try { host = new URL(url).hostname.replace(/^www\./, ''); } catch { /* bad url */ }
+  const hit = LINK_KINDS.find(([re]) => re.test(host) || re.test(url));
+  return hit ? { label: hit[1], icon: hit[2] } : { label: host || 'Link', icon: /menu/i.test(url) ? '📋' : '🔗' };
+}
+
+function linksOf (r) { return Array.isArray(r?.links) ? r.links.filter(l => l && safeUrl(l.url)) : []; }
+
+// Adds a link once (same URL twice is ignored). Returns false if it isn't a web link.
+function addLinkTo (r, raw) {
+  const url = String(raw || '').trim().match(/https?:\/\/\S+/i)?.[0] || '';
+  if (!r || !/^https?:\/\//i.test(safeUrl(url))) return false;
+  if (!Array.isArray(r.links)) r.links = [];
+  if (!r.links.some(l => l.url === url)) r.links.unshift({ url: url.slice(0, 500), added: iso() });
+  r.links = r.links.slice(0, LINKS_MAX);
+  r.updatedAt = Date.now();
+  return true;
+}
+
+function linkChipsHtml (r, max = 4) {
+  const links = linksOf(r);
+  if (!links.length) return '';
+  return `<div class="link-chips">${links.slice(0, max).map(l => {
+    const k = linkKind(l.url);
+    return `<a class="link-chip" href="${escHtml(safeUrl(l.url))}" target="_blank" rel="noopener" data-action="open-link">${k.icon} ${escHtml(k.label)}</a>`;
+  }).join('')}${links.length > max ? `<span class="link-chip more">+${links.length - max}</span>` : ''}</div>`;
+}
+
+function renderDetailLinks (r) {
+  const list = document.getElementById('detail-links-list');
+  if (!list) return;
+  const links = linksOf(r);
+  list.innerHTML = links.length
+    ? links.map(l => {
+        const k = linkKind(l.url);
+        return `<div class="detail-link-row"><a href="${escHtml(safeUrl(l.url))}" target="_blank" rel="noopener">${k.icon} <strong>${escHtml(k.label)}</strong> <span>${escHtml(l.url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 48))}</span></a>
+          <button type="button" class="icon-btn detail-link-remove" data-url="${escHtml(l.url)}" aria-label="Remove link">✕</button></div>`;
+      }).join('')
+    : '<div class="detail-links-empty">Where did you hear about it? Save the TikTok, Instagram post, review or menu here.</div>';
+}
+
+// Your photos and videos from visits and dishes, newest first, for cards.
+function spotMediaOf (r) {
+  const items = [];
+  (r.visits || []).forEach(v => mediaOf(v).forEach(m => items.push({ ...m, date: v.date || '' })));
+  dishesOf(r).forEach(d => mediaOf(d).forEach(m => items.push({ ...m, date: d.date || '' })));
+  const seen = new Set();
+  return items.filter(m => safeUrl(m.photo) && !seen.has(m.photo) && seen.add(m.photo))
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+}
+
+// What a card shows beyond the name: your photos, a bit of your notes, your links.
+function cardExtrasHtml (r) {
+  const media = spotMediaOf(r);
+  const strip = media.length
+    ? `<div class="card-media-strip">${media.slice(0, 4).map((m, i) => `<span class="cms-item"><img src="${escHtml(safeUrl(m.photo))}" alt="" loading="lazy" />${m.video ? '<span class="video-badge small" aria-hidden="true">▶</span>' : ''}${i === 3 && media.length > 4 ? `<span class="cms-more">+${media.length - 4}</span>` : ''}</span>`).join('')}</div>`
+    : '';
+  const note = String(r.notes || '').trim();
+  return strip
+    + (note ? `<div class="card-note">“${escHtml(note.length > 110 ? `${note.slice(0, 107)}…` : note)}”</div>` : '')
+    + linkChipsHtml(r);
+}
+
 /* ── Who's been here: friends at the top of a spot, and "Go with a friend" ── */
 function renderDetailFriends (r) {
   const el = document.getElementById('detail-friends');
@@ -10173,6 +10301,7 @@ const TOOL_ACTIONS = {
   'profile':          openFoodieProfile,
   'friends':          openFoodieFriends,
   'stats2':           openStats2,
+  'stats-view':       () => setView('stats'),
   'ai-panel':         openAiPanel,
   'route':            openRoutePlanner,
   'export2':          openExport2,
@@ -10235,7 +10364,7 @@ const HUB_SECTIONS = [
     ['review','🎉','Year in Review'], ['wrap','🎁','Monthly Wrap'],
     ['passport','🛂','Passport'], ['gallery','🖼️','Photo Gallery'],
     ['visitlog','📖','Visit Log'], ['moodcal','📅','Mood Calendar'],
-    ['beenawhile','⏰','Been a While'], ['stats2','📊','Deep Stats'],
+    ['beenawhile','⏰','Been a While'], ['stats-view','📈','My Stats'], ['stats2','📊','Deep Stats'],
   ]},
   { title: 'Games & rewards', items: [
     ['challenge','🎯','Challenges'], ['achievements','🏅','Achievements'],
@@ -10286,6 +10415,7 @@ const HUB_INFO = {
   review:        ['Your year in food', 'photo'],
   wrap:          ['Your month, wrapped', 'photo'],
   digest:        ['This month at a glance', 'bars'],
+  'stats-view':  ['Your counts, streaks and passport', 'bars'],
   stats2:        ['Deep dive into your habits', 'bars'],
   challenge:     ['Food quests with rewards', 'trophy'],
   achievements:  ['Badges you have earned', 'trophy'],
@@ -10413,21 +10543,67 @@ function initMobileHub () {
 }
 
 /* Switch the main list/map/stats view from any control (nav, stat chips). */
+const LIST_VIEWS = ['want-to-try', 'visited'];
+const isListView = view => LIST_VIEWS.includes(view);
+
 function setView (view) {
+  // "lists" opens My Lists on the tab you used last (Want to Try at first).
+  if (view === 'lists') view = LIST_VIEWS.includes(state.settings.lastList) ? state.settings.lastList : 'want-to-try';
   // A soft rise-in when switching between List, Map and Stats (CSS, instant state).
-  if (view !== state.currentView) {
+  const changed = view !== state.currentView;
+  if (changed) {
     const main = document.getElementById('main-content');
     main?.classList.remove('view-enter'); void main?.offsetWidth; main?.classList.add('view-enter');
   }
   document.querySelectorAll('.nav-btn, .mobile-nav-btn[data-view]').forEach(b => b.classList.remove('active'));
   document.querySelector(`.nav-btn[data-view="${view}"]`)?.classList.add('active');
-  document.querySelector(`.mobile-nav-btn[data-view="${view}"]`)?.classList.add('active');
+  document.querySelector(`.mobile-nav-btn[data-view="${isListView(view) ? 'lists' : view}"]`)?.classList.add('active');
   state.currentView = view;
+  document.body.dataset.view = view;
+  if (isListView(view) && state.settings.lastList !== view) {
+    state.settings.lastList = view;
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); } catch { /* storage full */ }
+  }
+  renderListHeader();
   if (view === 'map') { showMapView(); }
   else if (view === 'stats') { showStatsView(); }
   else { hideMapView(); hideStatsView(); renderCards(); }
+  // My Lists starts at the top, where the tabs are.
+  if (changed && isListView(view)) window.scrollTo({ top: 0 });
   BackNav.layer('view', view !== 'all');
   renderSearchMode();
+}
+
+// The Want to Try / Been There tabs on My Lists, with live counts.
+function renderListHeader () {
+  const header = document.getElementById('list-header');
+  if (!header) return;
+  const on = isListView(state.currentView);
+  header.classList.toggle('hidden', !on);
+  const count = s => state.restaurants.filter(r => r.status === s).length;
+  const want = document.getElementById('list-count-want');
+  const been = document.getElementById('list-count-visited');
+  if (want) want.textContent = count('want-to-try');
+  if (been) been.textContent = count('visited');
+  header.querySelectorAll('.list-tab').forEach(t => {
+    const active = t.dataset.list === state.currentView;
+    t.classList.toggle('active', active);
+    t.setAttribute('aria-selected', String(active));
+  });
+}
+
+// An empty list says what goes there and how to fill it.
+function listEmptyHtml (view) {
+  return view === 'want-to-try'
+    ? `<div class="list-empty"><div class="list-empty-icon" aria-hidden="true">🔖</div>
+        <h3>Nothing on your Want to Try list yet</h3>
+        <p>Save places you've heard about: from a TikTok, a friend, a sign you drove past.</p>
+        <button type="button" class="btn-primary" data-list-empty="add">＋ Add a place</button>
+        <button type="button" class="btn-ghost" data-list-empty="import">Import a list from your notes</button></div>`
+    : `<div class="list-empty"><div class="list-empty-icon" aria-hidden="true">🍽️</div>
+        <h3>No places you've been yet</h3>
+        <p>Log a meal with photos, videos and notes, and it lands here.</p>
+        <button type="button" class="btn-primary" data-list-empty="justate">📸 Log a meal</button></div>`;
 }
 
 /* ------------------------------------------------------------
@@ -10723,7 +10899,43 @@ function photoReveal (dataUrl, caption = '') {
 }
 
 /* ── Just Ate: log a meal in about ten seconds ──────────────── */
-let _justAte = { placeId: null, verdict: null, media: [] };
+// `found`: a real restaurant picked from search (Google), used when it isn't saved yet.
+let _justAte = { placeId: null, verdict: null, media: [], stars: 0, found: null, results: [] };
+let _justAteSearchTimer = null;
+let _justAteSearchSeq = 0;
+
+// Real restaurants matching what's typed (our Google Places search). [] when unavailable.
+async function searchRealPlaces (q) {
+  const at = Number.isFinite(state.userLat) ? `&lat=${state.userLat.toFixed(2)}&lng=${state.userLng.toFixed(2)}` : '';
+  try {
+    const resp = await fetch(`/api/place-info?mode=search&q=${encodeURIComponent(q)}${at}`);
+    if (!resp.ok) return [];
+    const list = (await resp.json())?.places;
+    return Array.isArray(list) ? list.filter(p => p && p.name) : [];
+  } catch { return []; }
+}
+
+function searchJustAtePlaces () {
+  clearTimeout(_justAteSearchTimer);
+  const q = (document.getElementById('just-ate-place')?.value || '').trim();
+  if (q.length < 3) { _justAte.results = []; renderJustAtePlaces(); return; }
+  const seq = ++_justAteSearchSeq;
+  _justAteSearchTimer = setTimeout(async () => {
+    const found = await searchRealPlaces(q);
+    if (seq !== _justAteSearchSeq) return;
+    const saved = new Set(state.restaurants.map(r => normalizeName(r.name)));
+    _justAte.results = found.filter(p => !saved.has(normalizeName(p.name))).slice(0, 5);
+    renderJustAtePlaces();
+  }, 450);
+}
+
+function setJustAteStars (n) {
+  _justAte.stars = n;
+  document.querySelectorAll('#just-ate-stars .ja-star').forEach(b => {
+    b.classList.toggle('on', Number(b.dataset.n) <= n);
+    b.setAttribute('aria-checked', String(Number(b.dataset.n) === n));
+  });
+}
 
 function justAteSuggestions (query = '') {
   const q = dishKey(query);
@@ -10741,14 +10953,20 @@ function renderJustAtePlaces () {
   if (!box || !input) return;
   const typed = input.value.trim();
   const picks = justAteSuggestions(typed);
-  const exact = picks.some(r => dishKey(r.name) === dishKey(typed));
+  const exact = picks.some(r => dishKey(r.name) === dishKey(typed)) || dishKey(_justAte.found?.name) === dishKey(typed);
+  const results = _justAte.results || [];
   box.innerHTML = picks.map(r => {
     const dist = distOf(r);
     return `<button type="button" class="ja-place${r.id === _justAte.placeId ? ' active' : ''}" data-id="${escHtml(r.id)}" aria-pressed="${r.id === _justAte.placeId}">
-      <span class="ja-place-name">${escHtml(r.name)}</span>${Number.isFinite(dist) ? `<span class="ja-place-dist">${fmtDist(dist)}</span>` : ''}
+      <span class="ja-place-name">${escHtml(r.name)}</span><span class="ja-place-dist">${escHtml([r.status === 'want-to-try' ? 'On your list' : 'Saved', Number.isFinite(dist) ? fmtDist(dist) : ''].filter(Boolean).join(' · '))}</span>
+    </button>`;
+  }).join('') + results.map((p, i) => {
+    const on = !!(_justAte.found && _justAte.found.placeId === p.placeId);
+    return `<button type="button" class="ja-place ja-place-real${on ? ' active' : ''}" data-g="${i}" aria-pressed="${on}">
+      <span class="ja-place-name">${escHtml(p.name)}</span><span class="ja-place-dist">${escHtml([p.rating ? `★ ${p.rating.toFixed(1)}` : '', p.address].filter(Boolean).join(' · '))}</span>
     </button>`;
   }).join('') + (typed && !exact
-    ? `<button type="button" class="ja-place ja-place-new${_justAte.placeId === null ? ' active' : ''}" data-new="1">+ New spot: ${escHtml(typed)}</button>`
+    ? `<button type="button" class="ja-place ja-place-new${_justAte.placeId === null && !_justAte.found ? ' active' : ''}" data-new="1">+ Use “${escHtml(typed)}”</button>`
     : '');
   syncJustAteSave();
 }
@@ -10763,8 +10981,11 @@ function openJustAte (restaurantId = null) {
   const overlay = document.getElementById('just-ate-overlay');
   if (!overlay) return;
   const preset = restaurantId ? state.restaurants.find(r => r.id === restaurantId) : null;
-  _justAte = { placeId: preset?.id || null, verdict: null, media: [] };
+  _justAte = { placeId: preset?.id || null, verdict: null, media: [], stars: 0, found: null, results: [] };
   document.getElementById('just-ate-place').value = preset?.name || '';
+  const linkInput = document.getElementById('just-ate-link');
+  if (linkInput) linkInput.value = '';
+  setJustAteStars(preset?.myRating || 0);
   document.getElementById('just-ate-dish').value = '';
   document.getElementById('just-ate-note').value = '';
   document.querySelectorAll('#just-ate-tags .ja-tag').forEach(t => t.classList.remove('active'));
@@ -10825,9 +11046,13 @@ function saveJustAte () {
       return;
     }
     const today = iso();
+    // A real restaurant picked from search brings its address, map pin, cuisine and Google rating.
+    const f = _justAte.found && dishKey(_justAte.found.name) === dishKey(placeName) ? _justAte.found : null;
+    const kind = String(f?.kind || '').replace(/\s*(restaurant|food|place)$/i, '').replace(/^(restaurant|food)$/i, '');
     r = {
-      id: uid(), name: placeName.slice(0, 80), cuisine: '', priceRange: 0, address: '', lat: null, lng: null,
-      website: '', photo: '', googleRating: 0, googleReviews: 0, myRating: 0, notes: '', tags: [],
+      id: uid(), name: placeName.slice(0, 80), cuisine: kind.slice(0, 40), priceRange: f?.priceLevel || 0,
+      address: f?.address || '', lat: Number.isFinite(f?.lat) ? f.lat : null, lng: Number.isFinite(f?.lng) ? f.lng : null,
+      website: '', photo: '', googleRating: f?.rating || 0, googleReviews: f?.reviews || 0, myRating: 0, notes: '', tags: [],
       collectionId: null, priority: '', status: 'visited', dateAdded: today, dateVisited: today,
       updatedAt: Date.now(), visits: [],
     };
@@ -10835,7 +11060,10 @@ function saveJustAte () {
   }
 
   if (!Array.isArray(r.visits)) r.visits = [];
-  const visit = { date: iso(), note, rating: 0, dish: dishName };
+  const stars = _justAte.stars || 0;
+  const visit = { date: iso(), note, rating: stars, dish: dishName };
+  if (stars) r.myRating = stars;
+  addLinkTo(r, document.getElementById('just-ate-link')?.value || '');
   setMediaOn(visit, media);
   if (!visit.photo) visit.photo = '';
   r.visits.push(visit);
@@ -10852,8 +11080,8 @@ function saveJustAte () {
   renderAll();
   if (photo) photoReveal(photo, dishName || r.name);
   trackProductEvent('just_ate_logged', { restaurantId: r.id, isNew, hasDish: !!dishName, hasPhoto: !!photo, mediaCount: media.length, hasNote: !!note, verdict: dishName ? verdict : null });
-  showToast(`Logged ${r.name}`,
-    dishName ? `${DISH_VERDICT_LABEL[verdict]}: ${dishName}` : (isNew ? 'New spot added to your den.' : 'Visit added to your history.'),
+  showToast(`${r.name} is on your Been There list`,
+    [stars ? '★'.repeat(stars) : '', dishName ? `${DISH_VERDICT_LABEL[verdict]}: ${dishName}` : ''].filter(Boolean).join(' · ') || 'Find it any time under Lists.',
     'success');
   if (typeof celebrateMilestones === 'function') celebrateMilestones();
   // The moment people actually post: offer a Story card once the photo has landed.
