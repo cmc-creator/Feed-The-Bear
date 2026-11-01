@@ -152,3 +152,6 @@ jobs:
       - name: Invites work for the friend; Add button is easy to find
         working-directory: tests
         run: node invitefix.test.js
+      - name: First impressions (messages, cards, daily pick, place search)
+        working-directory: tests
+        run: node firstimpressions.test.js

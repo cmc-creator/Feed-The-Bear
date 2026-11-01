@@ -53,10 +53,64 @@ function safeHttpUrl (value) {
   } catch { return ''; }
 }
 
+/* GET /api/place-info?mode=search&q=&lat=&lng=
+   Type-ahead for Add a spot: up to 5 real places matching what's typed,
+   near the user when we know where they are. Cached at the CDN per query
+   and rounded location, so repeated searches don't hit Google again. */
+const SEARCH_FIELDS = [
+  'places.id', 'places.displayName', 'places.formattedAddress', 'places.shortFormattedAddress',
+  'places.location', 'places.primaryTypeDisplayName', 'places.rating', 'places.userRatingCount', 'places.priceLevel',
+].join(',');
+
+async function searchPlaces (req, res, key) {
+  const q = String(req.query.q || '').trim().slice(0, 80);
+  const lat = parseFloat(req.query.lat);
+  const lng = parseFloat(req.query.lng);
+  if (q.length < 3) return res.status(400).json({ places: [], error: 'Type at least 3 letters' });
+  const body = { textQuery: q, maxResultCount: 5 };
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    body.locationBias = { circle: { center: { latitude: lat, longitude: lng }, radius: 25000 } };
+  }
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    const resp = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': SEARCH_FIELDS },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    }).finally(() => clearTimeout(timer));
+    if (!resp.ok) {
+      console.warn('[FTB] place-search HTTP', resp.status, (await resp.text()).slice(0, 200));
+      return res.status(502).json({ places: [] });
+    }
+    const places = ((await resp.json())?.places || []).map(p => ({
+      placeId: p.id || '',
+      name: String(p.displayName?.text || '').slice(0, 80),
+      address: String(p.shortFormattedAddress || p.formattedAddress || '').slice(0, 160),
+      lat: Number(p.location?.latitude), lng: Number(p.location?.longitude),
+      kind: String(p.primaryTypeDisplayName?.text || '').slice(0, 40),
+      rating: Number(p.rating) || 0,
+      reviews: Number(p.userRatingCount) || 0,
+      priceLevel: PRICE[p.priceLevel] || 0,
+    })).filter(p => p.name);
+    res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=86400');
+    return res.status(200).json({ places });
+  } catch (err) {
+    console.warn('[FTB] place-search failed:', err.message);
+    return res.status(502).json({ places: [] });
+  }
+}
+
 module.exports = async function handler (req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const key = process.env.GOOGLE_PLACES_API_KEY;
   if (!key) return res.status(503).json({ found: false, error: 'Place info is not set up.' });
+  if (req.query.mode === 'search') {
+    const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
+    if (limited(ip)) return res.status(429).json({ places: [], error: 'Slow down a little.' });
+    return searchPlaces(req, res, key);
+  }
 
   const name = String(req.query.name || '').trim().slice(0, 120);
   const address = String(req.query.address || '').trim().slice(0, 200);

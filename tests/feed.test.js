@@ -22,6 +22,8 @@ const OLD_LINK_FRIEND = { key: 'name:jo', name: 'Jo', savedAt: 1, data: { id: ''
   check(await e.locator('#ff-invite').isVisible(), 'with no friends, it invites one');
   await e.evaluate(() => { navigator.share = undefined; });
   await e.context().grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
+  // No name yet: the invite asks for one so friends know who it's from.
+  e.once('dialog', d => d.accept('Me'));
   await e.locator('#ff-invite').click();
   await e.waitForTimeout(300);
   check(await e.evaluate(() => state.settings.shareLive === true), 'inviting turns on live sharing');

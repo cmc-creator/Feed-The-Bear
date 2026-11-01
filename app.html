@@ -2015,22 +2015,19 @@
         <h2 id="friends-title">Foodie Friends</h2>
         <button id="friends-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
-      <p class="friends-subtitle">Follow friends to see what they order, what they skip, and what they're craving. Paste their link to follow.</p>
-      <div style="display:flex;gap:8px">
-        <input id="friends-link-input" class="form-input" placeholder="Paste friend profile link here" style="flex:1" />
-        <button id="friends-load-btn" class="btn-sm btn-orange">Load</button>
-      </div>
-      <div id="friends-result" class="friends-result hidden"></div>
+      <p class="friends-subtitle">See what your friends order, what they skip, and what they're craving, right on the places you both save.</p>
+      <button id="friends-invite-btn" type="button" class="btn-primary friends-invite-big">Invite a friend</button>
+      <button id="friends-copy-btn" type="button" class="friends-copy-link">or copy your link</button>
+      <div id="friends-live-note" class="friends-live-note"></div>
       <div id="friends-list" class="friends-list"></div>
-      <div class="friends-my-link" style="margin-top:16px">
-        <span style="font-size:.78rem;color:var(--text-dim)">Your shareable link:</span>
-        <div style="display:flex;gap:6px;margin-top:4px">
-          <input id="friends-my-link-input" class="form-input" readonly style="flex:1;font-size:.75rem" />
-          <button id="friends-copy-btn" class="btn-sm btn-orange">Copy</button>
-          <button id="friends-invite-btn" class="btn-sm btn-primary">Invite</button>
+      <details class="friends-paste">
+        <summary>Got a friend's link? Paste it here</summary>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input id="friends-link-input" class="form-input" placeholder="Paste their link" style="flex:1" />
+          <button id="friends-load-btn" class="btn-sm btn-orange">Follow</button>
         </div>
-        <div id="friends-live-note" class="friends-live-note"></div>
-      </div>
+      </details>
+      <div id="friends-result" class="friends-result hidden"></div>
     </div>
   </div>
 

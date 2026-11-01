@@ -63,6 +63,7 @@ const ME = [
   await me.evaluate(() => openFoodieFriends());
   await me.waitForTimeout(300);
   check(/Following \(1\)/i.test(await me.locator('#friends-list').innerText()), 'Friends screen lists who you follow');
+  await me.click('.friends-paste summary');
   await me.fill('#friends-link-input', link);
   await me.click('#friends-load-btn');
   await me.waitForTimeout(300);

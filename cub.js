@@ -105,7 +105,7 @@ window.Cub = (() => {
 
   function suggestionHtml (p, i) {
     const dist = Number.isFinite(p.dist) ? app().fmtDist(p.dist) : '';
-    const meta = [p.cuisine, dist || p.address].filter(Boolean).join(' · ');
+    const meta = [p.rating ? `★ ${p.rating.toFixed(1)}` : '', p.cuisine, p.address, dist].filter(Boolean).join(' · ');
     return `<button type="button" class="qa-sugg" data-i="${i}"><strong>${esc(p.name)}</strong>${meta ? `<span>${esc(meta)}</span>` : ''}</button>`;
   }
 
@@ -127,13 +127,38 @@ window.Cub = (() => {
     if (!q && !near.length) box.innerHTML = '<div class="qa-hint">Type a name, or paste a TikTok, Instagram or Google Maps link.</div>';
   }
 
-  // Nominatim for places not in the nearby list (one request at a time, debounced).
+  // Real places from Google as you type (our /api/place-info search). Rounded
+  // location keeps the CDN cache useful. Null means "fall back to Nominatim".
+  async function googleSearch (q) {
+    const s = state;
+    const at = Number.isFinite(s.userLat) ? `&lat=${s.userLat.toFixed(2)}&lng=${s.userLng.toFixed(2)}` : '';
+    try {
+      const resp = await fetch(`/api/place-info?mode=search&q=${encodeURIComponent(q)}${at}`);
+      if (!resp.ok) return null;
+      const list = (await resp.json())?.places;
+      if (!Array.isArray(list) || !list.length) return null;
+      return list.map(p => ({
+        name: p.name, lat: p.lat, lng: p.lng, address: p.address,
+        // "Mexican Restaurant" -> "Mexican"; a plain "Restaurant" says nothing.
+        cuisine: guessCuisine(p.name, String(p.kind || '').replace(/\s*(restaurant|food|place)$/i, '').replace(/^(restaurant|food)$/i, ''), p.kind), website: '',
+        rating: p.rating, reviews: p.reviews, priceRange: p.priceLevel || 0,
+        dist: Number.isFinite(s.userLat) && Number.isFinite(p.lat) ? app().haversine(s.userLat, s.userLng, p.lat, p.lng) : undefined,
+        source: 'google',
+      }));
+    } catch { return null; }
+  }
+
+  // Places not in the nearby list (one request at a time, debounced):
+  // Google first, Nominatim when Google isn't available.
   function searchMore (typed) {
     clearTimeout(searchTimer);
     const q = typed.trim();
     if (q.length < 3) return;
     const seq = ++searchSeq;
     searchTimer = setTimeout(async () => {
+      const google = await googleSearch(q);
+      if (seq !== searchSeq || !sheet) return;
+      if (google) { renderSuggestions(sheet.querySelector('.qa-input').value, google); return; }
       try {
         const s = state;
         const near = Number.isFinite(s.userLat) ? `&viewbox=${s.userLng - 0.4},${s.userLat + 0.3},${s.userLng + 0.4},${s.userLat - 0.3}` : '';
@@ -260,7 +285,7 @@ window.Cub = (() => {
     const r = {
       id: a.uid(), name: pick.name.slice(0, 80), cuisine, priceRange: pick.priceRange || 0,
       address: pick.address || '', lat: Number.isFinite(pick.lat) ? pick.lat : null, lng: Number.isFinite(pick.lng) ? pick.lng : null,
-      website: pick.website || '', photo: '', googleRating: 0, googleReviews: 0,
+      website: pick.website || '', photo: '', googleRating: pick.rating || 0, googleReviews: pick.reviews || 0,
       myRating: status === 'visited' ? stars : 0, notes: pick.notes || '', tags: pick.tags || [],
       collectionId: null, priority: '', status, dateAdded: today,
       dateVisited: status === 'visited' ? today : null, updatedAt: Date.now(), visits: [],

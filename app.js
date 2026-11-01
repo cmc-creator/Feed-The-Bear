@@ -2519,8 +2519,6 @@ function buildCard (r) {
   const collBadge = col
     ? `<span class="collection-badge" style="background:${col.color}22;color:${col.color};border-color:${col.color}44"><span class="collection-dot" style="background:${col.color}"></span>${escHtml(col.name)}</span>`
     : '';
-  const matchScore = Math.max(42, Math.min(99, Math.round(((r.myRating || r.googleRating || 3) * 18) + (r.isFavorite ? 10 : 0) + (r.status === 'want-to-try' ? 6 : 0))));
-  const moodLabel = r.status === 'want-to-try' ? 'Up next' : 'Trusted pick';
 
   card.innerHTML = `
     <div class="card-checkbox${state.selectedIds.has(r.id) ? ' checked' : ''}" title="Select"></div>
@@ -2548,8 +2546,6 @@ function buildCard (r) {
       ${cardOrderLine(r)}
       <div class="card-highlights">
         ${openChipHtml(r)}
-        <span class="card-highlight good">${matchScore}% match</span>
-        <span class="card-highlight mood">${escHtml(moodLabel)}</span>
         ${distStr ? `<span class="card-highlight neutral">📍 ${distStr}</span>` : ''}
       </div>
       ${r.address ? `
@@ -3809,6 +3805,8 @@ function openAddPlace () {
 function renderAll () {
   // A soft ring on the Add button until someone has saved a few places.
   document.body.classList.toggle('add-hint', (state.restaurants || []).length < 3);
+  // Today's pick doesn't wait for nearby results (Grizzly's AI pick does).
+  try { if (!usesAiDailyPick()) showLocalDailyPick(); } catch (err) { console.warn('[FTB] daily pick:', err); }
   renderStats();
   renderCuisineFilter();
   if (state.currentView === 'map') {
@@ -3876,8 +3874,15 @@ function showToast (title, msg, type = 'default') {
     setTimeout(() => toast.remove(), 300);
   };
   toast.querySelector('.toast-close').onclick = dismiss;
+  // Tapping anywhere on it dismisses it too (phones show them over the header).
+  toast.addEventListener('click', e => { if (!e.target.closest('a, button:not(.toast-close)')) dismiss(); });
+  // Two at most: a burst of messages shouldn't bury the screen.
+  [...container.querySelectorAll('.toast:not(.removing)')].slice(0, -1).forEach(old => {
+    old.classList.add('removing');
+    setTimeout(() => old.remove(), 300);
+  });
   container.appendChild(toast);
-  setTimeout(dismiss, 5000);
+  setTimeout(dismiss, type === 'error' ? 6000 : 4000);
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -6941,12 +6946,12 @@ function setupEvents () {
     renderFriendsList();
   });
   document.getElementById('friends-link-input').addEventListener('keydown', e => { if (e.key === 'Enter') loadFriendProfile(); });
-  document.getElementById('friends-copy-btn').addEventListener('click', () => {
-    const link = document.getElementById('friends-my-link-input').value;
-    if (!link) { showToast('Almost there', 'Rate a spot or log a dish first, so friends have something to see.', 'info'); return; }
-    navigator.clipboard?.writeText(link);
+  document.getElementById('friends-copy-btn').addEventListener('click', async () => {
+    if (!ensureInviteName()) return;
+    const link = buildInviteLink();
     startSharingLive();
-    showToast('Copied!', 'Profile link copied.', 'success');
+    try { await navigator.clipboard.writeText(link); showToast('Link copied', 'Paste it in a text to a friend.', 'success'); }
+    catch { window.prompt('Copy your link:', link); }
   });
   document.getElementById('friends-invite-btn')?.addEventListener('click', inviteFriend);
   document.getElementById('ff-open-friends')?.addEventListener('click', openFoodieFriends);
@@ -7526,7 +7531,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('ai-rec-banner')?.addEventListener('click', e => {
     if (!e.target.closest('#ai-rec-refresh-btn')) openAiRecPick();
   });
-  document.getElementById('ai-rec-refresh-btn')?.addEventListener('click', () => {
+  document.getElementById('ai-rec-refresh-btn')?.addEventListener('click', e => {
+    e.stopPropagation();
+    if (!usesAiDailyPick()) { showLocalDailyPick({ reroll: true }); return; }
     const cacheKey = 'ftb_airec_' + new Date().toDateString();
     sessionStorage.removeItem(cacheKey);
     const textEl = document.getElementById('ai-rec-text');
@@ -9392,8 +9399,9 @@ function ensureInviteName () {
 
 // The one invite link: your picks to follow (or just your name, before you've
 // rated anything), plus your free-month invite code when you're signed in.
+// It goes through invite.html, whose link preview says "You're invited".
 function buildInviteLink (ref = window._ftbUid || '') {
-  const link = encodeProfileLink(buildProfileData());
+  const link = encodeProfileLink(buildProfileData()).replace(/\/app\.html#profile=/, '/invite.html#profile=');
   return ref && /^[A-Za-z0-9]{10,64}$/.test(ref) ? link.replace('#profile=', `?ref=${ref}#profile=`) : link;
 }
 
@@ -10293,8 +10301,6 @@ function openCravingEngine () {
   document.getElementById('craving-result').classList.add('hidden');
   document.getElementById('craving-overlay').classList.remove('hidden');
   document.body.classList.add('overlay-open');
-  // Populate my-link in friends while we're at it (pre-generate)
-  _buildFriendsMyLink();
 }
 function closeCravingEngine () {
   document.getElementById('craving-overlay').classList.add('hidden');
@@ -10925,14 +10931,6 @@ function shareYearReview () {
    PHASE 8 • ❤ FOODIE FRIENDS
    ------------------------------------------------------------ */
 
-function _buildFriendsMyLink () {
-  const data = buildProfileData();
-  const el = document.getElementById('friends-my-link-input');
-  if (!el) return;
-  el.value = profileHasContent(data) ? encodeProfileLink(data) : '';
-  el.placeholder = 'Rate a spot or log a dish to get your link';
-}
-
 function renderFriendsList () {
   const el = document.getElementById('friends-list');
   if (!el) return;
@@ -10946,11 +10944,10 @@ function renderFriendsList () {
           <button type="button" class="friend-remove icon-btn" data-key="${escHtml(f.key)}" aria-label="Unfollow ${escHtml(f.name)}">✕</button>
         </div>`;
       }).join('')
-    : '<div class="friends-empty">Follow friends to see what they order. Send them your link below, and paste theirs above.</div>';
+    : '<div class="friends-empty">No friends yet. Send an invite: when they open it, they can follow you, and you can follow them back from their link.</div>';
 }
 
 function openFoodieFriends () {
-  _buildFriendsMyLink();
   renderFriendsList();
   renderFriendsLiveNote();
   refreshFriendsLive(true);
@@ -13625,8 +13622,55 @@ function renderHomeDiscovery ({ elements }) {
   setNearbyCards(cards.filter(card => isCredibleVenueName(card.name)));
 }
 
+// Today's pick for everyone: Decision Mode's scoring (meal time, open now,
+// cravings, friends, weather) picks one saved spot and says why. Kept for the
+// rest of the meal so it doesn't reshuffle on every render.
+// `reroll` swaps in another of the top three (the refresh button).
+function localDailyPick (now = new Date(), { reroll = false } = {}) {
+  if ((state.restaurants || []).filter(nearEnoughToSuggest).length < 2) return null;
+  const meal = mealtimeOf(now);
+  const key = `ftb_daily_pick_${now.toDateString()}_${meal}`;
+  let id = '';
+  try { id = sessionStorage.getItem(key) || ''; } catch { /* private mode */ }
+  let pick = id && !reroll ? state.restaurants.find(r => r.id === id) : null;
+  let reasons = [];
+  if (!pick) {
+    const saved = _decisionModeState;
+    _decisionModeState = { mood: meal === 'dinner' ? 'comfort' : 'quick', budget: 0, miles: 10, party: 2, with: [] };
+    try {
+      const shortlist = buildDecisionModeShortlist().filter(x => nearEnoughToSuggest(x.r));
+      const pool = reroll ? shortlist.filter(x => x.r.id !== id) : shortlist;
+      const top = reroll ? pool[Math.floor(Math.random() * pool.length)] : pool[0];
+      if (top) { pick = top.r; reasons = top.reasons; }
+    } finally { _decisionModeState = saved; }
+    if (!pick) return null;
+    try { sessionStorage.setItem(key, pick.id); } catch { /* private mode */ }
+  }
+  const day = now.toLocaleDateString(undefined, { weekday: 'long' });
+  const why = (reasons.length ? reasons : [pick.status === 'want-to-try' ? 'on your Want to Try list' : 'a spot you love'])
+    .filter(r => !/fast decision pick|balanced overall/.test(r)).slice(0, 2).join(', ');
+  return { r: pick, text: `${day} ${MEALTIME_LABEL[meal]}: ${pick.name}${why ? `. ${why.charAt(0).toUpperCase()}${why.slice(1)}.` : '.'}` };
+}
+
+function usesAiDailyPick () {
+  return !!window.AI && typeof isPremium === 'function' && isPremium();
+}
+
+function showLocalDailyPick (opts) {
+  const banner = document.getElementById('ai-rec-banner');
+  const textEl = document.getElementById('ai-rec-text');
+  if (!banner || !textEl) return false;
+  const pick = localDailyPick(new Date(), opts);
+  if (!pick) { banner.classList.add('hidden'); return false; }
+  const label = banner.querySelector('.ai-rec-label');
+  if (label) label.textContent = "Today's Pick";
+  textEl.textContent = pick.text;
+  banner.classList.remove('hidden');
+  return true;
+}
+
 async function loadAiRec (discData) {
-  if (!window.AI || (typeof isPremium === 'function' && !isPremium())) return;
+  if (!window.AI || (typeof isPremium === 'function' && !isPremium())) { showLocalDailyPick(); return; }
   const banner = document.getElementById('ai-rec-banner');
   const textEl = document.getElementById('ai-rec-text');
   if (!banner || !textEl) return;
@@ -13661,8 +13705,8 @@ Mention a specific place or cuisine name. Be warm and exciting.`;
     const rec = await AI.call(prompt);
     const clean = wholeSentences((rec || '').trim().split('\n')[0].replace(/^["']|["']$/g, ''));
     if (clean) { sessionStorage.setItem(cacheKey, clean); textEl.textContent = clean; }
-    else { banner.classList.add('hidden'); }
-  } catch { banner.classList.add('hidden'); }
+    else if (!showLocalDailyPick()) banner.classList.add('hidden');
+  } catch { if (!showLocalDailyPick()) banner.classList.add('hidden'); }
 }
 
 // Never show a reply that stops mid-sentence: keep the complete sentences, or nothing.

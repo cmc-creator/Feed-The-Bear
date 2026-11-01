@@ -945,6 +945,7 @@ button:focus-visible,
   gap: 7px;
   margin-bottom: 9px;
 }
+.card-highlights:not(:has(*)) { display: none; }
 
 .card-highlight {
   display: inline-flex;
@@ -1718,6 +1719,25 @@ body.celebrate-glow::before {
 }
 .toast.removing { animation: toast-out .3s ease forwards; }
 
+/* Phones: messages drop in at the top, over the header, so they never cover
+   the bottom bar, the Add button, or the Save button of an open sheet. */
+@media (max-width: 768px) {
+  #toast-container {
+    top: calc(env(safe-area-inset-top, 0px) + 8px);
+    bottom: auto;
+    left: 12px;
+    right: 12px;
+    max-width: none;
+    z-index: 9600;
+    gap: 6px;
+    pointer-events: none;
+  }
+  .toast { pointer-events: auto; cursor: pointer; animation-name: toast-drop; padding: 10px 14px; }
+  .toast.removing { animation-name: toast-lift; }
+  @keyframes toast-drop { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: none; } }
+  @keyframes toast-lift { from { opacity: 1; transform: none; max-height: 100px; } to { opacity: 0; transform: translateY(-16px); max-height: 0; padding: 0; margin: 0; } }
+}
+
 /* ── Chat Panel ──────────────────────────────────────────── */
 .chat-panel {
   position: fixed;
@@ -1970,8 +1990,8 @@ body.celebrate-glow::before {
     padding: 0 0 7px;
     background: none;
     border: 0;
-    color: #f6d58f;
-    font-size: .66rem;
+    color: #c07f12;
+    font-size: .68rem;
     font-weight: 800;
     letter-spacing: .03em;
   }
@@ -4140,6 +4160,13 @@ body.light-mode #profile-btn {
    ------------------------------------------------------------ */
 .friends-card { max-width: 520px; }
 .friends-subtitle { font-size: .82rem; color: var(--text-dim); margin: 0 0 12px; }
+.friends-invite-big { width: 100%; min-height: 50px; font-size: 1rem; }
+.friends-copy-link {
+  display: block; margin: 6px auto 4px; padding: 6px 10px; background: none; border: 0; cursor: pointer;
+  font: inherit; font-size: .8rem; color: var(--text-dim); text-decoration: underline;
+}
+.friends-paste { margin-top: 14px; font-size: .84rem; color: var(--text-muted); }
+.friends-paste summary { cursor: pointer; font-weight: 700; color: var(--text); }
 .friends-result { margin-top: 16px; }
 .friends-overlap {
   padding: 14px 16px; background: var(--surface2);

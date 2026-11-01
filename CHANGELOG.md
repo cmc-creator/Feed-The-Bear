@@ -1,5 +1,37 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-01 (third drop)
+
+### Friend invites that work on the friend's end
+- One invite link from Friends and the account menu, through `invite.html`
+  (link preview: "You're invited to Feed The Bear 🐻"). It carries the
+  free-month code and your profile, so the friend sees "Connie invited you",
+  your picks, Follow, and the free month before the Cub setup.
+- Fixed: the free-month code capture wiped the profile part of the link.
+- Fixed: invites went out as "Foodie" (the placeholder name); the app now asks
+  for your name first. Invites also work before you've rated anything.
+- Followed friends are saved to your account and follow you to every device.
+- Friends screen leads with a big "Invite a friend"; pasting a link is tucked
+  into a fold-out; the empty "Your shareable link" box is gone.
+
+### Adding places
+- The bottom Add button is gold, labelled "Add", and pulses until you've saved
+  three places. A gold "Add a place you want to try" bar sits at the top of
+  home. The Add sheet links to importing a whole list.
+- Typing a name searches Google Places (through `/api/place-info?mode=search`,
+  cached a day per query) and fills in rating, price, cuisine and address.
+  OpenStreetMap is the fallback.
+
+### First impressions
+- Pop-up messages on phones drop in at the top, two at most, tap to dismiss,
+  4 seconds. They used to stack at the bottom over the Add button and block
+  taps on the bottom bar.
+- Removed the invented "% match" score and "Up next"/"Trusted pick" filler
+  from cards.
+- Today's Pick for everyone (it was Grizzly-only): a saved spot chosen for the
+  meal time with a reason (open now, a craving, friends, weather). Refresh
+  swaps it. Grizzly keeps the AI version, with this as the fallback.
+
 ## [Unreleased] - 2026-11-01 (second drop)
 
 ### Import your old lists from notes apps

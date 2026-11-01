@@ -34,7 +34,10 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
   await me.context().close();
 
   // ── The friend: brand new, opens the link ──
-  const path = link.slice(link.indexOf('/app.html'));
+  check(/\/invite\.html\?/.test(link), 'the link goes through the invite page (for a friendly preview)');
+  const preview = await (await fetch(`${BASE}/invite.html`)).text();
+  check(/og:title" content="You're invited to Feed The Bear/.test(preview), 'the invite page has an inviting link preview');
+  const path = link.slice(link.indexOf('/invite.html'));
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
   const f = await ctx.newPage();
   const errs = [];
