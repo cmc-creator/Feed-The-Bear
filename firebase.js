@@ -287,17 +287,22 @@ function cloudSafeRestaurant (r) {
   if (json.length <= FB_DOC_BUDGET && !hasLocalRefs) return r;
   const copy = JSON.parse(json);
   if (hasLocalRefs) {
-    const clear = o => { if (typeof o?.photo === 'string' && o.photo.startsWith('idb:')) o.photo = ''; };
+    const clear = o => {
+      if (typeof o?.photo === 'string' && o.photo.startsWith('idb:')) o.photo = '';
+      (Array.isArray(o?.media) ? o.media : []).forEach(m => { if (typeof m?.photo === 'string' && m.photo.startsWith('idb:')) m.photo = ''; });
+    };
     clear(copy);
     (copy.visits || []).forEach(clear);
     (copy.dishes || []).forEach(clear);
   }
   const slots = [];
-  const add = (obj, key) => { if (typeof obj?.[key] === 'string' && obj[key].startsWith('data:')) slots.push({ obj, key, size: obj[key].length }); };
+  const add = (obj, key, extra = false) => { if (typeof obj?.[key] === 'string' && obj[key].startsWith('data:')) slots.push({ obj, key, extra, size: obj[key].length }); };
+  const addAll = o => { (Array.isArray(o?.media) ? o.media : []).forEach(m => add(m, 'photo', true)); add(o, 'photo'); };
   add(copy, 'photo');
-  (copy.visits || []).forEach(v => add(v, 'photo'));
-  (copy.dishes || []).forEach(d => add(d, 'photo'));
-  slots.sort((a, b) => b.size - a.size);
+  (copy.visits || []).forEach(addAll);
+  (copy.dishes || []).forEach(addAll);
+  // Extra photos are trimmed first so the main photo on a dish or visit survives longest.
+  slots.sort((a, b) => b.extra - a.extra || b.size - a.size);
   for (const s of slots) {
     if (JSON.stringify(copy).length <= FB_DOC_BUDGET) break;
     s.obj[s.key] = '';
@@ -312,7 +317,14 @@ function restoreTrimmedPhotos (cloud, local) {
   const fill = (cloudList, localList, keyOf) => {
     if (!Array.isArray(cloudList) || !Array.isArray(localList)) return;
     const byKey = new Map(localList.map(x => [keyOf(x), x]));
-    cloudList.forEach(x => { const l = byKey.get(keyOf(x)); if (l && !x.photo && l.photo) x.photo = l.photo; });
+    cloudList.forEach(x => {
+      const l = byKey.get(keyOf(x));
+      if (!l) return;
+      if (!x.photo && l.photo) x.photo = l.photo;
+      if (Array.isArray(x.media) && Array.isArray(l.media)) {
+        x.media.forEach((m, i) => { if (m && !m.photo && l.media[i]?.photo) m.photo = l.media[i].photo; });
+      }
+    });
   };
   fill(cloud.visits, local.visits, v => `${v.date}|${v.dish || ''}|${v.note || ''}`);
   fill(cloud.dishes, local.dishes, d => d.id);

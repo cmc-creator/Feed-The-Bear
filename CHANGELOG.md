@@ -1,5 +1,38 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-01 (second drop)
+
+### Import your old lists from notes apps
+- The old "Import Bookmarks" screen is now **Import Your Old Lists** (More →
+  Import Lists, and a link on the empty list). Paste a list copied from Google
+  Keep, Samsung Notes, Apple Notes or anything else, or pick several note
+  files at once: Samsung Notes .txt, Google Keep Takeout .json/.html, Google
+  Maps Saved Places .json/.csv.
+- Cleans up bullets, checkboxes and numbering; skips the note's title line;
+  "Name - note", "Name: note" and "Name (note)" keep the note; a street
+  address after a comma becomes the address; a link becomes the website.
+- Preview with a tickbox per place. Spots you already saved are flagged and
+  left unticked; duplicates in the list collapse. Ticked-off items (☑, [x], ✓)
+  go into Visited, everything else into Want to Try.
+- Sharing a note into the app (Android share sheet or installed web app) now
+  opens this import. Before, a shared list opened Add Restaurant with the
+  note's title as the name, or did nothing on Android.
+- Respects the Cub spot limit (imports what fits, then offers Grizzly).
+- Android: shared text limit raised from 1,500 to 8,000 characters (needs an
+  app rebuild to take effect).
+
+### Several photos and videos at once
+- Every food picker (Just Ate, Your Order, a dish's photos, check-in) now
+  takes several photos or clips in one go, up to 6 per meal or dish, each
+  removable before saving. Buttons say "Add photos & videos".
+- The check-in prompt used to open the camera for a single photo only; it now
+  offers the library and videos too.
+- Extras are stored beside the main photo (`media` on dishes and visits), so
+  older data and everything that reads `photo` keep working. They're saved to
+  photo storage, restored on reload, synced (trimmed first if a spot gets too
+  big for the cloud), and shown in the gallery. Dishes show "+N".
+- Videos remain a Grizzly feature.
+
 ## [Unreleased] - 2026-11-01
 
 ### What to order

@@ -61,7 +61,7 @@ public class MainActivity extends BridgeActivity {
         if (Intent.ACTION_SEND.equals(intent.getAction())) {
             String text = intent.getStringExtra(Intent.EXTRA_TEXT);
             intent.setAction(null);
-            if (text != null && !text.isEmpty()) load(APP_URL + "?text=" + Uri.encode(text.length() > 1500 ? text.substring(0, 1500) : text));
+            if (text != null && !text.isEmpty()) load(APP_URL + "?text=" + Uri.encode(text.length() > 8000 ? text.substring(0, 8000) : text));
             return;
         }
         Uri data = intent.getData();

@@ -3670,8 +3670,26 @@ body.light-mode .import-textarea { background: rgba(0,0,0,.05); border-color: rg
   border-bottom: 1px solid rgba(255,255,255,.06);
 }
 .import-row:hover { background: rgba(255,255,255,.04); }
-.import-row-name { flex: 1; font-weight: 600; }
+.import-row { cursor: pointer; }
+.import-row input { flex: 0 0 auto; width: 18px; height: 18px; accent-color: var(--primary); }
+.import-row-main { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.import-row-name { font-weight: 600; overflow-wrap: anywhere; }
 .import-row-addr { font-size: .72rem; color: var(--text-dim); }
+.import-row.is-dupe .import-row-name { color: var(--text-dim); }
+.import-tag {
+  flex: 0 0 auto; font-size: .64rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 999px; background: var(--surface2); color: var(--text-dim);
+}
+.import-tag.been { background: rgba(var(--primary-rgb), .16); color: var(--primary); }
+.import-count, .import-empty { font-size: .75rem; color: var(--text-dim); margin-bottom: 6px; }
+.import-empty { padding: 8px; }
+.import-preview { max-height: 280px; }
+.import-help { font-size: .8rem; color: var(--text-dim); margin: -4px 0 10px; }
+.import-help summary { cursor: pointer; font-weight: 700; color: var(--text); }
+.import-help ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; line-height: 1.4; }
+.import-file-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.import-file-btn { cursor: pointer; }
+.import-file-names { font-size: .74rem; color: var(--text-dim); overflow-wrap: anywhere; }
 
 /* -- AI weekly suggestion toast ---------------------------- */
 .weekly-suggest-banner {
@@ -8503,7 +8521,23 @@ body[data-ui-motion='playful'] .btn-primary:hover { box-shadow: 0 6px 20px rgba(
 }
 .video-badge.small { width: 22px; height: 22px; font-size: .62rem; border-width: 1.5px; padding-left: 2px; }
 .yo-dish-photo, .yo-pending, .ja-photo-preview, .gallery-item { position: relative; }
-.yo-pending .video-badge.small { left: 30px; }
+.yo-pending { flex-wrap: wrap; }
+/* Picked photos/clips waiting to be saved, each with its own remove button. */
+.pm-strip { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.pm-item { position: relative; display: block; }
+.ja-photo-preview .pm-item img, .yo-pending .pm-item img {
+  display: block; width: 64px; height: 64px; object-fit: cover; border-radius: 8px; transform: none;
+  border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.25);
+}
+.pm-remove {
+  position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
+  border: 0; background: rgba(0,0,0,.7); color: #fff; font-size: .7rem; display: grid; place-items: center;
+}
+.pm-hint { flex: 1 1 100%; text-align: center; font-size: .78rem; color: var(--text-muted); }
+.yo-media-count {
+  position: absolute; right: -6px; bottom: -4px; padding: 1px 5px; border-radius: 999px;
+  font-size: .62rem; font-weight: 800; color: #fff; background: var(--primary); border: 1.5px solid #fff;
+}
 .video-viewer {
   position: fixed; inset: 0; z-index: 9500; display: grid; place-items: center; padding: 16px;
   background: rgba(0, 0, 0, .9);

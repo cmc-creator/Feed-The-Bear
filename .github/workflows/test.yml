@@ -143,3 +143,9 @@ jobs:
       - name: Best bet, Explorer, smarter Decision Mode
         working-directory: tests
         run: node foodie.test.js
+      - name: Several photos and videos at once
+        working-directory: tests
+        run: node multiphoto.test.js
+      - name: Import lists from notes apps
+        working-directory: tests
+        run: node notesimport.test.js

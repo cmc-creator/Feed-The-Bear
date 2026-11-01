@@ -696,41 +696,90 @@ function getFoodVideo (ref) {
     .catch(() => null);
 }
 
-// Photo or video picker. Resolves { photo } or { photo: poster, video }, or
-// null. Videos are Grizzly; free users who pick one get the pitch.
-function pickFoodMedia () {
+// Most photos and clips one meal or dish keeps. Each photo is ~80 KB and
+// synced docs cap near 1 MB, so this leaves room for the rest of the spot.
+const FOOD_MEDIA_MAX = 6;
+
+// One picked file to { photo } or { photo: poster, video }, or null.
+// Videos are Grizzly; `quiet` skips the upsell (already shown this batch).
+async function mediaFromFile (file, { quiet = false } = {}) {
+  if (!file.type.startsWith('video/')) {
+    try { return { photo: await readImageFileCompressed(file, FOOD_PHOTO_MAX_DIM, FOOD_PHOTO_QUALITY) }; }
+    catch { showToast('Photo Error', `Could not load ${file.name || 'that image'}.`, 'error'); return null; }
+  }
+  if (!hasGrizzly()) {
+    if (!quiet) { trackProductEvent('video_upsell_shown', {}); showGrizzlyUpsell('video'); }
+    return null;
+  }
+  if (file.size > FOOD_VIDEO_MAX_BYTES) { showToast('Video too big', 'Try a shorter clip (up to 15 seconds).', 'error'); return null; }
+  try {
+    const { duration, poster } = await readVideoPoster(file);
+    if (duration > FOOD_VIDEO_MAX_SECONDS + 0.5) {
+      showToast('Keep it to 15 seconds', `That clip is ${Math.round(duration)}s. Trim it in your camera app, then add it again.`, 'info');
+      return null;
+    }
+    const video = await storeFoodVideo(file);
+    trackProductEvent('video_added', { seconds: Math.round(duration) });
+    return { photo: poster || 'assets/food/pizza.jpg', video };
+  } catch {
+    showToast('Video Error', 'Could not read that video. Try one from your camera.', 'error');
+    return null;
+  }
+}
+
+// Photo and video picker, several at a time. Resolves an array (empty if
+// nothing usable was picked), at most `max` items.
+function pickFoodMediaList (max = FOOD_MEDIA_MAX) {
   return new Promise(resolve => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*,video/*';
+    input.multiple = max > 1;
     input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) { resolve(null); return; }
-      if (!file.type.startsWith('video/')) {
-        readImageFileCompressed(file, FOOD_PHOTO_MAX_DIM, FOOD_PHOTO_QUALITY)
-          .then(photo => resolve({ photo }))
-          .catch(() => { showToast('Photo Error', 'Could not load that image.', 'error'); resolve(null); });
-        return;
+      const files = [...(input.files || [])];
+      if (files.length > max) showToast(`Up to ${max} at a time`, `Added the first ${max}.`, 'info');
+      const out = [];
+      let upsold = false;
+      for (const file of files.slice(0, max)) {
+        const isVideo = file.type.startsWith('video/');
+        const m = await mediaFromFile(file, { quiet: upsold });
+        if (isVideo && !m && !hasGrizzly()) upsold = true;
+        if (m) out.push(m);
       }
-      if (!hasGrizzly()) { trackProductEvent('video_upsell_shown', {}); showGrizzlyUpsell('video'); resolve(null); return; }
-      if (file.size > FOOD_VIDEO_MAX_BYTES) { showToast('Video too big', 'Try a shorter clip (up to 15 seconds).', 'error'); resolve(null); return; }
-      try {
-        const { duration, poster } = await readVideoPoster(file);
-        if (duration > FOOD_VIDEO_MAX_SECONDS + 0.5) {
-          showToast('Keep it to 15 seconds', `That clip is ${Math.round(duration)}s. Trim it in your camera app, then add it again.`, 'info');
-          resolve(null);
-          return;
-        }
-        const video = await storeFoodVideo(file);
-        trackProductEvent('video_added', { seconds: Math.round(duration) });
-        resolve({ photo: poster || 'assets/food/pizza.jpg', video });
-      } catch {
-        showToast('Video Error', 'Could not read that video. Try one from your camera.', 'error');
-        resolve(null);
-      }
+      resolve(out);
     };
     input.click();
   });
+}
+
+// Single-item picker kept for callers that hold one photo.
+async function pickFoodMedia () {
+  return (await pickFoodMediaList(1))[0] || null;
+}
+
+// Every photo/clip on a dish or visit: the main one (photo/video) first,
+// then extras in `media`. Older entries simply have no `media`.
+function mediaOf (obj) {
+  if (!obj) return [];
+  const main = obj.photo ? [{ photo: obj.photo, ...(obj.video ? { video: obj.video } : {}) }] : [];
+  const extra = Array.isArray(obj.media) ? obj.media.filter(m => m && m.photo) : [];
+  return [...main, ...extra];
+}
+
+function setMediaOn (obj, list) {
+  const items = (list || []).filter(m => m && m.photo).slice(0, FOOD_MEDIA_MAX);
+  if (items[0]) obj.photo = items[0].photo; else delete obj.photo;
+  if (items[0]?.video) obj.video = items[0].video; else delete obj.video;
+  if (items.length > 1) obj.media = items.slice(1).map(m => ({ photo: m.photo, ...(m.video ? { video: m.video } : {}) }));
+  else delete obj.media;
+}
+
+// Small thumbnail strip for media waiting to be saved, each removable.
+function pendingMediaHtml (list, hint) {
+  return `<div class="pm-strip">${list.map((m, i) => `<span class="pm-item">
+      <img src="${escHtml(safeUrl(m.photo))}" alt="" />${m.video ? '<span class="video-badge small" aria-label="Video">▶</span>' : ''}
+      <button type="button" class="pm-remove" data-idx="${i}" aria-label="Remove ${m.video ? 'video' : 'photo'} ${i + 1}">✕</button>
+    </span>`).join('')}</div>${hint ? `<span class="pm-hint">${escHtml(hint)}</span>` : ''}`;
 }
 
 let _videoViewerUrl = '';
@@ -859,7 +908,10 @@ async function persistRestaurants () {
 async function hydrateStoredPhotos () {
   const db = await openPhotoDb(); // also lets later saves offload photos
   const holders = [];
-  const visit = obj => { if (obj && typeof obj.photo === 'string' && obj.photo.startsWith(PHOTO_REF)) holders.push(obj); };
+  const visit = obj => {
+    if (obj && typeof obj.photo === 'string' && obj.photo.startsWith(PHOTO_REF)) holders.push(obj);
+    (Array.isArray(obj?.media) ? obj.media : []).forEach(m => { if (typeof m?.photo === 'string' && m.photo.startsWith(PHOTO_REF)) holders.push(m); });
+  };
   (state.restaurants || []).forEach(r => {
     visit(r);
     (r.visits || []).forEach(visit);
@@ -2978,7 +3030,7 @@ function openDetailModal (id) {
 
   const yoInput = document.getElementById('your-order-input');
   if (yoInput) yoInput.value = '';
-  setYourOrderPendingPhoto('');
+  setYourOrderPending([]);
   renderYourOrder(id);
 
   document.getElementById('detail-overlay').classList.remove('hidden');
@@ -6305,6 +6357,7 @@ function setupEvents () {
   const openQuickAdd = () => (window.Cub ? window.Cub.openAdd() : openAddModal());
   document.getElementById('add-btn')?.addEventListener('click', openQuickAdd);
   document.getElementById('empty-add-btn')?.addEventListener('click', openQuickAdd);
+  document.getElementById('empty-import-btn')?.addEventListener('click', () => showImportBookmarks());
 
   // Modal close
   document.getElementById('modal-close-btn').addEventListener('click', closeModal);
@@ -6642,6 +6695,16 @@ function setupEvents () {
   });
   document.getElementById('import-parse-btn').addEventListener('click', parseImportText);
   document.getElementById('import-confirm-btn').addEventListener('click', confirmImport);
+  document.getElementById('import-notes-file')?.addEventListener('change', e => {
+    importNoteFiles(e.target.files);
+    e.target.value = '';
+  });
+  document.getElementById('import-preview').addEventListener('change', e => {
+    const box = e.target.closest('input[type="checkbox"][data-idx]');
+    if (!box || !_importParsed[box.dataset.idx]) return;
+    _importParsed[box.dataset.idx].on = box.checked;
+    renderImportPreview();
+  });
 
   // Phase 6 - Add to Calendar
   document.getElementById('detail-calendar-btn').addEventListener('click', () => {
@@ -6777,11 +6840,14 @@ function setupEvents () {
   });
   document.getElementById('just-ate-save')?.addEventListener('click', saveJustAte);
   document.getElementById('just-ate-photo')?.addEventListener('click', async () => {
-    const media = await pickFoodMedia();
-    if (media) setJustAtePhoto(media.photo, media.video);
+    const room = FOOD_MEDIA_MAX - _justAte.media.length;
+    if (room <= 0) { showToast(`Up to ${FOOD_MEDIA_MAX} per meal`, 'Remove one to add another.', 'info'); return; }
+    const picked = await pickFoodMediaList(room);
+    if (picked.length) setJustAteMedia([..._justAte.media, ...picked]);
   });
   document.getElementById('just-ate-photo-preview')?.addEventListener('click', e => {
-    if (e.target.closest('.ja-photo-clear')) setJustAtePhoto('');
+    const rm = e.target.closest('.pm-remove');
+    if (rm) setJustAteMedia(_justAte.media.filter((_, i) => i !== Number(rm.dataset.idx)));
   });
   document.getElementById('just-ate-tags')?.addEventListener('click', e => toggleJustAteTag(e.target.closest('.ja-tag')));
   document.getElementById('your-order-input')?.addEventListener('keydown', e => {
@@ -6791,13 +6857,16 @@ function setupEvents () {
     logYourOrder(r?.status === 'want-to-try' ? 'want' : 'ok');
   });
   document.getElementById('your-order-photo')?.addEventListener('click', async () => {
-    const media = await pickFoodMedia();
-    if (!media) return;
-    setYourOrderPendingPhoto(media.photo, media.video);
+    const room = FOOD_MEDIA_MAX - _yoPendingMedia.length;
+    if (room <= 0) { showToast(`Up to ${FOOD_MEDIA_MAX} per dish`, 'Remove one to add another.', 'info'); return; }
+    const picked = await pickFoodMediaList(room);
+    if (!picked.length) return;
+    setYourOrderPending([..._yoPendingMedia, ...picked]);
     document.getElementById('your-order-input')?.focus();
   });
   document.getElementById('your-order-pending')?.addEventListener('click', e => {
-    if (e.target.closest('.yo-pending-clear')) setYourOrderPendingPhoto('');
+    const rm = e.target.closest('.pm-remove');
+    if (rm) setYourOrderPending(_yoPendingMedia.filter((_, i) => i !== Number(rm.dataset.idx)));
   });
   document.getElementById('your-order-list')?.addEventListener('click', async e => {
     const r = state.restaurants.find(x => x.id === state.detailId);
@@ -6812,16 +6881,15 @@ function setupEvents () {
     }
     const photoFor = e.target.closest('.yo-photo-btn[data-photo-for]');
     if (photoFor) {
+      // Adds to the dish's photos; the oldest drop off past the limit.
       const d = dishesOf(r).find(x => x.id === photoFor.dataset.photoFor);
-      const media = d && await pickFoodMedia();
-      if (!media) return;
-      const photo = media.photo;
-      d.photo = photo;
-      if (media.video) d.video = media.video; else delete d.video;
+      const picked = d ? await pickFoodMediaList() : [];
+      if (!picked.length) return;
+      setMediaOn(d, [...picked, ...mediaOf(d)]);
       r.updatedAt = Date.now();
       saveData();
       renderYourOrder(r.id);
-      photoReveal(photo, d.name);
+      photoReveal(picked[0].photo, d.name);
       return;
     }
     const move = e.target.closest('.yo-move');
@@ -8429,80 +8497,223 @@ function addToGoogleCalendar (restaurantId) {
    PHASE 6 • IMPORT FROM YELP / GOOGLE MAPS
    ------------------------------------------------------------ */
 
+// Parsed rows waiting in the preview: { name, note, address, website, checked, dupe, on }
 let _importParsed = [];
 
-function showImportBookmarks () {
+function showImportBookmarks (prefill = '') {
   _importParsed = [];
-  document.getElementById('import-paste-area').value = '';
+  document.getElementById('import-paste-area').value = typeof prefill === 'string' ? prefill : '';
   document.getElementById('import-preview').innerHTML = '';
+  document.getElementById('import-file-names').textContent = '';
   document.getElementById('import-confirm-btn').disabled = true;
   document.getElementById('import-overlay').classList.remove('hidden');
   document.body.classList.add('overlay-open');
+  if (typeof prefill === 'string' && prefill.trim()) parseImportText();
 }
 function closeImportBookmarks () {
   document.getElementById('import-overlay').classList.add('hidden');
   maybeHideOverlay();
 }
-function parseImportText () {
-  const raw = document.getElementById('import-paste-area').value.trim();
-  if (!raw) return;
-  const lines = raw.split(/\n/).map(l => l.trim()).filter(Boolean);
-  _importParsed = [];
-  lines.forEach(line => {
-    // Try CSV: Name, Address, (optional more fields)
-    // Skip header rows
-    if (/^(name|title|place|location)/i.test(line)) return;
-    // Remove Google Takeout JSON array brackets
-    if (line === '[' || line === ']' || line === '{' || line === '}') return;
-    // Try JSON object {"Title":"...","Note":"...","Location":{"Address":"..."}}
-    try {
-      const obj = JSON.parse(line.replace(/,$/, ''));
-      const name    = obj.Title || obj.name || obj.Name || '';
-      const address = obj.Location?.Address || obj.address || obj.Address || '';
-      if (name) { _importParsed.push({ name, address }); return; }
-    } catch(_) {}
-    // Try CSV-style
-    const parts = line.split(',').map(p => p.trim().replace(/^["']|["']$/g,''));
-    if (parts[0]) {
-      _importParsed.push({ name: parts[0], address: parts.slice(1).join(', ').trim() });
+
+const IMPORT_TICKED = /^(?:☑|✅|✔️?|✓|\[[xX✓]\])\s*/;
+const IMPORT_BULLET = /^(?:☐|⬜|□|▢|◻️?|\[\s?\]|[-*•·▪◦‣–—>]|\d{1,3}[.)]|[a-zA-Z][.)](?=\s))\s*/;
+// A first line like "Restaurants to try:" or "Food list" is a note title, not a place.
+const IMPORT_TITLE = /^(?:my\s+)?(?:(?:restaurants?|places?|spots?|food|eats?|foodie|dining|brunch|dinner|lunch|bars?|coffee|date\s+nights?)(?:\s+(?:to\s+(?:try|go|eat|visit)|list|wishlist|bucket\s*list|ideas|spots|places))?|(?:to\s+try|want\s+to\s+try|try\s+list|bucket\s*list|wishlist)(?:\s+.*)?)\s*:?$/i;
+const IMPORT_URL = /https?:\/\/\S+/gi;
+
+// One line of a notes list to a place, or null if it isn't one.
+function parseImportLine (line) {
+  let s = String(line || '').replace(/[​﻿]/g, '').trim();
+  if (!s) return null;
+  let checked = false;
+  for (let i = 0; i < 3; i++) {
+    if (IMPORT_TICKED.test(s)) { checked = true; s = s.replace(IMPORT_TICKED, ''); continue; }
+    if (IMPORT_BULLET.test(s)) { s = s.replace(IMPORT_BULLET, ''); continue; }
+    break;
+  }
+  // Strike-through ~~done~~ in Markdown notes also means been there.
+  if (/^~~.+~~$/.test(s)) { checked = true; s = s.slice(2, -2); }
+  const website = (s.match(IMPORT_URL) || [])[0] || '';
+  s = s.replace(IMPORT_URL, '').replace(/\s{2,}/g, ' ').trim();
+  if (!s || s.length > 120 || /^#/.test(s) || /:$/.test(s)) return null;
+
+  // "Name - note", "Name: note", "Name (note)"
+  let name = s;
+  let note = '';
+  const dash = s.match(/^(.+?)\s+[-–—|]\s+(.+)$/) || s.match(/^([^:]{2,60}):\s+(.+)$/);
+  if (dash) { name = dash[1]; note = dash[2]; }
+  else {
+    const paren = s.match(/^(.+?)\s*\((.+)\)\s*$/);
+    if (paren) { name = paren[1]; note = paren[2]; }
+  }
+  // "Name, 105 Hudson St, New York": the rest is an address when it has a street number.
+  let address = '';
+  const comma = name.match(/^([^,]+),\s*(.+)$/);
+  if (comma) {
+    if (/\d/.test(comma[2])) { name = comma[1]; address = comma[2]; }
+    else if (!note) { name = comma[1]; note = comma[2]; }
+  }
+  name = name.replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim().slice(0, 80);
+  if (name.length < 2 || !/[\p{L}\p{N}]/u.test(name)) return null;
+  return { name, note: note.trim().slice(0, 300), address: address.trim().slice(0, 200), website, checked };
+}
+
+// Google Maps Takeout "Saved Places" GeoJSON, Keep Takeout notes, or plain arrays.
+function placesFromJson (data) {
+  const out = [];
+  const items = Array.isArray(data) ? data : (Array.isArray(data?.features) ? data.features : [data]);
+  items.forEach(item => {
+    if (!item || typeof item !== 'object') return;
+    const props = item.properties || item;
+    // Google Keep: { title, textContent, listContent: [{ text, isChecked }] }
+    if (Array.isArray(props.listContent) || typeof props.textContent === 'string') {
+      if (props.isTrashed) return;
+      (props.listContent || []).forEach(li => {
+        const p = parseImportLine(li?.text);
+        if (p) out.push({ ...p, checked: p.checked || !!li?.isChecked });
+      });
+      String(props.textContent || '').split(/\r?\n/).forEach(l => { const p = parseImportLine(l); if (p) out.push(p); });
+      return;
     }
+    const name = props.Title || props.title || props.name || props.Name || props.location?.name || '';
+    const address = props.Location?.Address || props.location?.address || props.address || props.Address || '';
+    if (name) out.push({ name: String(name).slice(0, 80), note: String(props.Note || props.note || props.Comment || '').slice(0, 300), address: String(address).slice(0, 200), website: props.google_maps_url || props.url || '', checked: false });
   });
+  return out;
+}
+
+// Pasted or file text to places. Whole-text JSON first, then line by line.
+function parseImportSource (raw) {
+  const text = String(raw || '').trim();
+  if (!text) return [];
+  if (/^[[{]/.test(text)) {
+    try { return placesFromJson(JSON.parse(text)); } catch { /* not one JSON document */ }
+  }
+  const lines = text.split(/\r?\n/);
+  // Skip a note's title line (and a CSV header) at the top.
+  while (lines.length && (!lines[0].trim() || IMPORT_TITLE.test(lines[0].trim()) || /^(name|title|place)\s*(,|$)/i.test(lines[0].trim()))) lines.shift();
+  const out = [];
+  lines.forEach(line => {
+    const t = line.trim().replace(/,$/, '');
+    if (/^[{]/.test(t)) {
+      try { out.push(...placesFromJson(JSON.parse(t))); return; } catch { /* fall through */ }
+    }
+    if (IMPORT_TITLE.test(t)) return;
+    const p = parseImportLine(line);
+    if (p) out.push(p);
+  });
+  return out;
+}
+
+// A note file to plain text. Keep's Takeout HTML lists each item in a <li>.
+async function textFromNoteFile (file) {
+  const raw = await file.text();
+  if (!/\.html?$/i.test(file.name) && !/^\s*<(?:!doctype|html)/i.test(raw)) {
+    // Samsung Notes and others name the file after the note; drop that title line.
+    const base = file.name.replace(/\.[^.]+$/, '').trim().toLowerCase();
+    const lines = raw.split(/\r?\n/);
+    const first = lines.findIndex(l => l.trim());
+    if (first >= 0 && lines[first].trim().toLowerCase() === base) lines.splice(first, 1);
+    return lines.join('\n');
+  }
+  const doc = new DOMParser().parseFromString(raw, 'text/html');
+  doc.querySelectorAll('script, style, title, .heading, .title, .meta-icons, .chips').forEach(el => el.remove());
+  doc.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+  doc.querySelectorAll('li, p, div, h1, h2, h3, tr').forEach(el => el.append('\n'));
+  // Keep marks ticked list items with a "checked" class on the bullet's parent.
+  doc.querySelectorAll('li.listitem.checked, li.checked').forEach(li => li.prepend('☑ '));
+  return doc.body?.textContent || '';
+}
+
+async function importNoteFiles (files) {
+  const list = [...(files || [])];
+  if (!list.length) return;
+  const texts = [];
+  for (const f of list) {
+    try { texts.push(await textFromNoteFile(f)); } catch { showToast('Could not read file', f.name, 'error'); }
+  }
+  const area = document.getElementById('import-paste-area');
+  // JSON files stay whole so they parse as JSON, one file per block.
+  area.value = [area.value.trim(), ...texts.map(t => t.trim())].filter(Boolean).join('\n\n');
+  document.getElementById('import-file-names').textContent = list.map(f => f.name).join(', ');
+  parseImportText();
+}
+
+function parseImportText () {
+  const raw = document.getElementById('import-paste-area').value;
+  // Several pasted/loaded JSON files are split on blank lines between them.
+  const blocks = raw.split(/\n\s*\n(?=\s*[[{])/);
+  const seen = new Set();
+  _importParsed = [];
+  blocks.flatMap(parseImportSource).forEach(p => {
+    const key = normalizeName(p.name);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    const dupe = findDuplicates(p.name).length > 0;
+    _importParsed.push({ ...p, dupe, on: !dupe });
+  });
+  renderImportPreview();
+}
+
+function renderImportPreview () {
   const preview = document.getElementById('import-preview');
+  const btn = document.getElementById('import-confirm-btn');
   if (!_importParsed.length) {
-    preview.innerHTML = '<div style="color:var(--text-dim);font-size:.82rem;padding:8px">Could not parse any entries. Try one name per line.</div>';
-    document.getElementById('import-confirm-btn').disabled = true;
+    preview.innerHTML = '<div class="import-empty">No places found yet. Put one place per line.</div>';
+    btn.disabled = true;
+    btn.textContent = 'Import';
     return;
   }
-  preview.innerHTML = '<div style="font-size:.75rem;color:var(--text-dim);margin-bottom:6px">Found ' + _importParsed.length + ' places:</div>'
-    + _importParsed.map(p =>
-      '<div class="import-row"><span class="import-row-name">' + escHtml(p.name) + '</span>'
-      + (p.address ? '<span class="import-row-addr">' + escHtml(p.address.slice(0,50)) + '</span>' : '')
-      + '</div>'
-    ).join('');
-  document.getElementById('import-confirm-btn').disabled = false;
+  const picked = _importParsed.filter(p => p.on);
+  const toVisited = picked.filter(p => p.checked).length;
+  preview.innerHTML = `<div class="import-count">Found ${_importParsed.length} place${_importParsed.length === 1 ? '' : 's'}. Untick any you don't want.</div>`
+    + _importParsed.map((p, i) => `<label class="import-row${p.dupe ? ' is-dupe' : ''}">
+        <input type="checkbox" data-idx="${i}" ${p.on ? 'checked' : ''} />
+        <span class="import-row-main"><span class="import-row-name">${escHtml(p.name)}</span>
+          ${p.note || p.address ? `<span class="import-row-addr">${escHtml([p.note, p.address].filter(Boolean).join(' · ').slice(0, 80))}</span>` : ''}</span>
+        ${p.dupe ? '<span class="import-tag">Already saved</span>' : p.checked ? '<span class="import-tag been">Been there</span>' : ''}
+      </label>`).join('');
+  btn.disabled = !picked.length;
+  btn.textContent = !picked.length ? 'Import'
+    : `Import ${picked.length}${toVisited ? ` (${toVisited} to Visited)` : ''}`;
 }
+
 function confirmImport () {
-  if (!_importParsed.length) return;
+  let picked = _importParsed.filter(p => p.on);
+  if (!picked.length) return;
+  // Cub keeps a spot limit; import what fits and pitch Grizzly for the rest.
+  let leftOut = 0;
+  if (typeof isPremium === 'function' && !isPremium()) {
+    const room = Math.max(0, FREE_RESTAURANT_LIMIT - state.restaurants.length);
+    leftOut = Math.max(0, picked.length - room);
+    picked = picked.slice(0, room);
+  }
   const now = iso();
-  let added = 0;
-  _importParsed.forEach(p => {
-    const dupes = findDuplicates(p.name);
-    if (dupes.length) return; // skip duplicates
+  picked.forEach(p => {
     const entry = {
       id: uid(), name: p.name, cuisine: '', priceRange: 0,
-      address: p.address||'', lat: null, lng: null,
-      website: '', photo: '', googleRating: 0, googleReviews: 0,
-      myRating: 0, notes: '', tags: [], collectionId: null,
-      status: 'want-to-try', dateAdded: now, dateVisited: null, visits: [],
+      address: p.address || '', lat: null, lng: null,
+      website: p.website || '', photo: '', googleRating: 0, googleReviews: 0,
+      myRating: 0, notes: p.note || '', tags: [], collectionId: null,
+      status: p.checked ? 'visited' : 'want-to-try', dateAdded: now, dateVisited: null, visits: [],
+      updatedAt: Date.now(),
     };
     state.restaurants.unshift(entry);
     if (p.address) geocodeAddress(entry.id, p.address);
-    added++;
   });
-  saveData(); renderAll();
+  if (picked.length) { saveData(); renderAll(); }
   closeImportBookmarks();
-  showToast('✓ Imported!', added + ' restaurant' + (added!==1?'s':'') + ' added to Want to Try.', 'success');
-  if (added > 0) launchConfetti(2000);
+  const wants = picked.filter(p => !p.checked).length;
+  const been = picked.length - wants;
+  trackProductEvent('list_imported', { added: picked.length, visited: been, leftOut });
+  if (picked.length) {
+    showToast('Imported!', [wants && `${wants} to Want to Try`, been && `${been} to Visited`].filter(Boolean).join(', ') + '.', 'success');
+    launchConfetti(2000);
+  }
+  if (leftOut) {
+    showToast('Cub limit reached', `${leftOut} more didn't fit. Grizzly saves unlimited spots.`, 'info');
+    showGrizzlyUpsell('limit');
+  }
 }
 
 /* ------------------------------------------------------------
@@ -8796,8 +9007,8 @@ function collectFoodPhotos () {
     out.push({ src: safe, name, id, date: date || '', type, video });
   };
   (state.restaurants || []).forEach(r => {
-    dishesOf(r).forEach(d => add(d.photo, `${d.name} · ${r.name}`, r.id, d.date, 'dish', d.video));
-    (r.visits || []).forEach(v => add(v.photo, `${v.dish || r.name}${v.dish ? ` · ${r.name}` : ''} - ${fmtDate(v.date)}`, r.id, v.date, 'visit', v.video));
+    dishesOf(r).forEach(d => mediaOf(d).forEach(m => add(m.photo, `${d.name} · ${r.name}`, r.id, d.date, 'dish', m.video)));
+    (r.visits || []).forEach(v => mediaOf(v).forEach(m => add(m.photo, `${v.dish || r.name}${v.dish ? ` · ${r.name}` : ''} - ${fmtDate(v.date)}`, r.id, v.date, 'visit', m.video)));
     add(r.photo, r.name, r.id, r.dateVisited || r.dateAdded, 'cover');
   });
   return out.sort((a, b) => String(b.date).localeCompare(String(a.date)));
@@ -9539,12 +9750,23 @@ function looksLikeSharedUrl (value) {
   return /https?:\/\//i.test(String(value || '')) || /(?:maps\.google|goo\.gl\/maps|maps\.app\.goo\.gl)/i.test(String(value || ''));
 }
 
+const SOCIAL_SHARE_RE = /tiktok\.com|instagram\.com|youtube\.com|youtu\.be|facebook\.com|fb\.watch|x\.com|twitter\.com|threads\.net|yelp\.com/i;
+
 function handleWebShareTarget () {
   const params = new URLSearchParams(window.location.search);
   const title = params.get('title') || '';
   const url   = params.get('url')   || '';
   const text  = params.get('text')  || '';
   const reserved = params.has('action') || params.has('upgrade') || params.has('session_id') || params.has('room') || params.has('landing');
+  // A list shared from Keep, Samsung Notes, etc.: several lines, mostly not links.
+  const isList = !reserved && !url && !SOCIAL_SHARE_RE.test(text)
+    && text.split(/\r?\n/).filter(l => l.trim()).length >= 2 && parseImportSource(text).length >= 2;
+  if (isList) {
+    history.replaceState(null, '', window.location.pathname);
+    trackProductEvent('list_shared_in', {});
+    showImportBookmarks(text);
+    return;
+  }
   const isShare = params.has('share-target') || ((!reserved) && (title || url || looksLikeSharedUrl(text)));
   if (!isShare) return;
   const sharedUrl = url || (looksLikeSharedUrl(text) ? text.trim().split(/\s+/).find(looksLikeSharedUrl) || '' : '');
@@ -9552,7 +9774,7 @@ function handleWebShareTarget () {
   history.replaceState(null,'', window.location.pathname);
   // A TikTok/Instagram/YouTube post: the Cub reads it and finds the restaurant.
   const shared = [sharedUrl, text, title].filter(Boolean).join(' ');
-  if (window.Cub && /tiktok\.com|instagram\.com|youtube\.com|youtu\.be|facebook\.com|fb\.watch|x\.com|twitter\.com|threads\.net|yelp\.com/i.test(shared)) {
+  if (window.Cub && SOCIAL_SHARE_RE.test(shared)) {
     window.Cub.openAdd(shared);
     return;
   }
@@ -9825,7 +10047,7 @@ const HUB_SECTIONS = [
     ['location','📍','Location'], ['bulk','☑️','Bulk Select'], ['command','⌘','Command Palette'],
     ['export2','🛂','Export Passport'], ['pdf','📄','Export PDF'],
     ['export','💾','Export JSON'], ['import','📥','Import JSON'],
-    ['import-bookmarks','🔖','Import Bookmarks'],
+    ['import-bookmarks','🔖','Import Lists (Notes, Maps)'],
   ]},
   { title: 'Also try', layout: 'search', items: [
     ['digest','🗞️','Monthly Digest'], ['worldmap','🌍','Cuisine Map'], ['route','🛣️','Route Planner'],
@@ -10145,7 +10367,8 @@ function verdictFromRating (rating = 0) {
 
 // Adds a dish or updates the one with the same name, so re-logging a dish
 // changes its verdict instead of creating duplicates.
-function upsertDish (r, { name, verdict, rating, note, photo, video } = {}) {
+// `media` (list of { photo, video? }) adds photos ahead of the dish's existing ones.
+function upsertDish (r, { name, verdict, rating, note, photo, video, media } = {}) {
   const clean = String(name || '').trim().slice(0, 80);
   if (!r || !clean) return null;
   if (!Array.isArray(r.dishes)) r.dishes = [];
@@ -10159,6 +10382,7 @@ function upsertDish (r, { name, verdict, rating, note, photo, video } = {}) {
   else if (Number.isFinite(rating) && rating > 0) dish.verdict = verdictFromRating(rating);
   if (note != null) dish.note = String(note).slice(0, 200);
   if (photo) { dish.photo = photo; if (video) dish.video = video; else delete dish.video; }
+  if (Array.isArray(media) && media.length) setMediaOn(dish, [...media, ...mediaOf(dish)]);
   if (dish.verdict !== 'want') dish.date = iso();
   r.updatedAt = Date.now();
   saveData();
@@ -10248,12 +10472,12 @@ function renderYourOrder (restaurantId) {
       ${dishes.filter(d => d.verdict === g).map(d => `
         <div class="yo-dish${d.photo ? ' has-photo' : ''}">
           <div class="yo-dish-row">
-            ${safeUrl(d.photo || '') ? `<button type="button" class="yo-dish-photo${d.video ? ' is-video' : ''}" data-view="${escHtml(d.id)}" aria-label="${d.video ? 'Play video' : 'View photo'} of ${escHtml(d.name)}"><img src="${escHtml(safeUrl(d.photo))}" alt="" loading="lazy" />${d.video ? '<span class="video-badge small" aria-hidden="true">▶</span>' : ''}</button>` : ''}
+            ${safeUrl(d.photo || '') ? `<button type="button" class="yo-dish-photo${d.video ? ' is-video' : ''}" data-view="${escHtml(d.id)}" aria-label="${d.video ? 'Play video' : 'View photos'} of ${escHtml(d.name)}"><img src="${escHtml(safeUrl(d.photo))}" alt="" loading="lazy" />${d.video ? '<span class="video-badge small" aria-hidden="true">▶</span>' : ''}${mediaOf(d).length > 1 ? `<span class="yo-media-count" aria-hidden="true">+${mediaOf(d).length - 1}</span>` : ''}</button>` : ''}
             <button type="button" class="yo-dish-name" aria-expanded="false">${escHtml(d.name)}${d.rating ? ` <span class="yo-dish-stars" aria-label="${d.rating} stars">${'★'.repeat(d.rating)}</span>` : ''}</button>
           </div>
           ${d.note ? `<div class="yo-dish-note">${escHtml(d.note)}</div>` : ''}
           <span class="yo-dish-actions">
-            <button type="button" class="yo-move yo-photo-btn" data-photo-for="${escHtml(d.id)}">${d.photo ? 'New photo' : 'Add photo'}</button>
+            <button type="button" class="yo-move yo-photo-btn" data-photo-for="${escHtml(d.id)}">${d.photo ? 'Add more photos/videos' : 'Add photos/videos'}</button>
             ${DISH_VERDICTS.filter(v => v !== g).map(v => `<button type="button" class="yo-move" data-move="${v}" data-id="${escHtml(d.id)}">${DISH_VERDICT_LABEL[v]}</button>`).join('')}
             <button type="button" class="yo-remove" data-remove="${escHtml(d.id)}" aria-label="Remove ${escHtml(d.name)}">✕</button>
           </span>
@@ -10262,23 +10486,20 @@ function renderYourOrder (restaurantId) {
 }
 
 /* ── Food photos: snap first, name it, done ─────────────────── */
-let _yoPendingPhoto = '';
-let _yoPendingVideo = '';
+let _yoPendingMedia = [];
 
-function setYourOrderPendingPhoto (dataUrl = '', video = '') {
-  _yoPendingPhoto = dataUrl;
-  _yoPendingVideo = dataUrl ? video : '';
+// Photos/clips picked before the dish is named. Pass [] to clear.
+function setYourOrderPending (list = []) {
+  _yoPendingMedia = list.slice(0, FOOD_MEDIA_MAX);
   const box = document.getElementById('your-order-pending');
   if (!box) return;
-  box.classList.toggle('hidden', !dataUrl);
-  box.innerHTML = dataUrl
-    ? `<img src="${escHtml(safeUrl(dataUrl))}" alt="" />${video ? '<span class="video-badge small" aria-label="Video">▶</span>' : ''}<span>Now name the dish and tap how it was.</span><button type="button" class="yo-pending-clear" aria-label="Remove photo">✕</button>`
-    : '';
+  box.classList.toggle('hidden', !_yoPendingMedia.length);
+  box.innerHTML = _yoPendingMedia.length ? pendingMediaHtml(_yoPendingMedia, 'Now name the dish and tap how it was.') : '';
 }
 
 // All dish photos at a spot, in Your Order order, for the swipeable viewer.
 function dishPhotosOf (r) {
-  return dishesOf(r).filter(d => safeUrl(d.photo || '')).map(d => ({ id: d.id, url: d.photo, alt: `${d.name} at ${r.name}` }));
+  return dishesOf(r).flatMap(d => mediaOf(d).filter(m => safeUrl(m.photo)).map(m => ({ id: d.id, url: m.photo, alt: `${d.name} at ${r.name}` })));
 }
 
 // A quick Polaroid that drops in when a photo is saved.
@@ -10296,7 +10517,7 @@ function photoReveal (dataUrl, caption = '') {
 }
 
 /* ── Just Ate: log a meal in about ten seconds ──────────────── */
-let _justAte = { placeId: null, verdict: null, photo: '', video: '' };
+let _justAte = { placeId: null, verdict: null, media: [] };
 
 function justAteSuggestions (query = '') {
   const q = dishKey(query);
@@ -10336,12 +10557,12 @@ function openJustAte (restaurantId = null) {
   const overlay = document.getElementById('just-ate-overlay');
   if (!overlay) return;
   const preset = restaurantId ? state.restaurants.find(r => r.id === restaurantId) : null;
-  _justAte = { placeId: preset?.id || null, verdict: null, photo: '', video: '' };
+  _justAte = { placeId: preset?.id || null, verdict: null, media: [] };
   document.getElementById('just-ate-place').value = preset?.name || '';
   document.getElementById('just-ate-dish').value = '';
   document.getElementById('just-ate-note').value = '';
   document.querySelectorAll('#just-ate-tags .ja-tag').forEach(t => t.classList.remove('active'));
-  setJustAtePhoto('');
+  setJustAteMedia([]);
   document.querySelectorAll('#just-ate-verdicts .yo-btn').forEach(b => {
     b.classList.remove('active'); b.setAttribute('aria-checked', 'false');
   });
@@ -10352,17 +10573,15 @@ function openJustAte (restaurantId = null) {
   setTimeout(() => document.getElementById(preset ? 'just-ate-dish' : 'just-ate-place')?.focus(), 60);
 }
 
-function setJustAtePhoto (dataUrl = '', video = '') {
-  _justAte.photo = dataUrl;
-  _justAte.video = dataUrl ? video : '';
+function setJustAteMedia (list = []) {
+  _justAte.media = list.slice(0, FOOD_MEDIA_MAX);
+  const n = _justAte.media.length;
   const preview = document.getElementById('just-ate-photo-preview');
   const label = document.getElementById('just-ate-photo-label');
-  if (label) label.textContent = dataUrl ? (video ? 'Retake video' : 'Retake photo') : 'Snap a photo or video';
+  if (label) label.textContent = n ? `Add more (${n}/${FOOD_MEDIA_MAX})` : 'Add photos & videos';
   if (!preview) return;
-  preview.classList.toggle('hidden', !dataUrl);
-  preview.innerHTML = dataUrl
-    ? `<img src="${escHtml(safeUrl(dataUrl))}" alt="Your photo" />${video ? '<span class="video-badge" aria-label="Video">▶</span>' : ''}<button type="button" class="ja-photo-clear" aria-label="Remove photo">✕</button>`
-    : '';
+  preview.classList.toggle('hidden', !n);
+  preview.innerHTML = n ? pendingMediaHtml(_justAte.media) : '';
 }
 
 // Tapping a tag adds it to the note, tapping again takes it out.
@@ -10386,8 +10605,8 @@ function saveJustAte () {
   const placeName = (document.getElementById('just-ate-place')?.value || '').trim();
   const dishName = (document.getElementById('just-ate-dish')?.value || '').trim();
   const note = (document.getElementById('just-ate-note')?.value || '').trim().slice(0, 300);
-  const photo = _justAte.photo;
-  const video = _justAte.video || '';
+  const media = _justAte.media || [];
+  const photo = media[0]?.photo || '';
   let r = state.restaurants.find(x => x.id === _justAte.placeId);
   // A typed name that matches a saved spot exactly counts as that spot.
   if (!r && placeName) r = state.restaurants.find(x => dishKey(x.name) === dishKey(placeName));
@@ -10410,20 +10629,23 @@ function saveJustAte () {
   }
 
   if (!Array.isArray(r.visits)) r.visits = [];
-  r.visits.push({ date: iso(), note, rating: 0, dish: dishName, photo, ...(video ? { video } : {}) });
+  const visit = { date: iso(), note, rating: 0, dish: dishName };
+  setMediaOn(visit, media);
+  if (!visit.photo) visit.photo = '';
+  r.visits.push(visit);
   r.status = 'visited';
   r.dateVisited = r.dateVisited || iso();
   // First photo of a spot becomes its cover so the list stops showing placeholders.
   if (photo && !r.photo) r.photo = photo;
   r.updatedAt = Date.now();
   const verdict = _justAte.verdict || 'ok';
-  if (dishName) upsertDish(r, { name: dishName, verdict, photo, video, note: note || null });
+  if (dishName) upsertDish(r, { name: dishName, verdict, media, note: note || null });
   else saveData();
 
   closeJustAte();
   renderAll();
   if (photo) photoReveal(photo, dishName || r.name);
-  trackProductEvent('just_ate_logged', { restaurantId: r.id, isNew, hasDish: !!dishName, hasPhoto: !!photo, hasNote: !!note, verdict: dishName ? verdict : null });
+  trackProductEvent('just_ate_logged', { restaurantId: r.id, isNew, hasDish: !!dishName, hasPhoto: !!photo, mediaCount: media.length, hasNote: !!note, verdict: dishName ? verdict : null });
   showToast(`Logged ${r.name}`,
     dishName ? `${DISH_VERDICT_LABEL[verdict]}: ${dishName}` : (isNew ? 'New spot added to your den.' : 'Visit added to your history.'),
     'success');
@@ -10475,11 +10697,12 @@ function logYourOrder (verdict) {
     return;
   }
   const r = state.restaurants.find(x => x.id === state.detailId);
-  const dish = upsertDish(r, { name, verdict, photo: _yoPendingPhoto, video: _yoPendingVideo });
+  const pending = _yoPendingMedia;
+  const dish = upsertDish(r, { name, verdict, media: pending });
   if (!dish) return;
   input.value = '';
-  if (_yoPendingPhoto) photoReveal(_yoPendingPhoto, dish.name);
-  setYourOrderPendingPhoto('');
+  if (pending.length) photoReveal(pending[0].photo, dish.name);
+  setYourOrderPending([]);
   renderYourOrder(r.id);
   renderAll();
   const msg = verdict === 'want' ? `${dish.name} is on your Crave List for next time.`
@@ -15336,23 +15559,17 @@ function openCheckinWithPhoto (id) {
   if (rating) state.restaurants[idx].myRating = rating;
 
   // Offer photo upload
-  const wantPhoto = confirm('Add a photo from this visit? ');
+  const wantPhoto = confirm('Add photos or videos from this visit?');
   if (wantPhoto) {
-    const input = document.createElement('input');
-    input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
-    input.onchange = () => {
-      const file = input.files[0];
-      if (!file) return;
-      readImageFileCompressed(file, FOOD_PHOTO_MAX_DIM, FOOD_PHOTO_QUALITY).then(dataUrl => {
-        const vIdx = state.restaurants[idx].visits.length - 1;
-        state.restaurants[idx].visits[vIdx].photo = dataUrl;
-        saveData();
-        renderAll();
-        openDetailModal(id);
-        showToast('Photo Added!', 'Visit photo saved to gallery.', 'success');
-      }).catch(() => showToast('Photo Error', 'Could not load that image.', 'error'));
-    };
-    input.click();
+    const visit = state.restaurants[idx].visits[state.restaurants[idx].visits.length - 1];
+    pickFoodMediaList().then(picked => {
+      if (!picked.length) return;
+      setMediaOn(visit, [...mediaOf(visit), ...picked]);
+      saveData();
+      renderAll();
+      openDetailModal(id);
+      showToast(picked.length > 1 ? `${picked.length} added!` : 'Added!', 'Saved to this visit and your gallery.', 'success');
+    });
   }
 
   saveData();
