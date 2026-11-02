@@ -2811,6 +2811,9 @@ async function refreshPlaceInfo (r) {
       if (info.website && !r.website) r.website = info.website;
       if (info.mapsUrl) r.mapsUrl = info.mapsUrl;
       if (info.placeId) r.placeId = info.placeId;
+      // Fill in where it is when we didn't know yet.
+      if (info.address && !r.address) r.address = info.address;
+      if (Number.isFinite(info.lat) && Number.isFinite(info.lng) && !(Number.isFinite(r.lat) && Number.isFinite(r.lng))) { r.lat = info.lat; r.lng = info.lng; }
     }
     saveData();
     return !!info.found;
@@ -2876,6 +2879,7 @@ function fillDetailFacts (r) {
     box.className = 'detail-hours';
     document.getElementById('detail-meta')?.insertAdjacentElement('afterend', box);
   }
+  renderDetailLocation(r, box);
   const st = openStatus(r);
   const today = (new Date().getDay() + 6) % 7; // Google lists Monday first
   const links = [
@@ -2890,6 +2894,36 @@ function fillDetailFacts (r) {
       <ul>${(r.hours || []).map((h, i) => `<li class="${i === today ? 'today' : ''}">${escHtml(h)}</li>`).join('')}</ul>
     </details>` : ''}
     ${links ? `<div class="detail-hours-links">${links}</div>` : ''}`;
+}
+
+// Where it is: a small map, the address, and one tap to directions.
+function renderDetailLocation (r, after) {
+  let el = document.getElementById('detail-location');
+  if (!el) {
+    el = document.createElement('section');
+    el.id = 'detail-location';
+    el.className = 'detail-location';
+    el.setAttribute('aria-label', 'Location');
+    after.insertAdjacentElement('afterend', el);
+  }
+  const hasPin = Number.isFinite(r.lat) && Number.isFinite(r.lng);
+  const dist = distOf(r);
+  const d = .006;
+  const map = hasPin
+    ? `<iframe class="dl-map" title="Map of ${escHtml(r.name)}" loading="lazy" referrerpolicy="no-referrer"
+         src="https://www.openstreetmap.org/export/embed.html?bbox=${r.lng - d},${r.lat - d * .6},${r.lng + d},${r.lat + d * .6}&amp;layer=mapnik&amp;marker=${r.lat},${r.lng}"></iframe>`
+    : '';
+  const looking = !r.placeInfoAt && !_placeInfoTried.has(r.id);
+  el.innerHTML = `${map}
+    <div class="dl-body">
+      <div class="dl-addr">📍 ${r.address ? escHtml(r.address) : `<span class="dl-dim">${looking ? 'Finding the address…' : 'No address saved yet'}</span>`}${Number.isFinite(dist) ? ` <span class="dl-dim">· ${fmtDist(dist)} away</span>` : ''}</div>
+      <div class="dl-actions">
+        <button type="button" class="btn-secondary btn-sm dl-maps">${hasPin || r.address ? 'Open in Google Maps' : 'Find it on Google Maps'}</button>
+      </div>
+    </div>`;
+  el.querySelector('.dl-maps')?.addEventListener('click', () => {
+    if (r.mapsUrl) window.open(r.mapsUrl, '_blank', 'noopener'); else openMapsSearch(r);
+  });
 }
 
 // After launch, quietly look up a few saved spots that have no info yet.
@@ -3842,7 +3876,6 @@ function renderAll () {
   // A soft ring on the Add button until someone has saved a few places.
   const spotCount = (state.restaurants || []).length;
   document.body.classList.toggle('add-hint', spotCount < 3);
-  document.body.classList.toggle('home-regular', spotCount >= 5);
   // Today's pick doesn't wait for nearby results (Grizzly's AI pick does).
   try { if (!usesAiDailyPick()) showLocalDailyPick(); } catch (err) { console.warn('[FTB] daily pick:', err); }
   renderStats();
@@ -3927,9 +3960,8 @@ function showToast (title, msg, type = 'default') {
    CHAT BUDDY - BYTE CUB
    ════════════════════════════════════════════════════════════ */
 const GREETINGS = [
-  'Hey foodie. I\'m Byte Cub, your personal restaurant strategist. What should we plan first?',
-  'Welcome back, hungry adventurer. Want a recommendation, a surprise pick, or your next list idea?',
-  'Ready when you are. I can help you discover, organize, and decide where to eat next.',
+  "Hey! I'm Byte Cub, your food assistant. Tell me where you ate (\"I went to Tacos Chiwas, had the birria, 5 stars\") and I'll log it, or ask me to save a place, pick dinner, or show your lists.",
+  "Hi foodie! Try \"add Bacanora to my want to try\", \"what should I eat tonight?\" or \"I had lunch at Pizzeria Bianco, 4 stars\". I'll take care of it.",
 ];
 
 const FOOD_TIPS = [
@@ -4191,14 +4223,12 @@ function tagQueryResponse (q) {
 }
 
 const QUICK_REPLIES = [
-  'Recommend something ',
-  'Surprise me! ',
-  'What\'s nearby? ',
-  'Date night ideas ',
-  'Top cuisine breakdown ',
-  'Want to try list ',
-  'My collections ',
-  'Food tip! ',
+  'What should I eat tonight?',
+  'Show my want to try',
+  'Show where I have been',
+  'Surprise me!',
+  'Date night ideas',
+  'Invite a friend',
 ];
 
 function randomFrom (arr) { return arr[Math.floor(Math.random() * arr.length)]; }
@@ -4275,26 +4305,268 @@ function hideTyping () {
   if (el) el.remove();
 }
 
-function sendChat () {
+/* ── Byte Cub, the assistant ─────────────────────────────────────
+   Understands everyday asks and does them: "I went to Tacos Chiwas, had
+   the birria, 5 stars" logs it; "add Bacanora to my want to try" saves
+   it; "what should I eat?" picks; "show my want to try" opens the list.
+   Anything else goes to the AI (Grizzly) or the built-in answers. */
+let _cubChatHistory = [];
+
+// Bot message with tappable buttons: [{ label, run, primary }]
+function cubSay (text, buttons = []) {
+  addChatMsg(text, 'bot');
+  _cubChatHistory.push({ role: 'assistant', text });
+  if (!buttons.length) return;
+  const row = document.createElement('div');
+  row.className = 'chat-actions';
+  buttons.forEach(b => {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = b.primary ? 'btn-primary btn-sm' : 'btn-secondary btn-sm';
+    el.textContent = b.label;
+    el.addEventListener('click', () => {
+      row.querySelectorAll('button').forEach(x => { x.disabled = true; });
+      b.run();
+    });
+    row.appendChild(el);
+  });
+  const messages = document.getElementById('chat-messages');
+  messages.appendChild(row);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+const MEAL_WORDS = /^(breakfast|brunch|lunch|dinner|drinks|dessert|coffee|food|a bite|something)\b/i;
+
+function starsFromText (t) {
+  const n = t.match(/\b([1-5])(?:\s*\/\s*5|\s*out of\s*5)?\s*(?:stars?|★)/i) || t.match(/\b([1-5])\s*(?:out of\s*5|\/\s*5)\b/i);
+  if (n) return Number(n[1]);
+  if (/\b(loved|amazing|incredible|perfect|best|10\/10|obsessed)\b/i.test(t)) return 5;
+  if (/\b(great|really good|delicious|so good)\b/i.test(t)) return 4;
+  if (/\b(good|solid|nice)\b/i.test(t)) return 4;
+  if (/\b(ok|okay|fine|meh|alright|average)\b/i.test(t)) return 3;
+  if (/\b(bad|disappointing|not great|didn'?t like|overrated)\b/i.test(t)) return 2;
+  if (/\b(terrible|awful|gross|worst)\b/i.test(t)) return 1;
+  return 0;
+}
+
+// "Tacos Chiwas and had the birria, 5 stars" -> "Tacos Chiwas"
+function placeFromText (rest) {
+  return String(rest)
+    .split(/\s*(?:,|\.(?:\s|$)|!|\?|\s-\s|\s+[1-5]\s*(?:stars?|\/|out of)|\s+and\s+(?:had|got|ordered|tried|it|we|i)\b|\s+(?:had|got|ordered|it was|it's|was|for (?:dinner|lunch|breakfast|brunch)|last night|today|yesterday|tonight|this (?:morning|afternoon|evening))\b)/i)[0]
+    .replace(/^(?:the\s+)/i, m => (/^the\s+[a-z]/i.test(rest) ? m : ''))
+    .replace(/["“”]/g, '').trim().slice(0, 80);
+}
+
+// The first "had the X" / "got the X" that is a dish, not "had dinner at …".
+function dishFromText (t) {
+  const re = /\b(?:had|got|ordered|tried|ate)\s+(?:the\s+|a\s+|an\s+|some\s+)?([^,.!?]+?)(?=\s*(?:,|\.|!|\?|$|\s+and\b|\s+it\b|\s+which\b|\s+(?:[1-5])\s*(?:stars?|\/)))/gi;
+  for (const m of t.matchAll(re)) {
+    const dish = m[1].trim();
+    if (dish && !MEAL_WORDS.test(dish) && !/^at\b|\bat\s/i.test(dish) && dish.length <= 60) return dish;
+  }
+  return '';
+}
+
+function parseCubCommand (text) {
+  const t = text.trim();
+  const low = t.toLowerCase();
+  if (/\b(show|open|see|view|go to|pull up)\b.*\b(want[- ]to[- ]try|wish ?list|to[- ]try)\b/.test(low)) return { kind: 'list', view: 'want-to-try' };
+  if (/\b(show|open|see|view|pull up)\b.*\b(been there|visited|places i('ve| have) (been|eaten)|where i('ve| have) (been|eaten))\b/.test(low)) return { kind: 'list', view: 'visited' };
+  if (/\b(show|open|see)\b.*\bmy lists?\b/.test(low)) return { kind: 'list', view: 'lists' };
+  let m = t.match(/\b(?:went to|ate at|eaten at|been to|visited|tried|stopped at|stopped by|had (?:breakfast|brunch|lunch|dinner|drinks|dessert|coffee) at|grabbed (?:breakfast|brunch|lunch|dinner|food|a bite) at)\s+(.+)/i)
+    || t.match(/\blog\s+(?:(?:a\s+)?(?:visit|meal)\s+(?:to|at|for)\s+)?(.+)/i);
+  if (m) {
+    const name = placeFromText(m[1]);
+    if (name.length >= 2) return { kind: 'log', name, dish: dishFromText(t), stars: starsFromText(t) };
+  }
+  m = t.match(/\b(?:add|save|put)\s+(.+?)\s+(?:to|on|in)\s+(?:my\s+)?(?:want[- ]to[- ]try|list|wish ?list|to[- ]try)/i)
+    || t.match(/\bi\s+want to try\s+(.+)/i) || t.match(/^(?:add|save)\s+(.+)/i);
+  if (m) {
+    const name = placeFromText(m[1]);
+    if (name.length >= 2) return { kind: 'want', name };
+  }
+  if (/\b(what|where)\b.*\b(eat|go|dinner|lunch|breakfast|brunch|tonight)\b|\bpick (?:for me|something|a place)\b|\bi'?m hungry\b|\bhelp me (?:decide|choose)\b/.test(low)) return { kind: 'pick' };
+  if (/\binvite\b/.test(low)) return { kind: 'invite' };
+  if (/\b(dinner vote|group vote|vote)\b/.test(low)) return { kind: 'vote' };
+  if (/\bimport\b/.test(low)) return { kind: 'import' };
+  return null;
+}
+
+function savedSpotNamed (name) {
+  const key = normalizeName(name);
+  return state.restaurants.find(r => normalizeName(r.name) === key) || findDuplicates(name)[0] || null;
+}
+
+// Creates a spot from a real place (or just a name). Respects the Cub limit.
+function createSpotFrom ({ found = null, name = '', status = 'want-to-try' }) {
+  if (typeof isPremium === 'function' && !isPremium() && state.restaurants.length >= FREE_RESTAURANT_LIMIT) {
+    showGrizzlyUpsell('limit');
+    return null;
+  }
+  const today = iso();
+  const kind = String(found?.kind || '').replace(/\s*(restaurant|food|place)$/i, '').replace(/^(restaurant|food)$/i, '');
+  const r = {
+    id: uid(), name: String(found?.name || name).slice(0, 80), cuisine: kind.slice(0, 40), priceRange: found?.priceLevel || 0,
+    address: found?.address || '', lat: Number.isFinite(found?.lat) ? found.lat : null, lng: Number.isFinite(found?.lng) ? found.lng : null,
+    website: '', photo: '', googleRating: found?.rating || 0, googleReviews: found?.reviews || 0, myRating: 0, notes: '', tags: [],
+    collectionId: null, priority: '', status, dateAdded: today, dateVisited: status === 'visited' ? today : null,
+    updatedAt: Date.now(), visits: [], links: [],
+  };
+  state.restaurants.unshift(r);
+  return r;
+}
+
+function cubLogVisit (r, { dish = '', stars = 0 } = {}) {
+  if (!Array.isArray(r.visits)) r.visits = [];
+  r.visits.push({ date: iso(), note: '', rating: stars, dish, photo: '' });
+  r.status = 'visited';
+  r.dateVisited = r.dateVisited || iso();
+  if (stars) r.myRating = stars;
+  r.updatedAt = Date.now();
+  if (dish) upsertDish(r, { name: dish, verdict: stars >= 4 ? 'again' : stars && stars <= 2 ? 'skip' : 'ok', rating: stars || undefined });
+  else saveData();
+  renderAll();
+  trackProductEvent('cub_logged_visit', { hasDish: !!dish, stars });
+  const bits = [stars ? '★'.repeat(stars) : '', dish ? `the ${dish}` : ''].filter(Boolean).join(' and ');
+  cubSay(`Done! **${r.name}** is on your Been There list${bits ? ` with ${bits}` : ''}. 🐻`, [
+    { label: '📸 Add photos', primary: true, run: () => { closeChat(); openDetailModal(r.id); } },
+    ...(stars ? [] : [{ label: '⭐ Rate it', run: () => cubAskStars(r) }]),
+    { label: 'See Been There', run: () => { closeChat(); setView('visited'); } },
+  ]);
+  if (typeof celebrateMilestones === 'function') celebrateMilestones();
+}
+
+function cubAskStars (r) {
+  cubSay(`How many stars for ${r.name}?`, [1, 2, 3, 4, 5].map(n => ({
+    label: '★'.repeat(n), run: () => {
+      r.myRating = n;
+      const v = (r.visits || []).at(-1);
+      if (v) v.rating = n;
+      r.updatedAt = Date.now();
+      saveData(); renderAll();
+      cubSay(`Got it: ${'★'.repeat(n)} for ${r.name}.`);
+    },
+  })));
+}
+
+function cubAddWant (r) {
+  trackProductEvent('cub_added_want', {});
+  cubSay(`Saved **${r.name}** to your Want to Try list${r.address ? ` (${r.address})` : ''}. 🔖`, [
+    { label: 'See Want to Try', primary: true, run: () => { closeChat(); setView('want-to-try'); } },
+    { label: 'Open it', run: () => { closeChat(); openDetailModal(r.id); } },
+  ]);
+}
+
+// Finds the place you mean: one of yours, or real ones to choose from.
+async function cubResolve (name, onPick) {
+  const saved = savedSpotNamed(name);
+  if (saved) { onPick({ r: saved }); return; }
+  showTyping();
+  const found = await searchRealPlaces(name);
+  hideTyping();
+  if (!found.length) {
+    cubSay(`I couldn't find "${name}" on the map. Want me to save it with just the name?`, [
+      { label: `Yes, use "${name}"`, primary: true, run: () => onPick({ name }) },
+    ]);
+    return;
+  }
+  if (found.length === 1 || normalizeName(found[0].name) === normalizeName(name)) {
+    const f = found[0];
+    cubSay(`Is it **${f.name}**${f.address ? `, ${f.address}` : ''}?`, [
+      { label: 'Yes', primary: true, run: () => onPick({ found: f }) },
+      ...(found.length > 1 ? [{ label: 'No, show others', run: () => cubChoose(found.slice(1), name, onPick) }] : [{ label: `No, just "${name}"`, run: () => onPick({ name }) }]),
+    ]);
+    return;
+  }
+  cubChoose(found, name, onPick);
+}
+
+function cubChoose (found, name, onPick) {
+  cubSay('Which one?', [
+    ...found.slice(0, 4).map(f => ({ label: `${f.name}${f.address ? ` · ${f.address.split(',')[0]}` : ''}`, run: () => onPick({ found: f }) })),
+    { label: `Just "${name}"`, run: () => onPick({ name }) },
+  ]);
+}
+
+async function handleCubCommand (cmd) {
+  if (cmd.kind === 'list') {
+    cubSay(cmd.view === 'visited' ? 'Here are the places you have been.' : cmd.view === 'want-to-try' ? 'Here is your Want to Try list.' : 'Here are your lists.');
+    setTimeout(() => { closeChat(); setView(cmd.view); }, 500);
+    return;
+  }
+  if (cmd.kind === 'log') {
+    await cubResolve(cmd.name, ({ r, found, name }) => {
+      const spot = r || createSpotFrom({ found, name, status: 'visited' });
+      if (spot) cubLogVisit(spot, cmd);
+    });
+    return;
+  }
+  if (cmd.kind === 'want') {
+    await cubResolve(cmd.name, ({ r, found, name }) => {
+      if (r) {
+        cubSay(r.status === 'visited' ? `You've already been to **${r.name}**! It's on your Been There list.` : `**${r.name}** is already on your Want to Try list.`, [
+          { label: 'Open it', primary: true, run: () => { closeChat(); openDetailModal(r.id); } },
+        ]);
+        return;
+      }
+      const spot = createSpotFrom({ found, name, status: 'want-to-try' });
+      if (spot) { saveData(); renderAll(); cubAddWant(spot); }
+    });
+    return;
+  }
+  if (cmd.kind === 'pick') {
+    const saved = _decisionModeState;
+    _decisionModeState = { mood: mealtimeOf() === 'dinner' ? 'comfort' : 'quick', budget: 0, miles: 10, party: 2, with: [] };
+    let top = [];
+    try { top = buildDecisionModeShortlist().filter(x => nearEnoughToSuggest(x.r)); } finally { _decisionModeState = saved; }
+    if (!top.length) {
+      cubSay('Save a few places first and I can pick for you. Want to add one?', [{ label: '＋ Add a place', primary: true, run: () => { closeChat(); openAddPlace(); } }]);
+      return;
+    }
+    cubSay(`My picks for ${MEALTIME_LABEL[mealtimeOf()]}:\n${top.map((x, i) => `${i + 1}. **${x.r.name}**: ${x.reasons.filter(r => !/fast decision pick|balanced overall/.test(r)).slice(0, 2).join(', ') || x.r.cuisine || 'a good fit'}`).join('\n')}`,
+      [...top.map((x, i) => ({ label: x.r.name, primary: i === 0, run: () => { closeChat(); openDetailModal(x.r.id); } })),
+        { label: 'Put them to a vote', run: () => { closeChat(); openDinnerRooms(top.map(x => x.r.id)); } }]);
+    return;
+  }
+  if (cmd.kind === 'invite') { cubSay('Sending an invite. They will see your picks and can follow you.'); inviteFriend(); return; }
+  if (cmd.kind === 'vote') { closeChat(); openDinnerRooms(); return; }
+  if (cmd.kind === 'import') { closeChat(); showImportBookmarks(); }
+}
+
+async function sendChat () {
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
   if (!text) return;
   input.value = '';
-
   addChatMsg(text, 'user');
-  showTyping();
+  _cubChatHistory.push({ role: 'user', text });
 
-  // Simulate thinking delay
-  setTimeout(() => {
-    hideTyping();
-    const response = chatResponse(text);
-    addChatMsg(response, 'bot');
-  }, 500 + Math.random() * 600);
+  const cmd = parseCubCommand(text);
+  if (cmd) { trackProductEvent('cub_command', { kind: cmd.kind }); await handleCubCommand(cmd); return; }
+
+  // A place you saved, by name: open it.
+  const named = state.restaurants.find(r => r.name && text.toLowerCase().includes(r.name.toLowerCase()));
+  if (named && !/\?$/.test(text)) {
+    cubSay(restaurantDetailResponse(named), [{ label: `Open ${named.name}`, primary: true, run: () => { closeChat(); openDetailModal(named.id); } }]);
+    return;
+  }
+
+  showTyping();
+  if (window.AI?.hasAccess?.()) {
+    try {
+      const reply = await AI.chat(text, _cubChatHistory.slice(-12), state.restaurants);
+      hideTyping();
+      cubSay(reply);
+      return;
+    } catch { /* fall through to the built-in answers */ }
+  }
+  setTimeout(() => { hideTyping(); cubSay(chatResponse(text)); }, 350);
 }
 
 function openChat () {
   document.getElementById('chat-panel').classList.remove('hidden');
   document.getElementById('ui-overlay').classList.remove('hidden');
+  document.body.classList.add('chat-open');
   document.getElementById('chat-input').focus();
 
   // Show welcome message if first time
@@ -4307,6 +4579,7 @@ function openChat () {
 
 function closeChat () {
   document.getElementById('chat-panel').classList.add('hidden');
+  document.body.classList.remove('chat-open');
   maybeHideOverlay();
 }
 
@@ -6407,6 +6680,8 @@ function setupEvents () {
   document.getElementById('add-btn')?.addEventListener('click', openQuickAdd);
   document.getElementById('empty-add-btn')?.addEventListener('click', openQuickAdd);
   document.getElementById('empty-import-btn')?.addEventListener('click', () => showImportBookmarks());
+  document.getElementById('header-invite-btn')?.addEventListener('click', () => { hapticTap('light'); inviteFriend(); });
+  document.getElementById('chat-hide-cub-btn')?.addEventListener('click', () => { closeChat(); window.Cub?.hide?.(); });
   // Links on a spot (detail page)
   const addDetailLink = () => {
     const input = document.getElementById('detail-link-input');
@@ -9619,18 +9894,10 @@ function renderFriendsFeedHome () {
   const section = document.getElementById('friends-feed-home');
   const list = document.getElementById('ff-list');
   if (!section || !list) return;
-  if (!(state.restaurants || []).length) { section.classList.add('hidden'); return; }
-  section.classList.remove('hidden');
-  const items = friendsFeedItems();
-  if (!items.length) {
-    list.innerHTML = `<div class="ff-empty">
-      <span class="ff-empty-icon" aria-hidden="true">🍽️</span>
-      <span><strong>Food's better with friends.</strong> Invite someone and see where they eat and what they order.</span>
-      <button type="button" class="btn-primary btn-sm" id="ff-invite">Invite a friend</button>
-    </div>`;
-    list.querySelector('#ff-invite').addEventListener('click', inviteFriend);
-    return;
-  }
+  // Only when friends have something to show; inviting is the small header button.
+  const items = (state.restaurants || []).length ? friendsFeedItems() : [];
+  section.classList.toggle('hidden', !items.length);
+  if (!items.length) { list.innerHTML = ''; return; }
   const mine = new Map((state.restaurants || []).map(r => [normalizeName(r.name), r]));
   list.innerHTML = items.map((x, i) => {
     const who = `<strong>${escHtml(x.who.name)}</strong>`;

@@ -510,6 +510,10 @@
         <span class="nav-badge-text">Byte Cub</span><span>Ask Byte Cub</span>
       </button>
 
+      <button id="header-invite-btn" class="header-invite-btn" type="button" title="Invite friends" aria-label="Invite friends">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" width="15" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.4 3.4-5.5 6.5-5.5s5.7 2.1 6.5 5.5"/><path d="M19 7v6M16 10h6"/></svg>
+        <span>Invite</span>
+      </button>
       <!-- Discover & Play hub launcher (legacy dropdown kept as fallback) -->
       <div class="more-menu-wrap">
         <button id="more-menu-btn" class="play-hub-btn" title="Discover and Play"><span class="play-hub-spark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><path d="M12 2l2.6 5.4L20 10l-5.4 2.6L12 18l-2.6-5.4L4 10l5.4-2.6L12 2z"/></svg></span> <span class="play-hub-label">Discover</span></button>
@@ -797,15 +801,6 @@
 
     <!-- ── Home Discovery: Near You + AI Rec ─────────── -->
     <section id="home-discovery" class="home-discovery" aria-label="Restaurants near you">
-      <button type="button" class="home-add-bar" id="home-add-bar">
-        <span class="home-add-plus" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" width="22"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        </span>
-        <span class="home-add-copy">
-          <strong>Add a place you want to try</strong>
-          <span>Type a name, paste a link, or import a list</span>
-        </span>
-      </button>
       <div id="bear-swipe-home" class="bear-swipe-home home-module hidden" aria-label="Bear swipe picks">
         <div class="bear-swipe-header">
           <div>
@@ -821,6 +816,15 @@
         </div>
         <div id="bear-swipe-joke" class="bear-swipe-joke">I can bear-ly decide, so swipe your mood.</div>
       </div>
+      <button type="button" class="home-add-bar" id="home-add-bar">
+        <span class="home-add-plus" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" width="22"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </span>
+        <span class="home-add-copy">
+          <strong>Add a place you want to try</strong>
+          <span>Type a name, paste a link, or import a list</span>
+        </span>
+      </button>
 
       <!-- AI Recommendation Banner -->
       <div id="ai-rec-banner" class="ai-rec-banner home-module hidden">
@@ -1649,8 +1653,9 @@
       <div class="chat-avatar"><img class="bear-mark" src="feedbear.jpg" alt="" aria-hidden="true" /></div>
       <div>
         <div class="chat-title">Byte Cub</div>
-        <div class="chat-subtitle">Your personal food guide</div>
+        <div class="chat-subtitle">Your food assistant: tell me where you ate</div>
       </div>
+      <button id="chat-hide-cub-btn" class="chat-hide-cub" type="button" title="Hide the floating cub until next time">Hide cub</button>
       <button id="chat-close-btn" class="icon-btn" aria-label="Close chat">✕</button>
     </div>
 
@@ -1663,7 +1668,7 @@
     </div>
 
     <div class="chat-input-row">
-      <input type="text" id="chat-input" placeholder="Ask me anything foodie" autocomplete="off" />
+      <input type="text" id="chat-input" placeholder="e.g. I went to Tacos Chiwas, had the birria, 5 stars" autocomplete="off" enterkeyhint="send" />
       <button id="chat-send-btn" class="btn-primary" aria-label="Send">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
       </button>

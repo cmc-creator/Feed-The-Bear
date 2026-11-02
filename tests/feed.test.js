@@ -18,13 +18,13 @@ const OLD_LINK_FRIEND = { key: 'name:jo', name: 'Jo', savedAt: 1, data: { id: ''
   await e.route(/overpass|nominatim|place-info/, r => r.abort());
   await e.goto(`${BASE}/app.html`);
   await e.waitForTimeout(1200);
-  check(await e.locator('#friends-feed-home').isVisible(), 'the home screen has a Friends\' Feed');
-  check(await e.locator('#ff-invite').isVisible(), 'with no friends, it invites one');
+  check(!(await e.locator('#friends-feed-home').isVisible()), 'no friends yet: no empty Friends\' Feed card');
+  check(await e.locator('#header-invite-btn').isVisible(), 'a small Invite button sits in the header');
   await e.evaluate(() => { navigator.share = undefined; });
   await e.context().grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
   // No name yet: the invite asks for one so friends know who it's from.
   e.once('dialog', d => d.accept('Me'));
-  await e.locator('#ff-invite').click();
+  await e.locator('#header-invite-btn').click();
   await e.waitForTimeout(300);
   check(await e.evaluate(() => state.settings.shareLive === true), 'inviting turns on live sharing');
 

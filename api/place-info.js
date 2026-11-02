@@ -11,7 +11,7 @@
    ════════════════════════════════════════════════════════════ */
 
 const FIELDS = [
-  'places.id', 'places.displayName', 'places.location', 'places.rating', 'places.userRatingCount',
+  'places.id', 'places.displayName', 'places.location', 'places.formattedAddress', 'places.rating', 'places.userRatingCount',
   'places.priceLevel', 'places.regularOpeningHours', 'places.nationalPhoneNumber',
   'places.websiteUri', 'places.googleMapsUri',
 ].join(',');
@@ -158,6 +158,9 @@ module.exports = async function handler (req, res) {
     found: true,
     placeId: place.id || '',
     name: place.displayName?.text || '',
+    address: String(place.formattedAddress || '').slice(0, 200),
+    lat: Number(place.location?.latitude) || null,
+    lng: Number(place.location?.longitude) || null,
     rating: Number(place.rating) || 0,
     reviews: Number(place.userRatingCount) || 0,
     priceLevel: PRICE[place.priceLevel] || 0,

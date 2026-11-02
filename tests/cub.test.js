@@ -20,12 +20,12 @@ const NEARBY = [
   // Buddy
   check(await p.locator('#cub-buddy .cub-btn').isVisible(), 'the cub buddy is on screen');
   await p.click('#cub-buddy .cub-btn');
-  const actions = await p.$$eval('#cub-buddy .cub-menu button', bs => bs.map(b => b.textContent.trim()));
-  check(actions.includes('Add a spot') && actions.includes('I just ate') && actions.includes('Pick for me'), `tapping the cub shows quick actions (${actions.join(', ')})`);
-  check(actions[0] === 'Chat with Byte Cub', 'chatting with Byte Cub is the first thing the cub offers');
+  check(await p.locator('#chat-panel').isVisible(), 'tapping the cub opens the Byte Cub chat');
+  check(/where you ate|I went to|I had lunch at/i.test(await p.locator('#chat-messages').innerText()), 'he says what he can do');
+  await p.evaluate(() => closeChat());
 
   // Quick add: nearby suggestions, pick one, "Want to try" with a crave dish
-  await p.locator('#cub-buddy .cub-menu [data-act="add"]').click();
+  await p.click('#home-add-bar');
   await p.waitForSelector('#quick-add-overlay:not(.hidden)');
   const suggs = await p.$$eval('.qa-sugg strong', s => s.map(x => x.textContent));
   check(suggs.includes('Taqueria El Sol') && suggs.includes('Ramen Ya'), `shows nearby places to pick (${suggs.join(', ')})`);
@@ -102,8 +102,9 @@ const NEARBY = [
   const tip = await p.locator('#cub-buddy .cub-bubble-text').innerText();
   check(/What did you order at/.test(tip), `the cub offers a relevant tip ("${tip}")`);
   await p.click('#cub-buddy .cub-btn');
-  await p.locator('[data-act="hide"]').click();
-  check(await p.locator('#cub-buddy').count() === 0, '"Hide the cub" hides it');
+  await p.click('#chat-hide-cub-btn');
+  check(await p.locator('#cub-buddy').count() === 0, '"Hide cub" in the chat hides it');
+  check(await p.evaluate(() => sessionStorage.getItem('ftb_cub_hidden_until') === '1' && !localStorage.getItem('ftb_cub_hidden_until')), 'only until the app is opened again');
 
   check(!p.errors.length, `no page errors ${p.errors.join(' | ')}`);
   await browser.close();

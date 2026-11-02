@@ -574,7 +574,7 @@ window.Cub = (() => {
   let bubbleTimer = null;
 
   const ACTIONS = [
-    ['ask', 'Chat with Byte Cub', () => (app().hasGrizzly() ? app().openAiPanel?.() : app().showGrizzlyUpsell('byte-cub'))],
+    ['ask', 'Chat with Byte Cub', () => app().openChat?.()],
     ['add', 'Add a spot', () => openAdd()],
     ['ate', 'I just ate', () => app().openJustAte?.()],
     ['pick', 'Pick for me', () => app().openDecisionMode?.()],
@@ -583,8 +583,10 @@ window.Cub = (() => {
     ['hide', 'Hide the cub for a week', () => hideBuddy()],
   ];
 
+  // Hidden only for this visit (from the chat's header). The old "hide for a
+  // week" made Byte Cub vanish for days after one stray tap.
   function hiddenNow () {
-    try { return Date.now() < Number(localStorage.getItem(HIDE_KEY) || 0); } catch { return false; }
+    try { localStorage.removeItem(HIDE_KEY); return sessionStorage.getItem(HIDE_KEY) === '1'; } catch { return false; }
   }
 
   function buildBuddy () {
@@ -593,27 +595,13 @@ window.Cub = (() => {
     el.className = 'cub-buddy';
     el.innerHTML = `
       <div class="cub-bubble hidden" role="status"><span class="cub-bubble-text"></span><button type="button" class="cub-bubble-x" aria-label="Dismiss tip">✕</button></div>
-      <div class="cub-menu hidden" role="menu" aria-label="Cub quick actions">${ACTIONS.map(([k, label]) => `<button type="button" role="menuitem" data-act="${k}" class="${k === 'hide' ? 'cub-menu-quiet' : ''}">${esc(label)}</button>`).join('')}</div>
-      <button type="button" class="cub-btn" aria-label="Your bear cub buddy" aria-expanded="false"><img src="${AVATAR}" alt="" /></button>`;
+      <button type="button" class="cub-btn" aria-label="Chat with Byte Cub, your food assistant"><img src="${AVATAR}" alt="" /><span class="cub-btn-dot" aria-hidden="true"></span></button>`;
     document.body.appendChild(el);
-    const btn = el.querySelector('.cub-btn');
-    const menu = el.querySelector('.cub-menu');
-    btn.addEventListener('click', () => {
+    // Tapping the cub opens Byte Cub's chat, where every action lives.
+    el.querySelector('.cub-btn').addEventListener('click', () => {
       hideBubble();
-      const open = menu.classList.toggle('hidden') === false;
-      btn.setAttribute('aria-expanded', String(open));
-      if (open) track('cub_menu_opened', {});
-    });
-    menu.addEventListener('click', e => {
-      const b = e.target.closest('[data-act]');
-      if (!b) return;
-      menu.classList.add('hidden');
-      btn.setAttribute('aria-expanded', 'false');
-      track('cub_action', { act: b.dataset.act });
-      ACTIONS.find(([k]) => k === b.dataset.act)?.[2]();
-    });
-    document.addEventListener('click', e => {
-      if (!el.contains(e.target)) { menu.classList.add('hidden'); btn.setAttribute('aria-expanded', 'false'); }
+      track('cub_chat_opened', {});
+      app().openChat?.();
     });
     el.querySelector('.cub-bubble-x').addEventListener('click', e => { e.stopPropagation(); hideBubble(); });
     el.querySelector('.cub-bubble').addEventListener('click', e => {
@@ -627,10 +615,10 @@ window.Cub = (() => {
   }
 
   function hideBuddy () {
-    try { localStorage.setItem(HIDE_KEY, String(Date.now() + 7 * 864e5)); } catch { /* storage blocked */ }
+    try { sessionStorage.setItem(HIDE_KEY, '1'); } catch { /* storage blocked */ }
     buddy?.remove();
     buddy = null;
-    app().showToast?.('See you soon', 'The cub will be back in a week. You can still add spots with +.', 'info');
+    app().showToast?.('Byte Cub is napping', "He'll be back next time you open the app. The ＋ button still adds spots.", 'info');
   }
 
   function hideBubble () {
@@ -677,7 +665,7 @@ window.Cub = (() => {
     }
   }
 
-  return { init, openAdd, close, welcome, guessCuisine, parseMapsLink, tip: buddyTip };
+  return { init, openAdd, close, welcome, guessCuisine, parseMapsLink, tip: buddyTip, hide: hideBuddy };
 })();
 
 document.addEventListener('DOMContentLoaded', () => window.Cub.init());

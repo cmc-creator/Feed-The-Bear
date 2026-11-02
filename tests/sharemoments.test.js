@@ -25,12 +25,12 @@ const SEED = [
     picks: [{ n: 'Tacos Chiwas', r: 5, g: ['Birria'], a: 'Phoenix' }, { n: 'Bacanora', r: 5, g: ['Pollo asado'], a: '1301 Grand Ave, Phoenix' }] }))));
   await closeAllDialogs(p);
 
-  // Regulars (5+ spots): today's pick comes before Bear Swipe on screen.
+  // Bear Swipe stays at the top of home, however many spots you have.
   const order = await p.evaluate(() => {
     const top = id => document.getElementById(id)?.getBoundingClientRect().top ?? 1e9;
-    return { regular: document.body.classList.contains('home-regular'), pick: top('ai-rec-banner'), swipe: top('bear-swipe-home') };
+    return { pick: top('ai-rec-banner'), swipe: top('bear-swipe-home'), add: top('home-add-bar') };
   });
-  check(order.regular && order.pick < order.swipe, `regulars see Today's Pick above Bear Swipe (${JSON.stringify(order)})`);
+  check(order.swipe < order.add && order.swipe < order.pick, `Bear Swipe stays first on home (${JSON.stringify(order)})`);
 
   // Who's been here + Go together.
   await p.evaluate(() => openDetailModal('t'));

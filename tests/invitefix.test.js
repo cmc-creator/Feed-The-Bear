@@ -91,9 +91,9 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
   await closeAllDialogs(p);
   check((await p.locator('#mobile-add-btn .mobile-nav-fab-label').innerText()) === 'Add', 'the bottom button says Add');
   check(await p.evaluate(() => document.body.classList.contains('add-hint')), 'it pulses for someone with few places');
-  check(await p.locator('#home-add-bar').isVisible(), 'home has an Add a place button near the top');
-  const box = await p.locator('#home-add-bar').boundingBox();
-  check(box && box.y < 844, `and it's on the first screen (y=${box && Math.round(box.y)})`);
+  check(await p.locator('#home-add-bar').isVisible(), 'home has an Add a place button (under Bear Swipe)');
+  const fab = await p.locator('#mobile-add-btn').boundingBox();
+  check(fab && fab.y < 844, `the gold Add button is always on screen (y=${fab && Math.round(fab.y)})`);
   await p.click('#home-add-bar');
   await p.waitForTimeout(300);
   check(await p.locator('.qa-sheet:not(.hidden), #quick-add:not(.hidden), .qa-input').first().isVisible(), 'it opens Add a spot');

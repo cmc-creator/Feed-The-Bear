@@ -1567,6 +1567,12 @@ button:focus-visible,
 .detail-meta { font-size: .78rem; color: var(--text-dim); margin-bottom: 20px; display: flex; gap: 16px; flex-wrap: wrap; }
 
 .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+/* Phones: a tidy two-column grid instead of a long ragged column of pills. */
+@media (max-width: 768px) {
+  .detail-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .detail-actions > button { width: 100%; min-width: 0; justify-content: center; text-align: center; white-space: normal; line-height: 1.2; }
+  .detail-actions > #detail-directions-btn { grid-column: 1 / -1; }
+}
 
 /* ── Proximity Alert ─────────────────────────────────────── */
 .proximity-alert {
@@ -2171,6 +2177,34 @@ body.celebrate-glow::before {
   box-shadow: 0 6px 18px rgba(var(--primary-rgb),.25);
 }
 .play-hub-btn:active { transform: scale(.96); }
+
+/* Small Invite button in the header, next to Discover & Play. */
+.header-invite-btn {
+  display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 11px; cursor: pointer;
+  border-radius: 999px; font: inherit; font-size: .76rem; font-weight: 800; color: #2a1a05;
+  background: linear-gradient(135deg, #ffe2a3, #f0b850); border: 1px solid #fff3d6;
+}
+@media (max-width: 420px) { .header-invite-btn span { display: none; } .header-invite-btn { width: 32px; padding: 0; justify-content: center; } }
+
+/* Byte Cub's chat: above everything, with his action buttons under a message. */
+.chat-panel { z-index: 300; }
+.chat-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: -2px 0 10px 44px; }
+.chat-actions .btn-sm { min-height: 36px; padding: 6px 12px; font-size: .8rem; }
+.chat-actions button:disabled { opacity: .55; }
+.chat-hide-cub { margin-left: auto; margin-right: 6px; background: none; border: 0; cursor: pointer; font: inherit; font-size: .72rem; color: var(--text-dim); text-decoration: underline; }
+/* The floating cub steps aside while his chat or any screen is open. */
+body.chat-open .cub-buddy,
+body:has(.modal-overlay:not(.hidden)) .cub-buddy { display: none; }
+.cub-btn { position: relative; }
+.cub-btn-dot { position: absolute; top: 3px; right: 3px; width: 12px; height: 12px; border-radius: 50%; background: #4ade80; border: 2px solid #1e130c; }
+
+/* Where it is, on a spot's page. */
+.detail-location { margin: 0 0 16px; border-radius: var(--radius); overflow: hidden; background: var(--surface2); border: 1px solid var(--border); }
+.dl-map { display: block; width: 100%; height: 170px; border: 0; }
+.dl-body { padding: 12px 14px; display: grid; gap: 10px; }
+.dl-addr { font-size: .9rem; color: var(--text); line-height: 1.4; overflow-wrap: anywhere; }
+.dl-dim { color: var(--text-dim); }
+.dl-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .play-hub-spark { filter: drop-shadow(0 0 6px rgba(var(--primary-rgb),.6)); }
 
 /* Desktop: render the Discover & Play hub as a centered modal, not fullscreen */
@@ -5408,13 +5442,6 @@ body.light-mode #profile-btn {
   display: flex;
   flex-direction: column;
 }
-/* Regulars (5+ spots, class set in renderAll) see today's pick, what's open
-   and friends first; Bear Swipe, a getting-to-know-you game, moves down. */
-body.home-regular #ai-rec-banner { order: -4; }
-body.home-regular #open-now-home { order: -3; }
-body.home-regular #friends-feed-home { order: -2; }
-body.home-regular #home-add-bar { order: -1; }
-body.home-regular #bear-swipe-home { order: 2; }
 
 .home-module {
   border: 1px solid rgba(194,157,115,.24);

@@ -161,3 +161,6 @@ jobs:
       - name: My Lists (Want to Try / Been There), links, Just Ate search and rating
         working-directory: tests
         run: node mylists.test.js
+      - name: Byte Cub assistant, spot location, header invite
+        working-directory: tests
+        run: node bytecub.test.js

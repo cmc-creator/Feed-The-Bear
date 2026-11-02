@@ -71,7 +71,9 @@ const call = (method, { query = {}, body = {} } = {}) => new Promise(resolve => 
   await p.evaluate(() => { document.querySelectorAll('.toast').forEach(t => t.remove()); });
   check(/Dinner Vote/.test(await p.locator('#home-quick-rooms-btn').innerText({ timeout: 2000 }).catch(() => '') || await p.locator('#home-quick-rooms-btn').textContent()), 'the home quick action is called Dinner Vote');
   await p.click('#cub-buddy .cub-btn');
-  await p.locator('#cub-buddy .cub-menu [data-act="vote"]').click();
+  await p.fill('#chat-input', 'start a dinner vote');
+  await p.press('#chat-input', 'Enter');
+  await p.waitForTimeout(300);
   check(await p.locator('.dv-pick.on').count() === 3, 'the best 3 spots are picked to start');
   await p.locator('.dv-pick.on').first().click();
   check((await p.locator('#dv-start').innerText()) === 'Start the vote (2 spots)', 'tapping a spot unpicks it');
