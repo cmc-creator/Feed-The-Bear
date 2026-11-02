@@ -43,6 +43,18 @@ function isPublicHost (hostname = '') {
     (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224);
 }
 
+// A public-looking name can still point at a private address (x.127.0.0.1.nip.io),
+// so check where it actually resolves too.
+async function resolvesPublic (hostname = '') {
+  if (!isPublicHost(hostname)) return false;
+  try {
+    const addrs = await require('dns').promises.lookup(hostname, { all: true });
+    return addrs.length > 0 && addrs.every(({ address, family }) => family === 4
+      ? isPublicHost(address)
+      : /^[23][0-9a-f]{3}:/i.test(address)); // IPv6: global unicast only
+  } catch { return false; }
+}
+
 function safeHttpUrl (value = '') {
   const v = String(value || '').trim();
   if (!v) return '';
@@ -239,7 +251,7 @@ async function scrapeWebsiteImage (website = '') {
   let resp = null;
   // Follow redirects by hand so every hop is checked against internal addresses.
   for (let hop = 0; hop < 4; hop++) {
-    if (!url || !isPublicHost(new URL(url).hostname)) return { parked: false, photoUrl: '' };
+    if (!url || !(await resolvesPublic(new URL(url).hostname))) return { parked: false, photoUrl: '' };
     resp = await fetchWithTimeout(url, {
       redirect: 'manual',
       headers: {

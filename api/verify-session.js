@@ -13,7 +13,7 @@
 
 const Stripe  = require('stripe');
 const admin   = require('firebase-admin');
-const { rewardInviter, expireReward } = require('./_referral');
+const { expireReward } = require('./_referral');
 
 const LIVE = ['active', 'trialing', 'past_due'];
 
@@ -148,10 +148,7 @@ module.exports = async function handler (req, res) {
       { merge: true }
     );
     if (session.customer) await db.doc(`stripeCustomers/${session.customer}`).set({ uid }, { merge: true });
-    // Came from a friend's invite: they get their free month (the webhook may do this first; it only happens once).
-    if (session.metadata?.ref) {
-      try { await rewardInviter({ db, stripe, inviterUid: session.metadata.ref, friendUid: uid }); } catch (err) { console.error('[FTB] invite reward failed:', err.message); }
-    }
+    // An invite's reward waits for the friend's first real payment (stripe-webhook.js).
 
     // On a free trial nothing is charged until the trial ends.
     const trialEnd = session.payment_status === 'no_payment_required' && sub?.trial_end

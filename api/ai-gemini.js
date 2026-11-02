@@ -19,6 +19,10 @@ const admin = require('firebase-admin');
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
 const GEMINI_BASE  = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}`;
 const THINKING_HEADROOM = 1536;
+// One request may carry recent chat, a photo, or every saved spot (craving
+// match, ~120 chars each), but not megabytes of text.
+const MAX_TURNS = 40;
+const MAX_TEXT_CHARS = 200000;
 
 function getAdmin () {
   if (!admin.apps.length) {
@@ -44,10 +48,17 @@ async function getPlan (uid) {
   return plan;
 }
 
+// Characters of text in the request; a photo (inline data) doesn't count.
+const textLength = v => typeof v === 'string' ? v.length
+  : Array.isArray(v) ? v.reduce((n, x) => n + textLength(x), 0)
+  : v && typeof v === 'object' ? Object.entries(v).reduce((n, [k, x]) => n + (/^inline_?data$/i.test(k) ? 0 : textLength(x)), 0)
+  : 0;
+
 function sanitizeBody (input) {
   // Only pass through the fields we expect; clamp token spend.
   const body = {};
-  if (!input || !Array.isArray(input.contents) || !input.contents.length) return null;
+  if (!input || !Array.isArray(input.contents) || !input.contents.length || input.contents.length > MAX_TURNS) return null;
+  if (textLength([input.contents, input.systemInstruction]) > MAX_TEXT_CHARS) return null;
   body.contents = input.contents;
   if (input.systemInstruction) body.systemInstruction = input.systemInstruction;
   const gen = input.generationConfig || {};

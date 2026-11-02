@@ -3,8 +3,9 @@
    Vercel skips files in api/ that start with "_")
    ════════════════════════════════════════════════════════════
    A friend who opens an invite link (app.html?ref=<uid>) gets a 30-day
-   Grizzly trial instead of 7 days. When they finish checkout, the person
-   who invited them gets a free month:
+   Grizzly trial instead of 7 days. When they first pay (the trial ends and
+   their card is charged; stripe-webhook.js invoice.paid), the person who
+   invited them gets a free month:
      - paying already: a $4.99 credit on their next Stripe bill
      - not paying:     Grizzly until rewards/{uid}.grizzlyUntil, then back to free
    Server-only collections (no client rules, so the app can't touch them):

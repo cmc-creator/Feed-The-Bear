@@ -9,7 +9,8 @@
      URL:    https://www.feed-the-bear.com/api/stripe-webhook
      Events: checkout.session.completed,
              customer.subscription.updated,
-             customer.subscription.deleted
+             customer.subscription.deleted,
+             invoice.paid                    (invite rewards)
 
    Environment variables required (set in Vercel dashboard):
      STRIPE_SECRET_KEY        - Stripe secret key
@@ -55,6 +56,19 @@ async function uidForCustomer (db, customerId, metadataUid) {
   return snap.exists ? snap.data().uid : null;
 }
 
+// Who invited this subscriber, if anyone. Subscriptions started before the
+// invite was copied onto them only have it on their checkout session.
+async function inviteFor (stripe, subId) {
+  if (!subId) return null;
+  const sub = typeof subId === 'string' ? await stripe.subscriptions.retrieve(subId) : subId;
+  let { uid, ref } = sub.metadata || {};
+  if (!ref) {
+    const session = (await stripe.checkout.sessions.list({ subscription: sub.id, limit: 1 })).data[0];
+    ({ uid, ref } = { uid: uid || session?.metadata?.uid, ref: session?.metadata?.ref });
+  }
+  return uid && ref ? { uid, ref } : null;
+}
+
 module.exports = async function handler (req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -85,9 +99,15 @@ module.exports = async function handler (req, res) {
           upgradedAt:       new Date().toISOString(),
         });
         if (obj.customer) await db.doc(`stripeCustomers/${obj.customer}`).set({ uid }, { merge: true });
-        // Came from a friend's invite: they get their free month (only ever once per friend).
-        if (obj.metadata?.ref) await rewardInviter({ db, stripe, inviterUid: obj.metadata.ref, friendUid: uid });
       }
+    }
+
+    // A friend's first real payment (after their free trial): whoever invited
+    // them gets the free month, only ever once per friend. Rewarding at
+    // checkout let free trials, cancelled right away, farm free months.
+    if (event.type === 'invoice.paid' && obj.amount_paid > 0) {
+      const invite = await inviteFor(stripe, obj.subscription || obj.parent?.subscription_details?.subscription);
+      if (invite) await rewardInviter({ db, stripe, inviterUid: invite.ref, friendUid: invite.uid });
     }
 
     if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {

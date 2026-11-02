@@ -1,5 +1,5 @@
 // Free trial and invite rewards on the server: one 7-day trial per person,
-// 30 days from a friend's invite, and the inviter's free month.
+// 30 days from a friend's invite, and the inviter's free month once the friend pays.
 const Module = require('module');
 const { Readable } = require('stream');
 const path = require('path');
@@ -12,6 +12,7 @@ let stripeCustomersByEmail = {};
 let liveSubs = {};
 let creditFails = false;
 const endedSubs = {};
+const subMeta = {};
 const fakeAdmin = {
   apps: [1],
   auth: () => ({
@@ -35,13 +36,14 @@ const fakeStripe = () => ({
   },
   subscriptions: {
     list: async ({ customer }) => ({ data: liveSubs[customer] ? [{ status: 'active' }] : [] }),
-    retrieve: async id => ({ status: endedSubs[id] ? 'canceled' : 'trialing', trial_end: Math.floor(Date.now() / 1000) + 7 * 86400 }),
+    retrieve: async id => ({ id, status: endedSubs[id] ? 'canceled' : 'trialing', trial_end: Math.floor(Date.now() / 1000) + 7 * 86400, metadata: subMeta[id] || {} }),
   },
   billingPortal: { sessions: { create: async ({ customer }) => ({ url: `https://billing.stripe.com/p/${customer}` }) } },
   checkout: {
     sessions: {
       create: async params => { stripeCalls.sessions.push(params); return { url: 'https://checkout.stripe.com/x' }; },
       retrieve: async id => sessionsById[id],
+      list: async ({ subscription }) => ({ data: Object.values(sessionsById).filter(s => s.subscription === subscription) }),
     },
   },
 });
@@ -134,14 +136,21 @@ const PRICE = 'price_1UW2DmLzFIsRCvKRfFexC3P8';
   check(r.data.days === 7, 'you cannot invite yourself');
   await call(checkout, { method: 'POST', body: { uid: 'friend00000001', email: 'friend@example.com', priceId: PRICE, ref: 'inviterfree001' } });
   const sess = stripeCalls.sessions.at(-1);
-  check(sess.subscription_data.trial_period_days === 30 && sess.metadata.ref === 'inviterfree001', 'the invite is carried through checkout');
+  check(sess.subscription_data.trial_period_days === 30 && sess.metadata.ref === 'inviterfree001' && sess.subscription_data.metadata.ref === 'inviterfree001', 'the invite is carried through checkout onto the subscription');
 
-  // Friend finishes checkout: a free inviter gets a Grizzly month, once.
-  await hook({ type: 'checkout.session.completed', data: { object: { id: 'cs_f1', status: 'complete', payment_status: 'no_payment_required', customer: 'cus_f1', metadata: { uid: 'friend00000001', ref: 'inviterfree001' } } } });
-  const until = Date.parse(docs['rewards/inviterfree001']?.grizzlyUntil || '');
-  check(docs['users/inviterfree001/meta/profile'].plan === 'grizzly' && until > Date.now() + 29 * 864e5, 'the inviter gets a free Grizzly month');
-  sessionsById.cs_f1 = { id: 'cs_f1', status: 'complete', payment_status: 'no_payment_required', customer: 'cus_f1', metadata: { uid: 'friend00000001', ref: 'inviterfree001' } };
+  // Starting the free trial gives the inviter nothing yet: trials cancelled straight away can't farm free months.
+  subMeta.sub_f1 = { uid: 'friend00000001', ref: 'inviterfree001' };
+  sessionsById.cs_f1 = { id: 'cs_f1', status: 'complete', payment_status: 'no_payment_required', customer: 'cus_f1', subscription: 'sub_f1', metadata: { uid: 'friend00000001', ref: 'inviterfree001' } };
+  await hook({ type: 'checkout.session.completed', data: { object: sessionsById.cs_f1 } });
   await call(verify, { query: { sessionId: 'cs_f1', uid: 'friend00000001' } });
+  await hook({ type: 'invoice.paid', data: { object: { id: 'in_f1_0', amount_paid: 0, subscription: 'sub_f1' } } });
+  check(!docs['rewards/inviterfree001'] && !docs['users/inviterfree001/meta/profile'].plan, 'no reward while the friend is on the free trial');
+
+  // The friend's first real payment: a free inviter gets a Grizzly month, once.
+  await hook({ type: 'invoice.paid', data: { object: { id: 'in_f1_1', amount_paid: 499, subscription: 'sub_f1' } } });
+  const until = Date.parse(docs['rewards/inviterfree001']?.grizzlyUntil || '');
+  check(docs['users/inviterfree001/meta/profile'].plan === 'grizzly' && until > Date.now() + 29 * 864e5, 'the inviter gets a free Grizzly month when the friend pays');
+  await hook({ type: 'invoice.paid', data: { object: { id: 'in_f1_2', amount_paid: 499, parent: { subscription_details: { subscription: 'sub_f1' } } } } });
   check(docs['rewards/inviterfree001'].invites === 1 && Date.parse(docs['rewards/inviterfree001'].grizzlyUntil) === until, 'the same friend only counts once');
 
   // A paying inviter gets a $4.99 credit instead.
@@ -150,10 +159,12 @@ const PRICE = 'price_1UW2DmLzFIsRCvKRfFexC3P8';
   docs['users/friend00000002/meta/profile'] = {};
   // Stripe hiccups the first time: the webhook fails so Stripe retries, and the retry still gives the credit.
   creditFails = true;
-  const failed = await hook({ type: 'checkout.session.completed', data: { object: { id: 'cs_f2', status: 'complete', payment_status: 'no_payment_required', customer: 'cus_f2', metadata: { uid: 'friend00000002', ref: 'inviterpaid01' } } } });
+  // This trial started before invites were copied onto subscriptions: found through its checkout session.
+  sessionsById.cs_f2 = { id: 'cs_f2', status: 'complete', payment_status: 'no_payment_required', customer: 'cus_f2', subscription: 'sub_f2', metadata: { uid: 'friend00000002', ref: 'inviterpaid01' } };
+  const failed = await hook({ type: 'invoice.paid', data: { object: { id: 'in_f2', amount_paid: 499, subscription: 'sub_f2' } } });
   check(failed === 500 && !docs['referrals/friend00000002'], 'a failed reward is not marked as given, so a retry can give it');
   creditFails = false;
-  await hook({ type: 'checkout.session.completed', data: { object: { id: 'cs_f2', status: 'complete', payment_status: 'no_payment_required', customer: 'cus_f2', metadata: { uid: 'friend00000002', ref: 'inviterpaid01' } } } });
+  await hook({ type: 'invoice.paid', data: { object: { id: 'in_f2', amount_paid: 499, subscription: 'sub_f2' } } });
   check(stripeCalls.credits.some(c => c.customer === 'cus_paid' && c.amount === -499), 'a paying inviter gets $4.99 off their next bill');
 
   // When the free month ends, the inviter goes back to free.

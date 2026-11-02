@@ -917,7 +917,7 @@ async function shareInvite () {
   } catch (err) { if (err?.name === 'AbortError') return; }
   try {
     await navigator.clipboard.writeText(`${text} ${url}`);
-    showToast('Invite link copied', 'Paste it to a friend. You get a free month when they join Grizzly.', 'success');
+    showToast('Invite link copied', 'Paste it to a friend. You get a free month when they subscribe to Grizzly.', 'success');
   } catch {
     prompt('Copy your invite link:', url);
   }

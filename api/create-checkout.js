@@ -102,7 +102,8 @@ module.exports = async function handler (req, res) {
       client_reference_id:  uid,
       // The webhook reads this to find the account when a subscription changes.
       subscription_data:    {
-        metadata: { uid },
+        // ref: the inviter is rewarded at the first real payment (stripe-webhook.js invoice.paid).
+        metadata: invitedBy ? { uid, ref: invitedBy } : { uid },
         // A card is still collected; the first charge comes when the trial ends.
         ...(trial ? { trial_period_days: days } : {}),
       },
