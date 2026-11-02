@@ -15,6 +15,8 @@ const Stripe  = require('stripe');
 const admin   = require('firebase-admin');
 const { rewardInviter, expireReward } = require('./_referral');
 
+const LIVE = ['active', 'trialing', 'past_due'];
+
 // Initialize Firebase Admin once (Vercel may reuse the runtime)
 function getAdmin () {
   if (!admin.apps.length) {
@@ -121,6 +123,17 @@ module.exports = async function handler (req, res) {
       return;
     }
 
+    // An old session id stays "paid" forever, so check the subscription is
+    // still live; otherwise a cancelled member could replay it for free Grizzly.
+    let sub = null;
+    if (session.subscription) {
+      sub = await stripe.subscriptions.retrieve(session.subscription);
+      if (!LIVE.includes(sub.status)) {
+        res.status(402).json({ error: 'This subscription has ended', payment_status: 'ended' });
+        return;
+      }
+    }
+
     // Write Grizzly plan to Firestore
     const db = getAdmin().firestore();
     // Any finished checkout uses up the one free trial (see create-checkout.js).
@@ -141,13 +154,8 @@ module.exports = async function handler (req, res) {
     }
 
     // On a free trial nothing is charged until the trial ends.
-    let trialEnd = null;
-    if (session.payment_status === 'no_payment_required' && session.subscription) {
-      try {
-        const sub = await stripe.subscriptions.retrieve(session.subscription);
-        if (sub.trial_end) trialEnd = new Date(sub.trial_end * 1000).toISOString();
-      } catch { /* the toast just leaves the date out */ }
-    }
+    const trialEnd = session.payment_status === 'no_payment_required' && sub?.trial_end
+      ? new Date(sub.trial_end * 1000).toISOString() : null;
     res.status(200).json({ plan: 'grizzly', trialEnd });
   } catch (err) {
     // An unknown session id will never succeed, so tell the app to stop retrying.

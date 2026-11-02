@@ -666,7 +666,7 @@ async function _verifyAndActivatePlan (sessionId, uid) {
       return 'grizzly';
     }
     if (resp.status === 403) return 'wrong-account';
-    if (resp.status === 404 || (resp.status === 402 && data.payment_status === 'unpaid')) return 'unpaid';
+    if (resp.status === 404 || (resp.status === 402 && ['unpaid', 'ended'].includes(data.payment_status))) return 'unpaid';
     return 'retry';
   } catch (err) {
     console.warn('[FTB] Plan verification failed:', err);

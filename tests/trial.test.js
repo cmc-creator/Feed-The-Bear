@@ -10,6 +10,8 @@ const docs = {};
 const stripeCalls = { sessions: [], credits: [] };
 let stripeCustomersByEmail = {};
 let liveSubs = {};
+let creditFails = false;
+const endedSubs = {};
 const fakeAdmin = {
   apps: [1],
   auth: () => ({
@@ -21,6 +23,7 @@ const fakeAdmin = {
       set: async (data, opts) => { docs[p] = opts?.merge ? { ...(docs[p] || {}), ...data } : data; },
       create: async data => { if (docs[p]) throw new Error('exists'); docs[p] = data; },
       get: async () => ({ exists: !!docs[p], data: () => docs[p] }),
+      delete: async () => { delete docs[p]; },
     }),
   }),
 };
@@ -28,11 +31,11 @@ const fakeStripe = () => ({
   webhooks: { constructEvent: body => JSON.parse(body.toString()) },
   customers: {
     list: async ({ email }) => ({ data: stripeCustomersByEmail[email] ? [{ id: stripeCustomersByEmail[email] }] : [] }),
-    createBalanceTransaction: async (customer, tx) => { stripeCalls.credits.push({ customer, ...tx }); return {}; },
+    createBalanceTransaction: async (customer, tx) => { if (creditFails) throw new Error('stripe down'); stripeCalls.credits.push({ customer, ...tx }); return {}; },
   },
   subscriptions: {
     list: async ({ customer }) => ({ data: liveSubs[customer] ? [{ status: 'active' }] : [] }),
-    retrieve: async () => ({ trial_end: Math.floor(Date.now() / 1000) + 7 * 86400 }),
+    retrieve: async id => ({ status: endedSubs[id] ? 'canceled' : 'trialing', trial_end: Math.floor(Date.now() / 1000) + 7 * 86400 }),
   },
   billingPortal: { sessions: { create: async ({ customer }) => ({ url: `https://billing.stripe.com/p/${customer}` }) } },
   checkout: {
@@ -70,7 +73,9 @@ async function hook (event) {
   const req = Readable.from([Buffer.from(JSON.stringify(event))]);
   req.method = 'POST';
   req.headers = { 'stripe-signature': 'x' };
-  await new Promise(resolve => webhook(req, { status () { return this; }, json () { resolve(); return this; } }));
+  let status = 200;
+  await new Promise(resolve => webhook(req, { status (s) { status = s; return this; }, json () { resolve(); return this; } }));
+  return status;
 }
 const PRICE = 'price_1UW2DmLzFIsRCvKRfFexC3P8';
 
@@ -111,6 +116,13 @@ const PRICE = 'price_1UW2DmLzFIsRCvKRfFexC3P8';
   r = await call(verify, { query: { sessionId: 'cs_bad', uid: 'again00000001' } });
   check(r.status === 402 && docs['users/again00000001/meta/profile'].plan === undefined, 'an unfinished checkout grants nothing');
 
+  // A paid session id from a subscription that was since cancelled can't be replayed for Grizzly.
+  docs['users/quitter000001/meta/profile'] = { plan: 'free', stripeCustomerId: 'cus_q' };
+  sessionsById.cs_q = { id: 'cs_q', status: 'complete', payment_status: 'paid', customer: 'cus_q', subscription: 'sub_q', metadata: { uid: 'quitter000001' } };
+  endedSubs.sub_q = true;
+  r = await call(verify, { query: { sessionId: 'cs_q', uid: 'quitter000001' } });
+  check(r.status === 402 && r.data.payment_status === 'ended' && docs['users/quitter000001/meta/profile'].plan === 'free', `an old session for a cancelled subscription grants nothing (${r.status})`);
+
   // ── Invites ──
   docs['users/inviterfree001/meta/profile'] = { name: 'Inviter' };
   docs['users/friend00000001/meta/profile'] = { name: 'Friend' };
@@ -136,6 +148,11 @@ const PRICE = 'price_1UW2DmLzFIsRCvKRfFexC3P8';
   docs['users/inviterpaid01/meta/profile'] = { plan: 'grizzly', stripeCustomerId: 'cus_paid' };
   liveSubs.cus_paid = true;
   docs['users/friend00000002/meta/profile'] = {};
+  // Stripe hiccups the first time: the webhook fails so Stripe retries, and the retry still gives the credit.
+  creditFails = true;
+  const failed = await hook({ type: 'checkout.session.completed', data: { object: { id: 'cs_f2', status: 'complete', payment_status: 'no_payment_required', customer: 'cus_f2', metadata: { uid: 'friend00000002', ref: 'inviterpaid01' } } } });
+  check(failed === 500 && !docs['referrals/friend00000002'], 'a failed reward is not marked as given, so a retry can give it');
+  creditFails = false;
   await hook({ type: 'checkout.session.completed', data: { object: { id: 'cs_f2', status: 'complete', payment_status: 'no_payment_required', customer: 'cus_f2', metadata: { uid: 'friend00000002', ref: 'inviterpaid01' } } } });
   check(stripeCalls.credits.some(c => c.customer === 'cus_paid' && c.amount === -499), 'a paying inviter gets $4.99 off their next bill');
 

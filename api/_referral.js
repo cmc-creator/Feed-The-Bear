@@ -34,6 +34,16 @@ async function rewardInviter ({ db, stripe, inviterUid, friendUid }) {
     await db.doc(`referrals/${friendUid}`).create({ inviter: inviterUid, at: new Date().toISOString() });
   } catch { return 'already'; } // this friend already earned someone a reward
 
+  try {
+    return await giveReward({ db, stripe, inviterUid });
+  } catch (err) {
+    // Let the next try (Stripe retries the webhook) give the reward instead of losing it.
+    await db.doc(`referrals/${friendUid}`).delete().catch(() => {});
+    throw err;
+  }
+}
+
+async function giveReward ({ db, stripe, inviterUid }) {
   const rewardRef = db.doc(`rewards/${inviterUid}`);
   const reward = (await rewardRef.get()).data() || {};
   const profile = (await db.doc(`users/${inviterUid}/meta/profile`).get()).data() || {};

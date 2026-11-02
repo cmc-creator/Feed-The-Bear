@@ -116,6 +116,9 @@ jobs:
       - name: Free trial and invite rewards (server)
         working-directory: tests
         run: node trial.test.js
+      - name: Delete account (server)
+        working-directory: tests
+        run: node deleteaccount.test.js
       - name: Free trial and invites (app)
         working-directory: tests
         run: node invite.test.js

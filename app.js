@@ -1510,7 +1510,7 @@ function updateHeaderAvatar (emoji) {
   if (!el) return;
   const profile = loadUserProfile() || {};
   if (profile.photo) {
-    el.innerHTML = `<img src="${profile.photo}" alt="Profile" class="account-avatar-photo" />`;
+    el.innerHTML = `<img src="${escHtml(profile.photo)}" alt="Profile" class="account-avatar-photo" />`;
   } else {
     renderAvatarInto(el, emoji || profile.avatar);
   }
@@ -1523,7 +1523,7 @@ function updateProfileVisuals (profile = null) {
   const accountAvatar = document.getElementById('account-avatar-display');
   if (accountAvatar) {
     if (p.photo) {
-      accountAvatar.innerHTML = `<img src="${p.photo}" alt="Profile" class="account-avatar-photo account-avatar-photo-lg" />`;
+      accountAvatar.innerHTML = `<img src="${escHtml(p.photo)}" alt="Profile" class="account-avatar-photo account-avatar-photo-lg" />`;
     } else {
       renderAvatarInto(accountAvatar, normalizedAvatar);
     }
@@ -1656,7 +1656,7 @@ function openAccountModal () {
 
   if (avatarEl) {
     if (profile.photo) {
-      avatarEl.innerHTML = `<img src="${profile.photo}" alt="Profile" class="account-avatar-photo account-avatar-photo-lg" />`;
+      avatarEl.innerHTML = `<img src="${escHtml(profile.photo)}" alt="Profile" class="account-avatar-photo account-avatar-photo-lg" />`;
     } else {
       renderAvatarInto(avatarEl, normalizedAvatar);
     }

@@ -5,6 +5,7 @@
    Permanently deletes the signed-in user's account and data:
      - users/{uid} and everything under it (spots, profile)
      - live friend profiles they published (profiles where uid == uid)
+     - weekly email sign-up, invite rewards, trial and Stripe customer records
      - any active Grizzly subscription in Stripe (cancelled now)
      - the Firebase sign-in account itself
    Runs on the server because the profile doc can't be deleted from
@@ -67,6 +68,10 @@ module.exports = async function handler (req, res) {
     }
     const published = await db.collection('profiles').where('uid', '==', uid).get();
     await Promise.all(published.docs.map(d => d.ref.delete()));
+    // Server-only records keyed by this account (the weekly email list holds their address).
+    const serverDocs = ['digestSubscribers', 'rewards', 'trials', 'referrals'].map(c => `${c}/${uid}`);
+    if (customerId) serverDocs.push(`stripeCustomers/${customerId}`);
+    await Promise.all(serverDocs.map(p => db.doc(p).delete()));
     await db.recursiveDelete(db.doc(`users/${uid}`));
     await fb.auth().deleteUser(uid);
     return res.status(200).json({ deleted: true });
