@@ -5499,53 +5499,136 @@ function ftbRoundRect (ctx, x, y, w, h, r) {
   ctx.quadraticCurveTo(x,y+h,x,y+h-r); ctx.lineTo(x,y+r);
   ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
 }
-function shareCard (r) {
+// A photo for the card, or null. Only images that allow cross-origin use can
+// be drawn and still exported, so anything else falls back to the emoji design.
+function loadShareImage (src) {
+  return new Promise(resolve => {
+    if (!src) { resolve(null); return; }
+    const img = new Image();
+    if (!/^data:/i.test(src)) img.crossOrigin = 'anonymous';
+    const done = ok => { clearTimeout(timer); resolve(ok ? img : null); };
+    const timer = setTimeout(() => done(false), 5000);
+    img.onload = () => done(img.naturalWidth > 0);
+    img.onerror = () => done(false);
+    img.src = src;
+  });
+}
+
+// Wraps text to at most `lines` lines of `maxW` pixels (the last one ends in …).
+function wrapCanvasText (ctx, text, maxW, lines) {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  const out = [];
+  let line = '';
+  for (const w of words) {
+    const next = line ? `${line} ${w}` : w;
+    if (ctx.measureText(next).width <= maxW || !line) { line = next; continue; }
+    out.push(line);
+    line = w;
+    if (out.length === lines) break;
+  }
+  if (out.length < lines && line) out.push(line);
+  else if (out.length === lines && line && !out.includes(line)) {
+    let last = out[lines - 1];
+    while (last && ctx.measureText(`${last}…`).width > maxW) last = last.slice(0, -1);
+    out[lines - 1] = `${last}…`;
+  }
+  return out.slice(0, lines);
+}
+
+// A phone-sized (Instagram/TikTok Story) card for one spot: its photo, your
+// rating and go-to dish, and a link back to the app in the share message.
+async function shareCard (r) {
   const canvas = document.getElementById('share-canvas');
   const ctx = canvas.getContext('2d');
-  const W = 800, H = 450;
+  // Stories cover about 250px at the top and bottom with their own buttons,
+  // so everything that matters sits between.
+  const W = 1080, H = 1920, PAD = 80, SAFE = 250, BG = '#17100b';
   canvas.width = W; canvas.height = H;
   const [c1, c2] = cuisineGrad(r.cuisine);
-  const bg = ctx.createLinearGradient(0,0,W,H);
-  bg.addColorStop(0,'#15111C'); bg.addColorStop(1,'#281F34');
-  ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
-  const acc = ctx.createLinearGradient(0,0,0,H);
-  acc.addColorStop(0,c1); acc.addColorStop(1,c2);
-  ctx.fillStyle = acc; ctx.fillRect(0,0,8,H);
-  ctx.globalAlpha = .07; ctx.font = '220px serif'; ctx.fillStyle = '#FFF';
-  ctx.fillText(cuisineEmoji(r.cuisine), W-260, H-10); ctx.globalAlpha = 1;
-  ctx.fillStyle = '#FFF'; ctx.font = 'bold 40px system-ui,sans-serif';
-  ctx.fillText(r.name.length>30 ? r.name.slice(0,30)+'…' : r.name, 50, 130);
-  if (r.cuisine) {
-    ctx.font = '15px system-ui,sans-serif';
-    const badge = `${cuisineEmoji(r.cuisine)} ${r.cuisine}`;
-    const bw = ctx.measureText(badge).width + 24;
-    ctx.fillStyle = c1+'44'; ftbRoundRect(ctx,50,148,bw,28,8); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.fillText(badge, 62, 168);
+  ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H);
+
+  // Top: the spot's photo, cropped to fill, or its cuisine colors and emoji.
+  const PH = 1060;
+  const photo = await loadShareImage(safeUrl(r.photo || r.placePhoto || ''));
+  if (photo) {
+    const scale = Math.max(W / photo.naturalWidth, PH / photo.naturalHeight);
+    const w = photo.naturalWidth * scale, h = photo.naturalHeight * scale;
+    ctx.drawImage(photo, (W - w) / 2, (PH - h) / 2, w, h);
+  } else {
+    const g = ctx.createLinearGradient(0, 0, W, PH);
+    g.addColorStop(0, c1); g.addColorStop(1, c2);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, PH);
+    ctx.font = '420px serif'; ctx.textAlign = 'center';
+    ctx.fillText(cuisineEmoji(r.cuisine) || '🍽️', W / 2, PH / 2 + 220);
+    ctx.textAlign = 'left';
   }
-  if (r.googleRating) {
-    ctx.fillStyle = '#F4C430'; ctx.font = 'bold 26px system-ui,sans-serif';
-    ctx.fillText(`★ ${r.googleRating}`, 50, 225);
-    if (r.googleReviews) { ctx.fillStyle = '#888'; ctx.font = '14px system-ui,sans-serif'; ctx.fillText(`(${r.googleReviews.toLocaleString()} reviews)`, 50, 248); }
+  const fade = ctx.createLinearGradient(0, PH - 420, 0, PH);
+  fade.addColorStop(0, 'rgba(23,16,11,0)'); fade.addColorStop(1, BG);
+  ctx.fillStyle = fade; ctx.fillRect(0, PH - 420, W, 420);
+
+  // Brand, top left over the photo.
+  ctx.font = 'bold 40px system-ui,sans-serif';
+  const brand = '🐻 Feed The Bear · feed-the-bear.com';
+  ctx.fillStyle = 'rgba(23,16,11,.72)';
+  ftbRoundRect(ctx, PAD, SAFE + 20, ctx.measureText(brand).width + 60, 76, 38); ctx.fill();
+  ctx.fillStyle = '#E8B15A'; ctx.fillText(brand, PAD + 30, SAFE + 72);
+
+  // Status chip.
+  let y = PH - 40;
+  const visited = r.status === 'visited';
+  ctx.font = 'bold 34px system-ui,sans-serif';
+  const chip = visited ? 'BEEN THERE' : 'ON MY LIST';
+  const cw = ctx.measureText(chip).width + 56;
+  ctx.fillStyle = visited ? '#2ECC71' : '#E8B15A';
+  ftbRoundRect(ctx, PAD, y - 50, cw, 66, 33); ctx.fill();
+  ctx.fillStyle = BG; ctx.fillText(chip, PAD + 28, y - 5);
+
+  // Name, up to two lines.
+  y += 120;
+  ctx.fillStyle = '#fff8ee'; ctx.font = 'bold 104px system-ui,sans-serif';
+  wrapCanvasText(ctx, r.name, W - PAD * 2, 2).forEach(line => { ctx.fillText(line, PAD, y); y += 116; });
+
+  // Cuisine · price · area.
+  const area = String(r.address || '').split(',').slice(-2, -1)[0]?.trim() || '';
+  const meta = [r.cuisine, priceDollars(r.priceRange), area].filter(Boolean).join('  ·  ');
+  if (meta) { ctx.fillStyle = '#d9c4a8'; ctx.font = '44px system-ui,sans-serif'; ctx.fillText(wrapCanvasText(ctx, meta, W - PAD * 2, 1)[0], PAD, y); y += 96; }
+
+  // Your stars, or Google's.
+  if (r.myRating) {
+    ctx.fillStyle = '#F4C430'; ctx.font = 'bold 76px system-ui,sans-serif';
+    ctx.fillText('★'.repeat(r.myRating) + '☆'.repeat(5 - r.myRating), PAD, y); y += 100;
+  } else if (r.googleRating) {
+    ctx.fillStyle = '#F4C430'; ctx.font = 'bold 56px system-ui,sans-serif';
+    ctx.fillText(`★ ${Number(r.googleRating).toFixed(1)} on Google`, PAD, y); y += 96;
   }
-  if (r.myRating) { ctx.fillStyle = '#F4C430'; ctx.font = '18px system-ui,sans-serif'; ctx.fillText('★'.repeat(r.myRating)+'☆'.repeat(5-r.myRating)+' My Rating', 50, r.googleRating ? 278 : 225); }
-  if (r.address) { ctx.fillStyle = '#AAA'; ctx.font = '17px system-ui,sans-serif'; ctx.fillText(` ${r.address.length>55?r.address.slice(0,55)+'…':r.address}`, 50, 318); }
-  if (r.notes) { ctx.fillStyle = '#777'; ctx.font = 'italic 15px system-ui,sans-serif'; ctx.fillText(`"${r.notes.length>72?r.notes.slice(0,72)+'…':r.notes}"`, 50, 356); }
-  if (r.priceRange) { ctx.fillStyle = '#F4C430'; ctx.font = 'bold 20px monospace'; ctx.fillText(priceDollars(r.priceRange), 50, 408); }
-  const bc = r.status==='visited' ? '#2ECC71' : '#9B7BE0';
-  ctx.fillStyle = bc+'33'; ftbRoundRect(ctx, r.priceRange?110:50, 390, 130, 28, 8); ctx.fill();
-  ctx.fillStyle = bc; ctx.font = 'bold 13px system-ui,sans-serif';
-  ctx.fillText(r.status==='visited'?'✅ Visited':' Want to Try', r.priceRange?122:62, 409);
-  ctx.fillStyle = '#E8B15A'; ctx.font = 'bold 15px system-ui,sans-serif';
-  ctx.fillText('Feed The Bear', W-195, H-18);
+
+  // The dish to get.
+  const goTo = goToDishOf(r) || dishesOf(r).find(d => d.verdict === 'want');
+  if (goTo) {
+    ctx.fillStyle = '#fff8ee'; ctx.font = '50px system-ui,sans-serif';
+    const lead = goTo.verdict === 'want' ? 'Dying to try the ' : 'Get the ';
+    wrapCanvasText(ctx, `${lead}${goTo.name}`, W - PAD * 2, 2).forEach(line => { ctx.fillText(line, PAD, y); y += 64; });
+  }
+
+
+  // Your invite (with the free month) when signed in, the site otherwise.
+  const uidRef = window._ftbUid && /^[A-Za-z0-9]{10,64}$/.test(window._ftbUid) ? window._ftbUid : '';
+  const link = uidRef ? `https://www.feed-the-bear.com/app.html?ref=${uidRef}` : 'https://www.feed-the-bear.com';
+  const text = `${visited ? 'Eating at' : 'Next up:'} ${r.name}${goTo ? ` (the ${goTo.name}!)` : ''}. I keep all my spots on Feed The Bear: ${link}`;
+  trackProductEvent('spot_card_shared', { photo: !!photo });
+
   canvas.toBlob(blob => {
-    const file = new File([blob], `${r.name.replace(/[^a-z0-9]/gi,'_')}-ftb.png`, {type:'image/png'});
-    if (navigator.share && navigator.canShare?.({files:[file]})) {
-      navigator.share({title:r.name, text:`Check out ${r.name} on Feed The Bear`, files:[file]}).catch(()=>{});
+    if (!blob) { showToast('Could not make the card', 'Please try again.', 'error'); return; }
+    const file = new File([blob], `${r.name.replace(/[^a-z0-9]/gi, '_')}-feed-the-bear.png`, { type: 'image/png' });
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      navigator.share({ title: r.name, text, files: [file] }).catch(() => {});
     } else {
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href=url; a.download=file.name; a.click(); URL.revokeObjectURL(url);
+      const a = document.createElement('a'); a.href = url; a.download = file.name; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      navigator.clipboard?.writeText(text).catch(() => {});
+      showToast('Card saved', 'Post it to your Story. The link to the app is copied too.', 'success');
     }
-    showToast('Card Ready!', `"${r.name}" card saved!`, 'success');
   }, 'image/png');
 }
 
