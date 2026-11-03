@@ -633,7 +633,11 @@ function initFirebaseAuth () {
         window._ftbCancelAtEnd = !!data.cancelAtPeriodEnd;
         localStorage.setItem('ftb_plan_v1', window._ftbPlan);
         localStorage.setItem('ftb_uid_v1',  user.uid);
-      } catch { window._ftbPlan = 'free'; }
+      } catch {
+        // Offline (or a blip): keep the plan this phone last saw, so Grizzly
+        // doesn't turn into Cub in a basement with no signal.
+        window._ftbPlan = localStorage.getItem('ftb_uid_v1') === user.uid ? (localStorage.getItem('ftb_plan_v1') || 'free') : 'free';
+      }
       if (typeof renderGrizzlyUi === 'function') renderGrizzlyUi();
       FriendPings.start();
 

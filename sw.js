@@ -3,7 +3,7 @@
    Offline-first cache strategy
    ════════════════════════════════════════════════════════════ */
 
-const CACHE  = 'ftb-v105';
+const CACHE  = 'ftb-v106';
 const ASSETS = [
   './',
   './index.html',
@@ -100,21 +100,26 @@ self.addEventListener('fetch', e => {
      url.endsWith('.json') || url.endsWith('.svg') || url === self.location.origin + '/');
 
   if (isAppFile) {
-    e.respondWith(
-      fetch(e.request).then(resp => {
-        if (resp.ok) {
-          const clone = resp.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return resp;
-      }).catch(() => caches.match(e.request).then(cached => {
-        if (cached) return cached;
-        // Only fall back to index.html for page navigations — serving HTML
-        // where JS/CSS is expected just causes confusing parse errors.
-        if (e.request.mode === 'navigate') return caches.match('./index.html');
-        return new Response('', { status: 503 });
-      }))
-    );
+    const fromCache = () => caches.match(e.request, { ignoreSearch: e.request.mode === 'navigate' }).then(cached => {
+      if (cached) return cached;
+      // Only fall back to a page for page navigations — serving HTML
+      // where JS/CSS is expected just causes confusing parse errors.
+      if (e.request.mode === 'navigate') return caches.match(url.includes('/app.html') ? './app.html' : './index.html');
+      return new Response('', { status: 503 });
+    });
+    const network = fetch(e.request).then(resp => {
+      if (resp.ok) {
+        const clone = resp.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+      }
+      return resp;
+    });
+    // On a weak signal the network can hang instead of failing. After 3s use
+    // the saved copy (if there is one); the download still finishes and is
+    // saved for next time.
+    network.catch(() => {}); // a late failure after the saved copy was used is fine
+    const slow = new Promise(resolve => setTimeout(resolve, 3000)).then(() => caches.match(e.request).then(c => c || network));
+    e.respondWith(Promise.race([network, slow]).catch(fromCache));
     return;
   }
 

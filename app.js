@@ -3131,6 +3131,29 @@ async function checkSpotPlaces () {
 }
 window.addEventListener('load', () => setTimeout(checkSpotPlaces, 9000));
 
+/* ── Offline ─────────────────────────────────────────────────
+   Your list, spot pages and logging a meal all work without a signal (they
+   live on the phone and sync later); lookups like nearby search don't. Say so
+   instead of letting screens look stuck. */
+function renderOfflineNote () {
+  let note = document.getElementById('offline-note');
+  if (navigator.onLine !== false) { note?.remove(); return; }
+  if (note) return;
+  note = document.createElement('div');
+  note.id = 'offline-note';
+  note.className = 'offline-note';
+  note.setAttribute('role', 'status');
+  note.textContent = "You're offline. Your list still works, and changes sync when you're back.";
+  document.body.appendChild(note);
+}
+window.addEventListener('offline', renderOfflineNote);
+window.addEventListener('online', () => {
+  renderOfflineNote();
+  // Back online: send what was saved while offline.
+  try { if (typeof fbDebouncedSync === 'function') fbDebouncedSync(); } catch { /* next save will sync */ }
+});
+window.addEventListener('load', renderOfflineNote);
+
 /* ── "Enjoying Feed The Bear?" ───────────────────────────────
    Asked right after someone logs a new 5-star visit, once they've opened
    the app a few times and saved a few spots; at most every 4 months, and

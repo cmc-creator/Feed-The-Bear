@@ -9056,3 +9056,10 @@ body.light-mode .mood-picks-home .home-mood-chip:not(.active) { background: rgba
 .rate-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .rate-close { position: absolute; top: 8px; right: 8px; background: none; border: 0; color: var(--text-dim); font-size: 1rem; padding: 6px; cursor: pointer; }
 .rate-text { width: 100%; resize: vertical; }
+
+/* No signal (app.js renderOfflineNote). */
+.offline-note {
+  position: fixed; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 62px); z-index: 960;
+  max-width: calc(100% - 24px); padding: 8px 14px; border-radius: 999px; font-size: .8rem; font-weight: 700;
+  background: #2a1d16; color: #f6e7d0; border: 1px solid rgba(232, 177, 90, .45); box-shadow: 0 8px 20px rgba(0, 0, 0, .3);
+}
