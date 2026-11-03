@@ -10,7 +10,8 @@
    them on the saved spot, so each place is looked up rarely.
    ════════════════════════════════════════════════════════════ */
 
-const { guard } = require('./_guard');
+const { guard, planOf } = require('./_guard');
+const { overLimit } = require('./_limit');
 
 const FIELDS = [
   'places.id', 'places.displayName', 'places.location', 'places.formattedAddress', 'places.rating', 'places.userRatingCount',
@@ -21,15 +22,7 @@ const FIELDS = [
 const PRICE = { PRICE_LEVEL_INEXPENSIVE: 1, PRICE_LEVEL_MODERATE: 2, PRICE_LEVEL_EXPENSIVE: 3, PRICE_LEVEL_VERY_EXPENSIVE: 4 };
 const STOP = ['the', 'and', 'restaurant', 'cafe', 'bar', 'grill', 'kitchen', 'eatery', 'co'];
 
-// Per-instance limit so one client can't run up the Google bill.
-const hits = new Map();
-function limited (ip) {
-  const now = Date.now();
-  const list = (hits.get(ip) || []).filter(t => now - t < 10 * 60 * 1000);
-  list.push(now);
-  hits.set(ip, list);
-  return list.length > 60;
-}
+// Rate limits live in the database, so they hold across server restarts (_limit.js).
 
 const tokens = s => String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(t => t && !STOP.includes(t));
 
@@ -137,10 +130,14 @@ module.exports = async function handler (req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const key = process.env.GOOGLE_PLACES_API_KEY;
   if (!key) return res.status(503).json({ found: false, error: 'Place info is not set up.' });
-  if (!await guard(req, res)) return;
+  const uid = await guard(req, res);
+  if (!uid) return;
+  if (req.query.mode === 'reviews' && await planOf(uid) !== 'grizzly') {
+    return res.status(402).json({ reviews: [], error: 'Dish tips from reviews are a Grizzly feature.' });
+  }
   if (req.query.mode === 'search' || req.query.mode === 'reviews') {
     const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
-    if (limited(ip)) return res.status(429).json({ places: [], reviews: [], error: 'Slow down a little.' });
+    if (await overLimit(`placeinfo:${ip}`, 60, 600)) return res.status(429).json({ places: [], reviews: [], error: 'Slow down a little.' });
     return req.query.mode === 'search' ? searchPlaces(req, res, key) : placeReviews(req, res, key);
   }
 
@@ -151,7 +148,7 @@ module.exports = async function handler (req, res) {
   if (!name) return res.status(400).json({ found: false, error: 'Missing name' });
 
   const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
-  if (limited(ip)) return res.status(429).json({ found: false, error: 'Slow down a little.' });
+  if (await overLimit(`placeinfo:${ip}`, 60, 600)) return res.status(429).json({ found: false, error: 'Slow down a little.' });
 
   const body = { textQuery: address ? `${name}, ${address}` : name, maxResultCount: 3 };
   if (Number.isFinite(lat) && Number.isFinite(lng)) {

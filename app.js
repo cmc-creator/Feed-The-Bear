@@ -6944,7 +6944,8 @@ async function startDinnerVote () {
   try {
     const resp = await fetch('/api/vote', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // Starting a vote is checked on the server (Grizzly).
+      headers: { 'Content-Type': 'application/json', ...(typeof ftbApiHeaders === 'function' ? await ftbApiHeaders() : {}) },
       body: JSON.stringify({
         action: 'create',
         host: (loadUserProfile()?.name || '').slice(0, 30),
@@ -14447,10 +14448,13 @@ function closeAiPanel () {
   maybeHideOverlay();
 }
 
+// The developer key box is only for testing on a developer's own computer
+// (ai.js ignores a key anywhere else); members never see it.
 function _syncAiKeyUI () {
+  const dev = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   const hasKey = AI.hasKey();
-  document.getElementById('ai-key-setup')?.classList.toggle('hidden', hasKey);
-  document.getElementById('ai-key-active')?.classList.toggle('hidden', !hasKey);
+  document.getElementById('ai-key-setup')?.classList.toggle('hidden', !dev || hasKey);
+  document.getElementById('ai-key-active')?.classList.toggle('hidden', !dev || !hasKey);
 }
 
 function _appendAiMsg (role, text) {

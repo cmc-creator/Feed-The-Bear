@@ -46,4 +46,21 @@ async function guard (req, res) {
   return uid;
 }
 
-module.exports = { guard, DAILY_LOOKUPS };
+// 'grizzly' or 'free', from the server-written profile.
+async function planOf (uid) {
+  try {
+    return (await getAdmin().firestore().doc(`users/${uid}/meta/profile`).get()).data()?.plan === 'grizzly' ? 'grizzly' : 'free';
+  } catch { return 'free'; }
+}
+
+// The signed-in member ({ uid, plan }) from X-FTB-Token, or null.
+async function member (req) {
+  try {
+    const token = String(req.headers?.['x-ftb-token'] || '');
+    if (!token) return null;
+    const uid = (await getAdmin().auth().verifyIdToken(token)).uid;
+    return { uid, plan: await planOf(uid) };
+  } catch { return null; }
+}
+
+module.exports = { guard, planOf, member, DAILY_LOOKUPS };

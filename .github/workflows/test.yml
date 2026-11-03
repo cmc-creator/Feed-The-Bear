@@ -212,3 +212,6 @@ jobs:
       - name: Byte Cub AI on the server (plan check, daily cap)
         working-directory: tests
         run: node aiproxy.test.js
+      - name: Rate limits survive restarts; plan checks on the server
+        working-directory: tests
+        run: node limits.test.js

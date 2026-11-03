@@ -6,9 +6,10 @@ const { BASE, check, launch, newPage, finish, asGrizzly } = require('./lib');
 asGrizzly(); // uses Grizzly-only features
 
 // ── Server (api/vote.js) with a fake Firestore ──
-const docs = {};
+const docs = { 'users/hostG/meta/profile': { plan: 'grizzly' }, 'users/hostF/meta/profile': { plan: 'free' } };
 const fakeAdmin = {
   apps: [1],
+  auth: () => ({ verifyIdToken: async t => { if (!t.startsWith('token-')) throw new Error('bad'); return { uid: t.slice(6) }; } }),
   firestore: () => ({
     doc: p => ({
       set: async (data, opts) => { docs[p] = opts?.merge ? { ...(docs[p] || {}), ...data } : data; },
@@ -23,13 +24,18 @@ Module._load = function (req, ...rest) {
 };
 const api = require(path.join(__dirname, '..', 'api', 'vote.js'));
 Module._load = realLoad;
-const call = (method, { query = {}, body = {} } = {}) => new Promise(resolve => {
+const call = (method, { query = {}, body = {}, as = body.action === 'create' ? 'hostG' : '' } = {}) => new Promise(resolve => {
   let status = 200;
-  api({ method, query, body, headers: {} }, { status (s) { status = s; return this; }, setHeader () {}, json (d) { resolve({ status, ...d }); return this; } });
+  api({ method, query, body, headers: as ? { 'x-ftb-token': `token-${as}` } : {} }, { status (s) { status = s; return this; }, setHeader () {}, json (d) { resolve({ status, ...d }); return this; } });
 });
 
 (async () => {
-  let r = await call('POST', { body: { action: 'create', host: 'Connie', options: [{ name: 'Only one' }] } });
+  const two = [{ name: 'Nobu' }, { name: 'Kai' }];
+  let r = await call('POST', { body: { action: 'create', host: 'Connie', options: two }, as: '' });
+  check(r.status === 401, 'starting a vote needs a signed-in member');
+  r = await call('POST', { body: { action: 'create', host: 'Connie', options: two }, as: 'hostF' });
+  check(r.status === 402, 'starting a vote is Grizzly, checked on the server');
+  r = await call('POST', { body: { action: 'create', host: 'Connie', options: [{ name: 'Only one' }] } });
   check(r.status === 400, 'a vote needs at least 2 spots');
   r = await call('POST', { body: { action: 'create', host: 'Connie', options: [
     { name: 'Nobu', cuisine: 'Japanese', rating: 4 }, { name: 'Pizzeria Bianco', cuisine: 'Pizza', rating: 5 }, { name: '<b>Taco</b> Spot', rating: 3 },

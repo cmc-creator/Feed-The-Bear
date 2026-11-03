@@ -14,19 +14,13 @@
    ════════════════════════════════════════════════════════════ */
 
 const admin = require('firebase-admin');
+const { overLimit } = require('./_limit');
 
 const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
 const ID_RE = /^[a-z0-9]{8,40}$/;
 const RESERVED = new Set(['admin', 'support', 'help', 'feedthebear', 'feed_the_bear', 'grizzly', 'cub', 'bytecub', 'byte_cub', 'official', 'team', 'staff', 'moderator', 'root', 'null', 'undefined']);
 
-const hits = new Map();
-function limited (key, max) {
-  const now = Date.now();
-  const list = (hits.get(key) || []).filter(t => now - t < 10 * 60 * 1000);
-  list.push(now);
-  hits.set(key, list);
-  return list.length > max;
-}
+// Rate limits live in the database, so they hold across server restarts (_limit.js).
 
 function getAdmin () {
   if (!admin.apps.length) {
@@ -54,7 +48,7 @@ module.exports = async function handler (req, res) {
   try {
     if (req.method === 'GET') {
       if (req.query?.mine) return res.status(200).json({ handle: (await db.doc(`handleOf/${uid}`).get()).data()?.handle || '' });
-      if (limited(`q:${uid}`, 30)) return res.status(429).json({ error: 'Slow down a little and try again soon.' });
+      if (await overLimit(`handle:q:${uid}`, 30, 600)) return res.status(429).json({ error: 'Slow down a little and try again soon.' });
       const handle = cleanHandle(req.query?.q);
       if (!HANDLE_RE.test(handle)) return res.status(200).json({ found: false });
       const doc = (await db.doc(`handles/${handle}`).get()).data();
@@ -77,7 +71,7 @@ module.exports = async function handler (req, res) {
     }
 
     if (body.action === 'claim') {
-      if (limited(`c:${uid}`, 10)) return res.status(429).json({ error: 'Slow down a little and try again soon.' });
+      if (await overLimit(`handle:c:${uid}`, 10, 600)) return res.status(429).json({ error: 'Slow down a little and try again soon.' });
       const handle = cleanHandle(body.handle);
       const id = String(body.id || '');
       const name = String(body.name || '').slice(0, 30);

@@ -13,6 +13,8 @@
    ════════════════════════════════════════════════════════════ */
 
 const admin = require('firebase-admin');
+const { overLimit } = require('./_limit');
+const { member } = require('./_guard');
 
 const ROOM_DAYS = 3;
 const MAX_OPTIONS = 6;
@@ -28,14 +30,7 @@ function getAdmin () {
   return admin;
 }
 
-const hits = new Map();
-function limited (ip, max) {
-  const now = Date.now();
-  const list = (hits.get(ip) || []).filter(t => now - t < 10 * 60 * 1000);
-  list.push(now);
-  hits.set(ip, list);
-  return list.length > max;
-}
+// Rate limits live in the database, so they hold across server restarts (_limit.js).
 
 const text = (v, n) => String(v ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n);
 const num = v => (Number.isFinite(Number(v)) && v !== null && v !== '' ? Number(v) : null);
@@ -91,7 +86,11 @@ module.exports = async function handler (req, res) {
 
     const body = req.body || {};
     if (body.action === 'create') {
-      if (limited(ip, 20)) return res.status(429).json({ error: 'Slow down a little and try again soon.' });
+      if (await overLimit(`vote:create:${ip}`, 20, 600)) return res.status(429).json({ error: 'Slow down a little and try again soon.' });
+      // Starting a vote is Grizzly; friends voting need no account at all.
+      const who = await member(req);
+      if (!who) return res.status(401).json({ error: 'Sign in to start a Dinner Vote.' });
+      if (who.plan !== 'grizzly') return res.status(402).json({ error: 'Dinner Vote is a Grizzly feature.' });
       const options = (Array.isArray(body.options) ? body.options : []).slice(0, MAX_OPTIONS).map(o => ({
         name: text(o?.name, 80), cuisine: text(o?.cuisine, 40), address: text(o?.address, 160),
         lat: num(o?.lat), lng: num(o?.lng), rating: Math.min(5, Math.max(0, Number(o?.rating) || 0)),
@@ -108,7 +107,7 @@ module.exports = async function handler (req, res) {
     }
 
     if (body.action === 'vote') {
-      if (limited(ip, 120)) return res.status(429).json({ error: 'Slow down a little and try again soon.' });
+      if (await overLimit(`vote:${ip}`, 120, 600)) return res.status(429).json({ error: 'Slow down a little and try again soon.' });
       const code = text(body.code, 8).toUpperCase();
       const voterId = text(body.voter?.id, 40).replace(/[^\w-]/g, '');
       if (!/^[A-Z0-9]{6}$/.test(code) || voterId.length < 8) return res.status(400).json({ error: 'Something is off with that vote.' });

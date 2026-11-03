@@ -123,7 +123,9 @@ module.exports = async function handler (req, res) {
     }
 
     if (body.action === 'follows') {
-      const ids = [...new Set((Array.isArray(body.ids) ? body.ids : []).map(String).filter(x => ID_RE.test(x)))].slice(0, MAX_FOLLOWS);
+      const plan = (await db.doc(`users/${uid}/meta/profile`).get()).data()?.plan === 'grizzly' ? 'grizzly' : 'free';
+      // Free accounts follow one friend (Grizzly: everyone), so they get one friend's pings.
+      const ids = [...new Set((Array.isArray(body.ids) ? body.ids : []).map(String).filter(x => ID_RE.test(x)))].slice(0, plan === 'grizzly' ? MAX_FOLLOWS : 1);
       const ref = db.doc(`pushFollows/${uid}`);
       const before = (await ref.get()).data()?.ids || [];
       const added = ids.filter(x => !before.includes(x));

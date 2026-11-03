@@ -14,6 +14,7 @@
    ════════════════════════════════════════════════════════════ */
 
 const crypto = require('crypto');
+const { overLimit } = require('./_limit');
 const admin = require('firebase-admin');
 
 const NAME_RE = /^[a-z][a-z0-9_]{2,47}$/;
@@ -56,15 +57,7 @@ function readErrors (body) {
   return clean.length ? clean : null;
 }
 
-// Per-instance limit on reports from one address.
-const hits = new Map();
-function limited (ip) {
-  const now = Date.now();
-  const list = (hits.get(ip) || []).filter(t => now - t < 10 * 60 * 1000);
-  list.push(now);
-  hits.set(ip, list);
-  return list.length > 60;
-}
+// Rate limits live in the database, so they hold across server restarts (_limit.js).
 
 module.exports = async function handler (req, res) {
   if (req.method !== 'POST') {
@@ -72,7 +65,7 @@ module.exports = async function handler (req, res) {
     return;
   }
   const ip = String(req.headers?.['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
-  if (limited(ip)) { res.status(429).json({ error: 'Too many reports' }); return; }
+  if (await overLimit(`track:${ip}`, 60, 600)) { res.status(429).json({ error: 'Too many reports' }); return; }
   const counts = readCounts(req.body);
   const errors = readErrors(req.body);
   if (!counts && !errors) {

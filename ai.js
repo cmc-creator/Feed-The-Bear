@@ -25,7 +25,11 @@ function answerText (data) {
 const AI = {
 
   /* ── 1 · Key management ──────────────────────────────── */
+  // A personal Gemini key is only for testing on a developer's own computer.
+  // On the real site it's ignored, so AI always goes through the server's
+  // plan check (otherwise a pasted key would unlock every AI feature free).
   getKey () {
+    if (!/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return '';
     try { return (JSON.parse(localStorage.getItem('ftb_settings_v1') || '{}')).geminiKey || ''; }
     catch { return ''; }
   },

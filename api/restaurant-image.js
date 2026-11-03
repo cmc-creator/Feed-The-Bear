@@ -14,6 +14,7 @@
    ════════════════════════════════════════════════════════════ */
 
 const { guard } = require('./_guard');
+const { overLimit } = require('./_limit');
 const WIKI_API = 'https://en.wikipedia.org/w/api.php';
 
 function cors (res) {
@@ -22,15 +23,7 @@ function cors (res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-FTB-Token');
 }
 
-// Per-instance limit so one client can't run up the Google bill.
-const hits = new Map();
-function limited (ip) {
-  const now = Date.now();
-  const list = (hits.get(ip) || []).filter(t => now - t < 10 * 60 * 1000);
-  list.push(now);
-  hits.set(ip, list);
-  return list.length > 60;
-}
+// Rate limits live in the database, so they hold across server restarts (_limit.js).
 
 // The website scraper must never reach private or internal addresses.
 function isPublicHost (hostname = '') {
@@ -314,7 +307,7 @@ module.exports = async function handler (req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
-  if (limited(ip)) return res.status(429).json({ found: false, error: 'Slow down a little.' });
+  if (await overLimit(`restimg:${ip}`, 60, 600)) return res.status(429).json({ found: false, error: 'Slow down a little.' });
   if (!await guard(req, res)) return;
 
   const name = String(req.query?.name || '').trim();

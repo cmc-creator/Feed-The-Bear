@@ -8,16 +8,10 @@
    ════════════════════════════════════════════════════════════ */
 
 const admin = require('firebase-admin');
+const { overLimit } = require('./_limit');
 const { sendEmail, emailHtml, esc } = require('./_email');
 
-const hits = new Map();
-function limited (ip) {
-  const now = Date.now();
-  const list = (hits.get(ip) || []).filter(t => now - t < 60 * 60 * 1000);
-  list.push(now);
-  hits.set(ip, list);
-  return list.length > 5;
-}
+// Rate limits live in the database, so they hold across server restarts (_limit.js).
 
 function getAdmin () {
   if (!admin.apps.length) {
@@ -31,7 +25,7 @@ function getAdmin () {
 module.exports = async function handler (req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
-  if (limited(ip)) return res.status(429).json({ error: 'Thanks! We got your notes already.' });
+  if (await overLimit(`feedback:${ip}`, 5, 3600)) return res.status(429).json({ error: 'Thanks! We got your notes already.' });
   const body = typeof req.body === 'string' ? (() => { try { return JSON.parse(req.body); } catch { return {}; } })() : (req.body || {});
   const text = String(body.text || '').trim().slice(0, 2000);
   const mood = ['love', 'meh'].includes(body.mood) ? body.mood : 'meh';
