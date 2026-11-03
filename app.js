@@ -1393,7 +1393,7 @@ function hapticTap (strength = 'light') {
 // phone. Profiles saved before these existed hold short text codes ('FTB',
 // 'CHEF', ...); normalizeAvatar maps those to a bear.
 const BEAR_AVATARS = {
-  'bear-chef':   { fur: '#9a6236', ear: '#d9a36f', muzzle: '#f1d2a8', bg: '#2f5d50', acc: 'chef' },
+  'bear-chef':   { fur: '#9a6236', ear: '#d9a36f', muzzle: '#f1d2a8', bg: '#7a4f2c', acc: 'chef' },
   'bear-crown':  { fur: '#c98a4b', ear: '#f0c18a', muzzle: '#f7e1bf', bg: '#5b3f8c', acc: 'crown' },
   'bear-shades': { fur: '#6b4a2e', ear: '#a8784e', muzzle: '#e2c29b', bg: '#d76b3f', acc: 'shades' },
   'bear-pizza':  { fur: '#8b5a2b', ear: '#c79262', muzzle: '#efcfa3', bg: '#c84b3c', acc: 'pizza' },
@@ -5715,137 +5715,36 @@ function ftbRoundRect (ctx, x, y, w, h, r) {
   ctx.quadraticCurveTo(x,y+h,x,y+h-r); ctx.lineTo(x,y+r);
   ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
 }
-// A photo for the card, or null. Only images that allow cross-origin use can
-// be drawn and still exported, so anything else falls back to the emoji design.
-function loadShareImage (src) {
-  return new Promise(resolve => {
-    if (!src) { resolve(null); return; }
-    const img = new Image();
-    if (!/^data:/i.test(src)) img.crossOrigin = 'anonymous';
-    const done = ok => { clearTimeout(timer); resolve(ok ? img : null); };
-    const timer = setTimeout(() => done(false), 5000);
-    img.onload = () => done(img.naturalWidth > 0);
-    img.onerror = () => done(false);
-    img.src = src;
-  });
-}
-
-// Wraps text to at most `lines` lines of `maxW` pixels (the last one ends in …).
-function wrapCanvasText (ctx, text, maxW, lines) {
-  const words = String(text || '').split(/\s+/).filter(Boolean);
-  const out = [];
-  let line = '';
-  for (const w of words) {
-    const next = line ? `${line} ${w}` : w;
-    if (ctx.measureText(next).width <= maxW || !line) { line = next; continue; }
-    out.push(line);
-    line = w;
-    if (out.length === lines) break;
-  }
-  if (out.length < lines && line) out.push(line);
-  else if (out.length === lines && line && !out.includes(line)) {
-    let last = out[lines - 1];
-    while (last && ctx.measureText(`${last}…`).width > maxW) last = last.slice(0, -1);
-    out[lines - 1] = `${last}…`;
-  }
-  return out.slice(0, lines);
-}
-
-// A phone-sized (Instagram/TikTok Story) card for one spot: its photo, your
-// rating and go-to dish, and a link back to the app in the share message.
+// A spot's Share: the same Story-sized card as "what to order" and the other
+// stories (story-card.js), with the spot's photo, your stars and the dish to
+// get, and a link back to the app (your invite when signed in) in the message.
 async function shareCard (r) {
-  const canvas = document.getElementById('share-canvas');
-  const ctx = canvas.getContext('2d');
-  // Stories cover about 250px at the top and bottom with their own buttons,
-  // so everything that matters sits between.
-  const W = 1080, H = 1920, PAD = 80, SAFE = 250, BG = '#17100b';
-  canvas.width = W; canvas.height = H;
-  const [c1, c2] = cuisineGrad(r.cuisine);
-  ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H);
-
-  // Top: the spot's photo, cropped to fill, or its cuisine colors and emoji.
-  const PH = 1060;
-  const photo = await loadShareImage(safeUrl(r.photo || r.placePhoto || ''));
-  if (photo) {
-    const scale = Math.max(W / photo.naturalWidth, PH / photo.naturalHeight);
-    const w = photo.naturalWidth * scale, h = photo.naturalHeight * scale;
-    ctx.drawImage(photo, (W - w) / 2, (PH - h) / 2, w, h);
-  } else {
-    const g = ctx.createLinearGradient(0, 0, W, PH);
-    g.addColorStop(0, c1); g.addColorStop(1, c2);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, PH);
-    ctx.font = '420px serif'; ctx.textAlign = 'center';
-    ctx.fillText(cuisineEmoji(r.cuisine) || '🍽️', W / 2, PH / 2 + 220);
-    ctx.textAlign = 'left';
-  }
-  const fade = ctx.createLinearGradient(0, PH - 420, 0, PH);
-  fade.addColorStop(0, 'rgba(23,16,11,0)'); fade.addColorStop(1, BG);
-  ctx.fillStyle = fade; ctx.fillRect(0, PH - 420, W, 420);
-
-  // Brand, top left over the photo.
-  ctx.font = 'bold 40px system-ui,sans-serif';
-  const brand = '🐻 Feed The Bear · feed-the-bear.com';
-  ctx.fillStyle = 'rgba(23,16,11,.72)';
-  ftbRoundRect(ctx, PAD, SAFE + 20, ctx.measureText(brand).width + 60, 76, 38); ctx.fill();
-  ctx.fillStyle = '#E8B15A'; ctx.fillText(brand, PAD + 30, SAFE + 72);
-
-  // Status chip.
-  let y = PH - 40;
-  const visited = r.status === 'visited';
-  ctx.font = 'bold 34px system-ui,sans-serif';
-  const chip = visited ? 'BEEN THERE' : 'ON MY LIST';
-  const cw = ctx.measureText(chip).width + 56;
-  ctx.fillStyle = visited ? '#2ECC71' : '#E8B15A';
-  ftbRoundRect(ctx, PAD, y - 50, cw, 66, 33); ctx.fill();
-  ctx.fillStyle = BG; ctx.fillText(chip, PAD + 28, y - 5);
-
-  // Name, up to two lines.
-  y += 120;
-  ctx.fillStyle = '#fff8ee'; ctx.font = 'bold 104px system-ui,sans-serif';
-  wrapCanvasText(ctx, r.name, W - PAD * 2, 2).forEach(line => { ctx.fillText(line, PAD, y); y += 116; });
-
-  // Cuisine · price · area.
-  const area = String(r.address || '').split(',').slice(-2, -1)[0]?.trim() || '';
-  const meta = [r.cuisine, priceDollars(r.priceRange), area].filter(Boolean).join('  ·  ');
-  if (meta) { ctx.fillStyle = '#d9c4a8'; ctx.font = '44px system-ui,sans-serif'; ctx.fillText(wrapCanvasText(ctx, meta, W - PAD * 2, 1)[0], PAD, y); y += 96; }
-
-  // Your stars, or Google's.
-  if (r.myRating) {
-    ctx.fillStyle = '#F4C430'; ctx.font = 'bold 76px system-ui,sans-serif';
-    ctx.fillText('★'.repeat(r.myRating) + '☆'.repeat(5 - r.myRating), PAD, y); y += 100;
-  } else if (r.googleRating) {
-    ctx.fillStyle = '#F4C430'; ctx.font = 'bold 56px system-ui,sans-serif';
-    ctx.fillText(`★ ${Number(r.googleRating).toFixed(1)} on Google`, PAD, y); y += 96;
-  }
-
-  // The dish to get.
   const goTo = goToDishOf(r) || dishesOf(r).find(d => d.verdict === 'want');
-  if (goTo) {
-    ctx.fillStyle = '#fff8ee'; ctx.font = '50px system-ui,sans-serif';
-    const lead = goTo.verdict === 'want' ? 'Dying to try the ' : 'Get the ';
-    wrapCanvasText(ctx, `${lead}${goTo.name}`, W - PAD * 2, 2).forEach(line => { ctx.fillText(line, PAD, y); y += 64; });
-  }
-
-
-  // Your invite (with the free month) when signed in, the site otherwise.
+  const visited = r.status === 'visited';
+  const area = String(r.address || '').split(',').slice(-2, -1)[0]?.trim() || '';
   const uidRef = window._ftbUid && /^[A-Za-z0-9]{10,64}$/.test(window._ftbUid) ? window._ftbUid : '';
   const link = uidRef ? `https://www.feed-the-bear.com/app.html?ref=${uidRef}` : 'https://www.feed-the-bear.com';
   const text = `${visited ? 'Eating at' : 'Next up:'} ${r.name}${goTo ? ` (the ${goTo.name}!)` : ''}. I keep all my spots on Feed The Bear: ${link}`;
-  trackProductEvent('spot_card_shared', { photo: !!photo });
-
-  canvas.toBlob(blob => {
-    if (!blob) { showToast('Could not make the card', 'Please try again.', 'error'); return; }
-    const file = new File([blob], `${r.name.replace(/[^a-z0-9]/gi, '_')}-feed-the-bear.png`, { type: 'image/png' });
-    if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      navigator.share({ title: r.name, text, files: [file] }).catch(() => {});
-    } else {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = file.name; a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      navigator.clipboard?.writeText(text).catch(() => {});
-      showToast('Card saved', 'Post it to your Story. The link to the app is copied too.', 'success');
-    }
-  }, 'image/png');
+  trackProductEvent('spot_card_shared', { photo: !!(r.photo || r.placePhoto) });
+  if (window.StoryCard?.openStory) {
+    try {
+      await StoryCard.openStory({
+        kind: 'spot',
+        kicker: visited ? 'Been there' : 'On my list',
+        title: r.name,
+        sub: [r.cuisine, priceDollars(r.priceRange), area].filter(Boolean).join(' · '),
+        stars: r.myRating || 0,
+        photo: safeUrl(r.photo || r.placePhoto || ''),
+        sections: goTo ? [{ label: goTo.verdict === 'want' ? 'Dying to try' : 'Get the', items: [goTo.name], tone: 'gold' }] : [],
+        footer: visited ? 'Remember every great bite' : 'Never lose a place to try',
+      }, text, `${r.name}-feed-the-bear`);
+      return;
+    } catch (err) { console.warn('[FTB] spot story failed:', err); }
+  }
+  try {
+    if (navigator.share) await navigator.share({ title: r.name, text });
+    else { await navigator.clipboard.writeText(text); showToast('Copied', 'Paste it to a friend.', 'success'); }
+  } catch { /* closed the share sheet */ }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -7857,7 +7756,6 @@ function setupEvents () {
 
   // Phase 8 - Year in Review
   document.getElementById('review-close-btn').addEventListener('click', closeYearReview);
-  document.getElementById('review-close-btn2').addEventListener('click', closeYearReview);
   document.getElementById('review-share-btn').addEventListener('click', shareYearReview);
   document.getElementById('review-overlay').addEventListener('click', e => { if (e.target === document.getElementById('review-overlay')) closeYearReview(); });
   document.getElementById('review-prev-year').addEventListener('click', () => { _reviewYear--; document.getElementById('review-year-label').textContent = _reviewYear; renderYearReview(); });
@@ -13236,7 +13134,7 @@ function triggerBearSwipeParty (cardEl) {
 
   const partyEl = document.createElement('div');
   partyEl.className = 'bear-swipe-party pop';
-  partyEl.innerHTML = `<video class="bear-swipe-party-video" autoplay loop controls playsinline webkit-playsinline muted aria-label="Dancing bear celebration" preload="metadata"><source src="assets/videos/dancingbear.webm" type="video/webm" /><source src="assets/videos/dancingbear.mp4" type="video/mp4" /></video><div class="bear-swipe-party-actions"><button class="bear-swipe-party-close" type="button">Close</button></div><span class="bear-swipe-party-text">SNACK DANCE</span>`;
+  partyEl.innerHTML = `<video class="bear-swipe-party-video" autoplay loop controls playsinline webkit-playsinline muted aria-label="Dancing bear celebration" preload="metadata"><source src="assets/videos/dancingbear.webm" type="video/webm" /><source src="assets/videos/dancingbear.mp4" type="video/mp4" /></video><div class="bear-swipe-party-actions"><button class="bear-swipe-party-close icon-btn" type="button" aria-label="Close">✕</button></div><span class="bear-swipe-party-text">SNACK DANCE</span>`;
   cardEl.appendChild(partyEl);
   partyEl.addEventListener('click', e => e.stopPropagation());
   partyEl.querySelector('.bear-swipe-party-close')?.addEventListener('click', () => partyEl.remove());

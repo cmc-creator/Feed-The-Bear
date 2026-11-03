@@ -2390,6 +2390,9 @@ body.light-mode {
 }
 body.light-mode .app-header { background: rgba(255,255,255,.98); box-shadow: 0 1px 0 rgba(17,24,39,.14); }
 body.light-mode .stats-bar  { background: #fff; border-bottom-color: rgba(17,24,39,.14); }
+/* The dark theme's cream numbers vanish on white: use the text colors. */
+body.light-mode .stat-value { color: var(--text); text-shadow: none; }
+body.light-mode .stat-label { color: var(--text-dim); }
 body.light-mode .filter-bar { background: var(--surface2); border-bottom-color: rgba(17,24,39,.12); }
 /* Light themes: their own soft background, not the dark forest photo. */
 body.light-mode { background: radial-gradient(120% 70% at 50% -10%, rgba(var(--primary-rgb),.10), transparent 60%), var(--bg); }
@@ -3783,20 +3786,23 @@ body.light-mode .import-textarea { background: rgba(0,0,0,.05); border-color: rg
 .import-help { font-size: .8rem; color: var(--text-dim); margin: -4px 0 10px; }
 .import-help summary { cursor: pointer; font-weight: 700; color: var(--text); }
 .import-help ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; line-height: 1.4; }
+.import-howto { display: grid; gap: 6px; margin: 0 0 12px; }
+.import-howto .import-help { margin: 0; padding: 9px 12px; border-radius: 10px; background: var(--surface2); border: 1px solid var(--border); }
+.import-howto .import-help p { margin: 6px 0 0; line-height: 1.45; }
 .import-file-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .import-file-btn { cursor: pointer; }
 .import-file-names { font-size: .74rem; color: var(--text-dim); overflow-wrap: anywhere; }
 
 /* -- AI weekly suggestion toast ---------------------------- */
 .weekly-suggest-banner {
-  background: linear-gradient(135deg, rgba(124,58,237,.15), rgba(37,99,235,.15));
-  border: 1.5px solid rgba(124,58,237,.4);
+  background: linear-gradient(135deg, rgba(var(--primary-rgb),.16), rgba(var(--primary-rgb),.05));
+  border: 1.5px solid rgba(var(--primary-rgb),.4);
   border-radius: 14px; padding: 14px 16px; margin: 0 0 16px;
   display: flex; gap: 12px; align-items: flex-start;
 }
 .wsb-icon { font-size: 1.4rem; flex-shrink: 0; }
 .wsb-body { flex: 1; }
-.wsb-title { font-size: .85rem; font-weight: 700; color: #a78bfa; margin-bottom: 2px; }
+.wsb-title { font-size: .85rem; font-weight: 700; color: var(--primary); margin-bottom: 2px; }
 .wsb-text  { font-size: .82rem; color: var(--text-dim); }
 .weekly-suggest-banner, .ai-rec-banner { cursor: pointer; }
 .wsb-dismiss { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 1rem; padding: 0; }
@@ -6594,6 +6600,8 @@ body[data-view="visited"] .weekly-suggest-banner { display: none; }
 .bear-swipe-party-close {
   cursor: pointer;
 }
+/* Same round ✕ as every other window. */
+.bear-swipe-party-close.icon-btn { width: 32px; height: 32px; padding: 0; font-size: .9rem; letter-spacing: 0; }
 
 .bear-swipe-party-text {
   font-size: .62rem;
@@ -9056,3 +9064,16 @@ body.light-mode .mood-picks-home .home-mood-chip:not(.active) { background: rgba
 .rate-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .rate-close { position: absolute; top: 8px; right: 8px; background: none; border: 0; color: var(--text-dim); font-size: 1rem; padding: 6px; cursor: pointer; }
 .rate-text { width: 100%; resize: vertical; }
+
+/* Small phones: the header was 383px wide and pushed the page sideways on
+   anything narrower. The light/dark switch is also in Settings. */
+@media (max-width: 400px) {
+  #theme-toggle-btn { display: none; }
+  .app-header .header-actions { gap: 5px; }
+  .app-header .brand-icon { width: 3.6rem; height: 3.6rem; }
+  .app-header .icon-btn { width: 34px; height: 34px; }
+}
+@media (max-width: 340px) {
+  #header-invite-btn { display: none; }
+  .grizzly-pill { padding: 5px 8px; }
+}

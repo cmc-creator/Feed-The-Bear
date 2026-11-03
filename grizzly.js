@@ -14,7 +14,7 @@
    where Grizzly lives (header pill, home card, badges on locked tools). */
 const GRIZZLY_PITCH = {
   general:     { title: 'Go Grizzly', body: 'Unlimited spots, Byte Cub AI picks, Year in Review, and 15-second food videos.' },
-  home:        { title: 'Feed the bear without limits', body: 'Unlimited spots, Byte Cub AI picks and dish tips, Duel verdicts, Year in Review, and sync on every device.' },
+  home:        { title: 'Feed the bear without limits', body: 'Unlimited spots, Byte Cub AI picks and dish tips, all your friends, Duel verdicts and Year in Review.' },
   duel:        { title: 'Let Byte Cub judge the showdown', body: 'A dramatic AI fight card that weighs vibe, value, and your notes, then crowns a winner you can share.' },
   mealplanner: { title: 'Plan your week of eating out', body: 'Byte Cub builds a day-by-day dining plan around your budget, cravings, and wish list.' },
   'byte-cub':  { title: 'Your personal food concierge', body: 'Ask Byte Cub anything: where to go tonight, what to order, date-night ideas, all from your own list.' },
@@ -29,7 +29,7 @@ const GRIZZLY_PITCH = {
   pick:        { title: "Today's Pick, every meal", body: 'The bear picks a spot from your list for breakfast, lunch and dinner, and tells you why.' },
   // FREE_RESTAURANT_LIMIT lives in firebase.js, which loads after this file,
   // so read it when the pitch is shown, not while app.js is starting up.
-  get limit () { return { title: 'Save every spot you love', body: `Cub holds ${FREE_RESTAURANT_LIMIT} spots. Grizzly is unlimited and synced across your devices.` }; },
+  get limit () { return { title: 'Save every spot you love', body: `Cub holds ${FREE_RESTAURANT_LIMIT} spots (backed up and synced on every device). Grizzly is unlimited.` }; },
 };
 const GRIZZLY_TOOLS = new Set(['ai-panel', 'mealplanner', 'review', 'friends', 'swipe', 'rooms', 'groupvote']);
 const GRIZZLY_SNOOZE_KEY = 'ftb_grizzly_card_snooze';

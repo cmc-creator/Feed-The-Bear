@@ -194,3 +194,9 @@ jobs:
       - name: Enjoying Feed The Bear? prompt and private feedback
         working-directory: tests
         run: node rate.test.js
+      - name: Small phones and the landing page layout
+        working-directory: tests
+        run: node layout.test.js
+      - name: Works offline
+        working-directory: tests
+        run: node offline.test.js

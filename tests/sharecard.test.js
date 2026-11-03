@@ -19,6 +19,9 @@ const { BASE, SHOTS, check, launch, newPage, closeAllDialogs, finish } = require
     navigator.share = async d => { got = d; };
     openDetailModal('a');
     document.getElementById('detail-share-btn').click();
+    // The card opens in the same preview as every story; Share sends it.
+    for (let i = 0; i < 40 && !document.querySelector('.story-share:not(.hidden)')?.offsetParent; i++) await new Promise(r => setTimeout(r, 100));
+    document.querySelector('.story-share')?.click();
     for (let i = 0; i < 40 && !got; i++) await new Promise(r => setTimeout(r, 100));
     if (!got) return null;
     const bmp = await createImageBitmap(got.files[0]);
@@ -27,7 +30,8 @@ const { BASE, SHOTS, check, launch, newPage, closeAllDialogs, finish } = require
   check(out && out.w === 1080 && out.h === 1920 && out.type === 'image/png', `Share makes a Story-sized image (${out && `${out.w}x${out.h}`})`);
   check(/Pizzeria Bianco/.test(out?.text || '') && /the Rosa pizza/.test(out?.text || ''), 'the message names the spot and the dish to get');
   check(/feed-the-bear\.com\/app\.html\?ref=abcdefghij12345/.test(out?.text || ''), 'and links back with your invite');
-  await p.locator('#share-canvas').screenshot({ path: path.join(SHOTS, 'share-card.png') }).catch(() => {});
+  await p.locator('.story-img').screenshot({ path: path.join(SHOTS, 'share-card.png') }).catch(() => {});
+  check(/Pizzeria Bianco/.test(await p.locator('.story-img').getAttribute('alt').catch(() => '') || ''), 'it uses the same story preview as every other card');
 
   check(!p.errors.length, `no page errors ${p.errors.join(' | ')}`);
   await browser.close();

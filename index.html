@@ -265,7 +265,8 @@
       transition: border-color .2s, transform .2s;
     }
     .feature-card:hover { border-color: rgba(255,107,53,.3); transform: translateY(-4px); }
-    .feature-icon { font-size: 2.2rem; margin-bottom: 16px; display: block; }
+    .feature-icon { display: block; width: 36px; height: 36px; margin-bottom: 16px; color: var(--primary); }
+    .feature-icon svg { display: block; }
     .feature-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
     .feature-desc { color: var(--text-muted); font-size: .9rem; line-height: 1.6; }
     .feature-badge {
@@ -329,8 +330,10 @@
     .pricing-period { color: var(--text-muted); font-size: .85rem; margin-top: 2px; }
     .pricing-features { list-style: none; margin-bottom: 28px; display: flex; flex-direction: column; gap: 10px; }
     .pricing-features li { display: flex; align-items: center; gap: 10px; font-size: .9rem; }
-    .pricing-check { color: var(--green); font-size: 1rem; flex-shrink: 0; }
-    .pricing-lock  { color: var(--text-dim); font-size: .85rem; flex-shrink: 0; }
+    .pricing-check, .pricing-lock { display: inline-flex; width: 18px; justify-content: center; flex-shrink: 0; }
+    .pricing-check { color: var(--green); }
+    .pricing-lock  { color: var(--text-dim); }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
     .btn-plan-free {
       display: block; width: 100%; padding: 13px;
       background: var(--surface2); color: var(--text);
@@ -497,50 +500,50 @@
     <p class="section-sub">From random cravings to planned food adventures, keep everything in one warm, woodsy command center.</p>
     <div class="features-grid">
       <div class="feature-card fade-in">
-        <span class="feature-icon">◎</span>
+        <span class="feature-icon"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><path d="M12 6.5v6M9 9.5h6"/></svg></span>
         <h3 class="feature-title">Snag Any Spot</h3>
         <p class="feature-desc">Found a place on TikTok, Maps, or from a friend? Toss it in your den, tag it, and keep notes for future-you.</p>
       </div>
       <div class="feature-card fade-in">
-        <span class="feature-icon">◌</span>
+        <span class="feature-icon"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg></span>
         <h3 class="feature-title">Forage Nearby</h3>
         <p class="feature-desc">Open the map and sniff out what's close, what's saved, and what's worth crossing town for.</p>
       </div>
       <div class="feature-card fade-in">
-        <span class="feature-icon">✦</span>
+        <span class="feature-icon"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z"/></svg></span>
         <h3 class="feature-title">Byte Cub AI Guide</h3>
         <p class="feature-desc">Ask what to eat, what to skip, and where to go. Byte Cub gives fast, tasty, no-fluff answers.</p>
         <span class="feature-badge">Grizzly Only</span>
       </div>
       <div class="feature-card fade-in">
-        <span class="feature-icon">▦</span>
+        <span class="feature-icon"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
         <h3 class="feature-title">Trail Stats</h3>
         <p class="feature-desc">See your top cuisines, repeat winners, and flavor trends like a food logbook for your inner grizzly.</p>
       </div>
       <div class="feature-card fade-in">
-        <span class="feature-icon">⟡</span>
+        <span class="feature-icon"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="13" height="10" rx="1.5"/><path d="M1 18h15"/><rect x="17" y="8" width="6" height="12" rx="1.5"/></svg></span>
         <h3 class="feature-title">Phone, Laptop, Campfire</h3>
         <p class="feature-desc">Use it on any device, install it like an app, and keep your picks handy when cravings hit hard.</p>
       </div>
       <div class="feature-card fade-in">
-        <span class="feature-icon">◐</span>
+        <span class="feature-icon"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a5 5 0 0 1-.6-9.96A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9H7z"/><path d="M9.5 13.5l2 2 3.5-4"/></svg></span>
         <h3 class="feature-title">Synced Across The Den</h3>
-        <p class="feature-desc">Sign in to restore your den. Grizzly keeps new saves in sync across every device, so you never lose a favorite again.</p>
+        <p class="feature-desc">Every free account backs up your den and keeps it in sync on your phone and laptop. Lose your phone, keep every favorite.</p>
       </div>
       <div class="feature-card fade-in">
-        <span class="feature-icon">✦</span>
+        <span class="feature-icon"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="6"/><path d="M8.5 13.8L7 22l5-3 5 3-1.5-8.2"/></svg></span>
         <h3 class="feature-title">Badges & Bear XP</h3>
         <p class="feature-desc">Earn playful milestones as you explore. Your appetite deserves a little glory.</p>
         <span class="feature-badge">Grizzly Only</span>
       </div>
       <div class="feature-card fade-in">
-        <span class="feature-icon">▧</span>
+        <span class="feature-icon"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M12 13.5l1 2 2.2.3-1.6 1.5.4 2.2-2-1-2 1 .4-2.2-1.6-1.5 2.2-.3z"/></svg></span>
         <h3 class="feature-title">Year In Paw-view</h3>
         <p class="feature-desc">Relive your best bites of the year with a clean recap of what you loved most.</p>
         <span class="feature-badge">Grizzly Only</span>
       </div>
       <div class="feature-card fade-in">
-        <span class="feature-icon">◒</span>
+        <span class="feature-icon"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="11" rx="5.5"/><path d="M7 11v3M5.5 12.5h3"/><circle cx="16" cy="11.5" r=".8"/><circle cx="18" cy="13.5" r=".8"/></svg></span>
         <h3 class="feature-title">Snack Break Fun</h3>
         <p class="feature-desc">A little playful downtime between cravings so the app feels fun, not fussy.</p>
       </div>
@@ -557,19 +560,16 @@
       <div class="steps-grid">
         <div class="step">
           <div class="step-num">1</div>
-          <span class="step-icon">01</span>
           <h3 class="step-title">Join the den</h3>
           <p class="step-desc">Sign up with Google or email. No credit card, no nonsense.</p>
         </div>
         <div class="step">
           <div class="step-num">2</div>
-          <span class="step-icon">02</span>
           <h3 class="step-title">Save your first bite</h3>
           <p class="step-desc">Search, paste a link, or pick nearby. Your first save takes seconds.</p>
         </div>
         <div class="step">
           <div class="step-num">3</div>
-          <span class="step-icon">03</span>
           <h3 class="step-title">Swipe, rate, repeat</h3>
           <p class="step-desc">Track what you loved, skip what you didn't, and let Byte Cub guide tonight's move.</p>
         </div>
@@ -583,7 +583,7 @@
   <section class="section" id="pricing">
     <p class="section-label">Simple pricing</p>
       <h2 class="section-title">Start as Cub. Upgrade to Grizzly when hunger gets serious.</h2>
-    <p class="section-sub">Use Cub for free forever, then unlock AI, sync, and unlimited saves when your food den grows wild.</p>
+    <p class="section-sub">Use Cub free forever, with backup and sync on every device. Unlock AI picks, friends and unlimited saves when your food den grows wild.</p>
     <div class="pricing-grid">
       <!-- Cub (Free) -->
       <div class="pricing-card fade-in">
@@ -595,15 +595,15 @@
           <div class="pricing-period">forever</div>
         </div>
         <ul class="pricing-features">
-          <li><span class="pricing-check">✓</span> Up to 10 restaurants</li>
-          <li><span class="pricing-check">✓</span> Map, nearby &amp; Open now</li>
-          <li><span class="pricing-check">✓</span> Ratings &amp; notes</li>
-          <li><span class="pricing-check">✓</span> Backup on every device</li>
-          <li><span class="pricing-check">✓</span> Follow one friend</li>
-          <li><span class="pricing-lock">LOCK</span> <span style="color:var(--text-dim)">More friends &amp; Dinner Vote</span></li>
-          <li><span class="pricing-lock">LOCK</span> <span style="color:var(--text-dim)">Bear Swipe &amp; Today's Pick</span></li>
-          <li><span class="pricing-lock">LOCK</span> <span style="color:var(--text-dim)">Byte Cub AI</span></li>
-          <li><span class="pricing-lock">LOCK</span> <span style="color:var(--text-dim)">Unlimited restaurants</span></li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Up to 10 restaurants</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Map, nearby &amp; Open now</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Ratings &amp; notes</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Backup &amp; sync on every device</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Follow one friend</li>
+          <li><span class="pricing-lock"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span> <span style="color:var(--text-dim)"><span class="sr-only">Not included: </span>More friends &amp; Dinner Vote</span></li>
+          <li><span class="pricing-lock"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span> <span style="color:var(--text-dim)"><span class="sr-only">Not included: </span>Bear Swipe &amp; Today's Pick</span></li>
+          <li><span class="pricing-lock"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span> <span style="color:var(--text-dim)"><span class="sr-only">Not included: </span>Byte Cub AI</span></li>
+          <li><span class="pricing-lock"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span> <span style="color:var(--text-dim)"><span class="sr-only">Not included: </span>Unlimited restaurants</span></li>
         </ul>
         <a href="auth.html?mode=signup" class="btn-plan-free">Get started free</a>
       </div>
@@ -618,16 +618,16 @@
           <div class="pricing-period">per month · cancel anytime</div>
         </div>
         <ul class="pricing-features">
-          <li><span class="pricing-check">✓</span> <strong>Unlimited</strong> restaurants</li>
-          <li><span class="pricing-check">✓</span> Everything in Cub</li>
-          <li><span class="pricing-check">✓</span> All your friends, invites &amp; Dinner Vote</li>
-          <li><span class="pricing-check">✓</span> Bear Swipe &amp; Today's Pick</li>
-          <li><span class="pricing-check">✓</span> Byte Cub AI assistant</li>
-          <li><span class="pricing-check">✓</span> AI dish recommendations</li>
-          <li><span class="pricing-check">✓</span> Achievements &amp; XP</li>
-          <li><span class="pricing-check">✓</span> Year in Review</li>
-          <li><span class="pricing-check">✓</span> Foodie profile page</li>
-          <li><span class="pricing-check">✓</span> Priority support</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> <strong>Unlimited</strong> restaurants</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Everything in Cub</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> All your friends, invites &amp; Dinner Vote</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Bear Swipe &amp; Today's Pick</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Byte Cub AI assistant</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> AI dish recommendations</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Achievements &amp; XP</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Year in Review</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Foodie profile page</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Priority support</li>
         </ul>
         <a href="auth.html?mode=signup" class="btn-plan-paid">Start Grizzly - $4.99/mo</a>
       </div>

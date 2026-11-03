@@ -1948,15 +1948,29 @@
         <h2 id="import-title">Import Your Old Lists</h2>
         <button id="import-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
-      <p class="import-subtitle">Got a "places to try" note? Open it in Google Keep, Samsung Notes, Apple Notes or any notes app, copy everything, and paste it here. One place per line; anything after a dash becomes a note.</p>
-      <details class="import-help">
-        <summary>Other ways to bring it in</summary>
-        <ul>
-          <li><strong>Share it:</strong> in Keep or Samsung Notes tap Share → Feed The Bear (Android app or installed web app).</li>
-          <li><strong>Files:</strong> Samsung Notes → Share → Text file; Google Keep → Google Takeout (Keep) gives .json/.html; Google Maps Saved Places from Takeout (.json/.csv). You can pick several at once.</li>
-          <li>Ticked items (☑, [x], ✓) count as places you've been and go into Visited.</li>
-        </ul>
-      </details>
+      <p class="import-subtitle">Copy your "places to try" note from any notes app and paste it below. One place per line.</p>
+      <div class="import-howto">
+        <details class="import-help">
+          <summary>How to copy from Google Keep</summary>
+          <p>Open the note, tap ⋮ → <strong>Copy</strong>. Or tap <strong>Send → Feed The Bear</strong> to skip pasting. For many notes at once, Google Takeout (Keep) gives files you can pick below.</p>
+        </details>
+        <details class="import-help">
+          <summary>How to copy from Apple Notes</summary>
+          <p>Open the note, press and hold the text, tap <strong>Select All → Copy</strong>, then paste here.</p>
+        </details>
+        <details class="import-help">
+          <summary>How to copy from Samsung Notes</summary>
+          <p>Open the note, tap ⋮ → <strong>Share → Text</strong> and pick Feed The Bear, or save it as a text file and choose it below.</p>
+        </details>
+        <details class="import-help">
+          <summary>Google Maps saved places and files</summary>
+          <p>Google Takeout → <strong>Maps (your places)</strong> gives a .json or .csv file. Choose it (or several notes files) with <strong>Choose note files</strong>.</p>
+        </details>
+        <details class="import-help">
+          <summary>Notes, dishes and places you've been</summary>
+          <p>Anything after a dash becomes a note ("Tacos Chiwas - get the birria"). Ticked items (☑, [x], ✓) go into Been There.</p>
+        </details>
+      </div>
       <textarea id="import-paste-area" class="import-textarea" placeholder="Paste your list here, e.g.&#10;Restaurants to try&#10;☐ Tacos Chiwas - get the birria&#10;☐ Pizzeria Bianco&#10;☑ Nobu, 105 Hudson St, New York" rows="8"></textarea>
       <div class="import-file-row">
         <label class="btn-secondary btn-sm import-file-btn">Choose note files<input type="file" id="import-notes-file" accept=".txt,.md,.json,.html,.htm,.csv,text/plain,text/html,application/json,text/csv" multiple hidden /></label>
@@ -2036,9 +2050,6 @@
       <div style="display:flex;gap:8px;margin-top:16px">
         <button id="review-ai-btn" class="btn-secondary">AI Year Recap</button>
         <button id="review-share-btn" class="btn-primary" style="flex:1">Share My Wrap</button>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <button id="review-close-btn2" class="btn-ghost" style="flex:1">Close</button>
       </div>
     </div>
   </div>
