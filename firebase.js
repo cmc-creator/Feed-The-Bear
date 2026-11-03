@@ -67,6 +67,8 @@ async function fbSignUpEmail (email, password) {
 }
 
 async function fbSignOut () {
+  // This phone stops getting the account's friend notifications.
+  await FriendPings.stop();
   await _auth.signOut();
   window._ftbUid  = null;
   window._ftbPlan = 'free';
@@ -374,6 +376,7 @@ function fbSaveFriendsCloud () {
       friends, friendsAt: friendsUpdatedAt() || Date.now(),
       ...(state.settings.profileShareId ? { profileShareId: state.settings.profileShareId } : {}),
     }, { merge: true }).catch(err => console.warn('[FTB] friends sync failed:', err.code || err));
+    FriendPings.syncFollows();
   }, 1500);
 }
 window.fbSaveFriendsCloud = fbSaveFriendsCloud;
@@ -445,6 +448,7 @@ async function fbPublishFriendProfile () {
   try {
     await _db.doc(`profiles/${doc.id}`).set({ ...doc, uid, updatedAt: Date.now() });
     _lastPublishedProfile = json;
+    FriendPings.notify(doc.id);
   } catch (err) {
     console.warn('[FTB] profile publish failed:', err.code || err);
   }
@@ -462,6 +466,92 @@ async function fbFetchFriendProfiles (ids) {
     .then(snap => (snap.exists ? snap.data() : null))
     .catch(() => null)));
 }
+// ─── FRIEND NOTIFICATIONS (Android app, api/push.js) ──────────
+// In the Android app, a phone that allowed notifications registers with the
+// server along with who you follow; when a friend logs a visit, a dish or a
+// new spot, the server pings their followers. The website does none of this.
+var FriendPings = (() => {
+  const plugin = () => (window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins?.PushNotifications : null);
+  const ASKED_KEY = 'ftb_push_asked';
+  let listening = false;
+  let lastFollows = '';
+
+  async function call (action, data = {}) {
+    const user = _auth?.currentUser;
+    if (!user) return null;
+    try {
+      const resp = await fetch('/api/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
+        body: JSON.stringify({ action, ...data }),
+      });
+      return resp.ok ? resp.json() : null;
+    } catch { return null; }
+  }
+
+  function listen (p) {
+    if (listening) return;
+    listening = true;
+    p.addListener('registration', ({ value }) => { call('register', { token: value }); syncFollows(true); });
+    p.addListener('registrationError', err => console.warn('[FTB] push registration failed:', err?.error || err));
+    // Tapping a friend's notification opens Friends.
+    p.addListener('pushNotificationActionPerformed', () => { setTimeout(() => window.openFoodieFriends?.(), 400); });
+    // While the app is open Android doesn't show it, so say it in the app.
+    p.addListener('pushNotificationReceived', n => {
+      if (typeof showToast === 'function') showToast(n.title || 'Feed The Bear', n.body || '', 'info');
+      if (typeof refreshFriendsLive === 'function') refreshFriendsLive(true);
+    });
+  }
+
+  // Signed in on the phone: register quietly if notifications are already allowed.
+  async function start () {
+    const p = plugin();
+    if (!p || !_auth?.currentUser) return;
+    listen(p);
+    try {
+      if ((await p.checkPermissions()).receive === 'granted') await p.register();
+    } catch (err) { console.warn('[FTB] push start failed:', err); }
+  }
+
+  // After following someone: ask once, then register.
+  async function offer () {
+    const p = plugin();
+    if (!p || !_auth?.currentUser) return;
+    listen(p);
+    try {
+      let perm = (await p.checkPermissions()).receive;
+      if (perm !== 'granted' && localStorage.getItem(ASKED_KEY) !== '1') {
+        localStorage.setItem(ASKED_KEY, '1');
+        perm = (await p.requestPermissions()).receive;
+      }
+      if (perm === 'granted') await p.register();
+      else syncFollows();
+    } catch (err) { console.warn('[FTB] push offer failed:', err); }
+  }
+
+  // Who you follow, so their posts can reach this phone.
+  function syncFollows (force = false) {
+    if (!plugin() || typeof getFriends !== 'function') return;
+    const ids = getFriends().map(f => f.data?.id).filter(Boolean);
+    const sig = ids.join(',');
+    if (!force && sig === lastFollows) return;
+    lastFollows = sig;
+    call('follows', { ids });
+  }
+
+  // You just posted: the server decides if it's news and pings followers (from any device).
+  function notify (id) { if (id) call('notify', { id }); }
+
+  async function stop () {
+    const p = plugin();
+    if (!p) return;
+    try { await p.unregister(); } catch { /* already off */ }
+  }
+
+  return { start, offer, syncFollows, notify, stop };
+})();
+window.FriendPings = FriendPings;
+
 window.fbPublishFriendProfile = fbPublishFriendProfile;
 window.fbUnpublishFriendProfile = fbUnpublishFriendProfile;
 window.fbFetchFriendProfiles = fbFetchFriendProfiles;
@@ -529,6 +619,7 @@ function initFirebaseAuth () {
         localStorage.setItem('ftb_uid_v1',  user.uid);
       } catch { window._ftbPlan = 'free'; }
       if (typeof renderGrizzlyUi === 'function') renderGrizzlyUi();
+      FriendPings.start();
 
       // They tapped Upgrade before signing in: bring them straight back.
       let pendingUpgrade = null;

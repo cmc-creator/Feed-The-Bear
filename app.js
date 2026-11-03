@@ -10351,6 +10351,8 @@ function followFriend (data) {
   trackProductEvent('friend_followed', { updated: i >= 0 });
   showToast(i >= 0 ? `Updated ${entry.name}` : `Following ${entry.name}`, 'Their go-to orders now show on matching restaurants.', 'success');
   renderAll();
+  // Android app: offer a ping when they eat somewhere new (asks once).
+  if (i < 0) window.FriendPings?.offer();
   return entry;
 }
 

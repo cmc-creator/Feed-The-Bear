@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "565915716798",
+    "project_id": "feed-the-bear-app-2-102926",
+    "storage_bucket": "feed-the-bear-app-2-102926.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:565915716798:android:1e911453701c94bc4622ef",
+        "android_client_info": {
+          "package_name": "com.feedthebear.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "565915716798-4ec8hkqgk7g25kar9rtkf8q9rvhtskk3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBJMARr-Z8oafbbp7ys7jCrq6EIAxl9QwY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "565915716798-4ec8hkqgk7g25kar9rtkf8q9rvhtskk3.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

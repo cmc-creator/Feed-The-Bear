@@ -36,6 +36,7 @@
     <h3>Things collected as you use the app</h3>
     <ul>
       <li><strong>Location:</strong> if you allow it, your device's location while the app is open. It's used to find nearby restaurants and to remind you when a spot on your list is close. We don't store a history of where you've been.</li>
+      <li><strong>Notification token (Android app):</strong> if you allow notifications, a code from Google that lets us send this phone a notification when someone you follow posts a visit, a dish or a new spot. We keep it with the list of friends you follow, and delete it when you sign out on that phone or delete your account.</li>
       <li><strong>Usage counts:</strong> anonymous daily totals of feature use (for example, "spots added: 42"), with no user ID, so we know what to improve.</li>
       <li><strong>Basic technical data:</strong> our hosting provider keeps standard server logs, such as IP address and browser type, for security and troubleshooting.</li>
     </ul>
@@ -51,7 +52,7 @@
     <h2>Who we share it with</h2>
     <p>We share only what each service needs to do its job for us:</p>
     <ul>
-      <li><strong>Google Firebase:</strong> sign-in and the database that backs up your diary.</li>
+      <li><strong>Google Firebase:</strong> sign-in, the database that backs up your diary, and Cloud Messaging, which delivers friend notifications to the Android app.</li>
       <li><strong>Vercel:</strong> hosts the website and our server functions.</li>
       <li><strong>Google Maps Platform (Places):</strong> receives a restaurant's name and approximate location to return its rating, hours and photos.</li>
       <li><strong>OpenStreetMap services (Nominatim, Overpass):</strong> receive a location or address to find nearby restaurants and map addresses.</li>
@@ -70,6 +71,7 @@
       <li><strong>See and export your data:</strong> in the app, open your profile and choose Export My Data.</li>
       <li><strong>Correct it:</strong> edit or delete any spot, note or photo in the app.</li>
       <li><strong>Stop sharing:</strong> in Foodie Friends, choose Stop sharing.</li>
+      <li><strong>Notifications:</strong> turn them off for Feed The Bear in your phone's settings at any time.</li>
       <li><strong>Location:</strong> you can turn off location access in your device or browser settings at any time.</li>
       <li><strong>Delete your account:</strong> in the app, open your profile and choose Delete Account, or follow the steps on our <a href="delete-account.html">account deletion page</a>.</li>
     </ul>

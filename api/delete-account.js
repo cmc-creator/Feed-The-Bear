@@ -68,8 +68,12 @@ module.exports = async function handler (req, res) {
     }
     const published = await db.collection('profiles').where('uid', '==', uid).get();
     await Promise.all(published.docs.map(d => d.ref.delete()));
+    // Friend notifications (push.js): their followers list, and them on everyone else's.
+    await Promise.all(published.docs.map(d => db.doc(`followers/${d.id}`).delete()));
+    const follows = (await db.doc(`pushFollows/${uid}`).get()).data()?.ids || [];
+    await Promise.all(follows.map(id => db.doc(`followers/${id}`).set({ uids: fb.firestore.FieldValue.arrayRemove(uid) }, { merge: true })));
     // Server-only records keyed by this account (the weekly email list holds their address).
-    const serverDocs = ['digestSubscribers', 'rewards', 'trials', 'referrals'].map(c => `${c}/${uid}`);
+    const serverDocs = ['digestSubscribers', 'rewards', 'trials', 'referrals', 'pushTokens', 'pushFollows'].map(c => `${c}/${uid}`);
     if (customerId) serverDocs.push(`stripeCustomers/${customerId}`);
     await Promise.all(serverDocs.map(p => db.doc(p).delete()));
     await db.recursiveDelete(db.doc(`users/${uid}`));
