@@ -315,6 +315,7 @@ window.BearSwipe = (() => {
     els.actions.classList.add('hidden');
     if (liked.length) { try { window.onBearSwipeCraving?.(); } catch { /* the pick catches up on the next render */ } }
     track('bear_swipe_round_done', { liked: liked.length, top: cravings[0]?.[0] || '' });
+    if (store.rounds === 1) track('bear_swipe_first_round', {});
 
     // Free accounts can swipe; naming the craving is Grizzly (app.js grizzlyUnlockHtml).
     const locked = typeof window.hasGrizzly === 'function' && !window.hasGrizzly();

@@ -84,10 +84,16 @@ asGrizzly(); // uses Grizzly-only features
 
   // Finish the round with a mix, using the keyboard too.
   await mod.focus();
+  // Wait for each swipe to land rather than a fixed time: a slow photo used to
+  // swallow a key press, so the round never ended and the test flaked.
   for (let i = 2; i < 20; i++) {
     const left = i % 3 === 0;
-    await p.keyboard.press(left ? 'ArrowLeft' : 'ArrowRight');
-    await p.waitForTimeout(left ? 2200 : 1000);
+    for (let tries = 0; tries < 3; tries++) {
+      await p.keyboard.press(left ? 'ArrowLeft' : 'ArrowRight');
+      const moved = await p.waitForFunction(n => BearSwipe._state().index > n || !document.querySelector('.bs-result.hidden'), i, { timeout: 4000 }).then(() => true).catch(() => false);
+      if (moved) break;
+      await mod.focus();
+    }
   }
   await p.waitForSelector('.bs-result:not(.hidden)', { timeout: 5000 }).catch(() => {});
   const result = await p.locator('.bs-result').innerText().catch(() => '');

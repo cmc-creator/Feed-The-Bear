@@ -58,11 +58,13 @@ async function call (handler, { token, days } = {}) {
   await p.waitForSelector('#board:not([hidden])');
   check(await p.locator('#gate').isHidden(), 'demo mode skips sign-in');
   const tiles = await p.$$eval('.tile span', s => s.map(x => x.textContent));
-  check(tiles.includes('App opens') && tiles.includes('Grizzly upgrades'), `headline numbers show (${tiles.join(', ')})`);
+  check(tiles.includes('App opens') && tiles.includes('Trials started') && tiles.includes('First payments'), `headline numbers show (${tiles.join(', ')})`);
   check(await p.locator('#chart path').count() === 30, 'a bar for each of 30 days');
   await p.hover('#chart rect.hit[data-i="29"]');
   check(/opens/.test(await p.locator('.tip').innerText()), 'hovering a bar shows the count');
   check(await p.locator('#funnel-money .step').count() === 3, 'the upgrade funnel has three steps');
+  const signup = await p.locator('#funnel-signup').innerText();
+  check(await p.locator('#funnel-signup .step').count() === 5 && /Created an account/.test(signup) && /Made a first payment/.test(signup), 'the sign-up funnel runs from account to first payment');
   check(await p.locator('#rows tr', { hasText: 'Meal logged' }).count() === 1, 'the table lists events with plain names');
   await p.screenshot({ path: path.join(SHOTS, 'usage-desktop.png'), fullPage: true }).catch(() => {});
   await p.click('.range [data-days="7"]');

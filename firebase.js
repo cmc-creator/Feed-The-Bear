@@ -507,6 +507,15 @@ function initFirebaseAuth () {
     if (user) {
       window._ftbUid       = user.uid;
       window._ftbUserEmail = user.email;
+      // A brand-new account (signed in for the first time just now), counted once for the funnel.
+      try {
+        const m = user.metadata || {};
+        const fresh = Math.abs(Date.parse(m.creationTime) - Date.parse(m.lastSignInTime)) < 120000;
+        if (fresh && localStorage.getItem('ftb_counted_signup') !== user.uid) {
+          localStorage.setItem('ftb_counted_signup', user.uid);
+          if (typeof trackProductEvent === 'function') trackProductEvent('account_created');
+        }
+      } catch { /* analytics only */ }
 
       // Load plan from Firestore
       try {

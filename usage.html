@@ -74,6 +74,7 @@
       <div class="chart" id="chart"><svg role="img" aria-label="App opens per day"></svg><div class="tip" hidden></div></div>
     </div>
     <div class="funnels">
+      <div class="panel" id="funnel-signup"></div>
       <div class="panel" id="funnel-welcome"></div>
       <div class="panel" id="funnel-money"></div>
     </div>
@@ -109,6 +110,9 @@ const LABELS = {
   welcome_step_shown: 'Welcome step shown', welcome_step_done: 'Welcome step done', welcome_step_skipped: 'Welcome step skipped',
   welcome_done: 'Welcome finished', welcome_skipped: 'Welcome skipped',
   cub_menu_opened: 'Cub menu opened', cub_action: 'Cub action used', duel_free_verdict: 'Free duel verdict',
+  account_created: 'Account created', first_spot_saved: 'First spot saved', bear_swipe_first_round: 'First Bear Swipe round',
+  free_limit_hit: 'Hit the 10-spot limit', trial_started: 'Grizzly trial started', paid_signup: 'Paid Grizzly (no trial)', first_payment: 'First payment',
+  trial_reminder_manage: 'Trial reminder: Manage tapped',
   decision_session_started: 'Decision started', decision_session_completed: 'Decision finished', decision_option_selected: 'Decision option picked',
 };
 const label = k => LABELS[k] || k.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
@@ -130,6 +134,8 @@ function demoData (n) {
       bear_swipe_round_done: Math.round(base / 6), welcome_step_shown: Math.round(base / 2), welcome_step_done: Math.round(base / 3),
       welcome_done: Math.round(base / 8), welcome_skipped: Math.round(base / 12), upgrade_modal_opened: Math.round(base / 7),
       upgrade_cta_clicked: Math.round(base / 18), grizzly_upgraded: i % 4 ? 0 : 1,
+      account_created: Math.round(base / 5), first_spot_saved: Math.round(base / 7), bear_swipe_first_round: Math.round(base / 10),
+      trial_started: i % 3 ? 0 : 1, first_payment: i % 6 ? 0 : 1,
     } });
   }
   return { days: out };
@@ -176,11 +182,21 @@ function render (list) {
     [t('quick_add_saved'), 'Spots saved'],
     [t('just_ate_logged'), 'Meals logged'],
     [t('bear_swipe_round_done'), 'Swipe rounds'],
-    [t('grizzly_upgraded'), 'Grizzly upgrades'],
+    [t('account_created'), 'New accounts'],
+    [t('trial_started'), 'Trials started'],
+    [t('first_payment'), 'First payments'],
   ].map(([n, l]) => `<div class="tile"><b>${fmt(n)}</b><span>${l}</span></div>`).join('');
 
   drawChart(list.map(d => ({ date: d.date, v: (d.counts.app_opened || 0) + (d.counts.app_opened_new || 0) })));
 
+  // Each step counts people doing it for the first time, so it reads top to bottom.
+  funnel('funnel-signup', 'From sign-up to paying', [
+    ['Created an account', t('account_created')],
+    ['Saved a first spot', t('first_spot_saved')],
+    ['Finished a Bear Swipe round', t('bear_swipe_first_round')],
+    ['Started a Grizzly trial', t('trial_started') + t('paid_signup')],
+    ['Made a first payment', t('first_payment')],
+  ]);
   funnel('funnel-welcome', 'New user welcome', [
     ['Saw the welcome', t('app_opened_new')],
     ['Finished it', t('welcome_done')],

@@ -58,6 +58,15 @@ async function uidForCustomer (db, customerId, metadataUid) {
   return snap.exists ? snap.data().uid : null;
 }
 
+// Funnel counts for /usage.html (same daily counters as track.js), counted here
+// because only Stripe knows a trial started or a first payment went through.
+async function bump (db, name) {
+  try {
+    const day = new Date().toISOString().slice(0, 10);
+    await db.doc(`analytics/${day}`).set({ counts: { [name]: admin.firestore.FieldValue.increment(1) } }, { merge: true });
+  } catch (err) { console.warn('[FTB] usage count failed:', err.message); }
+}
+
 // When a free trial ends (null once it's over) and whether they've cancelled,
 // so the app can remind them a few days before.
 function trialFields (sub) {
@@ -137,7 +146,21 @@ module.exports = async function handler (req, res) {
           ...(sub ? trialFields(sub) : {}),
         });
         if (obj.customer) await db.doc(`stripeCustomers/${obj.customer}`).set({ uid }, { merge: true });
+        await bump(db, obj.payment_status === 'no_payment_required' ? 'trial_started' : 'paid_signup');
       }
+    }
+
+    // A member's first real payment (after a trial, or straight away), once each.
+    // Only a count: a failure here must not make Stripe retry the payment event.
+    if (event.type === 'invoice.paid' && obj.amount_paid > 0) {
+      try {
+        const uid = await uidForCustomer(db, obj.customer, null);
+        const ref = uid && db.doc(`users/${uid}/meta/profile`);
+        if (ref && !(await ref.get()).data()?.firstPaidAt) {
+          await ref.set({ firstPaidAt: new Date().toISOString() }, { merge: true });
+          await bump(db, 'first_payment');
+        }
+      } catch (err) { console.warn('[FTB] first payment count failed:', err.message); }
     }
 
     // A friend's first real payment (after their free trial): whoever invited

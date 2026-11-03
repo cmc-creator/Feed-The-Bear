@@ -15323,6 +15323,7 @@ function grizzlyLocked (key) {
 
 function showGrizzlyUpsell (key = 'general') {
   const pitch = GRIZZLY_PITCH[key] || GRIZZLY_PITCH.general;
+  if (key === 'limit') trackProductEvent('free_limit_hit');
   if (typeof openUpgradeModal === 'function') openUpgradeModal({ key, ...pitch });
 }
 
@@ -15410,6 +15411,7 @@ function renderGrizzlyUi () {
     showToast(left ? `${left} free spot${left === 1 ? '' : 's'} left` : `That's all ${FREE_RESTAURANT_LIMIT} free spots`,
       left ? `Cub holds ${FREE_RESTAURANT_LIMIT}. Grizzly is unlimited.` : 'Grizzly keeps the den growing, with no limit.', 'info');
   }
+  if (_limitShownFor === 0 && count === 1) trackProductEvent('first_spot_saved');
   _limitShownFor = count;
   try { renderTrialReminder(); } catch (err) { console.warn('[FTB] trial reminder:', err); }
   const card = document.getElementById('grizzly-home');
