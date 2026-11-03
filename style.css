@@ -9089,3 +9089,15 @@ body.overlay-open .app-update-banner { display: none; }
 .nearalerts-when { margin-top: 6px; }
 .nearalerts-when [data-when] { display: grid; gap: 2px; text-align: left; }
 .nearalerts-when [data-when] small { font-weight: 500; font-size: .74rem; opacity: .75; }
+
+/* Scan the menu (app.js scanMenu). */
+.menu-scan-btn { display: flex; align-items: center; gap: 8px; width: 100%; margin: 6px 0 10px; padding: 10px 12px; border-radius: 12px;
+  border: 1px dashed rgba(var(--primary-rgb), .55); background: rgba(var(--primary-rgb), .08); color: var(--text); font: inherit; font-weight: 700; font-size: .86rem; cursor: pointer; text-align: left; }
+.menu-scan-btn .menu-scan-badge { margin-left: auto; }
+.menu-scan-result { display: grid; gap: 8px; margin: 0 0 12px; padding: 12px; border-radius: 12px; background: var(--surface2); border: 1px solid var(--border); }
+.menu-scan-title { font-weight: 800; color: var(--primary); }
+.menu-scan-wait { font-size: .86rem; color: var(--text-dim); }
+.menu-scan-pick { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+.menu-scan-pick div { display: grid; gap: 2px; }
+.menu-scan-pick span { font-size: .78rem; color: var(--text-dim); }
+.menu-scan-skip { font-size: .8rem; color: var(--text-dim); }

@@ -200,3 +200,9 @@ jobs:
       - name: Works offline
         working-directory: tests
         run: node offline.test.js
+      - name: QR code to follow you
+        working-directory: tests
+        run: node qr.test.js
+      - name: Scan the menu
+        working-directory: tests
+        run: node menuscan.test.js

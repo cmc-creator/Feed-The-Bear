@@ -3342,6 +3342,10 @@ function openDetailModal (id) {
   const r = state.restaurants.find(x => x.id === id);
   if (!r) return;
   state.detailId = id;
+  // A menu scan belongs to the spot it was taken at.
+  const scan = document.getElementById('menu-scan-result');
+  if (scan) { scan.classList.add('hidden'); scan.innerHTML = ''; }
+  document.querySelector('.menu-scan-badge')?.classList.toggle('hidden', hasGrizzly());
 
   const [c1, c2] = cuisineGrad(r.cuisine);
   const hero = document.getElementById('detail-hero');
@@ -7656,6 +7660,15 @@ function setupEvents () {
     if (btn) logYourOrder(btn.dataset.verdict);
   });
   document.getElementById('your-order-share')?.addEventListener('click', shareYourOrder);
+  document.getElementById('menu-scan-btn')?.addEventListener('click', () => {
+    if (grizzlyLocked('menu')) return;
+    document.getElementById('menu-scan-file').click();
+  });
+  document.getElementById('menu-scan-file')?.addEventListener('change', e => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) scanMenu(file);
+  });
 
   // Just Ate
   document.getElementById('home-quick-justate-btn')?.addEventListener('click', () => { hapticTap('medium'); openJustAte(); });
@@ -10849,6 +10862,88 @@ async function loadReviewDishes (r) {
     return dishes.length > 0;
   } catch {
     return false;
+  }
+}
+
+/* ── Scan the menu (Grizzly) ─────────────────────────────────
+   A photo of a menu goes to Byte Cub with what you like (dishes you'd order
+   again or skip, favorite cuisines, Bear Swipe tastes); back come up to five
+   dishes printed on that menu, each with a reason, and any to skip. One tap
+   puts a pick on this spot's Crave List. */
+function shrinkImageToJpeg (file, max = 1400) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth * scale);
+      c.height = Math.round(img.naturalHeight * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.82).split(',')[1]);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable')); };
+    img.src = url;
+  });
+}
+
+function tasteProfileText () {
+  const again = [], skip = [], cuisines = {};
+  (state.restaurants || []).forEach(r => {
+    dishesOf(r).forEach(d => { if (d.verdict === 'again') again.push(d.name); else if (d.verdict === 'skip') skip.push(d.name); });
+    if (r.cuisine && (r.myRating >= 4 || r.status === 'visited')) cuisines[r.cuisine] = (cuisines[r.cuisine] || 0) + (r.myRating || 3);
+  });
+  let swipe = {};
+  try { swipe = JSON.parse(localStorage.getItem('ftb_bear_swipe_v2') || '{}').tastes || {}; } catch { /* none yet */ }
+  const top = obj => Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k]) => k);
+  return [
+    again.length && `Dishes they'd order again: ${again.slice(0, 12).join(', ')}`,
+    skip.length && `Dishes they didn't like: ${skip.slice(0, 8).join(', ')}`,
+    top(cuisines).length && `Favorite cuisines: ${top(cuisines).join(', ')}`,
+    top(swipe).length && `Bear Swipe says they love: ${top(swipe).join(', ')}`,
+  ].filter(Boolean).join('\n') || 'No taste history yet: pick the dishes this place is best known for.';
+}
+
+async function scanMenu (file) {
+  const r = state.restaurants.find(x => x.id === state.detailId);
+  const box = document.getElementById('menu-scan-result');
+  if (!r || !box) return;
+  box.classList.remove('hidden');
+  box.innerHTML = '<div class="menu-scan-wait">Byte Cub is reading the menu… 🐻</div>';
+  trackProductEvent('menu_scanned');
+  try {
+    const photo = await shrinkImageToJpeg(file);
+    const prompt = `This is a photo of the menu at ${r.name}${r.cuisine ? ` (${r.cuisine})` : ''}. Pick what this person should order, based on their taste:
+${tasteProfileText()}
+
+Reply with only JSON, no other text:
+{"picks":[{"dish":"the name exactly as printed on the menu","why":"one short reason tied to their taste"}],"skip":[{"dish":"exact name","why":"short reason"}]}
+Up to 5 picks and up to 2 skips. Only dishes printed on this menu. If the photo isn't a readable menu, reply {"error":"not a menu"}.`;
+    const reply = await AI.callVision(prompt, photo, 'image/jpeg', { maxTokens: 700, temperature: 0.4 });
+    let data = {};
+    try { data = JSON.parse(String(reply || '').match(/\{[\s\S]*\}/)?.[0] || '{}'); } catch { data = {}; }
+    const clean = list => (Array.isArray(list) ? list : []).map(x => ({ dish: String(x?.dish || '').trim().slice(0, 80), why: String(x?.why || '').trim().slice(0, 160) })).filter(x => x.dish);
+    const picks = clean(data.picks).slice(0, 5);
+    const skips = clean(data.skip).slice(0, 2);
+    if (!picks.length) {
+      box.innerHTML = `<div class="menu-scan-wait">${data.error ? "That doesn't look like a menu I can read. Try a closer, straight-on photo." : "I couldn't make out the dishes. Try a closer, brighter photo."}</div>`;
+      return;
+    }
+    box.innerHTML = `<div class="menu-scan-title">Byte Cub's picks for you</div>
+      ${picks.map((p, i) => `<div class="menu-scan-pick"><div><strong>${escHtml(p.dish)}</strong>${p.why ? `<span>${escHtml(p.why)}</span>` : ''}</div>
+        <button type="button" class="btn-ghost btn-sm menu-scan-add" data-i="${i}">+ Crave List</button></div>`).join('')}
+      ${skips.length ? `<div class="menu-scan-skip">Maybe skip: ${skips.map(s => `<strong>${escHtml(s.dish)}</strong>${s.why ? ` (${escHtml(s.why)})` : ''}`).join('; ')}</div>` : ''}`;
+    box.querySelectorAll('.menu-scan-add').forEach(b => { b.onclick = () => {
+      const p = picks[Number(b.dataset.i)];
+      upsertDish(r, { name: p.dish, verdict: 'want', note: p.why });
+      renderYourOrder(r.id);
+      b.textContent = '✓ Added';
+      b.disabled = true;
+    }; });
+  } catch (err) {
+    box.innerHTML = "<div class=\"menu-scan-wait\">Byte Cub couldn't read that just now. Please try again in a moment.</div>";
+    console.warn('[FTB] menu scan failed:', err);
   }
 }
 

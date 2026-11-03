@@ -1030,7 +1030,7 @@ function _renderTrialOffer () {
   if (!btn || btn.disabled) return;
   const yearly = btn.dataset.period !== 'monthly';
   btn.textContent = _upgradeLabel();
-  if (el('upgrade-plan-badge')) el('upgrade-plan-badge').textContent = _trialOffer.trial ? `${_trialOffer.days} days free` : 'Most popular';
+  if (el('upgrade-plan-badge')) el('upgrade-plan-badge').textContent = _trialOffer.trial ? `${_trialOffer.days} days free` : 'Everything unlocked';
   if (el('upgrade-footer')) {
     el('upgrade-footer').textContent = _trialOffer.trial
       ? `Free for ${_trialOffer.days} days, then ${yearly ? '$53.89 a year' : '$4.99 a month'}. Cancel before then and you pay nothing. Billed securely by Stripe.`

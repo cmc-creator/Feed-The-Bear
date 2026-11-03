@@ -443,7 +443,7 @@
             </ul>
           </div>
           <div class="upgrade-plan upgrade-plan-paid">
-            <div class="upgrade-plan-badge" id="upgrade-plan-badge">Most popular</div>
+            <div class="upgrade-plan-badge" id="upgrade-plan-badge">Everything unlocked</div>
             <div class="upgrade-plan-name">Grizzly</div>
             <div class="upgrade-price-row">
               <span id="upgrade-price-main" class="upgrade-price-main">$53.89</span>
@@ -454,6 +454,7 @@
               <li>✓ All your friends, invites &amp; Dinner Vote</li>
               <li>✓ Bear Swipe &amp; Today's Pick</li>
               <li>✓ AI recs &amp; Smart Fill</li>
+              <li>✓ Snap a menu, get your order</li>
               <li>✓ Year in Review</li>
               <li>✓ All Achievements</li>
               <li>✓ 15-second food videos</li>
@@ -1504,6 +1505,12 @@
             <span class="your-order-sub" id="your-order-sub"></span>
             <button type="button" id="your-order-share" class="yo-share hidden">Share</button>
           </div>
+          <button type="button" id="menu-scan-btn" class="menu-scan-btn">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8 9h8M8 12h8M8 15h5"/></svg>
+            Scan the menu: what should I get?<span class="gz-badge menu-scan-badge">GRIZZLY</span>
+          </button>
+          <input type="file" id="menu-scan-file" accept="image/*" capture="environment" hidden />
+          <div id="menu-scan-result" class="menu-scan-result hidden" aria-live="polite"></div>
           <div id="your-order-list" class="your-order-list"></div>
           <div class="your-order-add">
             <div class="yo-input-row">
