@@ -83,7 +83,7 @@ html { scroll-behavior: smooth; }
 body {
   font-family: var(--font);
   background:
-    linear-gradient(rgba(15,22,17,.72), rgba(15,22,17,.78)),
+    linear-gradient(rgba(22,16,11,.74), rgba(22,16,11,.8)),
     url('assets/textures/forest.jpg') center/cover fixed no-repeat,
     radial-gradient(90% 110% at 8% 18%, rgba(111,153,86,.2), transparent 56%),
     radial-gradient(120% 95% at 50% -15%, rgba(120,86,52,.2), transparent 58%),
@@ -432,16 +432,16 @@ button:focus-visible,
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  color: #d9e6d8;
-  border: 1px solid rgba(138,168,127,.28);
-  background: linear-gradient(160deg, rgba(43,59,44,.94), rgba(27,38,30,.96));
-  box-shadow: 0 0 0 1px rgba(171,210,160,.07) inset, 0 8px 16px rgba(0,0,0,.32);
+  color: #f1e3cf;
+  border: 1px solid rgba(214,170,110,.3);
+  background: linear-gradient(160deg, rgba(64,45,31,.94), rgba(38,27,19,.96));
+  box-shadow: 0 0 0 1px rgba(232,190,130,.07) inset, 0 8px 16px rgba(0,0,0,.32);
   transition: all var(--transition);
 }
 .icon-btn:hover {
-  background: linear-gradient(160deg, rgba(55,76,56,.95), rgba(31,45,34,.96));
-  color: #f0f8ea;
-  border-color: rgba(173,214,153,.46);
+  background: linear-gradient(160deg, rgba(80,57,39,.95), rgba(46,33,23,.96));
+  color: #fff6e8;
+  border-color: rgba(232,177,90,.5);
 }
 .icon-btn svg { width: 18px; height: 18px; }
 .icon-btn.active { color: var(--primary); }
@@ -2380,7 +2380,9 @@ body.light-mode {
 }
 body.light-mode .app-header { background: rgba(255,255,255,.98); box-shadow: 0 1px 0 rgba(17,24,39,.14); }
 body.light-mode .stats-bar  { background: #fff; border-bottom-color: rgba(17,24,39,.14); }
-body.light-mode .filter-bar { background: #eaf1eb; border-bottom-color: rgba(17,24,39,.12); }
+body.light-mode .filter-bar { background: var(--surface2); border-bottom-color: rgba(17,24,39,.12); }
+/* Light themes: their own soft background, not the dark forest photo. */
+body.light-mode { background: radial-gradient(120% 70% at 50% -10%, rgba(var(--primary-rgb),.10), transparent 60%), var(--bg); }
 body.light-mode .restaurant-card { box-shadow: 0 2px 16px rgba(0,0,0,.07); }
 body.light-mode .chat-panel { background: #fff; }
 body.light-mode .toast { background: #fff; color: #1A1117; box-shadow: 0 4px 20px rgba(0,0,0,.12); }
@@ -7795,6 +7797,22 @@ body[data-theme-accent='berry'] {
   --primary-rgb: 184,101,127;
   --primary-dk: #98516a;
   --primary-lt: #cd86a0;
+}
+/* Honey: the default light theme. Warm cream and honey brown, like the bear
+   and the wood; Mint below is still there for anyone who wants green. */
+body[data-theme-accent='honey'] {
+  --bg: #f6efe4;
+  --surface: #fffaf2;
+  --surface2: #faf3e8;
+  --surface3: #efe2cf;
+  --text: #2a1d16;
+  --text-dim: #6b5a4c;
+  --text-muted: #5a4a3d;
+  --border: rgba(70,45,20,.16);
+  --primary: #b0702c;
+  --primary-rgb: 176,112,44;
+  --primary-dk: #8f5a22;
+  --primary-lt: #cf914c;
 }
 body[data-theme-accent='mint'] {
   --bg: #edf3ef;

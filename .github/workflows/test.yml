@@ -185,3 +185,6 @@ jobs:
       - name: Friend notifications (Android app)
         working-directory: tests
         run: node pushapp.test.js
+      - name: Error reports
+        working-directory: tests
+        run: node errors.test.js

@@ -1459,7 +1459,7 @@ function renderAvatarInto (el, id) {
 const PROFILE_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 const THEME_PRESETS = {
   dark:     { mode: 'dark',  accent: 'midnight' },
-  light:    { mode: 'light', accent: 'mint' },
+  light:    { mode: 'light', accent: 'honey' },
   forest:   { mode: 'dark',  accent: 'forest' },
   ocean:    { mode: 'dark',  accent: 'ocean' },
   sunset:   { mode: 'dark',  accent: 'sunset' },
@@ -6983,7 +6983,10 @@ function renderCollectionFilter () {
 function populateFormCollections () {
   const sel = document.getElementById('form-collection'); if (!sel) return;
   while (sel.options.length > 1) sel.remove(1);
-  (state.settings.collections||[]).forEach(c => { const o=document.createElement('option'); o.value=c.id; o.textContent=c.name; sel.appendChild(o); });
+  const lists = state.settings.collections || [];
+  lists.forEach(c => { const o=document.createElement('option'); o.value=c.id; o.textContent=c.name; sel.appendChild(o); });
+  // Without lists of your own (like "Date night") there's nothing to pick, so it isn't asked.
+  document.getElementById('form-collection-group')?.classList.toggle('hidden', !lists.length);
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -8871,17 +8874,19 @@ function checkConfettiMilestones (prev, next) {
 
 let _autoThemeTimer = null;
 
+// The default look follows the clock: warm Honey by day, gold-on-dark at night
+// (the greens, Mint and Neon, are still in settings for anyone who wants them).
 function getAutoThemePresetByHour (hour = new Date().getHours()) {
   if (hour >= 6 && hour < 11) {
-    return { mode: 'light', accent: 'mint', part: 'morning' };
+    return { mode: 'light', accent: 'honey', part: 'morning' };
   }
   if (hour >= 11 && hour < 17) {
-    return { mode: 'light', accent: 'mint', part: 'day' };
+    return { mode: 'light', accent: 'honey', part: 'day' };
   }
   if (hour >= 17 && hour < 22) {
     return { mode: 'dark', accent: 'midnight', part: 'evening' };
   }
-  return { mode: 'dark', accent: 'neon', part: 'late-night' };
+  return { mode: 'dark', accent: 'midnight', part: 'late-night' };
 }
 
 function applyAutoThemeByClock (opts = {}) {

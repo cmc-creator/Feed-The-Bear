@@ -18,7 +18,15 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
   await p.waitForTimeout(1500);
   await closeAllDialogs(p);
 
+  // The default look is warm (Honey by day, gold-on-dark at night), never the greens.
+  const looks = await p.evaluate(() => [8, 13, 19, 23].map(h => getAutoThemePresetByHour(h).accent));
+  check(JSON.stringify(looks) === '["honey","honey","midnight","midnight"]', `default themes are warm (${looks})`);
+
   await p.evaluate(() => openEditModal('b'));
+  check(await p.locator('#form-collection-group').isHidden(), 'no "add to a list" question when you have no lists');
+  await p.evaluate(() => { state.settings.collections = [{ id: 'c1', name: 'Date night', restaurantIds: [] }]; populateFormCollections(); });
+  check(await p.locator('#form-collection-group').isVisible() && (await p.locator('#form-collection option').first().innerText()) === 'No, just save it', 'with a list, it asks plainly');
+  await p.evaluate(() => { state.settings.collections = []; populateFormCollections(); });
   await p.fill('#form-name', 'Bacanora');
   await p.waitForSelector('#form-name-suggs:not(.hidden) .qa-sugg', { timeout: 4000 }).catch(() => {});
   check(/Bacanora.*1301 Grand Ave/s.test(await p.locator('#form-name-suggs').innerText().catch(() => '')), 'typing the name in Edit shows real places');
