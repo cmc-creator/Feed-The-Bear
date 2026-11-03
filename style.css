@@ -86,7 +86,6 @@ body {
     linear-gradient(rgba(15,22,17,.72), rgba(15,22,17,.78)),
     url('assets/textures/forest.jpg') center/cover fixed no-repeat,
     radial-gradient(90% 110% at 8% 18%, rgba(111,153,86,.2), transparent 56%),
-    url('assets/textures/moss2.jpg') center/cover fixed no-repeat,
     radial-gradient(120% 95% at 50% -15%, rgba(120,86,52,.2), transparent 58%),
     radial-gradient(130% 110% at -20% 120%, rgba(73,110,78,.18), transparent 62%),
     var(--bg);

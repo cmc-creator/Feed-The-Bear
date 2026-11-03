@@ -45,7 +45,7 @@ window.StoryCard = (() => {
 
   function heroPhotoFor (r, picks) {
     const withPhoto = [...picks.get, ...picks.want].find(d => d.photo);
-    return withPhoto?.photo || r.photo || '';
+    return withPhoto?.photo || r.photo || r.placePhoto || '';
   }
 
   function cover (ctx, img, x, y, w, h) {

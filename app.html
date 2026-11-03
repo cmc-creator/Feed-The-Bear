@@ -26,7 +26,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <!-- The map isn't on the first screen, so its stylesheet doesn't hold up the first paint. -->
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://unpkg.com" crossorigin />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" media="print" onload="this.media='all'" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="bear-swipe.css" />
   <link rel="stylesheet" href="cub.css" />
@@ -39,7 +42,7 @@
   <div id="profile-setup-overlay" class="signup-fullscreen hidden" role="dialog" aria-modal="true" aria-label="Create your account">
     <div class="signup-inner">
       <div class="signup-brand-row">
-        <img class="signup-brand-bear bear-mark" src="feedbear.jpg" alt="" aria-hidden="true" />
+        <img class="signup-brand-bear bear-mark" src="feedbear-sm.jpg" alt="" aria-hidden="true" />
         <span class="signup-brand-name">Feed The Bear</span>
       </div>
       <h1 class="signup-headline">Create your dining profile</h1>
@@ -391,7 +394,7 @@
         <button id="auth-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="auth-body">
-        <img class="auth-hero-bear" src="feedbear.jpg" alt="Feed The Bear mascot" loading="lazy" />
+        <img class="auth-hero-bear" src="feedbear-sm.jpg" alt="Feed The Bear mascot" loading="lazy" />
         <p class="auth-sub">It's free. Your spots, ratings and photos get backed up, so a new phone never means a lost food diary.</p>
         <button id="auth-google-btn" class="auth-google-btn">Continue with Google</button>
         <div class="auth-divider"><span>or</span></div>
@@ -481,7 +484,7 @@
   <!-- ── Header ────────────────────────────────────────────── -->
   <header class="app-header">
     <div class="header-brand">
-      <img class="brand-icon bear-mark" src="feedbear.jpg" alt="" aria-hidden="true" />
+      <img class="brand-icon bear-mark" src="feedbear-sm.jpg" alt="" aria-hidden="true" />
       <span class="brand-name">Feed The Bear</span>
     </div>
 
@@ -775,7 +778,7 @@
   <div id="map-container" class="map-container hidden"></div>
 
   <!-- ── Pull-to-refresh indicator ───────────────────────────── -->
-  <div id="ptr-indicator" class="ptr-indicator" aria-hidden="true"><span class="ptr-bear"><img class="bear-mark" src="feedbear.jpg" alt="" aria-hidden="true" /></span></div>
+  <div id="ptr-indicator" class="ptr-indicator" aria-hidden="true"><span class="ptr-bear"><img class="bear-mark" src="feedbear-sm.jpg" alt="" aria-hidden="true" /></span></div>
 
   <!-- ── Main Content ─────────────────────────────────────────── -->
   <main class="main-content" id="main-content">
@@ -1008,7 +1011,7 @@
 
     <!-- Empty state -->
     <div id="empty-state" class="empty-state hidden">
-      <div class="empty-icon"><img class="bear-mark" src="feedbear.jpg" alt="" aria-hidden="true" /></div>
+      <div class="empty-icon"><img class="bear-mark" src="feedbear-sm.jpg" alt="" aria-hidden="true" /></div>
       <h2>Your list is ready for its first star.</h2>
       <p>Add the restaurants you have tried or the ones you are saving for your next great night out.</p>
       <button class="btn-primary" id="empty-add-btn">＋ Add Your First Fav Spot</button>
@@ -1656,7 +1659,7 @@
   <!-- ── Chat Panel ─────────────────────────────────────────── -->
   <aside id="chat-panel" class="chat-panel hidden" aria-label="Byte Cub Chat">
     <div class="chat-header">
-      <div class="chat-avatar"><img class="bear-mark" src="feedbear.jpg" alt="" aria-hidden="true" /></div>
+      <div class="chat-avatar"><img class="bear-mark" src="feedbear-sm.jpg" alt="" aria-hidden="true" /></div>
       <div>
         <div class="chat-title">Byte Cub</div>
         <div class="chat-subtitle">Your food assistant: tell me where you ate</div>
@@ -1782,7 +1785,7 @@
   <!-- ── Onboarding Overlay ──────────────────────────────── -->
   <div id="onboarding-overlay" class="onboarding-overlay hidden" role="dialog" aria-modal="true">
     <div class="onboarding-card">
-      <img class="onboarding-icon bear-mark" id="onboarding-icon" src="feedbear.jpg" alt="Feed The Bear mascot" />
+      <img class="onboarding-icon bear-mark" id="onboarding-icon" src="feedbear-sm.jpg" alt="Feed The Bear mascot" />
       <h2 id="onboarding-title">Welcome to Feed The Bear</h2>
       <p id="onboarding-desc">Let&rsquo;s put some food in your den!</p>
       <div class="onboarding-footer">
@@ -1906,7 +1909,7 @@
   <div id="guest-profile-overlay" class="guest-profile-overlay hidden" role="dialog" aria-modal="true">
     <div class="guest-profile-card">
       <div class="guest-header">
-        <img class="guest-bear bear-mark" src="feedbear.jpg" alt="" aria-hidden="true" />
+        <img class="guest-bear bear-mark" src="feedbear-sm.jpg" alt="" aria-hidden="true" />
         <h1 id="guest-profile-name">Foodie Profile</h1>
         <p id="guest-profile-sub" class="guest-sub">Top picks shared via Feed The Bear</p>
       </div>
