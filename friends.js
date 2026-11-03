@@ -131,6 +131,47 @@ function ensureInviteName () {
 // The one invite link: your picks to follow (or just your name, before you've
 // rated anything), plus your free-month invite code when you're signed in.
 // It goes through invite.html, whose link preview says "You're invited".
+// Just enough to follow you (your share id and name): short enough for a QR
+// code a phone camera reads easily. Your picks arrive live once they follow.
+function buildFollowLink (ref = window._ftbUid || '') {
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
+  const data = { v: 2, id: getProfileShareId(), u: String(profile.name || '').slice(0, 30), picks: [], w: [], ts: Date.now() };
+  const link = encodeProfileLink(data).replace(/\/app\.html#profile=/, '/invite.html#profile=');
+  return ref && /^[A-Za-z0-9]{10,64}$/.test(ref) ? link.replace('#profile=', `?ref=${ref}#profile=`) : link;
+}
+
+// Draws `text` as a QR code on `canvas` (qrcodejs renders into a div first).
+function drawQr (canvas, text) {
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!window.QRCode) return false;
+  try {
+    const tmp = document.createElement('div');
+    new QRCode(tmp, { text, width: canvas.width, height: canvas.height, colorDark: '#1b130b', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+    const img = tmp.querySelector('img');
+    const paint = src => { const i = new Image(); i.onload = () => ctx.drawImage(i, 0, 0, canvas.width, canvas.height); i.src = src; };
+    const qrCanvas = tmp.querySelector('canvas');
+    if (qrCanvas) ctx.drawImage(qrCanvas, 0, 0, canvas.width, canvas.height);
+    else if (img?.src) paint(img.src);
+    else setTimeout(() => { const later = tmp.querySelector('img'); if (later?.src) paint(later.src); }, 200);
+    return true;
+  } catch { return false; }
+}
+
+// Friends: a QR code a friend scans with their camera to follow you.
+function showFollowQr () {
+  if (grizzlyLocked('friends') || !ensureInviteName()) return;
+  startSharingLive();
+  const box = document.getElementById('friends-qr');
+  if (!box) return;
+  box.classList.remove('hidden');
+  const ok = drawQr(document.getElementById('friends-qr-canvas'), buildFollowLink());
+  box.querySelector('.friends-qr-note').textContent = ok
+    ? "Point a friend's phone camera at this. They follow you (and get 30 days of Grizzly free)."
+    : "The QR code couldn't load. Use Invite a friend to send your link instead.";
+  trackProductEvent('friend_qr_shown');
+}
+
 function buildInviteLink (ref = window._ftbUid || '') {
   const link = encodeProfileLink(buildProfileData()).replace(/\/app\.html#profile=/, '/invite.html#profile=');
   return ref && /^[A-Za-z0-9]{10,64}$/.test(ref) ? link.replace('#profile=', `?ref=${ref}#profile=`) : link;
@@ -576,27 +617,11 @@ function openFoodieProfile () {
   const url = encodeProfileLink(data);
   document.getElementById('profile-link').value = url;
 
-  // Generate QR code
-  const canvas = document.getElementById('profile-qr');
-  canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
-  // The whole profile rides in the link, so long ones make a QR too dense for
-  // a phone camera; past ~500 characters the link alone is more useful.
-  const qrFits = url.length <= 500;
-  document.getElementById('profile-qr-wrap')?.classList.toggle('hidden', !qrFits || !window.QRCode);
-  if (window.QRCode && qrFits) {
-    try {
-      // qrcodejs uses a div; we'll render to a temp div then extract img
-      const tmp = document.createElement('div');
-      new QRCode(tmp, { text: url, width:180, height:180, colorDark:'#1b130b', colorLight:'#ffffff', correctLevel: QRCode.CorrectLevel.L });
-      setTimeout(() => {
-        const img = tmp.querySelector('img');
-        if (img) {
-          const ctx = canvas.getContext('2d');
-          const i = new Image(); i.onload = () => ctx.drawImage(i,0,0,180,180); i.src = img.src;
-        }
-      }, 200);
-    } catch(_) {}
-  }
+  // The QR code carries the short follow link (the full profile is usually
+  // too long for a camera to read); the picks arrive live once they follow.
+  startSharingLive();
+  const qrOk = drawQr(document.getElementById('profile-qr'), buildFollowLink());
+  document.getElementById('profile-qr-wrap')?.classList.toggle('hidden', !qrOk);
 
   // Profile preview
   const medals = ['🥇','🥈','🥉'];

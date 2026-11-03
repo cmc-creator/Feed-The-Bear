@@ -7772,6 +7772,7 @@ function setupEvents () {
     renderFriendsList();
   });
   document.getElementById('friends-link-input').addEventListener('keydown', e => { if (e.key === 'Enter') loadFriendProfile(); });
+  document.getElementById('friends-qr-btn')?.addEventListener('click', () => showFollowQr());
   document.getElementById('friends-copy-btn').addEventListener('click', async () => {
     if (!ensureInviteName()) return;
     const link = buildInviteLink();

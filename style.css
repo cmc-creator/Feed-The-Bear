@@ -9077,3 +9077,8 @@ body.light-mode .mood-picks-home .home-mood-chip:not(.active) { background: rgba
   #header-invite-btn { display: none; }
   .grizzly-pill { padding: 5px 8px; }
 }
+
+/* Friends: a QR code to follow you (friends.js showFollowQr). */
+.friends-qr { display: grid; justify-items: center; gap: 8px; margin: 10px 0 4px; padding: 14px; border-radius: 16px; background: #fff; }
+.friends-qr canvas { width: 200px; height: 200px; image-rendering: pixelated; }
+.friends-qr-note { margin: 0; font-size: .8rem; color: #5a4a3d; text-align: center; max-width: 260px; }

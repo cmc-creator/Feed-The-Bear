@@ -2064,6 +2064,11 @@
       <p class="friends-subtitle">See what your friends order, what they skip, and what they're craving, right on the places you both save.</p>
       <button id="friends-invite-btn" type="button" class="btn-primary friends-invite-big">Invite a friend</button>
       <button id="friends-copy-btn" type="button" class="friends-copy-link">or copy your link</button>
+      <button id="friends-qr-btn" type="button" class="friends-copy-link">or show my QR code</button>
+      <div id="friends-qr" class="friends-qr hidden">
+        <canvas id="friends-qr-canvas" width="220" height="220" aria-label="QR code to follow you"></canvas>
+        <p class="friends-qr-note"></p>
+      </div>
       <div id="friends-live-note" class="friends-live-note"></div>
       <div id="friends-list" class="friends-list"></div>
       <details class="friends-paste">
