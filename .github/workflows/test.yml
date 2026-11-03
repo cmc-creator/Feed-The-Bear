@@ -188,3 +188,6 @@ jobs:
       - name: Error reports
         working-directory: tests
         run: node errors.test.js
+      - name: Same place saved twice
+        working-directory: tests
+        run: node dupes.test.js

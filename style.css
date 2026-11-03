@@ -9036,3 +9036,10 @@ body.light-mode .mood-picks-home .home-mood-chip:not(.active) { background: rgba
 }
 .app-update-banner span { flex: 1; }
 .app-update-later { background: none; border: 0; color: var(--text-dim); font-size: 1rem; padding: 6px; cursor: pointer; }
+
+/* Same place saved twice (app.js renderDuplicateBanner). */
+.dupe-banner { grid-column: 1 / -1; display: grid; gap: 8px; padding: 14px 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid rgba(var(--primary-rgb), .45); }
+.dupe-q { font-weight: 800; color: var(--gold); }
+.dupe-names { font-size: .9rem; color: var(--text); }
+.dupe-names span { display: block; font-size: .8rem; color: var(--text-dim); margin-top: 2px; }
+.dupe-actions { display: flex; flex-wrap: wrap; gap: 8px; }

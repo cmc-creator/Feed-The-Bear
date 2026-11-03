@@ -2560,6 +2560,7 @@ function renderCards () {
   } else {
     list.forEach(r => grid.appendChild(buildCard(r)));
   }
+  renderDuplicateBanner(grid);
   fillSpotPhotos(list);
 }
 
@@ -3129,6 +3130,101 @@ async function checkSpotPlaces () {
   if (flagged) renderCards();
 }
 window.addEventListener('load', () => setTimeout(checkSpotPlaces, 9000));
+
+/* ── Duplicate spots ──────────────────────────────────────────
+   The same restaurant saved twice ("Bacanora" from a search, "Bacanora PHX"
+   from a TikTok) splits its visits and dishes across two cards. Pairs that
+   are clearly one place get a "same place?" banner on the list; merging
+   keeps everything from both. "Not the same" is remembered. */
+function duplicateKey (a, b) { return [a.id, b.id].sort().join('|'); }
+
+function looksLikeSamePlace (a, b) {
+  if (a.placeId && a.placeId === b.placeId) return true;
+  const na = normalizeName(a.name || ''), nb = normalizeName(b.name || '');
+  if (!na || !nb) return false;
+  const pinned = Number.isFinite(a.lat) && Number.isFinite(a.lng) && Number.isFinite(b.lat) && Number.isFinite(b.lng);
+  const close = pinned && haversine(a.lat, a.lng, b.lat, b.lng) < 200;
+  // Same name: the same place unless we know they're far apart (two locations of a chain).
+  if (na === nb) return !pinned || close;
+  // "Bacanora" and "Bacanora PHX": every word of the shorter name is in the longer one, and they're side by side.
+  const ta = placeNameTokens(a.name), tb = placeNameTokens(b.name);
+  const [short, long] = ta.length <= tb.length ? [ta, tb] : [tb, ta];
+  return close && short.length > 0 && short.every(t => long.includes(t));
+}
+
+function findDuplicateSpots () {
+  const skip = new Set(state.settings.notDuplicates || []);
+  const list = state.restaurants || [];
+  const pairs = [];
+  for (let i = 0; i < list.length; i++) {
+    for (let j = i + 1; j < list.length; j++) {
+      if (!skip.has(duplicateKey(list[i], list[j])) && looksLikeSamePlace(list[i], list[j])) pairs.push([list[i], list[j]]);
+    }
+  }
+  return pairs;
+}
+
+// Folds `b` into `a` (the one saved first) and removes `b`. Nothing is lost.
+function mergeSpots (a, b) {
+  const rank = { again: 4, ok: 3, want: 2, skip: 1 };
+  const [keep, drop] = String(a.dateAdded || '') <= String(b.dateAdded || '') ? [a, b] : [b, a];
+  const visitKey = v => `${v.date}|${v.note || ''}|${v.dish || ''}`;
+  const visits = [...(keep.visits || [])];
+  (drop.visits || []).forEach(v => { if (!visits.some(x => visitKey(x) === visitKey(v))) visits.push(v); });
+  const dishes = [...dishesOf(keep)];
+  dishesOf(drop).forEach(d => {
+    const same = dishes.find(x => dishKey(x.name) === dishKey(d.name));
+    if (!same) dishes.push(d);
+    else if ((rank[d.verdict] || 0) > (rank[same.verdict] || 0)) Object.assign(same, { verdict: d.verdict, rating: Math.max(same.rating || 0, d.rating || 0) });
+  });
+  const links = [...linksOf(keep)];
+  linksOf(drop).forEach(l => { if (!links.some(x => x.url === l.url)) links.push(l); });
+  const linked = keep.placeId ? keep : drop.placeId ? drop : keep;
+  Object.assign(keep, {
+    visits, dishes, links,
+    tags: [...new Set([...(keep.tags || []), ...(drop.tags || [])])],
+    status: keep.status === 'visited' || drop.status === 'visited' ? 'visited' : keep.status,
+    myRating: Math.max(keep.myRating || 0, drop.myRating || 0),
+    dateVisited: [keep.dateVisited, drop.dateVisited].filter(Boolean).sort().pop() || null,
+    isFavorite: !!(keep.isFavorite || drop.isFavorite),
+    photo: keep.photo || drop.photo || '',
+    notes: [keep.notes, drop.notes].filter(Boolean).filter((n, i, all) => all.indexOf(n) === i).join('\n\n'),
+    collectionId: keep.collectionId || drop.collectionId || null,
+    name: linked.name, address: linked.address || keep.address || drop.address,
+    lat: Number.isFinite(linked.lat) ? linked.lat : keep.lat ?? drop.lat, lng: Number.isFinite(linked.lng) ? linked.lng : keep.lng ?? drop.lng,
+    placeId: linked.placeId || '', placeChecked: !!(keep.placeChecked || drop.placeChecked), placeSuggest: null,
+    updatedAt: Date.now(),
+  });
+  state.restaurants = state.restaurants.filter(r => r.id !== drop.id);
+  return keep;
+}
+
+function renderDuplicateBanner (grid) {
+  const [pair] = findDuplicateSpots();
+  if (!pair) return;
+  const [a, b] = pair;
+  const bar = document.createElement('div');
+  bar.className = 'dupe-banner';
+  bar.innerHTML = `<div class="dupe-q">Same place saved twice?</div>
+    <div class="dupe-names"><strong>${escHtml(a.name)}</strong> and <strong>${escHtml(b.name)}</strong>${a.address || b.address ? `<span>${escHtml(a.address || b.address)}</span>` : ''}</div>
+    <div class="dupe-actions">
+      <button type="button" class="btn-primary btn-sm dupe-merge">Merge them</button>
+      <button type="button" class="btn-ghost btn-sm dupe-keep">They're different</button>
+    </div>`;
+  bar.querySelector('.dupe-merge').onclick = () => {
+    const kept = mergeSpots(a, b);
+    trackProductEvent('spots_merged');
+    saveData();
+    renderAll();
+    showToast('Merged', `${kept.name} now has everything from both.`, 'success');
+  };
+  bar.querySelector('.dupe-keep').onclick = () => {
+    state.settings.notDuplicates = [...(state.settings.notDuplicates || []), duplicateKey(a, b)].slice(-200);
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); } catch { /* storage full */ }
+    renderCards();
+  };
+  grid.prepend(bar);
+}
 
 // After launch, quietly look up a few saved spots that have no info yet.
 async function fillMissingPlaceInfo () {
