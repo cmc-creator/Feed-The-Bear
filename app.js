@@ -2168,7 +2168,7 @@ function renderNearAlertsRow () {
   const blocked = !native && 'Notification' in window && Notification.permission === 'denied';
   el.textContent = !on ? 'Off. Tap to get a heads-up near spots you want to try.'
     : native && NativeAlerts.closedToo() ? `On, within ${milesLabel(nearAlertMiles())}, even when the app is closed.`
-    : native ? `On, within ${milesLabel(nearAlertMiles())}, while the app is open. Tap to get them when it's closed too.`
+    : native ? `On, within ${milesLabel(nearAlertMiles())}, while the app is open.${state.settings.nearAlertsClosed === false ? '' : " Tap to get them when it's closed too."}`
     : blocked ? `On, within ${milesLabel(nearAlertMiles())}. Phone notifications are blocked in settings.`
     : `On, within ${milesLabel(nearAlertMiles())}, while Feed The Bear is open.`;
 }
@@ -2182,9 +2182,27 @@ function openNearAlerts () {
     b.onclick = () => { closeNearAlerts(); setNearAlerts(m); };
   });
   const note = document.getElementById('nearalerts-note');
-  if (note) note.textContent = NativeAlerts.available()
-    ? (NativeAlerts.closedToo() ? 'Works even when the app is closed.' : 'Works while the app is open. Pick a distance to set up alerts when it is closed too.')
+  const native = NativeAlerts.available();
+  if (note) note.textContent = native
+    ? (NativeAlerts.closedToo() ? 'Works even when the app is closed.' : 'Works while the app is open.')
     : 'Works while Feed The Bear is open on your phone.';
+  // Android: alerts while open need nothing extra; "even when closed" needs
+  // background location, so it's asked for only when chosen.
+  const when = document.getElementById('nearalerts-when');
+  when?.classList.toggle('hidden', !native);
+  when?.querySelectorAll('[data-when]').forEach(b => {
+    b.classList.toggle('active', (b.dataset.when === 'closed') === (state.settings.nearAlertsClosed === true));
+    b.onclick = () => {
+      state.settings.nearAlertsClosed = b.dataset.when === 'closed';
+      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); } catch { /* storage full */ }
+      trackProductEvent(state.settings.nearAlertsClosed ? 'near_alerts_closed' : 'near_alerts_open_only');
+      closeNearAlerts();
+      if (state.settings.nearAlertsClosed) NativeAlerts.askBackground();
+      else showToast('Alerts while the app is open', 'No background location needed. You can switch any time.', 'success');
+      NativeAlerts.schedule();
+      renderNearAlertsRow();
+    };
+  });
   document.getElementById('nearalerts-overlay').classList.remove('hidden');
   document.body.classList.add('overlay-open');
 }
@@ -2214,7 +2232,7 @@ async function setNearAlerts (miles) {
   pinWantToTrySpots();
   renderNearAlertsRow();
   NativeAlerts.schedule();
-  if (NativeAlerts.available()) setTimeout(() => NativeAlerts.askBackground(), 1200);
+  if (NativeAlerts.available() && state.settings.nearAlertsClosed === true) setTimeout(() => NativeAlerts.askBackground(), 1200);
   const want = state.restaurants.filter(r => r.status === 'want-to-try');
   const pinned = want.filter(r => r.lat && r.lng).length;
   showToast('Nearby alerts on', want.length
@@ -2271,7 +2289,9 @@ var NativeAlerts = (() => {
   async function sync () {
     const p = plugin();
     if (!p) return;
-    const on = nearAlertsOn() && !!state.settings.locationEnabled;
+    // Geofences wake the app when it's closed, which needs background
+    // location: only when they chose "even when the app is closed".
+    const on = nearAlertsOn() && !!state.settings.locationEnabled && state.settings.nearAlertsClosed !== false;
     const here = Number.isFinite(state.userLat) && Number.isFinite(state.userLng);
     // Android allows 100 geofences: keep the closest Want to Try spots.
     const spots = state.restaurants
@@ -8269,7 +8289,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('visibilitychange', () => { if (!document.hidden) { NativeAlerts.refresh(); NativeAlerts.schedule(); } });
   }
   document.getElementById('bg-location-allow')?.addEventListener('click', () => NativeAlerts.allowBackground());
-  document.getElementById('bg-location-later')?.addEventListener('click', closeBgLocation);
+  document.getElementById('bg-location-later')?.addEventListener('click', () => {
+    state.settings.nearAlertsClosed = false;
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); } catch { /* storage full */ }
+    closeBgLocation();
+    NativeAlerts.schedule();
+    renderNearAlertsRow();
+  });
   // A tapped "near a spot" notification opens that spot.
   openSpotFromLink(new URLSearchParams(window.location.search).get('spot'));
   navigator.serviceWorker?.addEventListener('message', e => { if (e.data?.type === 'OPEN_SPOT') openSpotFromLink(e.data.id); });

@@ -57,6 +57,7 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
   check(await p.evaluate(() => window._push.asked) === 1, 'after a reinstall, someone who follows friends is asked once at sign-in');
 
   // An up-to-date app shows no update banner; an old one (no notifications) offers the newest build.
+  await closeAllDialogs(p);
   check(await p.locator('#app-update-banner').count() === 0, 'an up-to-date app shows no update banner');
   const opened = await p.evaluate(() => {
     let url = '';

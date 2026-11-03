@@ -262,6 +262,14 @@
         <button type="button" data-miles="off">Off</button>
       </div>
       <p id="nearalerts-note" class="security-note">Works while Feed The Bear is open on your phone.</p>
+      <!-- Android app only: choose whether alerts need background location. -->
+      <div id="nearalerts-when" class="nearalerts-when hidden">
+        <p class="security-note"><strong>When should we alert you?</strong></p>
+        <div class="nearalerts-choices" style="grid-template-columns:1fr">
+          <button type="button" data-when="open">Only while the app is open<small>No extra permission. Easy on battery.</small></button>
+          <button type="button" data-when="closed">Even when the app is closed<small>Needs location "Allow all the time".</small></button>
+        </div>
+      </div>
     </div>
   </div>
 

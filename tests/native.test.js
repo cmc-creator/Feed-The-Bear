@@ -86,10 +86,22 @@ const call = (body, headers = {}) => new Promise(resolve => {
   await p.evaluate(() => { document.querySelectorAll('.toast').forEach(t => t.remove()); openAccountModal(); });
   check(/Tap to get them when it's closed too/.test(await p.locator('#account-nearalerts-state').innerText()), 'the row offers alerts when the app is closed');
   await p.click('#account-nearalerts-row');
-  check(/Pick a distance to set up alerts when it is closed too/.test(await p.locator('#nearalerts-note').innerText()), 'the chooser explains the closed-app option');
+  check(/Only while the app is open/.test(await p.locator('#nearalerts-when').innerText()) && /Even when the app is closed/.test(await p.locator('#nearalerts-when').innerText()), 'the chooser offers alerts only while open, or even when closed');
   await p.click('#nearalerts-choices [data-miles="25"]');
   await p.waitForFunction(() => window.__native.setSpots.at(-1)?.radiusMeters === 40234, null, { timeout: 8000 }).catch(() => {});
   check(await p.evaluate(() => window.__native.setSpots.at(-1).radiusMeters) === 40234, 'a new distance is handed to Android');
+  await p.waitForTimeout(1500);
+  check(await p.locator('#bg-location-overlay').isHidden(), 'picking a distance no longer asks for "Allow all the time" by itself');
+
+  // "Only while the app is open": no background location, no geofences.
+  await p.evaluate(() => openNearAlerts());
+  await p.click('#nearalerts-when [data-when="open"]');
+  await p.waitForFunction(() => window.__native.setSpots.at(-1)?.enabled === false, null, { timeout: 8000 }).catch(() => {});
+  check(await p.evaluate(() => window.__native.setSpots.at(-1).enabled) === false && await p.locator('#bg-location-overlay').isHidden(), '"Only while open" needs no background location');
+
+  // "Even when the app is closed": explained, then asked.
+  await p.evaluate(() => openNearAlerts());
+  await p.click('#nearalerts-when [data-when="closed"]');
   check(await p.locator('#bg-location-overlay').isVisible() && /does not store it, share it, or use it for ads/.test(await p.locator('#bg-location-overlay').innerText()), 'background location is explained before Android asks');
   await p.click('#bg-location-allow');
   await p.waitForTimeout(500);
