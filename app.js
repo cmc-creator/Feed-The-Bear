@@ -2222,6 +2222,41 @@ async function setNearAlerts (miles) {
     : 'Add spots to your Want to Try list and we will tell you when you are close.', 'success');
 }
 
+/* ── Android app: tell people when the app itself is out of date ──
+   Almost everything updates by itself (the app loads this website). Only
+   Android features, like notifications, need a new install. When this site
+   expects one the installed app doesn't have, a banner offers the newest
+   build (published by .github/workflows/android.yml; it installs over the old one). */
+const ANDROID_APP_URL = 'https://github.com/cmc-creator/Feed-The-Bear/releases/latest/download/feed-the-bear.apk';
+const ANDROID_APP_NEEDS = ['PushNotifications'];
+
+function checkAndroidAppVersion () {
+  const cap = window.Capacitor;
+  if (!cap?.isNativePlatform?.()) return;
+  const has = name => (typeof cap.isPluginAvailable === 'function' ? cap.isPluginAvailable(name) : !!cap.Plugins?.[name]);
+  if (ANDROID_APP_NEEDS.every(has) || document.getElementById('app-update-banner')) return;
+  try { if (localStorage.getItem('ftb_app_update_later') === new Date().toDateString()) return; } catch { /* private mode */ }
+  const bar = document.createElement('div');
+  bar.id = 'app-update-banner';
+  bar.className = 'app-update-banner';
+  bar.setAttribute('role', 'status');
+  bar.innerHTML = `<span>📲 A new version of the app is ready, with friend notifications.</span>
+    <button type="button" class="btn-primary btn-sm app-update-go">Update</button>
+    <button type="button" class="app-update-later" aria-label="Later">✕</button>`;
+  document.body.appendChild(bar);
+  bar.querySelector('.app-update-go').onclick = () => {
+    trackProductEvent('android_update_tapped');
+    const browser = cap.Plugins?.Browser;
+    if (browser?.open) browser.open({ url: ANDROID_APP_URL }).catch(() => window.open(ANDROID_APP_URL, '_blank'));
+    else window.open(ANDROID_APP_URL, '_blank');
+  };
+  bar.querySelector('.app-update-later').onclick = () => {
+    try { localStorage.setItem('ftb_app_update_later', new Date().toDateString()); } catch { /* private mode */ }
+    bar.remove();
+  };
+}
+window.addEventListener('load', () => setTimeout(checkAndroidAppVersion, 2500));
+
 /* ── Android app: alerts even when the app is closed ─────────
    In the Android app (native/), the Want to Try spots and the chosen
    distance are handed to Android geofencing (NearbyAlerts plugin), which

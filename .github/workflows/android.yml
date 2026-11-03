@@ -7,6 +7,12 @@
 #   ANDROID_KEY_ALIAS
 #   ANDROID_KEY_PASSWORD
 # Download the builds from the run's "Artifacts" section.
+#
+# Every build on main is also published as a GitHub release, so the newest
+# app is always at one link (the app shows an "Update" button that opens it):
+#   https://github.com/cmc-creator/Feed-The-Bear/releases/latest/download/feed-the-bear.apk
+# It's signed with native/android/app/sideload.p12, the same key every time,
+# so it installs over the previous version.
 name: Android app
 
 on:
@@ -15,6 +21,9 @@ on:
       - 'native/**'
       - '.github/workflows/android.yml'
   workflow_dispatch:
+
+permissions:
+  contents: write   # publish the release with the APK
 
 jobs:
   build:
@@ -43,6 +52,14 @@ jobs:
         with:
           name: feed-the-bear-test-apk
           path: native/android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Publish the app at the permanent download link
+        if: github.ref == 'refs/heads/main'
+        working-directory: native/android/app/build/outputs/apk/debug
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app-debug.apk feed-the-bear.apk
+          gh release create "android-${{ github.run_number }}" feed-the-bear.apk             --repo "${{ github.repository }}" --target "${{ github.sha }}" --latest             --title "Feed The Bear for Android (build ${{ github.run_number }})"             --notes "Open this on your Android phone and install feed-the-bear.apk. It installs over the previous version."
       - name: Signed bundle for Google Play
         if: ${{ env.HAS_KEY == 'true' }}
         working-directory: native/android

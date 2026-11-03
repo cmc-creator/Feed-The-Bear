@@ -21,6 +21,16 @@ android {
     // secrets (see .github/workflows/android.yml); without them only the
     // debug build is made.
     signingConfigs {
+        // The downloadable test app (GitHub "Android app" release) is always
+        // signed with this same key, so each new build installs over the last
+        // one. It's only for sideloaded builds, never for Google Play.
+        sideload {
+            storeFile file("sideload.p12")
+            storeType "pkcs12"
+            storePassword "ftb-sideload"
+            keyAlias "sideload"
+            keyPassword "ftb-sideload"
+        }
         release {
             def ks = System.getenv("FTB_KEYSTORE_PATH")
             if (ks) {
@@ -32,6 +42,9 @@ android {
         }
     }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.sideload
+        }
         release {
             if (System.getenv("FTB_KEYSTORE_PATH")) signingConfig signingConfigs.release
             minifyEnabled false

@@ -9026,3 +9026,13 @@ body.light-mode .mood-picks-home .home-mood-chip:not(.active) { background: rgba
 /* Signed out, the sign-in sheet covers the app and can't be closed. */
 #auth-overlay.auth-required { z-index: 10000; background: var(--bg, #14100c); }
 #auth-overlay.auth-required #auth-close-btn { display: none; }
+
+/* Android app out of date: one tap to the newest build (app.js checkAndroidAppVersion). */
+.app-update-banner {
+  position: fixed; left: 12px; right: 12px; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); z-index: 900;
+  display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 16px; border-radius: 16px;
+  background: var(--surface); color: var(--text); border: 1px solid rgba(var(--primary-rgb), .45);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .35); font-size: .88rem; line-height: 1.35;
+}
+.app-update-banner span { flex: 1; }
+.app-update-later { background: none; border: 0; color: var(--text-dim); font-size: 1rem; padding: 6px; cursor: pointer; }

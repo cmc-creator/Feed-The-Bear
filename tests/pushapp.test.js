@@ -56,6 +56,22 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
   await p.waitForTimeout(6600);
   check(await p.evaluate(() => window._push.asked) === 1, 'after a reinstall, someone who follows friends is asked once at sign-in');
 
+  // An up-to-date app shows no update banner; an old one (no notifications) offers the newest build.
+  check(await p.locator('#app-update-banner').count() === 0, 'an up-to-date app shows no update banner');
+  const opened = await p.evaluate(() => {
+    let url = '';
+    delete window.Capacitor.Plugins.PushNotifications;
+    window.Capacitor.Plugins.Browser = { open: async o => { url = o.url; } };
+    checkAndroidAppVersion();
+    document.querySelector('#app-update-banner .app-update-go')?.click();
+    return new Promise(r => setTimeout(() => r(url), 50));
+  });
+  check(await p.locator('#app-update-banner').isVisible(), 'an older app offers the update');
+  check(opened === 'https://github.com/cmc-creator/Feed-The-Bear/releases/latest/download/feed-the-bear.apk', `Update opens the newest build (${opened})`);
+  await p.click('#app-update-banner .app-update-later');
+  await p.evaluate(() => checkAndroidAppVersion());
+  check(await p.locator('#app-update-banner').count() === 0, '"Later" hides it for the day');
+
   // Paid lookups carry the sign-in (api/_guard.js checks it).
   let token = '';
   await p.route('**/api/place-info?**', r => { token = r.request().headers()['x-ftb-token'] || ''; r.fulfill({ json: { places: [] } }); });

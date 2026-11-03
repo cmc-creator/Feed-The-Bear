@@ -25,11 +25,21 @@ global.fetch = async (url, opts = {}) => {
 };
 process.env.GEMINI_API_KEY = 'k';
 process.env.GOOGLE_PLACES_API_KEY = 'k';
+// Lookups need a signed-in member (api/_guard.js): a fake Firebase that knows one.
+const Module = require('module');
+const fakeAdmin = {
+  apps: [1],
+  auth: () => ({ verifyIdToken: async t => { if (t !== 'member-token') throw new Error('bad'); return { uid: 'member1' }; } }),
+  firestore: () => ({ doc: () => ({ get: async () => ({ data: () => ({}) }), set: async () => {} }) }),
+};
+const realLoad = Module._load;
+Module._load = function (req, ...rest) { return req === 'firebase-admin' ? fakeAdmin : realLoad.call(this, req, ...rest); };
 const handler = require(path.join(__dirname, '..', 'api', 'link-spot.js'));
+Module._load = realLoad;
 
 const call = q => new Promise(resolve => {
   let status = 200;
-  handler({ method: 'GET', query: { q, lat: '33.49', lng: '-111.92' }, headers: {} }, {
+  handler({ method: 'GET', query: { q, lat: '33.49', lng: '-111.92' }, headers: { 'x-ftb-token': 'member-token' } }, {
     status (s) { status = s; return this; }, setHeader () {}, json (d) { resolve({ status, ...d }); return this; },
   });
 });
