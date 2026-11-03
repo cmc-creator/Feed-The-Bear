@@ -727,9 +727,12 @@ function renderFriendsList () {
 }
 
 function openFoodieFriends () {
-  // A free account that follows its one friend can still see and manage them.
-  if (!getFriends().length && grizzlyLocked('friends')) return;
+  // Open to everyone: a free account can follow one friend (followFriend
+  // checks), so it needs this screen to find them. Inviting stays Grizzly.
   renderFriendsList();
+  renderMyHandle();
+  const found = document.getElementById('friends-find-result');
+  if (found) found.innerHTML = '';
   renderFriendsLiveNote();
   refreshFriendsLive(true);
   document.getElementById('friends-link-input').value = '';
@@ -837,4 +840,82 @@ function openAddModalPreFilled (name, cuisine, prefill = null) {
     if (_pendingAddPrefill?.website) document.getElementById('form-website').value = String(_pendingAddPrefill.website || '').trim();
     if (_pendingAddPrefill?.photo) document.getElementById('form-photo').value = String(_pendingAddPrefill.photo || '').trim();
   }, 100);
+}
+
+/* ── Usernames (api/handle.js) ───────────────────────────────
+   Opt-in: you're findable only once you pick a username. Search is an exact
+   match, so nobody can browse who's on the app. */
+const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
+let _myHandle = null;
+let _myHandleFor = '';
+
+async function handleApi (method, { query = '', body = null } = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(typeof ftbApiHeaders === 'function' ? await ftbApiHeaders() : {}) };
+  const resp = await fetch(`/api/handle${query}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  const data = await resp.json().catch(() => ({}));
+  return { ok: resp.ok, status: resp.status, data };
+}
+
+async function renderMyHandle () {
+  const box = document.getElementById('friends-handle');
+  if (!box) return;
+  if (!window._ftbUid) { box.innerHTML = ''; return; }
+  if (_myHandleFor !== window._ftbUid) { _myHandle = null; _myHandleFor = window._ftbUid; }
+  if (_myHandle === null) {
+    try { _myHandle = (await handleApi('GET', { query: '?mine=1' })).data.handle || ''; } catch { _myHandle = ''; }
+  }
+  box.innerHTML = _myHandle
+    ? `Friends can find you as <strong>@${escHtml(_myHandle)}</strong> · <button type="button" class="link-btn friends-handle-edit">Change</button>`
+    : `<button type="button" class="link-btn friends-handle-edit">Pick a username</button> so friends can find you.`;
+  box.querySelector('.friends-handle-edit').onclick = editMyHandle;
+}
+
+function editMyHandle () {
+  const box = document.getElementById('friends-handle');
+  box.innerHTML = `<form class="friends-find-row friends-handle-form">
+      <input class="form-input" placeholder="your_name" value="${escHtml(_myHandle || '')}" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Your username" />
+      <button type="submit" class="btn-sm btn-orange">Save</button>
+    </form><div class="friends-handle-msg"></div>`;
+  const input = box.querySelector('input');
+  input.focus();
+  box.querySelector('form').onsubmit = async e => {
+    e.preventDefault();
+    const handle = input.value.trim().replace(/^@/, '').toLowerCase();
+    const msg = box.querySelector('.friends-handle-msg');
+    if (!HANDLE_RE.test(handle)) { msg.textContent = 'Use 3 to 20 letters, numbers or _.'; return; }
+    if (!ensureInviteName()) return;
+    // Your username points at your live profile, so followers get your picks.
+    startSharingLive();
+    const me = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
+    const { ok, data } = await handleApi('POST', { body: { action: 'claim', handle, id: getProfileShareId(), name: me.name || '' } });
+    if (!ok) { msg.textContent = data.error || 'Could not save that. Please try again.'; return; }
+    _myHandle = data.handle;
+    trackProductEvent('username_claimed');
+    showToast('Username saved', `Friends can find you as @${_myHandle}.`, 'success');
+    renderMyHandle();
+  };
+}
+
+async function findFriendByHandle (raw) {
+  const box = document.getElementById('friends-find-result');
+  const handle = String(raw || '').trim().replace(/^@/, '').toLowerCase();
+  if (!box) return;
+  if (!HANDLE_RE.test(handle)) { box.textContent = 'Usernames are 3 to 20 letters, numbers or _.'; return; }
+  box.textContent = 'Looking…';
+  const { ok, data } = await handleApi('GET', { query: `?q=${encodeURIComponent(handle)}` });
+  if (!ok) { box.textContent = data.error || 'Could not look that up right now.'; return; }
+  if (!data.found) { box.textContent = data.self ? "That's you!" : `No one is using @${handle} yet. Check the spelling, or send them your QR code.`; return; }
+  const friend = { id: data.id, u: data.u, picks: [], w: [] };
+  const already = isFollowing(friend);
+  box.innerHTML = `<div class="friends-find-hit"><strong>${escHtml(data.u)}</strong> <span>@${escHtml(handle)}</span>
+    <button type="button" class="btn-sm btn-primary friends-find-follow"${already ? ' disabled' : ''}>${already ? 'Following' : 'Follow'}</button></div>`;
+  box.querySelector('.friends-find-follow').onclick = e => {
+    if (followFriend(friend)) {
+      e.target.textContent = 'Following';
+      e.target.disabled = true;
+      trackProductEvent('friend_found_by_username');
+      renderFriendsList();
+      refreshFriendsLive(true);
+    }
+  };
 }

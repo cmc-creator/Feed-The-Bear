@@ -32,7 +32,9 @@ const GRIZZLY_PITCH = {
   // so read it when the pitch is shown, not while app.js is starting up.
   get limit () { return { title: 'Save every spot you love', body: `Cub holds ${FREE_RESTAURANT_LIMIT} spots (backed up and synced on every device). Grizzly is unlimited.` }; },
 };
-const GRIZZLY_TOOLS = new Set(['ai-panel', 'mealplanner', 'review', 'friends', 'swipe', 'rooms', 'groupvote']);
+// Friends isn't here: a free account can open it to follow one friend (followFriend
+// checks); inviting and following more are Grizzly.
+const GRIZZLY_TOOLS = new Set(['ai-panel', 'mealplanner', 'review', 'swipe', 'rooms', 'groupvote']);
 const GRIZZLY_SNOOZE_KEY = 'ftb_grizzly_card_snooze';
 
 function hasGrizzly () { return typeof isPremium === 'function' && isPremium(); }

@@ -9101,3 +9101,16 @@ body.overlay-open .app-update-banner { display: none; }
 .menu-scan-pick div { display: grid; gap: 2px; }
 .menu-scan-pick span { font-size: .78rem; color: var(--text-dim); }
 .menu-scan-skip { font-size: .8rem; color: var(--text-dim); }
+
+/* Find friends by username (friends.js). */
+.friends-find { display: grid; gap: 8px; margin: 14px 0 6px; padding-top: 12px; border-top: 1px solid var(--border); }
+.friends-find-label { font-weight: 800; font-size: .88rem; }
+.friends-find-row { display: flex; gap: 8px; }
+.friends-find-row .form-input { flex: 1; min-width: 0; }
+.friends-find-result { font-size: .84rem; color: var(--text-dim); }
+.friends-find-hit { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); }
+.friends-find-hit span { color: var(--text-dim); font-size: .8rem; }
+.friends-find-hit button { margin-left: auto; }
+.friends-handle { font-size: .82rem; color: var(--text-dim); }
+.friends-handle-msg { font-size: .8rem; color: var(--rose); margin-top: 4px; }
+.link-btn { background: none; border: 0; padding: 0; color: var(--primary); font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; }

@@ -60,7 +60,7 @@ async function upgradeTitle (p) {
   await p.evaluate(() => openMobileHub());
   await p.waitForTimeout(300);
   const locked = await p.$$eval('.hub-tile, .hub-card', tiles => tiles.filter(t => t.querySelector('.hub-lock')).map(t => t.dataset.tool).sort());
-  check(JSON.stringify(locked) === JSON.stringify(['ai-panel', 'friends', 'groupvote', 'mealplanner', 'review', 'rooms', 'swipe']), `Grizzly badges on locked tools (${locked})`);
+  check(JSON.stringify(locked) === JSON.stringify(['ai-panel', 'groupvote', 'mealplanner', 'review', 'rooms', 'swipe']), `Grizzly badges on locked tools (${locked})`);
   await p.locator('[data-tool="review"]').click();
   check(await upgradeTitle(p) === 'Your foodie Year in Review', 'Year in Review pitches Grizzly');
   await closeAllDialogs(p);

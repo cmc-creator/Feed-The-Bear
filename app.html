@@ -2084,6 +2084,15 @@
         <canvas id="friends-qr-canvas" width="220" height="220" aria-label="QR code to follow you"></canvas>
         <p class="friends-qr-note"></p>
       </div>
+      <div class="friends-find">
+        <label for="friends-find-input" class="friends-find-label">Find a friend by username</label>
+        <form id="friends-find-form" class="friends-find-row">
+          <input id="friends-find-input" class="form-input" placeholder="@username" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="21" />
+          <button type="submit" class="btn-sm btn-orange">Find</button>
+        </form>
+        <div id="friends-find-result" class="friends-find-result" aria-live="polite"></div>
+        <div id="friends-handle" class="friends-handle"></div>
+      </div>
       <div id="friends-live-note" class="friends-live-note"></div>
       <div id="friends-list" class="friends-list"></div>
       <details class="friends-paste">

@@ -206,3 +206,6 @@ jobs:
       - name: Scan the menu
         working-directory: tests
         run: node menuscan.test.js
+      - name: Find friends by username
+        working-directory: tests
+        run: node handle.test.js
