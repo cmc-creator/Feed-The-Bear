@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 
 const FILES = [
-  'app.js', 'firebase.js', 'cub.js', 'bear-swipe.js', 'ai.js', 'story-card.js',
+  'app.js', 'grizzly.js', 'friends.js', 'insights.js', 'play.js', 'firebase.js', 'cub.js', 'bear-swipe.js', 'ai.js', 'story-card.js',
   'photo-gallery.js', 'micro-interactions.js', 'trust-layer.js', 'analytics.js', 'errors.js', 'vote.js',
 ];
 

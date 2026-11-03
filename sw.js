@@ -3,13 +3,17 @@
    Offline-first cache strategy
    ════════════════════════════════════════════════════════════ */
 
-const CACHE  = 'ftb-v106';
+const CACHE  = 'ftb-v107';
 const ASSETS = [
   './',
   './index.html',
   './app.html',
   './auth.html',
   './app.js',
+  './grizzly.js',
+  './friends.js',
+  './insights.js',
+  './play.js',
   './bear-swipe.js',
   './bear-swipe.css',
   './cub.js',
