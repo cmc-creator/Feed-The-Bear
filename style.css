@@ -2205,6 +2205,14 @@ body:has(.modal-overlay:not(.hidden)) .cub-buddy { display: none; }
 .dl-addr { font-size: .9rem; color: var(--text); line-height: 1.4; overflow-wrap: anywhere; }
 .dl-dim { color: var(--text-dim); }
 .dl-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Place search under the Add/Edit form's name (buttons use Add a spot's .qa-sugg). */
+.form-name-suggs { display: grid; gap: 6px; margin-top: 8px; max-height: 40vh; overflow-y: auto; }
+.dl-check { border-top: 1px solid var(--border); padding-top: 10px; display: grid; gap: 8px; }
+.dl-check-q { font-weight: 800; font-size: .9rem; color: var(--gold); }
+.dl-check-place { display: grid; gap: 2px; }
+.dl-check-place span { font-size: .8rem; color: var(--text-dim); }
+.dl-check-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.card-highlight.card-place-check { background: rgba(var(--primary-rgb),.16); border-color: rgba(var(--primary-rgb),.45); color: var(--gold); }
 .play-hub-spark { filter: drop-shadow(0 0 6px rgba(var(--primary-rgb),.6)); }
 
 /* Desktop: render the Discover & Play hub as a centered modal, not fullscreen */

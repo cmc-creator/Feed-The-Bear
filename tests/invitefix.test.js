@@ -51,13 +51,16 @@ asGrizzly(); // uses Grizzly-only features
   check(/Connie invited you.*30 days of Grizzly free/.test(await f.locator('#guest-profile-sub').innerText()), 'and mentions the free month');
   check(/just getting started/.test(await f.locator('#guest-profile-list').innerText()), 'an empty profile explains itself');
   check(await f.evaluate(() => localStorage.getItem('ftb_ref_v1')) === 'inviterUid1234567890', 'the free-month invite is remembered');
-  // Friends are Grizzly: a new friend's Follow offers it (their invite makes it 30 days free).
+  // A free account can follow one friend: whoever invited them.
+  await f.evaluate(() => { window._ftbUid = 'friendUid12345678'; window._ftbPlan = 'free'; });
   await f.click('#guest-profile-follow');
-  check(await f.locator('#upgrade-overlay').isVisible().catch(() => false), 'Follow offers Grizzly to a new free account');
-  await f.evaluate(() => { window._ftbUid = 'friendUid12345678'; window._ftbPlan = 'grizzly'; closeUpgradeModal(); });
-  await f.click('#guest-profile-follow');
-  check(await f.evaluate(() => getFriends().some(x => x.name === 'Connie')), 'with Grizzly, Follow works');
+  check(!(await f.locator('#upgrade-overlay').isVisible().catch(() => false)) && await f.evaluate(() => getFriends().some(x => x.name === 'Connie')), 'a free account can follow the friend who invited them');
   check(await f.evaluate(() => friendsUpdatedAt() > 0), 'and is stamped for syncing');
+  // A second friend is Grizzly.
+  check(await f.evaluate(() => followFriend({ id: 'other1', u: 'Sam', picks: [], w: [] })) === null && await f.locator('#upgrade-overlay').isVisible(), 'following a second friend offers Grizzly');
+  await f.evaluate(() => { window._ftbPlan = 'grizzly'; closeUpgradeModal(); });
+  check(await f.evaluate(() => !!followFriend({ id: 'other1', u: 'Sam', picks: [], w: [] })), 'with Grizzly, they can follow more');
+  await f.evaluate(() => unfollowFriend('id:other1'));
   await f.evaluate(() => { window._ftbUid = null; window._ftbPlan = 'free'; });
   await f.click('#guest-profile-close');
   await f.waitForTimeout(400);

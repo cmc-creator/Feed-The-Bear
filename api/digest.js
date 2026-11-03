@@ -7,6 +7,8 @@
    POST { on: true|false } (Authorization: Bearer <Firebase ID token>)
         → turn the email on or off for the signed-in member
    GET  ?unsub=<uid>&sig=<hmac> → one-click unsubscribe link from the email
+   GET  ?only=<uid> (with the cron's Authorization) → send just that member's
+        email now, to check it (curl -H "Authorization: Bearer $CRON_SECRET")
 
    Environment (nothing is sent until all are set):
      BREVO_API_KEY            - Brevo → SMTP & API → API keys
@@ -66,7 +68,7 @@ function buildDigest (spots, name) {
     <tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>` : ''}
     ${crave ? `<tr><td style="padding-top:16px;font-size:16px;color:#2a1d16">On your Crave List: <strong>${esc(crave.dish)}</strong> at ${esc(crave.at)}.</td></tr>` : ''}
     <tr><td style="padding-top:20px"><a href="${APP_URL}/app.html" style="display:inline-block;background:#c8803a;color:#fff;text-decoration:none;font-weight:800;padding:12px 22px;border-radius:999px">Open my list</a></td></tr>
-    <tr><td style="padding-top:16px;font-size:14px;color:#6b5a4c">Can't decide with friends? Start a Dinner Vote from the cub menu in the app.</td></tr>
+    <tr><td style="padding-top:16px;font-size:14px;color:#6b5a4c">Tap a spot in the app for today's hours, directions and what to order.</td></tr>
   </table>
   <p style="max-width:520px;font-size:12px;color:#8a7a6c;line-height:1.5">You get this because you turned on weekly picks in Feed The Bear. <a href="{{UNSUB}}" style="color:#8a7a6c">Unsubscribe</a> · NyxCollective LLC · ${esc(process.env.DIGEST_ADDRESS || '')}</p>
   </td></tr></table></body></html>`;
@@ -133,9 +135,14 @@ module.exports = async function handler (req, res) {
   if (!process.env.CRON_SECRET || req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) return res.status(401).json({ error: 'Not allowed' });
   if (!ready()) return res.status(200).json({ sent: 0, skipped: 'Email is not set up yet (BREVO_API_KEY, DIGEST_FROM_EMAIL, DIGEST_ADDRESS).' });
 
-  const subs = await db.collection('digestSubscribers').where('on', '==', true).get();
+  // ?only=<uid> sends just that member's email, whether or not they turned it on
+  // (same CRON_SECRET), so the owner can check what it looks like before Thursday.
+  const only = String(req.query?.only || '');
+  const docs = only
+    ? [db.doc(`digestSubscribers/${only}`)].map(ref => ({ id: only, ref }))
+    : (await db.collection('digestSubscribers').where('on', '==', true).get()).docs;
   let sent = 0, empty = 0, failed = 0;
-  for (const doc of subs.docs) {
+  for (const doc of docs) {
     const uid = doc.id;
     try {
       const [spotsSnap, profileSnap, authUser] = await Promise.all([

@@ -449,6 +449,10 @@ function pickRealRestaurantPhoto ({ savedRestaurant = null, tags = null, cuisine
   const userPhoto = safeUrl(savedRestaurant?.photo || '');
   if (looksLikeGoodFoodPhoto(userPhoto)) return { url: userPhoto, source: 'user' };
 
+  // The restaurant's own photo, looked up for spots you haven't photographed (fillSpotPhotos).
+  const placePhoto = safeUrl(savedRestaurant?.placePhoto || '');
+  if (placePhoto) return { url: placePhoto, source: 'place' };
+
   const tagImage = safeUrl(tags?.image || tags?.photo || '');
   if (looksLikeGoodFoodPhoto(tagImage)) return { url: tagImage, source: 'osm' };
 
@@ -2515,6 +2519,54 @@ function renderCards () {
   } else {
     list.forEach(r => grid.appendChild(buildCard(r)));
   }
+  fillSpotPhotos(list);
+}
+
+/* Spots you haven't photographed (most Want to Try ones) get the
+   restaurant's own photo, looked up a few at a time and kept on the spot.
+   Google photo links can expire, so they're looked up again after a month. */
+const SPOT_PHOTO_TTL = 30 * 86400000;
+const _spotPhotoTried = new Set();
+let _spotPhotoRunning = false;
+
+// Lookups nobody asked for (photos, place checks) stop at a daily number per
+// device, so a big list fills in over a few days instead of in one Google bill.
+const BACKGROUND_LOOKUPS_PER_DAY = 40;
+function takeBackgroundLookup () {
+  const key = `ftb_bg_lookups_${new Date().toDateString()}`;
+  try {
+    const used = Number(localStorage.getItem(key)) || 0;
+    if (used >= BACKGROUND_LOOKUPS_PER_DAY) return false;
+    localStorage.setItem(key, String(used + 1));
+  } catch { /* private mode: the server's own limit still applies */ }
+  return true;
+}
+
+async function fillSpotPhotos (list) {
+  if (_spotPhotoRunning || navigator.onLine === false) return;
+  const todo = list.filter(r => r.name && !_spotPhotoTried.has(r.id) &&
+    !pickRealRestaurantPhoto({ savedRestaurant: { photo: r.photo } }).url &&
+    !(r.placePhoto && Date.now() - (r.placePhotoAt || 0) < SPOT_PHOTO_TTL)).slice(0, 8);
+  if (!todo.length) return;
+  _spotPhotoRunning = true;
+  let found = false;
+  let capped = false;
+  try {
+    for (const r of todo) {
+      if (!takeBackgroundLookup()) { capped = true; break; }
+      _spotPhotoTried.add(r.id);
+      const url = await getOrFetchPlacePhoto({ name: r.name, lat: r.lat ?? undefined, lon: r.lng ?? undefined, address: r.address, website: r.website });
+      // Look up by id again: the list may have been replaced while we waited.
+      const spot = state.restaurants.find(x => x.id === r.id);
+      if (!spot || !url) continue;
+      spot.placePhoto = url;
+      spot.placePhotoAt = Date.now();
+      found = true;
+    }
+  } finally {
+    _spotPhotoRunning = false;
+  }
+  if (found) { saveData(); renderCards(); } else if (!capped) fillSpotPhotos(list);
 }
 
 function buildCard (r) {
@@ -2571,6 +2623,7 @@ function buildCard (r) {
       ${cardOrderLine(r)}
       ${cardExtrasHtml(r)}
       <div class="card-highlights">
+        ${r.placeSuggest ? '<span class="card-highlight card-place-check">📍 Right place?</span>' : ''}
         ${openChipHtml(r)}
         ${distStr ? `<span class="card-highlight neutral">📍 ${distStr}</span>` : ''}
       </div>
@@ -2920,11 +2973,121 @@ function renderDetailLocation (r, after) {
       <div class="dl-actions">
         <button type="button" class="btn-secondary btn-sm dl-maps">${hasPin || r.address ? 'Open in Google Maps' : 'Find it on Google Maps'}</button>
       </div>
+      <div class="dl-check hidden" aria-live="polite"></div>
     </div>`;
   el.querySelector('.dl-maps')?.addEventListener('click', () => {
     if (r.mapsUrl) window.open(r.mapsUrl, '_blank', 'noopener'); else openMapsSearch(r);
   });
+  renderPlaceCheck(r, el.querySelector('.dl-check'));
+  if (!r.placeChecked && !r.placeSuggest) checkSpotPlace(r).then(changed => { if (changed && state.detailId === r.id) renderPlaceCheck(r, el.querySelector('.dl-check')); });
 }
+
+/* ── Is this the right place? ─────────────────────────────────
+   Spots saved by name alone can end up linked to the wrong restaurant.
+   Each spot is checked once against Google's best match for its name: the
+   same place (or right next to where it's pinned) is confirmed quietly;
+   anything else asks on the spot's page, and its card gets a small flag. */
+const _placeCheckTried = new Set();
+
+function placeNameTokens (s) {
+  return String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+    .filter(t => t && !['the', 'and', 'restaurant', 'cafe', 'bar', 'grill', 'kitchen', 'co'].includes(t));
+}
+
+async function checkSpotPlace (r) {
+  if (!r?.name || r.placeChecked || r.placeSuggest || _placeCheckTried.has(r.id) || navigator.onLine === false) return false;
+  _placeCheckTried.add(r.id);
+  const pinned = Number.isFinite(r.lat) && Number.isFinite(r.lng);
+  const lat = pinned ? r.lat : state.userLat;
+  const lng = pinned ? r.lng : state.userLng;
+  const at = Number.isFinite(lat) ? `&lat=${lat.toFixed(2)}&lng=${lng.toFixed(2)}` : '';
+  let top = null;
+  try {
+    const resp = await fetch(`/api/place-info?mode=search&q=${encodeURIComponent(r.name)}${at}`);
+    if (!resp.ok) return false;
+    top = ((await resp.json())?.places || []).find(p => p.name && Number.isFinite(p.lat) && Number.isFinite(p.lng)) || null;
+  } catch { return false; }
+  const spot = state.restaurants.find(x => x.id === r.id);
+  if (!spot || !top) return false;
+  // A different restaurant with a similar search isn't a suggestion worth making.
+  const want = placeNameTokens(spot.name);
+  const got = placeNameTokens(top.name);
+  const overlap = want.length ? want.filter(t => got.includes(t)).length / want.length : 0;
+  const near = pinned && haversine(spot.lat, spot.lng, top.lat, top.lng) < 150;
+  if ((top.placeId && top.placeId === spot.placeId) || near) {
+    spot.placeChecked = true;
+    if (!spot.placeId && top.placeId) spot.placeId = top.placeId;
+  } else if (overlap >= 0.5) {
+    spot.placeSuggest = { placeId: top.placeId || '', name: top.name, address: top.address || '', lat: top.lat, lng: top.lng,
+      rating: top.rating || 0, reviews: top.reviews || 0, priceLevel: top.priceLevel || 0 };
+  } else {
+    return false;
+  }
+  if (spot !== r) Object.assign(r, { placeChecked: spot.placeChecked, placeSuggest: spot.placeSuggest, placeId: spot.placeId });
+  saveData();
+  return true;
+}
+
+// Links a spot to a Google place: where it is, its rating, and fresh hours and photo.
+function linkSpotToPlace (r, p) {
+  Object.assign(r, {
+    name: p.name || r.name, address: p.address || r.address, lat: p.lat, lng: p.lng, placeId: p.placeId || '',
+    placeChecked: true, placeSuggest: null, updatedAt: Date.now(),
+    placeInfoAt: 0, hours: [], periods: [], phone: '', mapsUrl: '', placePhoto: '', placePhotoAt: 0,
+  });
+  if (p.rating) { r.googleRating = p.rating; r.googleReviews = p.reviews || 0; }
+  if (p.priceLevel && !r.priceRange) r.priceRange = p.priceLevel;
+  _placeInfoTried.delete(r.id);
+  _spotPhotoTried.delete(r.id);
+}
+
+function renderPlaceCheck (r, box) {
+  if (!box) return;
+  const s = r.placeSuggest;
+  if (!s) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  const dist = Number.isFinite(state.userLat) ? fmtDist(haversine(state.userLat, state.userLng, s.lat, s.lng)) : '';
+  box.classList.remove('hidden');
+  box.innerHTML = `<div class="dl-check-q">Is this the right place?</div>
+    <div class="dl-check-place"><strong>${escHtml(s.name)}</strong><span>${escHtml([s.rating ? `★ ${s.rating.toFixed(1)}` : '', s.address, dist ? `${dist} away` : ''].filter(Boolean).join(' · '))}</span></div>
+    <div class="dl-check-actions">
+      <button type="button" class="btn-primary btn-sm dl-check-yes">Yes, use this one</button>
+      <button type="button" class="btn-ghost btn-sm dl-check-search">Search for it</button>
+      <button type="button" class="btn-ghost btn-sm dl-check-keep">Keep mine</button>
+    </div>`;
+  box.querySelector('.dl-check-yes').onclick = () => {
+    linkSpotToPlace(r, s);
+    saveData();
+    renderAll();
+    openDetailModal(r.id);
+    showToast('Linked', `${r.name} is now linked to the right place.`, 'success');
+    refreshPlaceInfo(r).then(found => { if (found) { renderAll(); if (state.detailId === r.id && !document.getElementById('detail-overlay').classList.contains('hidden')) fillDetailFacts(r); } });
+  };
+  box.querySelector('.dl-check-keep').onclick = () => {
+    r.placeChecked = true;
+    r.placeSuggest = null;
+    saveData();
+    renderCards();
+    renderPlaceCheck(r, box);
+  };
+  box.querySelector('.dl-check-search').onclick = () => {
+    closeDetailModal();
+    openEditModal(r.id);
+    searchFormPlaces();
+  };
+}
+
+// After launch, check a few saved spots that haven't been checked yet.
+async function checkSpotPlaces () {
+  const todo = (state.restaurants || []).filter(r => r.name && !r.placeChecked && !r.placeSuggest).slice(0, 10);
+  let flagged = false;
+  for (const r of todo) {
+    if (!takeBackgroundLookup()) break;
+    if (await checkSpotPlace(r) && r.placeSuggest) flagged = true;
+    await new Promise(res => setTimeout(res, 800));
+  }
+  if (flagged) renderCards();
+}
+window.addEventListener('load', () => setTimeout(checkSpotPlaces, 9000));
 
 // After launch, quietly look up a few saved spots that have no info yet.
 async function fillMissingPlaceInfo () {
@@ -2946,8 +3109,8 @@ function openDetailModal (id) {
 
   const [c1, c2] = cuisineGrad(r.cuisine);
   const hero = document.getElementById('detail-hero');
-  if (r.photo) {
-    const safePhoto = safeUrl(r.photo);
+  if (r.photo || r.placePhoto) {
+    const safePhoto = safeUrl(r.photo || r.placePhoto);
     if (safePhoto) {
       hero.style.backgroundImage = `url('${safePhoto}')`;
       hero.style.backgroundSize = 'cover';
@@ -3306,9 +3469,69 @@ function initPullToRefresh () {
 }
 
 /* ── Add / Edit Modal ────────────────────────────────────── */
+/* Place search on the form's name field: the same Google search as Add a
+   spot. Picking a result links the spot to that place (address, location,
+   ratings); typing without picking just renames it. */
+let _formPlace = null;
+let _formPlaceTimer = null;
+let _formPlaceSeq = 0;
+let _formPlaceResults = [];
+
+function clearFormPlaceSearch () {
+  clearTimeout(_formPlaceTimer);
+  _formPlaceSeq++;
+  _formPlaceResults = [];
+  const box = document.getElementById('form-name-suggs');
+  if (box) { box.innerHTML = ''; box.classList.add('hidden'); }
+}
+
+function searchFormPlaces () {
+  const q = document.getElementById('form-name').value.trim();
+  clearFormPlaceSearch();
+  if (q.length < 3) return;
+  const seq = _formPlaceSeq;
+  _formPlaceTimer = setTimeout(async () => {
+    const at = Number.isFinite(state.userLat) ? `&lat=${state.userLat.toFixed(2)}&lng=${state.userLng.toFixed(2)}` : '';
+    let places = [];
+    try {
+      const resp = await fetch(`/api/place-info?mode=search&q=${encodeURIComponent(q)}${at}`);
+      if (resp.ok) places = (await resp.json())?.places || [];
+    } catch { /* offline: the name still saves as typed */ }
+    if (seq !== _formPlaceSeq || document.getElementById('modal-overlay').classList.contains('hidden')) return;
+    _formPlaceResults = places.filter(p => p.name && Number.isFinite(p.lat) && Number.isFinite(p.lng));
+    if (!_formPlaceResults.length) return;
+    const box = document.getElementById('form-name-suggs');
+    box.innerHTML = _formPlaceResults.map((p, i) => {
+      const dist = Number.isFinite(state.userLat) ? fmtDist(haversine(state.userLat, state.userLng, p.lat, p.lng)) : '';
+      const meta = [p.rating ? `★ ${p.rating.toFixed(1)}` : '', p.address, dist].filter(Boolean).join(' · ');
+      return `<button type="button" class="qa-sugg" data-i="${i}"><strong>${escHtml(p.name)}</strong>${meta ? `<span>${escHtml(meta)}</span>` : ''}</button>`;
+    }).join('');
+    box.classList.remove('hidden');
+  }, 500);
+}
+
+function pickFormPlace (p) {
+  _formPlace = p;
+  document.getElementById('form-name').value = p.name;
+  document.getElementById('form-address').value = p.address || '';
+  if (p.rating) {
+    document.getElementById('form-google-rating').value = p.rating;
+    document.getElementById('form-google-reviews').value = p.reviews || '';
+  }
+  const cuisine = document.getElementById('form-cuisine');
+  // "Mexican Restaurant" -> "Mexican"; a plain "Restaurant" says nothing.
+  const kind = String(p.kind || '').replace(/\s*(restaurant|food|place)$/i, '').replace(/^(restaurant|food)$/i, '').trim();
+  if (!cuisine.value.trim() && kind) cuisine.value = kind;
+  const price = document.getElementById('form-price');
+  if (p.priceLevel && !Number(price.value)) price.value = p.priceLevel;
+  clearFormPlaceSearch();
+}
+
 function openAddModal () {
   state.editingId = null;
   _pendingAddPrefill = null;
+  _formPlace = null;
+  clearFormPlaceSearch();
   state.formRating = 0;
   document.getElementById('modal-title').textContent = 'Add Restaurant';
   document.getElementById('modal-save-btn').textContent = 'Save Restaurant';
@@ -3332,6 +3555,8 @@ function openEditModal (id) {
   if (!r) return;
   state.editingId = id;
   state.formRating = r.myRating || 0;
+  _formPlace = null;
+  clearFormPlaceSearch();
 
   document.getElementById('modal-title').textContent = 'Edit Restaurant';
   document.getElementById('modal-save-btn').textContent = 'Save Changes';
@@ -3374,6 +3599,7 @@ function openEditModal (id) {
 }
 
 function closeModal () {
+  clearFormPlaceSearch();
   document.getElementById('modal-overlay').classList.add('hidden');
   maybeHideOverlay();
 }
@@ -3463,11 +3689,25 @@ function handleFormSubmit (e) {
     }
   }
 
+  // A place picked from the search (and not renamed after): link to it.
+  const picked = _formPlace && normalizeName(_formPlace.name) === normalizeName(name) ? _formPlace : null;
+  if (picked) {
+    entry.lat = picked.lat;
+    entry.lng = picked.lng;
+    entry.placeId = picked.placeId || '';
+    // Hours, phone and Maps link were for whatever it matched before; look them up again.
+    Object.assign(entry, { placeInfoAt: 0, hours: [], periods: [], phone: '', mapsUrl: '', placePhoto: '', placePhotoAt: 0, placeChecked: true, placeSuggest: null });
+    _placeInfoTried.delete(entry.id);
+    _spotPhotoTried.delete(entry.id);
+  }
+
   if (state.editingId) {
     // Preserve lat/lng from original
     const orig = state.restaurants.find(r => r.id === state.editingId);
-    entry.lat = orig?.lat || null;
-    entry.lng = orig?.lng || null;
+    if (!picked) {
+      entry.lat = orig?.lat || null;
+      entry.lng = orig?.lng || null;
+    }
     entry.visits = orig?.visits || [];
     // Keep everything the form doesn't edit (dishes, favorite, photos, ...).
     state.restaurants = state.restaurants.map(r => r.id === state.editingId ? { ...orig, ...entry } : r);
@@ -3479,12 +3719,16 @@ function handleFormSubmit (e) {
   }
 
   // Geocode in background if address provided
-  if (address) geocodeAddress(entry.id, address);
+  if (picked) {
+    const saved = state.restaurants.find(r => r.id === entry.id);
+    refreshPlaceInfo(saved).then(found => { if (found) renderAll(); });
+  } else if (address) geocodeAddress(entry.id, address);
 
   saveData();
   renderAll();
   closeModal();
   _pendingAddPrefill = null;
+  _formPlace = null;
 }
 
 /* ── Geocode via Nominatim (free, no API key) ─────────────── */
@@ -5123,8 +5367,11 @@ function _discApplyFilters () {
   const sort    = document.getElementById('disc-sort')?.value || 'distance';
   const metaEl  = document.getElementById('disc-result-meta');
 
+  // A craving word ("american", from Bear Swipe) also finds burgers, BBQ, diners…
+  const craving = CRAVING_MATCH[query];
   let results = _discAllResults.filter(r => {
     if (cuisine !== 'all' && r.cuisine !== cuisine && r.amenity !== cuisine) return false;
+    if (craving && craving.test(`${r.cuisine} ${r.name}`.toLowerCase())) return true;
     if (query && !r.name.toLowerCase().includes(query) && !r.cuisine.toLowerCase().includes(query)) return false;
     return true;
   });
@@ -6035,11 +6282,16 @@ function buildDecisionModeShortlist () {
   const feel = weatherFeel(w);
   const today = iso();
 
+  const swipe = swipeCraving();
+
   const scored = state.restaurants.map(r => {
     const distance = distOf(r);
     let score = scoreMoodPick(r, mood);
     const cuisineLc = String(r.cuisine || '').toLowerCase();
     const contextReasons = [];
+
+    // What Bear Swipe just said you're craving comes first.
+    if (swipe && matchesCraving(cuisineLc, swipe.cuisine)) { score += 3; contextReasons.push(`you're craving ${swipe.cuisine}`); }
 
     // Closed spots sink; known-open ones get a nudge.
     const st = openStatus(r, now);
@@ -7131,6 +7383,11 @@ function setupEvents () {
 
   // Phase 7 - Escape closes new modals (comment only - actual close calls below in Escape handler)
   document.getElementById('form-name').addEventListener('input', computeAutoTags);
+  document.getElementById('form-name').addEventListener('input', searchFormPlaces);
+  document.getElementById('form-name-suggs').addEventListener('click', e => {
+    const btn = e.target.closest('.qa-sugg');
+    if (btn) pickFormPlace(_formPlaceResults[Number(btn.dataset.i)]);
+  });
 
   // Phase 8 - ⋯ More Menu
   initMoreMenu();
@@ -9898,7 +10155,7 @@ function renderFriendsFeedHome () {
   const list = document.getElementById('ff-list');
   if (!section || !list) return;
   // Only when friends have something to show; inviting is the small header button.
-  const items = (state.restaurants || []).length && hasGrizzly() ? friendsFeedItems() : [];
+  const items = (state.restaurants || []).length ? friendsFeedItems() : [];
   section.classList.toggle('hidden', !items.length);
   if (!items.length) { list.innerHTML = ''; return; }
   const mine = new Map((state.restaurants || []).map(r => [normalizeName(r.name), r]));
@@ -9992,9 +10249,12 @@ function friendsUpdatedAt () {
 function friendKey (data) { return data.id ? `id:${data.id}` : `name:${String(data.u || '').toLowerCase()}`; }
 function isFollowing (data) { return getFriends().some(f => f.key === friendKey(data)); }
 
+// Free accounts can follow one friend (usually whoever invited them), so an
+// invite works without paying; following more people is Grizzly.
+const FREE_FRIENDS = 1;
+
 // Following again with a newer link updates that friend's profile.
 function followFriend (data) {
-  if (grizzlyLocked('friends')) return null;
   if (data.id && data.id === state.settings.profileShareId) {
     showToast("That's your link", 'Send it to a friend so they can follow you.', 'info');
     return null;
@@ -10002,6 +10262,7 @@ function followFriend (data) {
   const list = getFriends();
   const entry = { key: friendKey(data), name: data.u || 'Friend', data, savedAt: Date.now() };
   const i = list.findIndex(f => f.key === entry.key);
+  if (i < 0 && list.length >= FREE_FRIENDS && grizzlyLocked('friends')) return null;
   if (i >= 0) list[i] = entry; else list.unshift(entry);
   saveFriends(list);
   trackProductEvent('friend_followed', { updated: i >= 0 });
@@ -10204,6 +10465,8 @@ function orderPicksFor (r) {
     t.skip.forEach(n => vote(n, -2, t.name, true));
     t.wants.forEach(n => vote(n, 0.5, t.name));
   });
+  // What Google reviewers keep recommending (Grizzly; loadReviewDishes).
+  (r?.reviewDishes || []).forEach(d => vote(d.name, Math.min(2, d.n * 0.75), `${d.n} review${d.n > 1 ? 's' : ''}`));
   const all = [...tally.values()];
   return {
     get: all.filter(t => t.score > 0 && t.fans.length).sort((a, b) => b.score - a.score || b.fans.length - a.fans.length),
@@ -10217,9 +10480,9 @@ function whoSaid (names) {
 }
 
 // The one-line answer to "what should I get here?". Only shown once friends
-// weigh in; your own verdicts alone are already grouped right below it.
+// or reviewers weigh in; your own verdicts alone are already grouped right below it.
 function bestBetHtml (r) {
-  if (!friendTipsFor(r).length) return '';
+  if (!friendTipsFor(r).length && !(r?.reviewDishes || []).length) return '';
   const { get, skip } = orderPicksFor(r);
   if (!get.length && !skip.length) return '';
   const top = get[0];
@@ -11102,10 +11365,50 @@ function mergeLegacyDishStores () {
   return changed;
 }
 
+/* Dishes Google reviewers recommend, for Best bet. Grizzly, once a month per
+   spot: the AI picks dishes out of a few review texts, and only names that
+   really appear in those reviews are kept (counted by how many mention them). */
+const REVIEW_DISHES_TTL = 30 * 86400000;
+const _reviewDishesTried = new Set();
+
+async function loadReviewDishes (r) {
+  if (!r?.placeId || !hasGrizzly() || !window.AI || _reviewDishesTried.has(r.id) || navigator.onLine === false) return false;
+  if (r.reviewDishesAt && Date.now() - r.reviewDishesAt < REVIEW_DISHES_TTL) return false;
+  _reviewDishesTried.add(r.id);
+  try {
+    const resp = await fetch(`/api/place-info?mode=reviews&id=${encodeURIComponent(r.placeId)}`);
+    if (!resp.ok) return false;
+    const texts = ((await resp.json())?.reviews || []).map(x => String(x.text || '')).filter(Boolean);
+    let dishes = [];
+    if (texts.length) {
+      const reply = await AI.call(`These are Google reviews of ${r.name}. List the specific dishes or drinks the reviewers recommend, using the exact words from the reviews. Reply with only a JSON array of up to 5 short dish names, or [] if none.\n\n${texts.map((t, i) => `Review ${i + 1}: ${t}`).join('\n\n')}`);
+      let names = [];
+      try { names = JSON.parse(String(reply || '').match(/\[[\s\S]*\]/)?.[0] || '[]'); } catch { names = []; }
+      const lower = texts.map(t => t.toLowerCase());
+      dishes = (Array.isArray(names) ? names : [])
+        .map(n => String(n || '').trim().slice(0, 50))
+        .filter(n => n.length > 2)
+        .map(n => ({ name: n, n: lower.filter(t => t.includes(n.toLowerCase())).length }))
+        .filter(d => d.n > 0)
+        .sort((a, b) => b.n - a.n)
+        .slice(0, 3);
+    }
+    const spot = state.restaurants.find(x => x.id === r.id);
+    if (!spot) return false;
+    spot.reviewDishes = dishes;
+    spot.reviewDishesAt = Date.now();
+    saveData();
+    return dishes.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 function renderYourOrder (restaurantId) {
   const listEl = document.getElementById('your-order-list');
   if (!listEl) return;
   const r = state.restaurants.find(x => x.id === restaurantId);
+  if (r) loadReviewDishes(r).then(found => { if (found && state.detailId === restaurantId) renderYourOrder(restaurantId); });
   const dishes = dishesOf(r);
   const counts = {};
   dishes.forEach(d => { counts[d.verdict] = (counts[d.verdict] || 0) + 1; });
@@ -11591,7 +11894,8 @@ function renderFriendsList () {
 }
 
 function openFoodieFriends () {
-  if (grizzlyLocked('friends')) return;
+  // A free account that follows its one friend can still see and manage them.
+  if (!getFriends().length && grizzlyLocked('friends')) return;
   renderFriendsList();
   renderFriendsLiveNote();
   refreshFriendsLive(true);
@@ -14270,10 +14574,71 @@ function renderHomeDiscovery ({ elements }) {
 // cravings, friends, weather) picks one saved spot and says why. Kept for the
 // rest of the meal so it doesn't reshuffle on every render.
 // `reroll` swaps in another of the top three (the refresh button).
+// Bear Swipe's latest "Tonight you're craving …", good for a few hours.
+const SWIPE_CRAVING_TTL = 6 * 3600000;
+const CRAVING_MATCH = {
+  american: /american|burger|diner|bbq|barbecue|steak|wings|chicken|sandwich|grill|southern|hot dog/,
+  southern: /southern|soul|cajun|creole|fried chicken|bbq|barbecue/,
+  bbq: /bbq|barbecue|smokehouse|brisket/,
+  mexican: /mexican|taco|tex-?mex|burrito|taqueria|birria/,
+  'latin american': /latin|peruvian|cuban|brazilian|colombian|salvadoran|venezuelan|argentin|mexican/,
+  japanese: /japanese|sushi|ramen|izakaya|udon|teriyaki/,
+  chinese: /chinese|dim sum|szechuan|sichuan|cantonese|dumpling/,
+  vietnamese: /vietnamese|pho|banh mi/,
+  indian: /indian|curry|nepal|pakistani|tandoor/,
+  'middle eastern': /middle eastern|lebanese|mediterranean|falafel|shawarma|persian|kebab|halal/,
+  greek: /greek|mediterranean|gyro/,
+  turkish: /turkish|kebab|mediterranean/,
+  italian: /italian|pizza|pasta/,
+  pizza: /pizza|italian/,
+  french: /french|bistro|crepe/,
+  'eastern european': /eastern european|polish|russian|ukrainian|hungarian|georgian/,
+  african: /african|ethiopian|nigerian|moroccan|somali/,
+  seafood: /seafood|fish|oyster|poke|crab|lobster|shrimp/,
+  breakfast: /breakfast|brunch|diner|pancake|waffle|cafe/,
+  bakery: /bakery|pastry|donut|doughnut|bagel|bread/,
+  dessert: /dessert|ice cream|gelato|bakery|donut|doughnut|frozen yogurt|sweets|cake/,
+  drinks: /coffee|tea|boba|bar|juice|cafe|brewery/,
+  healthy: /healthy|salad|poke|vegan|vegetarian|bowl/,
+  sandwiches: /sandwich|deli|sub\b|hoagie/,
+  steakhouse: /steak/,
+};
+
+function swipeCraving () {
+  try {
+    const c = JSON.parse(localStorage.getItem('ftb_bear_swipe_v2') || '{}').craving;
+    if (c?.cuisine && Date.now() - (c.at || 0) < SWIPE_CRAVING_TTL) return c;
+  } catch { /* private mode */ }
+  return null;
+}
+
+function matchesCraving (cuisine, craving) {
+  const key = String(craving || '').toLowerCase();
+  const re = CRAVING_MATCH[key] || new RegExp(key.replace(/[^a-z ]/g, '') || '^$');
+  return re.test(String(cuisine || '').toLowerCase());
+}
+
+// Your saved spots that fit a craving, open ones first, then nearest.
+function savedCravingSpots (craving, limit = 3) {
+  return (state.restaurants || []).filter(r => matchesCraving(r.cuisine, craving))
+    .map(r => ({ r, st: openStatus(r), dist: distOf(r) }))
+    .filter(x => !(x.st && !x.st.open))
+    .sort((a, b) => (b.st?.open ? 1 : 0) - (a.st?.open ? 1 : 0) || a.dist - b.dist)
+    .slice(0, limit)
+    .map(({ r, st, dist }) => ({ id: r.id, name: r.name, cuisine: r.cuisine || '', status: st?.text || '', dist: Number.isFinite(dist) ? fmtDist(dist) : '' }));
+}
+
+// Bear Swipe just named a craving: Today's Pick follows it.
+function onBearSwipeCraving () {
+  if (usesAiDailyPick()) loadAiRec(_homeDiscCache || { elements: [] });
+  else showLocalDailyPick();
+}
+
 function localDailyPick (now = new Date(), { reroll = false } = {}) {
   if ((state.restaurants || []).filter(nearEnoughToSuggest).length < 2) return null;
   const meal = mealtimeOf(now);
-  const key = `ftb_daily_pick_${now.toDateString()}_${meal}`;
+  const swipe = swipeCraving();
+  const key = `ftb_daily_pick_${now.toDateString()}_${meal}${swipe ? `_${swipe.at}` : ''}`;
   let id = '';
   try { id = sessionStorage.getItem(key) || ''; } catch { /* private mode */ }
   let pick = id && !reroll ? state.restaurants.find(r => r.id === id) : null;
@@ -14321,14 +14686,19 @@ async function loadAiRec (discData) {
   const textEl = document.getElementById('ai-rec-text');
   if (!banner || !textEl) return;
 
-  // Cache per calendar day
-  const cacheKey = 'ftb_airec_' + new Date().toDateString();
+  // Cache per calendar day, and per Bear Swipe craving so a new one shows right away.
+  const swipe = swipeCraving();
+  const cacheKey = 'ftb_airec_' + new Date().toDateString() + (swipe ? `_${swipe.at}` : '');
   const cached   = sessionStorage.getItem(cacheKey);
   if (cached) { textEl.textContent = cached; banner.classList.remove('hidden'); return; }
 
   banner.classList.remove('hidden');
   textEl.textContent = 'Thinking…';
   try {
+    const cravingSpots = swipe
+      ? state.restaurants.filter(r => nearEnoughToSuggest(r) && matchesCraving(r.cuisine, swipe.cuisine)).slice(0, 5)
+        .map(r => `${r.name} (${r.cuisine})`).join(', ')
+      : '';
     const topSaved = state.restaurants
       .filter(r => r.myRating >= 4 && nearEnoughToSuggest(r))
       .sort((a, b) => (b.myRating || 0) - (a.myRating || 0))
@@ -14346,7 +14716,8 @@ async function loadAiRec (discData) {
 - User's favourite cuisines: ${topCuisines || 'various'}
 - Their top saved restaurants: ${topSaved || 'none yet'}
 - Restaurants near them right now: ${nearby || 'various places'}
-Mention a specific place or cuisine name. Be warm and exciting.`;
+${swipe ? `- They just played Bear Swipe and are craving ${swipe.cuisine} food right now. Recommend ${swipe.cuisine} food only${cravingSpots ? `, ideally one of their saved ${swipe.cuisine} spots: ${cravingSpots}` : ''}.
+` : ''}Mention a specific place or cuisine name. Be warm and exciting.`;
 
     const rec = await AI.call(prompt);
     const clean = wholeSentences((rec || '').trim().split('\n')[0].replace(/^["']|["']$/g, ''));
@@ -14930,7 +15301,7 @@ const GRIZZLY_PITCH = {
   smartfill:   { title: 'Let the cub do the typing', body: 'Byte Cub fills in cuisine, price, tags, and a short description for every spot you add.' },
   video:       { title: 'Save food videos', body: 'Catch the cheese pull, the sizzle, the steam. Grizzly saves 15-second videos with every dish you log.' },
   review:      { title: 'Your foodie Year in Review', body: 'Your top spots, cuisines, and streaks, wrapped up and ready to share.' },
-  friends:     { title: 'Eat with your friends', body: "Follow friends, see where they go and what they order, and invite them (they get 30 days of Grizzly free)." },
+  friends:     { title: 'Eat with all your friends', body: "Cub follows one friend. Grizzly follows everyone, shows where they go and what they order, and lets you invite friends (they get 30 days of Grizzly free)." },
   vote:        { title: 'End the "where should we eat" debate', body: 'Start a Dinner Vote: friends tap yes or no on your picks, no app needed, and the bear names the winner.' },
   swipe:       { title: 'Find out what you are craving', body: 'Bear Swipe reads your swipes, names your craving, and finds it near you.' },
   pick:        { title: "Today's Pick, every meal", body: 'The bear picks a spot from your list for breakfast, lunch and dinner, and tells you why.' },

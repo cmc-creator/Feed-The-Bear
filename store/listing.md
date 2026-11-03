@@ -54,7 +54,7 @@ MAKE IT FUN
 • Share story cards of your best meals
 • Your year in food, wrapped
 
-A free account holds up to 10 spots, backed up on every device, with the map, nearby search and Open now. Grizzly unlocks unlimited spots, friends and invites, Dinner Vote, Bear Swipe, Today's Pick, Byte Cub AI picks and summaries, Year in Review and 15-second food videos.
+A free account holds up to 10 spots, backed up on every device, with the map, nearby search, Open now and one friend to follow. Grizzly unlocks unlimited spots, all your friends and invites, Dinner Vote, Bear Swipe, Today's Pick, Byte Cub AI picks and summaries, Year in Review and 15-second food videos.
 
 ## What's new (first release)
 

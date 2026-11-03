@@ -305,12 +305,15 @@ window.BearSwipe = (() => {
   function showResult () {
     const store = loadStore();
     store.rounds = (store.rounds || 0) + 1;
+    const cravings = topCravings();
+    const liked = round.yes;
+    // Today's Pick and Decision Mode follow this (app.js swipeCraving).
+    if (liked.length) store.craving = { cuisine: cravings[0][0], at: Date.now() };
     saveStore(store);
     renderProgress();
     els.stage.classList.add('hidden');
     els.actions.classList.add('hidden');
-    const cravings = topCravings();
-    const liked = round.yes;
+    if (liked.length) { try { window.onBearSwipeCraving?.(); } catch { /* the pick catches up on the next render */ } }
     track('bear_swipe_round_done', { liked: liked.length, top: cravings[0]?.[0] || '' });
 
     // Free accounts can swipe; naming the craving is Grizzly (app.js grizzlyUnlockHtml).
@@ -331,6 +334,7 @@ window.BearSwipe = (() => {
         <p class="bs-result-sub">You'd eat ${liked.length} of ${round.yes.length + round.no.length}. Top pick: <strong>${esc(dish)}</strong>.</p>
         <div class="bs-collage">${liked.slice(0, 6).map(d => `<img src="${esc(d.url)}" alt="${esc(d.dish)}" title="${esc(d.dish)}" />`).join('')}</div>
         <div class="bs-bars">${cravings.slice(0, 3).map(([c, n]) => `<div class="bs-bar"><span>${esc(c)}</span><i style="width:${Math.round((n / liked.length) * 100)}%"></i></div>`).join('')}</div>
+        ${savedHtml(top)}
         <div class="bs-result-actions">
           <button type="button" class="btn-primary bs-find" data-q="${esc(top)}">Find ${esc(top)} near me</button>
           <button type="button" class="btn-secondary bs-decide">Decision Mode</button>
@@ -341,6 +345,18 @@ window.BearSwipe = (() => {
     els.result.querySelector('.bs-again')?.addEventListener('click', () => start());
     els.result.querySelector('.bs-decide')?.addEventListener('click', () => window.openDecisionMode?.());
     els.result.querySelector('.bs-find')?.addEventListener('click', e => findNearby(e.currentTarget.dataset.q));
+    els.result.querySelectorAll('.bs-saved-spot').forEach(b => b.addEventListener('click', () => {
+      track('bear_swipe_saved_spot', {});
+      window.openDetailModal?.(b.dataset.id);
+    }));
+  }
+
+  // Spots already on your list that fit the craving (app.js savedCravingSpots).
+  function savedHtml (craving) {
+    const spots = typeof window.savedCravingSpots === 'function' ? window.savedCravingSpots(craving) : [];
+    if (!spots.length) return '';
+    return `<div class="bs-saved"><div class="bs-saved-label">On your list</div>${spots.map(s =>
+      `<button type="button" class="bs-saved-spot" data-id="${esc(s.id)}"><strong>${esc(s.name)}</strong><span>${esc([s.cuisine, s.status, s.dist].filter(Boolean).join(' · '))}</span></button>`).join('')}</div>`;
   }
 
   async function findNearby (query) {

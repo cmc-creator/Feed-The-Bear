@@ -102,14 +102,43 @@ async function searchPlaces (req, res, key) {
   }
 }
 
+/* GET /api/place-info?mode=reviews&id=<placeId>
+   A few recent Google review texts for one place, for "What to order" on a
+   spot's page (Grizzly; the app asks once a month per spot). Cached a week. */
+async function placeReviews (req, res, key) {
+  const id = String(req.query.id || '');
+  if (!/^[A-Za-z0-9_-]{10,300}$/.test(id)) return res.status(400).json({ reviews: [] });
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    const resp = await fetch(`https://places.googleapis.com/v1/places/${id}`, {
+      headers: { 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': 'reviews' },
+      signal: ctrl.signal,
+    }).finally(() => clearTimeout(timer));
+    if (!resp.ok) {
+      console.warn('[FTB] place-reviews HTTP', resp.status, (await resp.text()).slice(0, 200));
+      return res.status(502).json({ reviews: [] });
+    }
+    const reviews = ((await resp.json())?.reviews || []).slice(0, 5).map(r => ({
+      rating: Number(r.rating) || 0,
+      text: String(r.originalText?.text || r.text?.text || '').slice(0, 600),
+    })).filter(r => r.text);
+    res.setHeader('Cache-Control', 'public, s-maxage=604800, stale-while-revalidate=86400');
+    return res.status(200).json({ reviews });
+  } catch (err) {
+    console.warn('[FTB] place-reviews failed:', err.message);
+    return res.status(502).json({ reviews: [] });
+  }
+}
+
 module.exports = async function handler (req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const key = process.env.GOOGLE_PLACES_API_KEY;
   if (!key) return res.status(503).json({ found: false, error: 'Place info is not set up.' });
-  if (req.query.mode === 'search') {
+  if (req.query.mode === 'search' || req.query.mode === 'reviews') {
     const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
-    if (limited(ip)) return res.status(429).json({ places: [], error: 'Slow down a little.' });
-    return searchPlaces(req, res, key);
+    if (limited(ip)) return res.status(429).json({ places: [], reviews: [], error: 'Slow down a little.' });
+    return req.query.mode === 'search' ? searchPlaces(req, res, key) : placeReviews(req, res, key);
   }
 
   const name = String(req.query.name || '').trim().slice(0, 120);

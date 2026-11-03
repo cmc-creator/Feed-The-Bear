@@ -170,3 +170,9 @@ jobs:
       - name: Sign-in required, free plan limits
         working-directory: tests
         run: node signin.test.js
+      - name: Edit a spot links it to a real place
+        working-directory: tests
+        run: node editlink.test.js
+      - name: Bear Swipe's craving steers Today's Pick
+        working-directory: tests
+        run: node craving.test.js
