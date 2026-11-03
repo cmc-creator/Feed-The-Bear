@@ -5,7 +5,7 @@
    the private dashboard at /usage.html. Owner only: the caller sends a
    Firebase ID token, and its verified email must be in ADMIN_EMAILS.
 
-   GET /api/usage?days=30   ->   { days: [{ date, counts }] }  (oldest first)
+   GET /api/usage?days=30   ->   { days: [{ date, counts, errors }] }  (oldest first)
 
    Environment variables required:
      FIREBASE_SERVICE_ACCOUNT - Stringified JSON service account key
@@ -74,7 +74,7 @@ module.exports = async function handler (req, res) {
     const keys = dayKeys(n);
     const db = fb.firestore();
     const snaps = await db.getAll(...keys.map(k => db.doc(`analytics/${k}`)));
-    const days = snaps.map((s, i) => ({ date: keys[i], counts: (s.exists && s.data().counts) || {} }));
+    const days = snaps.map((s, i) => ({ date: keys[i], counts: (s.exists && s.data().counts) || {}, errors: (s.exists && s.data().errors) || {} }));
     res.status(200).json({ days });
   } catch (err) {
     console.error('[FTB] usage read error:', err.message);

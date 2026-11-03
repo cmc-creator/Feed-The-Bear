@@ -79,6 +79,11 @@
       <div class="panel" id="funnel-money"></div>
     </div>
     <div class="panel">
+      <h2>Errors people hit</h2>
+      <table><thead><tr><th>Message</th><th>Where</th><th class="n">Times</th><th class="n">Last seen</th></tr></thead><tbody id="errors"></tbody></table>
+      <p class="muted">The 5 most common in this range. Messages only: no names, links or user ids.</p>
+    </div>
+    <div class="panel">
       <h2>Every event</h2>
       <table><thead><tr><th>Event</th><th class="n">Total</th><th class="n">Per day</th></tr></thead><tbody id="rows"></tbody></table>
       <p class="muted">Days are UTC. Counts arrive up to 20 seconds after use, or when the app is closed.</p>
@@ -136,7 +141,7 @@ function demoData (n) {
       upgrade_cta_clicked: Math.round(base / 18), grizzly_upgraded: i % 4 ? 0 : 1,
       account_created: Math.round(base / 5), first_spot_saved: Math.round(base / 7), bear_swipe_first_round: Math.round(base / 10),
       trial_started: i % 3 ? 0 : 1, first_payment: i % 6 ? 0 : 1,
-    } });
+    }, errors: i % 5 ? {} : { a1: { m: "Cannot read properties of null (reading 'lat')", w: 'app.js:2240', n: 3 } } });
   }
   return { days: out };
 }
@@ -207,6 +212,19 @@ function render (list) {
     ['Tapped upgrade', t('upgrade_cta_clicked')],
     ['Paid', t('grizzly_upgraded')],
   ]);
+
+  // Errors: same message across days adds up; newest day it happened is "last seen".
+  const errs = {};
+  list.forEach(d => Object.values(d.errors || {}).forEach(e => {
+    const x = errs[e.m] || (errs[e.m] = { m: e.m, w: e.w, n: 0, last: '' });
+    x.n += Number(e.n) || 0;
+    if (d.date > x.last) { x.last = d.date; x.w = e.w || x.w; }
+  }));
+  const topErrs = Object.values(errs).sort((a, b) => b.n - a.n).slice(0, 5);
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  $('errors').innerHTML = topErrs.length
+    ? topErrs.map(e => `<tr><td>${esc(e.m)}</td><td><code>${esc(e.w)}</code></td><td class="n">${fmt(e.n)}</td><td class="n">${esc(e.last)}</td></tr>`).join('')
+    : '<tr><td colspan="4" class="muted">No errors in this range. 🎉</td></tr>';
 
   const rows = Object.entries(totals).sort((a, b) => b[1] - a[1]);
   $('rows').innerHTML = rows.length

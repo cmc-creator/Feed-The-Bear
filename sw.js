@@ -19,6 +19,7 @@ const ASSETS = [
   './ai.js',
   './firebase.js',
   './analytics.js',
+  './errors.js',
   './trust-layer.js',
   './micro-interactions.js',
   './photo-gallery.js',

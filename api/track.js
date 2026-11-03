@@ -6,11 +6,14 @@
    This adds up event COUNTS per UTC day in Firestore at analytics/{date}:
      { counts: { just_ate_logged: 42, ... }, updatedAt }
    Only event names and counts are accepted: no user ids, no payloads.
+   Error reports from errors.js ({ errors: [{ m, w }] }) are counted the same
+   way, at analytics/{date}.errors.{hash} = { m, w, n }.
 
    Environment variables required (same as verify-session.js):
      FIREBASE_SERVICE_ACCOUNT - Stringified JSON service account key
    ════════════════════════════════════════════════════════════ */
 
+const crypto = require('crypto');
 const admin = require('firebase-admin');
 
 const NAME_RE = /^[a-z][a-z0-9_]{2,47}$/;
@@ -42,14 +45,26 @@ function readCounts (body) {
   return Object.keys(clean).length ? clean : null;
 }
 
+// Up to 10 error messages per report, already stripped of links by errors.js.
+function readErrors (body) {
+  let data = body;
+  if (typeof data === 'string') {
+    try { data = JSON.parse(data); } catch { return null; }
+  }
+  const list = Array.isArray(data?.errors) ? data.errors.slice(0, 10) : [];
+  const clean = list.map(e => ({ m: String(e?.m || '').slice(0, 160), w: String(e?.w || '').slice(0, 80) })).filter(e => e.m);
+  return clean.length ? clean : null;
+}
+
 module.exports = async function handler (req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
   const counts = readCounts(req.body);
-  if (!counts) {
-    res.status(400).json({ error: 'Expected { counts: { event_name: n } }' });
+  const errors = readErrors(req.body);
+  if (!counts && !errors) {
+    res.status(400).json({ error: 'Expected { counts: { event_name: n } } or { errors: [...] }' });
     return;
   }
 
@@ -57,8 +72,18 @@ module.exports = async function handler (req, res) {
     const fb = getAdmin();
     const inc = fb.firestore.FieldValue.increment;
     const day = new Date().toISOString().slice(0, 10);
-    const update = { counts: {}, updatedAt: fb.firestore.FieldValue.serverTimestamp() };
-    Object.entries(counts).forEach(([name, n]) => { update.counts[name] = inc(n); });
+    const update = { updatedAt: fb.firestore.FieldValue.serverTimestamp() };
+    if (counts) {
+      update.counts = {};
+      Object.entries(counts).forEach(([name, n]) => { update.counts[name] = inc(n); });
+    }
+    if (errors) {
+      update.errors = {};
+      errors.forEach(e => {
+        const key = crypto.createHash('sha1').update(e.m).digest('hex').slice(0, 12);
+        update.errors[key] = { m: e.m, w: e.w, n: inc(1) };
+      });
+    }
     await fb.firestore().doc(`analytics/${day}`).set(update, { merge: true });
     res.status(204).end();
   } catch (err) {

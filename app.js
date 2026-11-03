@@ -4137,7 +4137,7 @@ function renderAll () {
   // Home sections are isolated: a failure in one must never cascade and
   // abort renderAll (which would leave later init wiring unattached).
   [renderGrizzlyUi, renderTodayStatusRow, renderWeeklyGoal, renderOpenNowHome, renderCraveHome, renderFriendsFeedHome, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
-    .forEach(fn => { try { fn(); } catch (err) { console.error(`${fn.name} failed:`, err); } });
+    .forEach(fn => { try { fn(); } catch (err) { console.error(`${fn.name} failed:`, err); window.ftbReportError?.(err?.message || err, fn.name); } });
 }
 
 function updateLocationBanner () {

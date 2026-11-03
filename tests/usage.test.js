@@ -66,6 +66,7 @@ async function call (handler, { token, days } = {}) {
   const signup = await p.locator('#funnel-signup').innerText();
   check(await p.locator('#funnel-signup .step').count() === 5 && /Created an account/.test(signup) && /Made a first payment/.test(signup), 'the sign-up funnel runs from account to first payment');
   check(await p.locator('#rows tr', { hasText: 'Meal logged' }).count() === 1, 'the table lists events with plain names');
+  check(/Cannot read properties of null/.test(await p.locator('#errors').innerText()) && /app\.js:2240/.test(await p.locator('#errors').innerText()), 'errors people hit are listed with where they happened');
   await p.screenshot({ path: path.join(SHOTS, 'usage-desktop.png'), fullPage: true }).catch(() => {});
   await p.click('.range [data-days="7"]');
   check(await p.locator('#chart path').count() === 7, 'switching to 7 days redraws');
