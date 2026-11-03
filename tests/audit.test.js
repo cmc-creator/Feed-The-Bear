@@ -1,11 +1,60 @@
 // Audit fixes: untrusted shared-list and vote data can't run script, share text and
 // social previews point at the real site, and the photo scraper stays off internal hosts.
 const path = require('path');
+const Module = require('module');
 const { BASE, ROOT, check, launch, newPage, finish, asGrizzly } = require('./lib');
+
+// Lookups are for signed-in members (api/_guard.js): a fake Firebase that knows
+// one member and keeps their daily count.
+const quota = {};
+const fakeAdmin = {
+  apps: [1],
+  auth: () => ({ verifyIdToken: async t => { if (t !== 'member-token') throw new Error('bad'); return { uid: 'member1' }; } }),
+  firestore: () => ({ doc: p => ({ get: async () => ({ data: () => quota[p] }), set: async d => { quota[p] = d; } }) }),
+};
+function loadApi (file) {
+  const orig = Module._load;
+  Module._load = function (req, ...rest) { return req === 'firebase-admin' ? fakeAdmin : orig.call(this, req, ...rest); };
+  try { return require(path.join(ROOT, 'api', file)); } finally { Module._load = orig; }
+}
+function hit (handler, headers = {}, query = {}) {
+  return new Promise(resolve => {
+    const res = {
+      headers: {}, setHeader (k, v) { this.headers[k] = v; },
+      status (code) { this.code = code; return this; },
+      json (body) { resolve({ code: this.code, body }); return this; },
+      end () { resolve({ code: this.code }); },
+    };
+    handler({ method: 'GET', headers: { 'x-forwarded-for': `203.0.113.${Math.floor(Math.random() * 250)}`, ...headers }, query }, res);
+  });
+}
+
+async function lookupsNeedSignIn () {
+  process.env.GOOGLE_PLACES_API_KEY = 'test-key';
+  const realFetch = global.fetch;
+  let google = 0;
+  global.fetch = async () => { google++; return new Response(JSON.stringify({ places: [] }), { status: 200 }); };
+  const placeInfo = loadApi('place-info.js');
+  let r = await hit(placeInfo, {}, { mode: 'search', q: 'tacos' });
+  check(r.code === 401 && google === 0, 'a place search without signing in is refused, and never reaches Google');
+  r = await hit(placeInfo, { 'x-ftb-token': 'forged' }, { mode: 'search', q: 'tacos' });
+  check(r.code === 401 && google === 0, 'a made-up sign-in is refused too');
+  r = await hit(placeInfo, { 'x-ftb-token': 'member-token' }, { mode: 'search', q: 'tacos' });
+  check(r.code === 200 && google === 1 && quota['apiQuota/member1'].n === 1, 'a signed-in member gets an answer, and it counts toward their day');
+  quota['apiQuota/member1'] = { day: new Date().toISOString().slice(0, 10), n: 400 };
+  r = await hit(placeInfo, { 'x-ftb-token': 'member-token' }, { mode: 'search', q: 'tacos' });
+  check(r.code === 429 && google === 1, 'after 400 lookups in a day, they wait until tomorrow');
+  for (const f of ['restaurant-image.js', 'place-photo.js', 'link-spot.js']) {
+    r = await hit(loadApi(f), {}, { name: 'Tacos', q: 'Tacos' });
+    check(r.code === 401, `${f.replace('.js', '')} needs sign-in too`);
+  }
+  delete quota['apiQuota/member1'];
+  global.fetch = realFetch;
+}
 asGrizzly(); // uses Grizzly-only features
 
 async function scraperStaysPublic () {
-  const handler = require(path.join(ROOT, 'api', 'restaurant-image.js'));
+  const handler = loadApi('restaurant-image.js');
   const realFetch = global.fetch;
   const asked = [];
   global.fetch = async url => { asked.push(String(url)); return new Response('', { status: 404 }); };
@@ -16,7 +65,7 @@ async function scraperStaysPublic () {
       json (body) { resolve({ code: this.code, body }); return this; },
       end () { resolve({ code: this.code }); },
     };
-    handler({ method: 'GET', headers: { 'x-forwarded-for': '203.0.113.9' }, query: { name: '', website } }, res);
+    handler({ method: 'GET', headers: { 'x-forwarded-for': '203.0.113.9', 'x-ftb-token': 'member-token' }, query: { name: '', website } }, res);
   });
   for (const site of ['http://127.0.0.1/', 'http://169.254.169.254/latest/meta-data/', 'http://10.0.0.5/', 'http://localhost:8080/', 'http://[::1]/']) {
     asked.length = 0;
@@ -27,6 +76,7 @@ async function scraperStaysPublic () {
 }
 
 (async () => {
+  await lookupsNeedSignIn();
   await scraperStaysPublic();
 
   const browser = await launch();

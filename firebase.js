@@ -466,6 +466,18 @@ async function fbFetchFriendProfiles (ids) {
     .then(snap => (snap.exists ? snap.data() : null))
     .catch(() => null)));
 }
+// ─── SIGNED LOOKUPS (api/_guard.js) ──────────────────────────
+// Place, photo and link lookups cost money, so the server only answers
+// signed-in members. Right after launch sign-in may still be restoring:
+// wait a few seconds for it rather than send an anonymous request.
+async function ftbApiHeaders () {
+  for (let i = 0; i < 40 && !window._ftbAuthReady; i++) await new Promise(r => setTimeout(r, 100));
+  const user = _auth?.currentUser;
+  if (!user) return {};
+  try { return { 'X-FTB-Token': await user.getIdToken() }; } catch { return {}; }
+}
+window.ftbApiHeaders = ftbApiHeaders;
+
 // ─── FRIEND NOTIFICATIONS (Android app, api/push.js) ──────────
 // In the Android app, a phone that allowed notifications registers with the
 // server along with who you follow; when a friend logs a visit, a dish or a

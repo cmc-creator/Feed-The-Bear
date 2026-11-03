@@ -51,6 +51,12 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
   await p.waitForTimeout(700);
   check(await p.locator('#friends-overlay').isVisible(), 'tapping a notification opens Friends');
 
+  // Paid lookups carry the sign-in (api/_guard.js checks it).
+  let token = '';
+  await p.route('**/api/place-info?**', r => { token = r.request().headers()['x-ftb-token'] || ''; r.fulfill({ json: { places: [] } }); });
+  await p.evaluate(() => apiGet('/api/place-info?mode=search&q=tacos'));
+  check(token === 'id-token', `place lookups send the signed-in token (${token})`);
+
   check(!p.errors.length, `no page errors ${p.errors.join(' | ')}`);
   await browser.close();
   finish('pushapp');

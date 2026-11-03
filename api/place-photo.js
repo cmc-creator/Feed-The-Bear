@@ -5,6 +5,7 @@
    using geosearch + page image APIs.
    ════════════════════════════════════════════════════════════ */
 
+const { guard } = require('./_guard');
 const WIKI_API = 'https://en.wikipedia.org/w/api.php';
 
 function sendJson (res, status, body) {
@@ -129,6 +130,7 @@ module.exports = async function handler (req, res) {
     sendJson(res, 405, { error: 'Method not allowed' });
     return;
   }
+  if (!await guard(req, res)) return;
 
   const name = String(req.query?.name || '').trim();
   const city = String(req.query?.city || '').trim();

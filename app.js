@@ -1152,6 +1152,12 @@ function queueUsageCount (name) {
   _usageFlushTimer = setTimeout(flushUsageCounts, 20000);
 }
 
+// GET one of our paid lookups (place info, photos), signed in (api/_guard.js).
+async function apiGet (url) {
+  const headers = typeof ftbApiHeaders === 'function' ? await ftbApiHeaders() : {};
+  return fetch(url, { headers });
+}
+
 function flushUsageCounts () {
   clearTimeout(_usageFlushTimer);
   if (!Object.keys(_usageCounts).length) return;
@@ -2851,7 +2857,7 @@ async function refreshPlaceInfo (r) {
       q.set('lat', lat.toFixed(3));
       q.set('lng', lng.toFixed(3));
     }
-    const resp = await fetch(`/api/place-info?${q.toString()}`);
+    const resp = await apiGet(`/api/place-info?${q.toString()}`);
     if (!resp.ok) return false;
     const info = await resp.json();
     r.placeInfoAt = Date.now();
@@ -3003,7 +3009,7 @@ async function checkSpotPlace (r) {
   const at = Number.isFinite(lat) ? `&lat=${lat.toFixed(2)}&lng=${lng.toFixed(2)}` : '';
   let top = null;
   try {
-    const resp = await fetch(`/api/place-info?mode=search&q=${encodeURIComponent(r.name)}${at}`);
+    const resp = await apiGet(`/api/place-info?mode=search&q=${encodeURIComponent(r.name)}${at}`);
     if (!resp.ok) return false;
     top = ((await resp.json())?.places || []).find(p => p.name && Number.isFinite(p.lat) && Number.isFinite(p.lng)) || null;
   } catch { return false; }
@@ -3494,7 +3500,7 @@ function searchFormPlaces () {
     const at = Number.isFinite(state.userLat) ? `&lat=${state.userLat.toFixed(2)}&lng=${state.userLng.toFixed(2)}` : '';
     let places = [];
     try {
-      const resp = await fetch(`/api/place-info?mode=search&q=${encodeURIComponent(q)}${at}`);
+      const resp = await apiGet(`/api/place-info?mode=search&q=${encodeURIComponent(q)}${at}`);
       if (resp.ok) places = (await resp.json())?.places || [];
     } catch { /* offline: the name still saves as typed */ }
     if (seq !== _formPlaceSeq || document.getElementById('modal-overlay').classList.contains('hidden')) return;
@@ -11461,7 +11467,7 @@ async function loadReviewDishes (r) {
   if (r.reviewDishesAt && Date.now() - r.reviewDishesAt < REVIEW_DISHES_TTL) return false;
   _reviewDishesTried.add(r.id);
   try {
-    const resp = await fetch(`/api/place-info?mode=reviews&id=${encodeURIComponent(r.placeId)}`);
+    const resp = await apiGet(`/api/place-info?mode=reviews&id=${encodeURIComponent(r.placeId)}`);
     if (!resp.ok) return false;
     const texts = ((await resp.json())?.reviews || []).map(x => String(x.text || '')).filter(Boolean);
     let dishes = [];
@@ -11567,7 +11573,7 @@ let _justAteSearchSeq = 0;
 async function searchRealPlaces (q) {
   const at = Number.isFinite(state.userLat) ? `&lat=${state.userLat.toFixed(2)}&lng=${state.userLng.toFixed(2)}` : '';
   try {
-    const resp = await fetch(`/api/place-info?mode=search&q=${encodeURIComponent(q)}${at}`);
+    const resp = await apiGet(`/api/place-info?mode=search&q=${encodeURIComponent(q)}${at}`);
     if (!resp.ok) return [];
     const list = (await resp.json())?.places;
     return Array.isArray(list) ? list.filter(p => p && p.name) : [];
@@ -12132,7 +12138,7 @@ async function fetchPlacePhotoFromApi (card = {}) {
 
   let websiteParked = false;
   let websiteChecked = false;
-  let resp = await fetch(`/api/restaurant-image?${params.toString()}`);
+  let resp = await apiGet(`/api/restaurant-image?${params.toString()}`);
   const restaurantImageIsJson = String(resp.headers.get('content-type') || '').includes('application/json');
   if (restaurantImageIsJson) {
     try {
@@ -12148,7 +12154,7 @@ async function fetchPlacePhotoFromApi (card = {}) {
     }
   }
 
-  resp = await fetch(`/api/place-photo?${params.toString()}`);
+  resp = await apiGet(`/api/place-photo?${params.toString()}`);
   if (resp.ok) {
     const data = await resp.json();
     const photoUrl = safeUrl(data?.photoUrl || '');

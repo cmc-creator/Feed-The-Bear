@@ -13,12 +13,13 @@
    Project → Settings → Environment Variables, then redeploy.
    ════════════════════════════════════════════════════════════ */
 
+const { guard } = require('./_guard');
 const WIKI_API = 'https://en.wikipedia.org/w/api.php';
 
 function cors (res) {
   res.setHeader('Access-Control-Allow-Origin', 'https://www.feed-the-bear.com');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-FTB-Token');
 }
 
 // Per-instance limit so one client can't run up the Google bill.
@@ -314,6 +315,7 @@ module.exports = async function handler (req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
   if (limited(ip)) return res.status(429).json({ found: false, error: 'Slow down a little.' });
+  if (!await guard(req, res)) return;
 
   const name = String(req.query?.name || '').trim();
   const website = String(req.query?.website || '').trim();

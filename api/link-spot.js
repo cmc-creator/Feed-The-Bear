@@ -9,6 +9,7 @@
    Uses GEMINI_API_KEY (ai-gemini.js) and GOOGLE_PLACES_API_KEY (place-info.js).
    ════════════════════════════════════════════════════════════ */
 
+const { guard } = require('./_guard');
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
 
 // Only these sites are fetched, so the function can't be pointed at anything else.
@@ -144,6 +145,7 @@ module.exports = async function handler (req, res) {
   if (!q) return res.status(400).json({ error: 'Paste a link or a restaurant name.' });
   const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
   if (limited(ip)) return res.status(429).json({ error: 'Slow down a little and try again in a few minutes.' });
+  if (!await guard(req, res)) return;
   const lat = parseFloat(req.query.lat);
   const lng = parseFloat(req.query.lng);
 

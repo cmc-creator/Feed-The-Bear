@@ -10,6 +10,8 @@
    them on the saved spot, so each place is looked up rarely.
    ════════════════════════════════════════════════════════════ */
 
+const { guard } = require('./_guard');
+
 const FIELDS = [
   'places.id', 'places.displayName', 'places.location', 'places.formattedAddress', 'places.rating', 'places.userRatingCount',
   'places.priceLevel', 'places.regularOpeningHours', 'places.nationalPhoneNumber',
@@ -135,6 +137,7 @@ module.exports = async function handler (req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const key = process.env.GOOGLE_PLACES_API_KEY;
   if (!key) return res.status(503).json({ found: false, error: 'Place info is not set up.' });
+  if (!await guard(req, res)) return;
   if (req.query.mode === 'search' || req.query.mode === 'reviews') {
     const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
     if (limited(ip)) return res.status(429).json({ places: [], reviews: [], error: 'Slow down a little.' });

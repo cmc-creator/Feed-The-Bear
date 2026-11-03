@@ -133,7 +133,7 @@ window.Cub = (() => {
     const s = state;
     const at = Number.isFinite(s.userLat) ? `&lat=${s.userLat.toFixed(2)}&lng=${s.userLng.toFixed(2)}` : '';
     try {
-      const resp = await fetch(`/api/place-info?mode=search&q=${encodeURIComponent(q)}${at}`);
+      const resp = await app().apiGet(`/api/place-info?mode=search&q=${encodeURIComponent(q)}${at}`);
       if (!resp.ok) return null;
       const list = (await resp.json())?.places;
       if (!Array.isArray(list) || !list.length) return null;
@@ -192,7 +192,7 @@ window.Cub = (() => {
       const s = state;
       const q = new URLSearchParams({ q: String(text).slice(0, 600) });
       if (Number.isFinite(s.userLat)) { q.set('lat', s.userLat); q.set('lng', s.userLng); }
-      const resp = await fetch(`/api/link-spot?${q}`);
+      const resp = await app().apiGet(`/api/link-spot?${q}`);
       const data = await resp.json().catch(() => ({}));
       if (seq !== linkSeq || !sheet) return;
       const dish = data.guess?.dish || '';
