@@ -23,6 +23,8 @@ async function upgradeTitle (p) {
 
   // Header pill and home card
   check(await p.locator('#grizzly-pill').isVisible(), 'free users see the Go Grizzly pill');
+  check(/of 10 free/i.test(await p.locator('#stat-total-label').innerText()) && (await p.locator('#stat-total').innerText()).trim() === '2', 'Saved shows how many of their 10 free spots they have used');
+  check(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'the header fits the phone screen');
   await p.click('#grizzly-pill');
   check(await upgradeTitle(p) === 'Go Grizzly', 'the pill opens the upgrade screen');
   await closeAllDialogs(p);
@@ -37,6 +39,15 @@ async function upgradeTitle (p) {
   await card.screenshot({ path: path.join(SHOTS, 'grizzly-card.png') }).catch(() => {});
   await p.click('#grizzly-home .gz-snooze');
   check(await card.isHidden(), '"Not now" hides the card');
+
+  // Saving the 7th spot says 3 are left; nothing nags before that.
+  const addOne = n => p.evaluate(i => { document.querySelectorAll('.toast').forEach(t => t.remove()); state.restaurants.push({ id: 'z' + i, name: 'More ' + i, status: 'want-to-try', tags: [], visits: [] }); renderAll(); }, n);
+  await addOne(1);
+  check(!/free spot/.test(await p.locator('#toast-container').innerText()), 'no heads-up at 6 spots');
+  await addOne(2);
+  check(/3 free spots left/.test(await p.locator('#toast-container').innerText()), 'saving the 7th says 3 free spots are left');
+  check(await p.locator('.stat-item.near-limit #stat-total-label').isVisible(), 'and the count turns gold');
+  await p.evaluate(() => { state.restaurants = state.restaurants.filter(r => !/^z/.test(r.id)); renderAll(); document.querySelectorAll('.toast').forEach(t => t.remove()); });
 
   // Near the limit the card comes back regardless.
   await p.evaluate(() => {
@@ -101,6 +112,21 @@ async function upgradeTitle (p) {
   await p.evaluate(() => { window._ftbUid = 'u1'; window._ftbPlan = 'grizzly'; renderGrizzlyUi(); renderMobileHub(); });
   check(await p.locator('#grizzly-pill').isHidden() && await card.isHidden(), 'members see no pill or card');
   check(await p.locator('.hub-lock').count() === 0, 'members see no lock badges');
+
+  // Trial ending: 3 days out, home says when and what they keep, with Manage subscription.
+  const trialBox = p.locator('#trial-home');
+  check(await trialBox.isHidden(), 'no trial reminder without a trial');
+  await p.evaluate(() => { window._ftbTrialEnd = new Date(Date.now() + 10 * 864e5).toISOString(); renderGrizzlyUi(); });
+  check(await trialBox.isHidden(), 'not with 10 days left');
+  await p.evaluate(() => { const t = new Date(Date.now() + 864e5); t.setHours(12, 0, 0, 0); window._ftbTrialEnd = t.toISOString(); renderGrizzlyUi(); });
+  const trialText = (await trialBox.innerText().catch(() => '')).replace(/\s+/g, ' ');
+  check(/Your free trial ends tomorrow/.test(trialText) && /unlimited spots/.test(trialText) && /Manage subscription/.test(trialText), `2 days before, home says it ends and what they keep (${trialText.slice(0, 80)})`);
+  await p.evaluate(() => { window._ftbCancelAtEnd = true; renderGrizzlyUi(); });
+  check(/Grizzly ends tomorrow/.test(await trialBox.innerText()) && /Keep Grizzly/.test(await trialBox.innerText()), 'a cancelled trial offers Keep Grizzly instead');
+  await p.click('#trial-home .trial-ok');
+  check(await trialBox.isHidden(), '"Got it" hides it for the day');
+  await p.evaluate(() => { window._ftbTrialEnd = null; window._ftbCancelAtEnd = false; localStorage.removeItem('ftb_trial_reminder_seen'); });
+
   await p.evaluate(() => { window._ftbUid = null; window._ftbPlan = 'free'; });
 
   // Cuisine filter lists nearby cuisines and filters Near You Now

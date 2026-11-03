@@ -8613,6 +8613,9 @@ body[data-ui-motion='playful'] .btn-primary:hover { box-shadow: 0 6px 20px rgba(
   white-space: nowrap;
 }
 .grizzly-pill.hidden { display: none; }
+.trial-sub { margin: 6px 0 4px; font-size: .88rem; color: var(--text-dim); }
+.trial-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.stat-item.near-limit .stat-value, .stat-item.near-limit .stat-label { color: var(--gold); }
 @media (max-width: 420px) { .grizzly-pill { padding: 6px 9px; font-size: .66rem; } }
 
 .gz-badge {

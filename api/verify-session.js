@@ -144,6 +144,11 @@ module.exports = async function handler (req, res) {
         stripeCustomerId:  session.customer,
         stripeSessionId:   sessionId,
         upgradedAt:        new Date().toISOString(),
+        // For the reminder a few days before the trial ends (also kept up to date by the webhook).
+        ...(sub ? {
+          trialEndsAt: sub.status === 'trialing' && sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
+          cancelAtPeriodEnd: !!sub.cancel_at_period_end,
+        } : {}),
       },
       { merge: true }
     );

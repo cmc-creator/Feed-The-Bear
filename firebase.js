@@ -513,6 +513,9 @@ function initFirebaseAuth () {
         const snap = await _db.doc(`users/${user.uid}/meta/profile`).get();
         const data = snap.exists ? snap.data() : {};
         window._ftbPlan = data.plan || 'free';
+        // Trial end and cancellation, for the reminder near the end (app.js renderTrialReminder).
+        window._ftbTrialEnd = data.trialEndsAt || null;
+        window._ftbCancelAtEnd = !!data.cancelAtPeriodEnd;
         localStorage.setItem('ftb_plan_v1', window._ftbPlan);
         localStorage.setItem('ftb_uid_v1',  user.uid);
       } catch { window._ftbPlan = 'free'; }

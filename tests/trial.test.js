@@ -16,7 +16,7 @@ const subMeta = {};
 const fakeAdmin = {
   apps: [1],
   auth: () => ({
-    getUser: async uid => { if (!docs[`users/${uid}/meta/profile`]) throw new Error('no user'); return { uid }; },
+    getUser: async uid => { if (!docs[`users/${uid}/meta/profile`]) throw new Error('no user'); return { uid, email: `${uid}@example.com` }; },
     verifyIdToken: async t => ({ uid: t.replace('token-', '') }),
   }),
   firestore: () => ({
@@ -98,6 +98,7 @@ const PRICE = 'price_1UW2DmLzFIsRCvKRfFexC3P8';
   r = await call(verify, { query: { sessionId: 'cs_t1', uid: 'newbie0000001' } });
   check(r.status === 200 && docs['users/newbie0000001/meta/profile'].plan === 'grizzly', 'a free-trial checkout unlocks Grizzly');
   check(Date.parse(r.data.trialEnd) > Date.now() + 6 * 864e5, 'it says when the trial ends');
+  check(Date.parse(docs['users/newbie0000001/meta/profile'].trialEndsAt) > Date.now() + 6 * 864e5, 'and the account keeps the date, for the reminder');
   r = await call(verify, { method: 'POST', body: { action: 'portal' }, headers: { authorization: 'Bearer token-newbie0000001' } });
   check(/billing\.stripe\.com\/p\/cus_t1/.test(r.data.url || ''), 'a subscriber can open Stripe to manage or cancel');
   r = await call(verify, { method: 'POST', body: { action: 'portal' }, headers: { authorization: 'Bearer token-friend00000009' } });
@@ -173,6 +174,29 @@ const PRICE = 'price_1UW2DmLzFIsRCvKRfFexC3P8';
   check(r.data.expired === true && docs['users/inviterfree001/meta/profile'].plan === 'free', 'an ended free month goes back to free');
   r = await call(verify, { method: 'POST', headers: {} });
   check(r.status === 401, 'reward status needs a signed-in user');
+
+  // Stripe's 3-day notice emails the member when the trial ends, the price, and how to cancel.
+  process.env.BREVO_API_KEY = 'xkeysib-test';
+  process.env.DIGEST_FROM_EMAIL = 'picks@feed-the-bear.com';
+  const sent = [];
+  const realFetch = global.fetch;
+  global.fetch = async (url, opts) => { sent.push({ url, body: JSON.parse(opts.body) }); return { ok: true, text: async () => '' }; };
+  docs['stripeCustomers/cus_t1'] = { uid: 'newbie0000001' };
+  const trialSub = { id: 'sub_t1', customer: 'cus_t1', status: 'trialing', trial_end: Math.floor(Date.now() / 1000) + 3 * 86400, cancel_at_period_end: false, metadata: {},
+    items: { data: [{ price: { unit_amount: 499, recurring: { interval: 'month' } } }] } };
+  await hook({ type: 'customer.subscription.trial_will_end', data: { object: trialSub } });
+  const mail = sent.find(m => /brevo/.test(m.url))?.body;
+  check(mail && mail.to[0].email === 'newbie0000001@example.com' && /trial ends/.test(mail.subject) && /\$4\.99\/month/.test(mail.htmlContent) && /Manage subscription/.test(mail.htmlContent),
+    `the trial-ending email says when, how much, and how to cancel (${mail?.subject})`);
+  sent.length = 0;
+  await hook({ type: 'customer.subscription.trial_will_end', data: { object: { ...trialSub, cancel_at_period_end: true } } });
+  check(!sent.length, 'someone who already cancelled gets no email');
+  // A cancellation during the trial is noted; the trial date clears once it's paid.
+  await hook({ type: 'customer.subscription.updated', data: { object: { ...trialSub, cancel_at_period_end: true } } });
+  check(docs['users/newbie0000001/meta/profile'].cancelAtPeriodEnd === true, 'cancelling during the trial is noted on the account');
+  await hook({ type: 'customer.subscription.updated', data: { object: { ...trialSub, status: 'active' } } });
+  check(docs['users/newbie0000001/meta/profile'].trialEndsAt === null, 'once paid, the trial date clears');
+  global.fetch = realFetch;
 
   finish('trial');
 })();

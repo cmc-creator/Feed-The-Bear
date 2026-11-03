@@ -597,7 +597,7 @@
   <section class="stats-bar hidden" id="stats-bar">
     <div class="stat-item tappable" data-view-filter="lists" role="button" tabindex="0" aria-label="Open my lists">
       <span class="stat-value" id="stat-total">0</span>
-      <span class="stat-label">Saved</span>
+      <span class="stat-label" id="stat-total-label">Saved</span>
     </div>
     <div class="stat-divider"></div>
     <div class="stat-item tappable" data-view-filter="want-to-try" role="button" tabindex="0" aria-label="Show want to try">
@@ -962,13 +962,14 @@
       </div>
 
       <!-- Go Grizzly: free users only -->
+      <div id="trial-home" class="grizzly-home trial-home home-module hidden" aria-label="Your Grizzly trial" aria-live="polite"></div>
       <div id="grizzly-home" class="grizzly-home home-module hidden" aria-label="Go Grizzly">
         <div class="gz-top"><span class="gz-badge">GRIZZLY</span><button type="button" class="gz-snooze" aria-label="Not now">✕</button></div>
         <div class="gz-title">Feed the bear without limits</div>
         <div class="gz-meter" aria-hidden="true"><span></span></div>
         <div class="gz-meter-label"></div>
         <ul class="gz-perks">
-          <li>Unlimited spots, no 15-spot cap</li>
+          <li>Unlimited spots, no 10-spot cap</li>
           <li>Byte Cub AI: picks, summaries, and what to order</li>
           <li>15-second food videos, Duel verdicts, and Year in Review</li>
         </ul>
