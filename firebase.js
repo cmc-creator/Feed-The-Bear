@@ -45,7 +45,7 @@ function isPremium () {
   return !!window._ftbUid && plan === 'grizzly';
 }
 
-const FREE_RESTAURANT_LIMIT = 10;
+const FREE_RESTAURANT_LIMIT = 25;
 
 function requiresPremium (featureName, fn) {
   if (isPremium()) { fn(); return; }

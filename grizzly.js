@@ -120,7 +120,7 @@ function renderGrizzlyUi () {
   const count = (state.restaurants || []).length;
   const left = FREE_RESTAURANT_LIMIT - count;
   document.getElementById('grizzly-pill')?.classList.toggle('hidden', !free);
-  // Free accounts always see how many of their 10 spots they've used, under
+  // Free accounts always see how many of their free spots they've used, under
   // Saved (the header has no room on phones), gold once 3 or fewer are left.
   const savedLabel = document.getElementById('stat-total-label');
   if (savedLabel) {

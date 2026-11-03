@@ -23,7 +23,7 @@ async function upgradeTitle (p) {
 
   // Header pill and home card
   check(await p.locator('#grizzly-pill').isVisible(), 'free users see the Go Grizzly pill');
-  check(/of 10 free/i.test(await p.locator('#stat-total-label').innerText()) && (await p.locator('#stat-total').innerText()).trim() === '2', 'Saved shows how many of their 10 free spots they have used');
+  check(/of 25 free/i.test(await p.locator('#stat-total-label').innerText()) && (await p.locator('#stat-total').innerText()).trim() === '2', 'Saved shows how many of their 25 free spots they have used');
   check(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'the header fits the phone screen');
   await p.click('#grizzly-pill');
   check(await upgradeTitle(p) === 'Go Grizzly', 'the pill opens the upgrade screen');
@@ -34,27 +34,27 @@ async function upgradeTitle (p) {
     for (let i = 0; i < 3; i++) state.restaurants.push({ id: 'y' + i, name: 'Early ' + i, status: 'want-to-try', tags: [], visits: [] });
     renderAll();
   });
-  check(await card.isVisible() && /5 of 10 free spots used/.test(await card.innerText()), 'home card shows spots used once they have 5');
+  check(await card.isVisible() && /5 of 25 free spots used/.test(await card.innerText()), 'home card shows spots used once they have 5');
   await card.scrollIntoViewIfNeeded();
   await card.screenshot({ path: path.join(SHOTS, 'grizzly-card.png') }).catch(() => {});
   await p.click('#grizzly-home .gz-snooze');
   check(await card.isHidden(), '"Not now" hides the card');
 
-  // Saving the 7th spot says 3 are left; nothing nags before that.
+  // Saving the 22nd spot says 3 are left; nothing nags before that.
   const addOne = n => p.evaluate(i => { document.querySelectorAll('.toast').forEach(t => t.remove()); state.restaurants.push({ id: 'z' + i, name: 'More ' + i, status: 'want-to-try', tags: [], visits: [] }); renderAll(); }, n);
-  await addOne(1);
-  check(!/free spot/.test(await p.locator('#toast-container').innerText()), 'no heads-up at 6 spots');
-  await addOne(2);
-  check(/3 free spots left/.test(await p.locator('#toast-container').innerText()), 'saving the 7th says 3 free spots are left');
+  for (let i = 1; i <= 16; i++) await addOne(i);
+  check(!/free spot/.test(await p.locator('#toast-container').innerText()), 'no heads-up at 21 spots');
+  await addOne(17);
+  check(/3 free spots left/.test(await p.locator('#toast-container').innerText()), 'saving the 22nd says 3 free spots are left');
   check(await p.locator('.stat-item.near-limit #stat-total-label').isVisible(), 'and the count turns gold');
   await p.evaluate(() => { state.restaurants = state.restaurants.filter(r => !/^z/.test(r.id)); renderAll(); document.querySelectorAll('.toast').forEach(t => t.remove()); });
 
   // Near the limit the card comes back regardless.
   await p.evaluate(() => {
-    for (let i = 0; i < 3; i++) state.restaurants.push({ id: 'x' + i, name: 'Spot ' + i, status: 'want-to-try', tags: [], visits: [] });
+    for (let i = 0; i < 18; i++) state.restaurants.push({ id: 'x' + i, name: 'Spot ' + i, status: 'want-to-try', tags: [], visits: [] });
     renderAll();
   });
-  check(await card.isVisible() && /8 of 10/.test(await card.innerText()), 'near the limit the card shows even after "Not now"');
+  check(await card.isVisible() && /23 of 25/.test(await card.innerText()), 'near the limit the card shows even after "Not now"');
 
   // Hub lock badges and Year in Review gating
   await p.evaluate(() => openMobileHub());

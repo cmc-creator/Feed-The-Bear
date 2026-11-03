@@ -1,5 +1,5 @@
 // An account is required, and the free plan is small: signed out, the sign-in
-// sheet can't be closed; a free account gets 10 spots, and Friends, Dinner
+// sheet can't be closed; a free account gets 25 spots, and Friends, Dinner
 // Vote, Bear Swipe and Today's Pick pitch Grizzly instead of opening.
 const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib');
 
@@ -33,12 +33,12 @@ async function upgradeTitle (p) {
   check(await auth.isVisible(), 'Escape, tapping outside or closing it in code does not dismiss it');
   await p.close();
 
-  // ── Free account: 10 spots and the Grizzly-only features ──
+  // ── Free account: 25 spots and the Grizzly-only features ──
   p = await newPage(browser, { seed: SEED });
   await p.goto(`${BASE}/app.html`);
   await p.waitForTimeout(2000);
   await p.evaluate(() => { window._ftbUid = 'freeUser000001'; window._ftbPlan = 'free'; renderAll(); });
-  check(await p.evaluate(() => FREE_RESTAURANT_LIMIT) === 10, 'a free account holds 10 spots');
+  check(await p.evaluate(() => FREE_RESTAURANT_LIMIT) === 25, 'a free account holds 25 spots');
 
   for (const [label, run, title] of [
     ['Friends', () => runToolAction('friends'), 'Eat with all your friends'],
