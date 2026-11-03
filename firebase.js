@@ -515,13 +515,17 @@ var FriendPings = (() => {
     });
   }
 
-  // Signed in on the phone: register quietly if notifications are already allowed.
+  // Signed in on the phone: register quietly if notifications are already
+  // allowed. Already following friends (a reinstall, a new phone)? Ask once now,
+  // since there may never be a new follow to ask after.
   async function start () {
     const p = plugin();
     if (!p || !_auth?.currentUser) return;
     listen(p);
     try {
       if ((await p.checkPermissions()).receive === 'granted') await p.register();
+      // Wait for the friends list to sync down from the account first.
+      else setTimeout(() => { if (getFriends().length && localStorage.getItem(ASKED_KEY) !== '1') offer(); }, 6000);
     } catch (err) { console.warn('[FTB] push start failed:', err); }
   }
 

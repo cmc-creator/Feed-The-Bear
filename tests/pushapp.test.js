@@ -51,6 +51,11 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
   await p.waitForTimeout(700);
   check(await p.locator('#friends-overlay').isVisible(), 'tapping a notification opens Friends');
 
+  // A reinstall (already following friends, never asked on this phone) is asked at sign-in.
+  await p.evaluate(() => { localStorage.removeItem('ftb_push_asked'); window._push.perm = 'prompt'; window._push.asked = 0; FriendPings.start(); });
+  await p.waitForTimeout(6600);
+  check(await p.evaluate(() => window._push.asked) === 1, 'after a reinstall, someone who follows friends is asked once at sign-in');
+
   // Paid lookups carry the sign-in (api/_guard.js checks it).
   let token = '';
   await p.route('**/api/place-info?**', r => { token = r.request().headers()['x-ftb-token'] || ''; r.fulfill({ json: { places: [] } }); });
