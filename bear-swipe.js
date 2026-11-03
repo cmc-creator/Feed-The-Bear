@@ -313,7 +313,13 @@ window.BearSwipe = (() => {
     const liked = round.yes;
     track('bear_swipe_round_done', { liked: liked.length, top: cravings[0]?.[0] || '' });
 
-    if (!liked.length) {
+    // Free accounts can swipe; naming the craving is Grizzly (app.js grizzlyUnlockHtml).
+    const locked = typeof window.hasGrizzly === 'function' && !window.hasGrizzly();
+    if (liked.length && locked) {
+      els.result.innerHTML = `<div class="bs-result-kicker">The bear knows what you're craving</div>
+        ${window.grizzlyUnlockHtml('swipe')}
+        <div class="bs-result-actions"><button type="button" class="btn-ghost bs-again">Swipe again</button></div>`;
+    } else if (!liked.length) {
       els.result.innerHTML = `<div class="bs-result-title">Picky bear today.</div>
         <p class="bs-result-sub">Nothing grabbed you. Fresh dishes are waiting.</p>
         <button type="button" class="btn-primary bs-again">Swipe another 10</button>`;

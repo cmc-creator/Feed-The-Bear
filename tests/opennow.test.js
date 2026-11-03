@@ -1,5 +1,6 @@
 // "Open right now" on the home screen, and no passport party for stamps you already had.
-const { BASE, check, launch, newPage, finish } = require('./lib');
+const { BASE, check, launch, newPage, finish, asGrizzly } = require('./lib');
+asGrizzly(); // uses Grizzly-only features
 
 const ALWAYS = [0, 1, 2, 3, 4, 5, 6].map(day => ({ open: { day, hour: 0, minute: 0 }, close: { day, hour: 23, minute: 59 } }));
 const NEVER_NOW = (() => {

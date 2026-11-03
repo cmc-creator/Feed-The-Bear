@@ -1,5 +1,6 @@
 // Friends' feed: live friend activity on the home screen, invites, and saving a friend's spot.
-const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib');
+const { BASE, check, launch, newPage, closeAllDialogs, finish, asGrizzly } = require('./lib');
+asGrizzly(); // uses Grizzly-only features
 
 const day = n => { const d = new Date(Date.now() - n * 86400000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const ME = [

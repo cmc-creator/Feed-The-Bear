@@ -1,6 +1,7 @@
 // Home screen order and layout.
 const path = require('path');
-const { BASE, SHOTS, check, launch, newPage, finish } = require('./lib');
+const { BASE, SHOTS, check, launch, newPage, finish, asGrizzly } = require('./lib');
+asGrizzly(); // uses Grizzly-only features
 
 (async () => {
   const browser = await launch();

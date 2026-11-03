@@ -32,7 +32,7 @@ async function upgradeTitle (p) {
     for (let i = 0; i < 3; i++) state.restaurants.push({ id: 'y' + i, name: 'Early ' + i, status: 'want-to-try', tags: [], visits: [] });
     renderAll();
   });
-  check(await card.isVisible() && /5 of 15 free spots used/.test(await card.innerText()), 'home card shows spots used once they have 5');
+  check(await card.isVisible() && /5 of 10 free spots used/.test(await card.innerText()), 'home card shows spots used once they have 5');
   await card.scrollIntoViewIfNeeded();
   await card.screenshot({ path: path.join(SHOTS, 'grizzly-card.png') }).catch(() => {});
   await p.click('#grizzly-home .gz-snooze');
@@ -40,16 +40,16 @@ async function upgradeTitle (p) {
 
   // Near the limit the card comes back regardless.
   await p.evaluate(() => {
-    for (let i = 0; i < 8; i++) state.restaurants.push({ id: 'x' + i, name: 'Spot ' + i, status: 'want-to-try', tags: [], visits: [] });
+    for (let i = 0; i < 3; i++) state.restaurants.push({ id: 'x' + i, name: 'Spot ' + i, status: 'want-to-try', tags: [], visits: [] });
     renderAll();
   });
-  check(await card.isVisible() && /13 of 15/.test(await card.innerText()), 'near the limit the card shows even after "Not now"');
+  check(await card.isVisible() && /8 of 10/.test(await card.innerText()), 'near the limit the card shows even after "Not now"');
 
   // Hub lock badges and Year in Review gating
   await p.evaluate(() => openMobileHub());
   await p.waitForTimeout(300);
   const locked = await p.$$eval('.hub-tile, .hub-card', tiles => tiles.filter(t => t.querySelector('.hub-lock')).map(t => t.dataset.tool).sort());
-  check(JSON.stringify(locked) === JSON.stringify(['ai-panel', 'mealplanner', 'review']), `Grizzly badges on locked tools (${locked})`);
+  check(JSON.stringify(locked) === JSON.stringify(['ai-panel', 'friends', 'groupvote', 'mealplanner', 'review', 'rooms', 'swipe']), `Grizzly badges on locked tools (${locked})`);
   await p.locator('[data-tool="review"]').click();
   check(await upgradeTitle(p) === 'Your foodie Year in Review', 'Year in Review pitches Grizzly');
   await closeAllDialogs(p);

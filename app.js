@@ -3413,7 +3413,7 @@ function handleFormSubmit (e) {
   const status = document.querySelector('input[name="form-status"]:checked')?.value || 'want-to-try';
   const isNew  = !state.editingId;
 
-  // Free plan: cap at 15 restaurants
+  // Free plan: cap at FREE_RESTAURANT_LIMIT spots
   if (isNew && typeof isPremium === 'function' && !isPremium() && state.restaurants.length >= FREE_RESTAURANT_LIMIT) {
     showToast('Cub limit reached', `Cub includes up to ${FREE_RESTAURANT_LIMIT} spots. Upgrade to Grizzly for unlimited saves.`, 'info');
     showGrizzlyUpsell('limit');
@@ -6409,6 +6409,7 @@ function _dvCandidates () {
 
 // `presetIds` (e.g. Decision Mode's top 3) are pre-picked; otherwise the best candidates.
 function openDinnerRooms (presetIds = null) {
+  if (grizzlyLocked('vote')) return;
   _dvSelected.clear();
   const preset = Array.isArray(presetIds) ? presetIds.filter(id => state.restaurants.some(r => r.id === id)).slice(0, DV_MAX) : [];
   if (preset.length) preset.forEach(id => _dvSelected.add(id));
@@ -6460,6 +6461,7 @@ function renderDinnerVote () {
 }
 
 async function startDinnerVote () {
+  if (grizzlyLocked('vote')) return;
   const spots = [..._dvSelected].map(id => state.restaurants.find(r => r.id === id)).filter(Boolean);
   if (spots.length < 2) return;
   const btn = document.getElementById('dv-start');
@@ -7896,10 +7898,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('home-quick-itinerary-btn')?.addEventListener('click', () => { hapticTap('medium'); openSmartItinerary(); });
   document.getElementById('home-quick-rooms-btn')?.addEventListener('click', () => { hapticTap('medium'); openDinnerRooms(); });
   document.getElementById('ai-rec-banner')?.addEventListener('click', e => {
-    if (!e.target.closest('#ai-rec-refresh-btn')) openAiRecPick();
+    if (!e.target.closest('#ai-rec-refresh-btn') && !grizzlyLocked('pick')) openAiRecPick();
   });
   document.getElementById('ai-rec-refresh-btn')?.addEventListener('click', e => {
     e.stopPropagation();
+    if (grizzlyLocked('pick')) return;
     if (!usesAiDailyPick()) { showLocalDailyPick({ reroll: true }); return; }
     const cacheKey = 'ftb_airec_' + new Date().toDateString();
     sessionStorage.removeItem(cacheKey);
@@ -9806,7 +9809,7 @@ function buildInviteLink (ref = window._ftbUid || '') {
 
 // `ref` is your account id for the free-month reward (firebase.js passes it).
 async function inviteFriend ({ ref = window._ftbUid || '' } = {}) {
-  if (!ensureInviteName()) return;
+  if (grizzlyLocked('friends') || !ensureInviteName()) return;
   const data = buildProfileData();
   const url = buildInviteLink(ref);
   const hasPicks = profileHasContent(data);
@@ -9895,7 +9898,7 @@ function renderFriendsFeedHome () {
   const list = document.getElementById('ff-list');
   if (!section || !list) return;
   // Only when friends have something to show; inviting is the small header button.
-  const items = (state.restaurants || []).length ? friendsFeedItems() : [];
+  const items = (state.restaurants || []).length && hasGrizzly() ? friendsFeedItems() : [];
   section.classList.toggle('hidden', !items.length);
   if (!items.length) { list.innerHTML = ''; return; }
   const mine = new Map((state.restaurants || []).map(r => [normalizeName(r.name), r]));
@@ -9991,6 +9994,7 @@ function isFollowing (data) { return getFriends().some(f => f.key === friendKey(
 
 // Following again with a newer link updates that friend's profile.
 function followFriend (data) {
+  if (grizzlyLocked('friends')) return null;
   if (data.id && data.id === state.settings.profileShareId) {
     showToast("That's your link", 'Send it to a friend so they can follow you.', 'info');
     return null;
@@ -11587,6 +11591,7 @@ function renderFriendsList () {
 }
 
 function openFoodieFriends () {
+  if (grizzlyLocked('friends')) return;
   renderFriendsList();
   renderFriendsLiveNote();
   refreshFriendsLive(true);
@@ -14303,7 +14308,9 @@ function showLocalDailyPick (opts) {
   if (!pick) { banner.classList.add('hidden'); return false; }
   const label = banner.querySelector('.ai-rec-label');
   if (label) label.textContent = "Today's Pick";
-  textEl.textContent = pick.text;
+  const locked = !hasGrizzly();
+  banner.classList.toggle('is-locked', locked);
+  textEl.textContent = locked ? 'The bear has a pick from your list for this meal. Tap to unlock it with Grizzly.' : pick.text;
   banner.classList.remove('hidden');
   return true;
 }
@@ -14923,14 +14930,25 @@ const GRIZZLY_PITCH = {
   smartfill:   { title: 'Let the cub do the typing', body: 'Byte Cub fills in cuisine, price, tags, and a short description for every spot you add.' },
   video:       { title: 'Save food videos', body: 'Catch the cheese pull, the sizzle, the steam. Grizzly saves 15-second videos with every dish you log.' },
   review:      { title: 'Your foodie Year in Review', body: 'Your top spots, cuisines, and streaks, wrapped up and ready to share.' },
+  friends:     { title: 'Eat with your friends', body: "Follow friends, see where they go and what they order, and invite them (they get 30 days of Grizzly free)." },
+  vote:        { title: 'End the "where should we eat" debate', body: 'Start a Dinner Vote: friends tap yes or no on your picks, no app needed, and the bear names the winner.' },
+  swipe:       { title: 'Find out what you are craving', body: 'Bear Swipe reads your swipes, names your craving, and finds it near you.' },
+  pick:        { title: "Today's Pick, every meal", body: 'The bear picks a spot from your list for breakfast, lunch and dinner, and tells you why.' },
   // FREE_RESTAURANT_LIMIT lives in firebase.js, which loads after this file,
   // so read it when the pitch is shown, not while app.js is starting up.
   get limit () { return { title: 'Save every spot you love', body: `Cub holds ${FREE_RESTAURANT_LIMIT} spots. Grizzly is unlimited and synced across your devices.` }; },
 };
-const GRIZZLY_TOOLS = new Set(['ai-panel', 'mealplanner', 'review']);
+const GRIZZLY_TOOLS = new Set(['ai-panel', 'mealplanner', 'review', 'friends', 'swipe', 'rooms', 'groupvote']);
 const GRIZZLY_SNOOZE_KEY = 'ftb_grizzly_card_snooze';
 
 function hasGrizzly () { return typeof isPremium === 'function' && isPremium(); }
+
+// Grizzly-only features: a free account gets the pitch instead. True when locked.
+function grizzlyLocked (key) {
+  if (hasGrizzly()) return false;
+  showGrizzlyUpsell(key);
+  return true;
+}
 
 function showGrizzlyUpsell (key = 'general') {
   const pitch = GRIZZLY_PITCH[key] || GRIZZLY_PITCH.general;
@@ -15627,6 +15645,7 @@ let _swipeStartX = 0;
 let _swipeCurrentCard = null;
 
 function openSwipeDeck () {
+  if (grizzlyLocked('swipe')) return;
   _swipeDeck = [...state.restaurants]
     .filter(r => r.status === 'want-to-try')
     .sort(() => Math.random() - .5);
@@ -17173,6 +17192,7 @@ const _GV_MAX = 5;
 let _gvSelected = new Set();
 
 function openGroupVote () {
+  if (grizzlyLocked('vote')) return;
   _gvSelected.clear();
   document.getElementById('groupvote-overlay').classList.remove('hidden');
   document.body.classList.add('overlay-open');

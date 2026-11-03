@@ -1,7 +1,8 @@
 // Share moments (Story card after a meal, monthly wrap card), who's been
 // here + Go together, trip guides, the regulars' home order, and effects.
 const path = require('path');
-const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require('./lib');
+const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish, asGrizzly } = require('./lib');
+asGrizzly(); // uses Grizzly-only features
 
 const today = new Date();
 const day = n => { const d = new Date(Date.now() - n * 864e5); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -27,7 +28,7 @@ const SEED = [
 
   // Bear Swipe stays at the top of home, however many spots you have.
   const order = await p.evaluate(() => {
-    const top = id => document.getElementById(id)?.getBoundingClientRect().top ?? 1e9;
+    const top = id => { const el = document.getElementById(id); return el?.offsetParent ? el.getBoundingClientRect().top : 1e9; };
     return { pick: top('ai-rec-banner'), swipe: top('bear-swipe-home'), add: top('home-add-bar') };
   });
   check(order.swipe < order.add && order.swipe < order.pick, `Bear Swipe stays first on home (${JSON.stringify(order)})`);

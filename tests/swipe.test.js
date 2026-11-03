@@ -1,7 +1,8 @@
 // Bear Swipe: real photos load, drag and buttons both work, the claw and bite
 // effects run, a round of 10 ends with a craving and a way to find it.
 const path = require('path');
-const { BASE, ROOT, SHOTS, check, launch, newPage, finish } = require('./lib');
+const { BASE, ROOT, SHOTS, check, launch, newPage, finish, asGrizzly } = require('./lib');
+asGrizzly(); // uses Grizzly-only features
 
 (async () => {
   const browser = await launch();

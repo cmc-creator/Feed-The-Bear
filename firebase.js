@@ -45,7 +45,7 @@ function isPremium () {
   return !!window._ftbUid && plan === 'grizzly';
 }
 
-const FREE_RESTAURANT_LIMIT = 15;
+const FREE_RESTAURANT_LIMIT = 10;
 
 function requiresPremium (featureName, fn) {
   if (isPremium()) { fn(); return; }
@@ -625,6 +625,8 @@ function initFirebaseAuth () {
       if (_getPendingSession()) {
         showToast('Payment received!', 'Sign in to the account you upgraded to finish turning on Grizzly.', 'success');
         setTimeout(() => openAuthModal({ forUpgrade: true }), 400);
+      } else if (_signInRequired()) {
+        openAuthModal();
       }
     }
   });
@@ -679,19 +681,44 @@ async function _verifyAndActivatePlan (sessionId, uid) {
 const AUTH_SUB_DEFAULT = "It's free. Your spots, ratings and photos get backed up, so a new phone never means a lost food diary.";
 const AUTH_SUB_UPGRADE = 'Sign in or create your account, and you will go straight to Grizzly checkout.';
 
+// The app needs an account. Signed out, the sign-in sheet stays up and can't
+// be closed; spots already on this device move into the account on sign-in.
+// The local test server (tests/) skips it unless a test sets ftb_test_auth_gate.
+function _signInRequired () {
+  if (_auth?.currentUser) return false;
+  if (location.hostname !== '127.0.0.1') return true;
+  try { return !!localStorage.getItem('ftb_test_auth_gate'); } catch { return false; }
+}
+
+function _requiredAuthSub () {
+  let invited = false, hasSpots = false;
+  try {
+    invited = !!localStorage.getItem(REF_KEY);
+    hasSpots = JSON.parse(localStorage.getItem('ftb_restaurants_v2') || '[]').length > 0;
+  } catch { /* storage blocked */ }
+  if (invited) return 'A friend invited you! Create your free account, then get 30 days of Grizzly free.';
+  if (hasSpots) return 'Create your free account to keep going. The spots on this phone come with you.';
+  return 'Create your free account to start saving the places you want to eat.';
+}
+
 function openAuthModal ({ forUpgrade = false } = {}) {
   const overlay = document.getElementById('auth-overlay');
   if (!overlay) return;
+  const required = _signInRequired();
   overlay.dataset.purpose = forUpgrade ? 'upgrade' : '';
+  overlay.classList.toggle('auth-required', required);
   const sub = overlay.querySelector('.auth-sub');
-  if (sub) sub.textContent = forUpgrade ? AUTH_SUB_UPGRADE : AUTH_SUB_DEFAULT;
+  if (sub) sub.textContent = forUpgrade ? AUTH_SUB_UPGRADE : required ? _requiredAuthSub() : AUTH_SUB_DEFAULT;
   overlay.classList.remove('hidden');
   document.body.classList.add('overlay-open');
-  _setAuthMode('signin');
+  _setAuthMode(required && !forUpgrade ? 'signup' : 'signin');
 }
 
 function closeAuthModal () {
-  document.getElementById('auth-overlay')?.classList.add('hidden');
+  const overlay = document.getElementById('auth-overlay');
+  if (overlay?.classList.contains('auth-required') && _signInRequired()) return;
+  overlay?.classList.remove('auth-required');
+  overlay?.classList.add('hidden');
   maybeHideOverlay();
 }
 

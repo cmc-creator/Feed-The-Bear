@@ -23,13 +23,27 @@ function launch () {
   return chromium.launch({ channel: process.env.PW_CHANNEL || undefined, headless: true });
 }
 
+// Friends, Dinner Vote, Bear Swipe and Today's Pick are Grizzly-only. A test
+// of those calls asGrizzly() first: its pages act as a signed-in Grizzly
+// member (a test can still set window._ftbUid / _ftbPlan itself).
+let grizzlyPages = false;
+function asGrizzly () { grizzlyPages = true; }
+
 // A phone-sized page. `seed` (array of restaurants) pre-loads an existing
 // user who has finished onboarding; `settings` merges into their settings.
-async function newPage (browser, { seed = null, settings = {}, viewport = { width: 390, height: 844 }, geo = { latitude: 33.4942, longitude: -111.9261 } } = {}) {
+async function newPage (browser, { seed = null, settings = {}, viewport = { width: 390, height: 844 }, geo = { latitude: 33.4942, longitude: -111.9261 }, grizzly = grizzlyPages } = {}) {
   const ctx = await browser.newContext({
     viewport, isMobile: viewport.width < 500, hasTouch: viewport.width < 500, serviceWorkers: 'block',
     geolocation: geo, permissions: ['geolocation'],
   });
+  if (grizzly) {
+    await ctx.addInitScript(() => {
+      localStorage.setItem('ftb_plan_v1', 'grizzly');
+      // Signed out on the test server, the app clears the uid; keep it unless a test sets another.
+      let uid = 'testGrizzly00001';
+      Object.defineProperty(window, '_ftbUid', { configurable: true, get: () => uid, set: v => { if (v) uid = v; } });
+    });
+  }
   if (seed) {
     await ctx.addInitScript(([s, extra]) => {
       if (localStorage.getItem('seeded')) return;
@@ -66,4 +80,4 @@ function finish (name) {
   process.exitCode = failed.length ? 1 : 0;
 }
 
-module.exports = { BASE, ROOT, SHOTS, check, launch, newPage, closeAllDialogs, finish };
+module.exports = { BASE, ROOT, SHOTS, check, launch, newPage, asGrizzly, closeAllDialogs, finish };

@@ -2,7 +2,8 @@
 // on vote.html without the app; everyone sees the tally and the winner.
 const Module = require('module');
 const path = require('path');
-const { BASE, check, launch, newPage, finish } = require('./lib');
+const { BASE, check, launch, newPage, finish, asGrizzly } = require('./lib');
+asGrizzly(); // uses Grizzly-only features
 
 // ── Server (api/vote.js) with a fake Firestore ──
 const docs = {};

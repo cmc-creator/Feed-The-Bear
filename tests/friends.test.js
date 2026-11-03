@@ -1,6 +1,7 @@
 // Friends: one user shares a profile link, another follows it and sees the
 // friend's orders on matching restaurants. Links are untrusted input.
-const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib');
+const { BASE, check, launch, newPage, closeAllDialogs, finish, asGrizzly } = require('./lib');
+asGrizzly(); // uses Grizzly-only features
 
 const SAM = [
   { id: 's1', name: 'Tacos Chiwas', cuisine: 'Mexican', status: 'visited', myRating: 5, tags: [], dateAdded: '2026-09-01', visits: [],

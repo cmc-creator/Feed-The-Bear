@@ -1,6 +1,7 @@
 // Free trial, invite links and Manage subscription in the app (the server
 // side is covered by trial.test.js; here /api is faked with page routes).
-const { BASE, check, launch, newPage, finish } = require('./lib');
+const { BASE, check, launch, newPage, finish, asGrizzly } = require('./lib');
+asGrizzly(); // uses Grizzly-only features
 
 (async () => {
   const browser = await launch();

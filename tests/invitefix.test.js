@@ -1,6 +1,7 @@
 // Invites that work on the friend's end, follows that sync to your account,
 // and an Add button nobody can miss.
-const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib');
+const { BASE, check, launch, newPage, closeAllDialogs, finish, asGrizzly } = require('./lib');
+asGrizzly(); // uses Grizzly-only features
 
 (async () => {
   const browser = await launch();
@@ -50,9 +51,14 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
   check(/Connie invited you.*30 days of Grizzly free/.test(await f.locator('#guest-profile-sub').innerText()), 'and mentions the free month');
   check(/just getting started/.test(await f.locator('#guest-profile-list').innerText()), 'an empty profile explains itself');
   check(await f.evaluate(() => localStorage.getItem('ftb_ref_v1')) === 'inviterUid1234567890', 'the free-month invite is remembered');
+  // Friends are Grizzly: a new friend's Follow offers it (their invite makes it 30 days free).
   await f.click('#guest-profile-follow');
-  check(await f.evaluate(() => getFriends().some(x => x.name === 'Connie')), 'Follow works');
+  check(await f.locator('#upgrade-overlay').isVisible().catch(() => false), 'Follow offers Grizzly to a new free account');
+  await f.evaluate(() => { window._ftbUid = 'friendUid12345678'; window._ftbPlan = 'grizzly'; closeUpgradeModal(); });
+  await f.click('#guest-profile-follow');
+  check(await f.evaluate(() => getFriends().some(x => x.name === 'Connie')), 'with Grizzly, Follow works');
   check(await f.evaluate(() => friendsUpdatedAt() > 0), 'and is stamped for syncing');
+  await f.evaluate(() => { window._ftbUid = null; window._ftbPlan = 'free'; });
   await f.click('#guest-profile-close');
   await f.waitForTimeout(400);
   const welcome = await f.locator('#cub-welcome .cw-body').innerText().catch(() => '');

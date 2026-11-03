@@ -1,7 +1,8 @@
 // Audit fixes: untrusted shared-list and vote data can't run script, share text and
 // social previews point at the real site, and the photo scraper stays off internal hosts.
 const path = require('path');
-const { BASE, ROOT, check, launch, newPage, finish } = require('./lib');
+const { BASE, ROOT, check, launch, newPage, finish, asGrizzly } = require('./lib');
+asGrizzly(); // uses Grizzly-only features
 
 async function scraperStaysPublic () {
   const handler = require(path.join(ROOT, 'api', 'restaurant-image.js'));

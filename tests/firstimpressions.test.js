@@ -33,18 +33,22 @@ const spot = (id, name, extra) => ({ id, name, cuisine: 'Mexican', status: 'want
   const cardText = await p.locator('.restaurant-card').first().innerText();
   check(!/% match|Up next|Trusted pick/.test(cardText), 'cards show no invented match score');
 
-  // Today's pick for a free user, with a reason, that opens the spot.
-  check(await p.locator('#ai-rec-banner').isVisible(), "free users get Today's Pick");
-  const pickText = await p.locator('#ai-rec-text').innerText();
+  // Today's Pick is Grizzly: a free account sees it locked, without the answer.
+  check(await p.locator('#ai-rec-banner').isVisible(), "free accounts see Today's Pick");
+  check(/unlock it with Grizzly/.test(await p.locator('#ai-rec-text').innerText()), 'locked, without giving the pick away');
+  check((await p.locator('#ai-rec-banner .ai-rec-label').textContent()) === "Today's Pick", "labelled Today's Pick");
+  // The pick itself, with a reason, that opens the spot (as Grizzly sees it).
+  const pickText = await p.evaluate(() => { sessionStorage.clear(); return localDailyPick().text; });
   check(/(breakfast|lunch|dinner|late-night bite): Tacos Chiwas/.test(pickText), `it picks the open spot you're craving (${pickText})`);
   check(/wanting the Birria|open now/i.test(pickText), 'and says why');
-  check((await p.locator('#ai-rec-banner .ai-rec-label').textContent()) === "Today's Pick", 'labelled Today\'s Pick');
+  await p.evaluate(() => { window._ftbUid = 'grizzlyUser0001'; window._ftbPlan = 'grizzly'; window.AI = undefined; showLocalDailyPick(); });
   await p.click('#ai-rec-refresh-btn');
   await p.waitForTimeout(200);
   check(/Pizzeria Bianco/.test(await p.locator('#ai-rec-text').innerText()), 'refresh suggests something else');
   await p.click('#ai-rec-text');
   await p.waitForTimeout(400);
   check(await p.evaluate(() => state.detailId) === 'b', 'tapping it opens that spot');
+  await p.evaluate(() => { window._ftbUid = null; window._ftbPlan = 'free'; });
   await closeAllDialogs(p);
 
   // Add a spot finds real places (Google) with rating and cuisine filled in.
@@ -60,9 +64,9 @@ const spot = (id, name, extra) => ({ id, name, cuisine: 'Mexican', status: 'want
   const saved = await p.evaluate(() => { const r = state.restaurants.find(x => x.name === 'Bacanora'); return r && [r.cuisine, r.googleRating, r.priceRange, r.address].join('|'); });
   check(saved === 'Mexican|4.6|2|1301 Grand Ave, Phoenix', `saved with details filled in (${saved})`);
 
-  // Friends screen leads with Invite.
+  // Friends screen (Grizzly) leads with Invite.
   await closeAllDialogs(p);
-  await p.evaluate(() => openFoodieFriends());
+  await p.evaluate(() => { window._ftbUid = 'grizzlyUser0001'; window._ftbPlan = 'grizzly'; openFoodieFriends(); });
   await p.waitForTimeout(300);
   const first = await p.evaluate(() => [...document.querySelectorAll('#friends-overlay button, #friends-overlay input')].find(e => e.offsetParent)?.id);
   check(first === 'friends-close-btn' || first === 'friends-invite-btn', `Invite is the first thing on Friends (${first})`);

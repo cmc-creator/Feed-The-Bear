@@ -1,6 +1,7 @@
 // Best bet (you + friends on what to order), the passport's Explorer section,
 // and Decision Mode's context: open hours, recent visits, eating with friends.
-const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib');
+const { BASE, check, launch, newPage, closeAllDialogs, finish, asGrizzly } = require('./lib');
+asGrizzly(); // uses Grizzly-only features
 
 const day = n => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
 const ALWAYS = [0, 1, 2, 3, 4, 5, 6].map(d => ({ open: { day: d, hour: 0, minute: 0 }, close: { day: d, hour: 23, minute: 59 } }));

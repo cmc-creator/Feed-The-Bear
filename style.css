@@ -8980,3 +8980,11 @@ body.light-mode .mood-picks-home .home-mood-chip:not(.active) { background: rgba
 #main-content.is-searching > :not(#restaurant-grid):not(#no-results):not(#empty-state):not(#search-summary) { display: none !important; }
 .search-summary { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 2px 4px; font-weight: 700; color: var(--text); }
 .search-summary span { flex: 1; min-width: 0; }
+
+/* Today's Pick is Grizzly: a free account sees a locked card. */
+.ai-rec-banner.is-locked .ai-rec-refresh { display: none; }
+.ai-rec-banner.is-locked .ai-rec-label::after { content: ' · GRIZZLY'; font-weight: 800; color: var(--gold, #d9a441); }
+
+/* Signed out, the sign-in sheet covers the app and can't be closed. */
+#auth-overlay.auth-required { z-index: 10000; background: var(--bg, #14100c); }
+#auth-overlay.auth-required #auth-close-btn { display: none; }
