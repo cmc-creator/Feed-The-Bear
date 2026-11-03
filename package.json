@@ -2,8 +2,14 @@
   "name": "feed-the-bear",
   "version": "1.0.0",
   "private": true,
+  "scripts": {
+    "build": "node build/minify.js"
+  },
   "dependencies": {
     "firebase-admin": "^12.0.0",
     "stripe": "^16.0.0"
+  },
+  "devDependencies": {
+    "terser": "5.49.2"
   }
 }
