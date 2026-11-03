@@ -191,3 +191,6 @@ jobs:
       - name: Same place saved twice
         working-directory: tests
         run: node dupes.test.js
+      - name: Enjoying Feed The Bear? prompt and private feedback
+        working-directory: tests
+        run: node rate.test.js

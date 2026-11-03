@@ -3131,6 +3131,79 @@ async function checkSpotPlaces () {
 }
 window.addEventListener('load', () => setTimeout(checkSpotPlaces, 9000));
 
+/* ── "Enjoying Feed The Bear?" ───────────────────────────────
+   Asked right after someone logs a new 5-star visit, once they've opened
+   the app a few times and saved a few spots; at most every 4 months, and
+   never again after they answer. Happy: share it with a friend (Google Play
+   review once the app is listed there). Not happy: a private note that goes
+   to the owner (api/feedback.js) instead of a public review. */
+const RATE_ASK_KEY = 'ftb_rate_ask_v1';
+const RATE_ASK_EVERY = 120 * 864e5;
+
+function loadRateAsk () { try { return JSON.parse(localStorage.getItem(RATE_ASK_KEY) || '{}') || {}; } catch { return {}; } }
+function saveRateAsk (s) { try { localStorage.setItem(RATE_ASK_KEY, JSON.stringify(s)); } catch { /* storage full */ } }
+function fiveStarVisits () { return (state.restaurants || []).reduce((n, r) => n + (r.visits || []).filter(v => Number(v.rating) === 5).length, 0); }
+
+function maybeAskForRating () {
+  const s = loadRateAsk();
+  const five = fiveStarVisits();
+  // Only a 5-star visit logged from now on counts, not the ones already there.
+  if (s.five === undefined || five < s.five) { s.five = five; saveRateAsk(s); return; }
+  if (five === s.five) return;
+  s.five = five;
+  const ready = !s.answered && !(s.at && Date.now() - s.at < RATE_ASK_EVERY)
+    && (loadProductEvents().counts.app_opened || 0) >= 3 && (state.restaurants || []).length >= 3;
+  if (ready) s.at = Date.now();
+  saveRateAsk(s);
+  if (ready) setTimeout(showRatePrompt, 1200);
+}
+
+function showRatePrompt () {
+  if (document.getElementById('rate-prompt')) return;
+  const box = document.createElement('div');
+  box.id = 'rate-prompt';
+  box.className = 'rate-prompt';
+  box.setAttribute('role', 'dialog');
+  box.setAttribute('aria-label', 'Enjoying Feed The Bear?');
+  const answer = mood => { const st = loadRateAsk(); st.answered = mood; saveRateAsk(st); trackProductEvent(`rate_prompt_${mood}`); };
+  const close = () => box.remove();
+  const step = html => { box.innerHTML = `<button type="button" class="rate-close" aria-label="Close">✕</button>${html}`; box.querySelector('.rate-close').onclick = close; };
+  step(`<div class="rate-title">Enjoying Feed The Bear?</div>
+    <div class="rate-actions"><button type="button" class="btn-primary rate-love">Love it 🐻</button><button type="button" class="btn-ghost rate-meh">Not really</button></div>`);
+  box.querySelector('.rate-love').onclick = () => {
+    answer('love');
+    step(`<div class="rate-title">That makes the bear happy!</div>
+      <p class="rate-sub">Know someone who'd love it too? Sharing is the best thank-you.</p>
+      <div class="rate-actions"><button type="button" class="btn-primary rate-share">Share Feed The Bear</button></div>`);
+    box.querySelector('.rate-share').onclick = async () => {
+      const data = { title: 'Feed The Bear', text: 'I keep every restaurant I want to try in Feed The Bear. You should too:', url: 'https://www.feed-the-bear.com' };
+      try { if (navigator.share) await navigator.share(data); else { await navigator.clipboard.writeText(`${data.text} ${data.url}`); showToast('Link copied', 'Paste it to a friend.', 'success'); } } catch { /* closed the share sheet */ }
+      close();
+    };
+  };
+  box.querySelector('.rate-meh').onclick = () => {
+    answer('meh');
+    step(`<div class="rate-title">Sorry about that. What should we fix?</div>
+      <textarea class="form-input rate-text" rows="3" maxlength="2000" placeholder="Anything: a bug, something confusing, what you wish it did"></textarea>
+      <div class="rate-actions"><button type="button" class="btn-primary rate-send">Send to the team</button></div>`);
+    box.querySelector('.rate-send').onclick = async () => {
+      const text = box.querySelector('.rate-text').value.trim();
+      if (text.length < 3) { box.querySelector('.rate-text').focus(); return; }
+      try {
+        const headers = { 'Content-Type': 'application/json', ...(typeof ftbApiHeaders === 'function' ? await ftbApiHeaders() : {}) };
+        const resp = await fetch('/api/feedback', { method: 'POST', headers, body: JSON.stringify({ text, mood: 'meh' }) });
+        if (!resp.ok) throw new Error('send failed');
+        showToast('Thank you', 'The team reads every note.', 'success');
+        close();
+      } catch {
+        showToast('Could not send', 'Please try again in a moment.', 'error');
+      }
+    };
+  };
+  document.body.appendChild(box);
+  trackProductEvent('rate_prompt_shown');
+}
+
 /* ── Duplicate spots ──────────────────────────────────────────
    The same restaurant saved twice ("Bacanora" from a search, "Bacanora PHX"
    from a TikTok) splits its visits and dishes across two cards. Pairs that
@@ -4273,7 +4346,7 @@ function renderAll () {
   updateLocationBanner();
   // Home sections are isolated: a failure in one must never cascade and
   // abort renderAll (which would leave later init wiring unattached).
-  [renderGrizzlyUi, renderTodayStatusRow, renderWeeklyGoal, renderOpenNowHome, renderCraveHome, renderFriendsFeedHome, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
+  [renderGrizzlyUi, maybeAskForRating, renderTodayStatusRow, renderWeeklyGoal, renderOpenNowHome, renderCraveHome, renderFriendsFeedHome, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
     .forEach(fn => { try { fn(); } catch (err) { console.error(`${fn.name} failed:`, err); window.ftbReportError?.(err?.message || err, fn.name); } });
 }
 

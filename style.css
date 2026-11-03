@@ -9043,3 +9043,16 @@ body.light-mode .mood-picks-home .home-mood-chip:not(.active) { background: rgba
 .dupe-names { font-size: .9rem; color: var(--text); }
 .dupe-names span { display: block; font-size: .8rem; color: var(--text-dim); margin-top: 2px; }
 .dupe-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* "Enjoying Feed The Bear?" (app.js showRatePrompt). */
+.rate-prompt {
+  position: fixed; left: 12px; right: 12px; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); z-index: 950;
+  max-width: 440px; margin: 0 auto; padding: 18px 16px 16px; border-radius: 18px;
+  background: var(--surface); color: var(--text); border: 1px solid rgba(var(--primary-rgb), .45);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .4); display: grid; gap: 10px;
+}
+.rate-title { font-weight: 800; font-size: 1.05rem; padding-right: 28px; }
+.rate-sub { margin: 0; font-size: .88rem; color: var(--text-dim); }
+.rate-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.rate-close { position: absolute; top: 8px; right: 8px; background: none; border: 0; color: var(--text-dim); font-size: 1rem; padding: 6px; cursor: pointer; }
+.rate-text { width: 100%; resize: vertical; }
