@@ -35,7 +35,7 @@ const { BASE, check, launch, closeAllDialogs, finish } = require('./lib');
   await closeAllDialogs(p);
   await p.evaluate(() => { setView('want-to-try'); renderCards(); });
   check(/Bacanora/.test(await p.locator('#restaurant-grid').innerText().catch(() => '')), 'offline, it opens with your list');
-  check(await p.locator('#offline-note').isVisible(), 'and says it is offline');
+  check(await p.locator('#offline-banner').isVisible() && /Your list still works/.test(await p.locator('#offline-banner').innerText()), 'and says it is offline');
 
   // Logging a meal still works (it lives on the phone until the signal is back).
   await p.evaluate(() => { const r = state.restaurants.find(x => x.id === 'a'); r.status = 'visited'; r.visits.push({ date: '2026-11-03', rating: 4 }); saveData(); renderAll(); });
@@ -44,7 +44,7 @@ const { BASE, check, launch, closeAllDialogs, finish } = require('./lib');
   await ctx.setOffline(false);
   await p.evaluate(() => window.dispatchEvent(new Event('online')));
   await p.waitForTimeout(300);
-  check(await p.locator('#offline-note').count() === 0, 'the note goes away when the signal is back');
+  check(await p.locator('#offline-banner').isHidden(), 'the note goes away when the signal is back');
 
   check(!errors.length, `no page errors ${errors.join(' | ')}`);
   await browser.close();
