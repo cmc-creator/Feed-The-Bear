@@ -37,6 +37,11 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
   r = await call('sam', { query: { q: 'Connie_Eats' } });
   check(r.data.found && r.data.id === 'connieshare01' && r.data.u === 'Connie', 'an exact search finds her');
   check((await call('sam', { query: { q: 'connie' } })).data.found === false, 'a partial name finds nothing (no browsing)');
+  await call('sam', { method: 'POST', body: { action: 'claim', handle: 'sam_i_am', id: 'samnotlive99', name: 'Connie' } });
+  check((await call('connie', { query: { q: 'sam_i_am' } })).data.found === false, "a username whose profile isn't live (or isn't theirs) finds nothing");
+  docs['profiles/samnotlive99'] = { uid: 'sam', u: 'Sam' };
+  r = await call('connie', { query: { q: 'sam_i_am' } });
+  check(r.data.found && r.data.u === 'Sam', `once it's live, it shows the profile's real name, not the one sent with the claim (${r.data.u})`);
   await call('connie', { method: 'POST', body: { action: 'claim', handle: 'connie_b', id: 'connieshare01', name: 'Connie' } });
   check(!docs['handles/connie_eats'] && docs['handles/connie_b']?.uid === 'connie', 'changing your username frees the old one');
   await call('connie', { method: 'POST', body: { action: 'release' } });

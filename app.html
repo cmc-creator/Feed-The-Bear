@@ -160,7 +160,7 @@
         <button id="delete-account-close" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <p>This permanently deletes your account and everything backed up with it: your spots, ratings, dishes, photos, profile and anything you shared with friends. A Grizzly subscription is cancelled. This can't be undone.</p>
-      <label class="delete-account-check"><input type="checkbox" id="delete-account-local" checked /> Also erase everything saved on this device</label>
+      <label class="delete-account-check"><input type="checkbox" id="delete-account-local" aria-label="Also erase the data on this device" checked /> Also erase everything saved on this device</label>
       <div id="delete-account-password-wrap" class="hidden">
         <label class="form-label" for="delete-account-password">Your password</label>
         <input id="delete-account-password" class="form-input" type="password" autocomplete="current-password" />
@@ -1587,7 +1587,7 @@
             <button id="detail-checkin-btn" class="btn-sm btn-orange">+ Check In</button>
           </div>
           <div id="detail-checkin-form" class="detail-checkin-form hidden" data-rating="0">
-            <input type="text" class="form-input checkin-note" placeholder="Quick note for this visit (optional)" maxlength="200" />
+            <input type="text" class="form-input checkin-note" aria-label="Note for this visit" placeholder="Quick note for this visit (optional)" maxlength="200" />
             <div class="checkin-stars" role="group" aria-label="Rate this visit">
               <button type="button" class="checkin-star" data-val="1" aria-label="1 star">★</button>
               <button type="button" class="checkin-star" data-val="2" aria-label="2 stars">★</button>
@@ -1606,8 +1606,8 @@
         <div class="detail-reminder-wrap" id="detail-reminder-wrap">
           <h4> Plan a Visit</h4>
           <div class="reminder-row">
-            <input type="date" id="detail-reminder-date" />
-            <input type="time" id="detail-reminder-time" value="12:00" />
+            <input type="date" id="detail-reminder-date" aria-label="Reminder date" />
+            <input type="time" id="detail-reminder-time" aria-label="Reminder time" value="12:00" />
             <button id="detail-set-reminder-btn" class="btn-sm btn-orange">Set Reminder</button>
           </div>
           <div id="detail-reminder-status" class="reminder-status"></div>
@@ -2116,7 +2116,7 @@
       <div style="padding:16px 20px 20px">
         <p class="discover-subtitle">Nearby restaurants you <strong>haven't saved yet</strong>, ranked by your taste profile.</p>
         <div style="display:flex;gap:8px;margin-bottom:12px">
-          <select id="discover-radius" class="form-select" style="flex:1">
+          <select id="discover-radius" aria-label="Search radius" class="form-select" style="flex:1">
             <option value="402">Within 0.25 mi</option>
             <option value="805">Within 0.5 mi</option>
             <option value="1609">Within 1 mi</option>
@@ -2153,7 +2153,7 @@
       <div id="chal-tab-create" class="chal-tab-panel hidden">
         <div class="form-row"><label>Challenge Name</label><input id="chal-name-input" class="form-input" placeholder="e.g. 5 New Cuisines in May" /></div>
         <div class="form-row"><label>Type</label>
-          <select id="chal-type-input" class="form-select">
+          <select id="chal-type-input" aria-label="Challenge type" class="form-select">
             <option value="cuisine_count">Visit N different cuisines</option>
             <option value="visit_count">Visit N restaurants</option>
             <option value="new_only">Visit N restaurants never tried before</option>
@@ -2162,7 +2162,7 @@
           </select>
         </div>
         <div class="form-row"><label>Goal (number)</label><input id="chal-goal-input" class="form-input" type="number" min="1" placeholder="5" /></div>
-        <div class="form-row"><label>Deadline (optional)</label><input id="chal-deadline-input" class="form-input" type="date" /></div>
+        <div class="form-row"><label>Deadline (optional)</label><input id="chal-deadline-input" aria-label="Challenge deadline" class="form-input" type="date" /></div>
         <button id="chal-create-btn" class="btn-primary" style="width:100%;margin-top:8px">Create Challenge</button>
       </div>
       <div id="chal-tab-friend" class="chal-tab-panel hidden">
@@ -2467,7 +2467,7 @@
         <p class="open-now-hint">Find restaurants near you that OpenStreetMap says are open right now.</p>
         <div class="open-now-time-row">
           <span id="open-now-time" style="font-size:.82rem;color:var(--text-dim)"></span>
-          <select id="open-now-radius" class="form-input" style="width:auto;padding:4px 8px">
+          <select id="open-now-radius" aria-label="Open now radius" class="form-input" style="width:auto;padding:4px 8px">
             <option value="402">0.25 mi</option>
             <option value="805">0.5 mi</option>
             <option value="1609" selected>1 mi</option>
@@ -2494,14 +2494,14 @@
       <div class="duel-pickers">
         <div class="duel-picker-wrap">
           <div class="duel-corner-label"> Corner One</div>
-          <select id="duel-pick-a" class="form-input duel-select">
+          <select id="duel-pick-a" aria-label="First restaurant" class="form-input duel-select">
             <option value="">Choose a restaurant…</option>
           </select>
         </div>
         <div class="duel-vs">VS</div>
         <div class="duel-picker-wrap">
           <div class="duel-corner-label"> Corner Two</div>
-          <select id="duel-pick-b" class="form-input duel-select">
+          <select id="duel-pick-b" aria-label="Second restaurant" class="form-input duel-select">
             <option value="">Choose a restaurant…</option>
           </select>
         </div>
@@ -2582,7 +2582,7 @@
       </div>
       <p class="visitlog-sub">Track every visit to a restaurant - what you ordered, how much you spent, your thoughts.</p>
       <div class="visitlog-search-row">
-        <select id="visitlog-restaurant-select" class="form-input" style="flex:1"></select>
+        <select id="visitlog-restaurant-select" aria-label="Restaurant" class="form-input" style="flex:1"></select>
         <button id="visitlog-load-btn" class="btn-sm btn-orange">Load</button>
       </div>
       <div id="visitlog-entries" class="visitlog-entries hidden">
@@ -2590,7 +2590,7 @@
         <div class="visitlog-add-form">
           <h4 style="margin:0 0 8px">+ Log a visit</h4>
           <div class="visitlog-form-row">
-            <input type="date" id="vl-date" class="form-input" style="flex:1" />
+            <input type="date" id="vl-date" aria-label="Visit date" class="form-input" style="flex:1" />
             <input type="number" id="vl-spend" class="form-input" placeholder="$ spent" min="0" step="0.01" style="flex:1;max-width:120px" />
           </div>
           <input type="text" id="vl-dish" class="form-input" placeholder="What did you order?" style="margin-top:6px" />
@@ -2649,7 +2649,7 @@
       <div class="mealplanner-controls">
         <div class="mealplanner-row">
           <label class="mealplanner-label">Dining out days</label>
-          <select id="mp-days" class="form-input" style="width:auto">
+          <select id="mp-days" aria-label="Number of days" class="form-input" style="width:auto">
             <option value="2">2 days</option>
             <option value="3" selected>3 days</option>
             <option value="4">4 days</option>

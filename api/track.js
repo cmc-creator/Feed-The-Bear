@@ -7,7 +7,7 @@
      { counts: { just_ate_logged: 42, ... }, updatedAt }
    Only event names and counts are accepted: no user ids, no payloads.
    Error reports from errors.js ({ errors: [{ m, w }] }) are counted the same
-   way, at analytics/{date}.errors.{hash} = { m, w, n }.
+   way, at analyticsErrors/{date}.errors.{hash} = { m, w, n }.
 
    Environment variables required (same as verify-session.js):
      FIREBASE_SERVICE_ACCOUNT - Stringified JSON service account key
@@ -56,11 +56,23 @@ function readErrors (body) {
   return clean.length ? clean : null;
 }
 
+// Per-instance limit on reports from one address.
+const hits = new Map();
+function limited (ip) {
+  const now = Date.now();
+  const list = (hits.get(ip) || []).filter(t => now - t < 10 * 60 * 1000);
+  list.push(now);
+  hits.set(ip, list);
+  return list.length > 60;
+}
+
 module.exports = async function handler (req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
+  const ip = String(req.headers?.['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
+  if (limited(ip)) { res.status(429).json({ error: 'Too many reports' }); return; }
   const counts = readCounts(req.body);
   const errors = readErrors(req.body);
   if (!counts && !errors) {
@@ -72,19 +84,21 @@ module.exports = async function handler (req, res) {
     const fb = getAdmin();
     const inc = fb.firestore.FieldValue.increment;
     const day = new Date().toISOString().slice(0, 10);
-    const update = { updatedAt: fb.firestore.FieldValue.serverTimestamp() };
+    const stamp = fb.firestore.FieldValue.serverTimestamp();
     if (counts) {
-      update.counts = {};
+      const update = { counts: {}, updatedAt: stamp };
       Object.entries(counts).forEach(([name, n]) => { update.counts[name] = inc(n); });
+      await fb.firestore().doc(`analytics/${day}`).set(update, { merge: true });
     }
     if (errors) {
-      update.errors = {};
+      // Their own doc: a flood of junk messages can't crowd out the usage counts.
+      const update = { errors: {}, updatedAt: stamp };
       errors.forEach(e => {
         const key = crypto.createHash('sha1').update(e.m).digest('hex').slice(0, 12);
         update.errors[key] = { m: e.m, w: e.w, n: inc(1) };
       });
+      await fb.firestore().doc(`analyticsErrors/${day}`).set(update, { merge: true });
     }
-    await fb.firestore().doc(`analytics/${day}`).set(update, { merge: true });
     res.status(204).end();
   } catch (err) {
     console.error('[FTB] track error:', err.message);

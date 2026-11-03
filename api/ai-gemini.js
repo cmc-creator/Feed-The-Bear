@@ -35,6 +35,21 @@ function getAdmin () {
   return admin;
 }
 
+// Requests per member per day (UTC). Counted in aiQuota/{uid}; a database
+// hiccup lets the request through rather than blocking a paying member.
+const DAILY_AI = 300;
+async function overDailyAi (uid) {
+  try {
+    const day = new Date().toISOString().slice(0, 10);
+    const ref = getAdmin().firestore().doc(`aiQuota/${uid}`);
+    const q = (await ref.get()).data() || {};
+    const used = q.day === day ? Number(q.n) || 0 : 0;
+    if (used >= DAILY_AI) return true;
+    await ref.set({ day, n: used + 1 });
+  } catch (err) { console.warn('[FTB] AI quota check failed:', err.message); }
+  return false;
+}
+
 // Cache plan lookups briefly so every chat message isn't a Firestore read
 const _planCache = new Map(); // uid -> { plan, expires }
 const PLAN_TTL_MS = 5 * 60 * 1000;
@@ -106,6 +121,11 @@ module.exports = async function handler (req, res) {
     const plan = await getPlan(uid);
     if (plan !== 'grizzly') {
       res.status(402).json({ error: 'Byte Cub AI is a Grizzly feature. Upgrade to unlock it.' });
+      return;
+    }
+    // A generous daily cap per member (chat, picks, menu scans all count).
+    if (await overDailyAi(uid)) {
+      res.status(429).json({ error: "Byte Cub has helped a lot today. He'll be back tomorrow." });
       return;
     }
   } catch (err) {

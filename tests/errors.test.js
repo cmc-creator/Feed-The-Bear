@@ -20,11 +20,11 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
   Module._load = orig;
   const call = body => new Promise(resolve => {
     const res = { status (c) { this.c = c; return this; }, json () { resolve(this.c); return this; }, end () { resolve(this.c); return this; } };
-    track({ method: 'POST', body }, res);
+    track({ method: 'POST', body, headers: { 'x-forwarded-for': '203.0.113.7' } }, res);
   });
   let status = await call(JSON.stringify({ errors: Array.from({ length: 12 }, (_, i) => ({ m: `Boom ${i}`, w: 'app.js:1' })) }));
   const errs = Object.values(written?.data?.errors || {});
-  check(status === 204 && errs.length === 10 && errs[0].m === 'Boom 0' && errs[0].n.inc === 1 && /^analytics\//.test(written.p), `error reports are counted per message, 10 at most (${errs.length})`);
+  check(status === 204 && errs.length === 10 && errs[0].m === 'Boom 0' && errs[0].n.inc === 1 && /^analyticsErrors\//.test(written.p), `error reports are counted per message, 10 at most (${errs.length})`);
   check(await call({ errors: [] }) === 400, 'an empty report is refused');
 
   // The page side.

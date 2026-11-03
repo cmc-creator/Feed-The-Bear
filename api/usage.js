@@ -73,8 +73,11 @@ module.exports = async function handler (req, res) {
     const n = Math.min(MAX_DAYS, Math.max(1, Math.floor(Number(req.query?.days)) || 30));
     const keys = dayKeys(n);
     const db = fb.firestore();
-    const snaps = await db.getAll(...keys.map(k => db.doc(`analytics/${k}`)));
-    const days = snaps.map((s, i) => ({ date: keys[i], counts: (s.exists && s.data().counts) || {}, errors: (s.exists && s.data().errors) || {} }));
+    const [snaps, errSnaps] = await Promise.all([
+      db.getAll(...keys.map(k => db.doc(`analytics/${k}`))),
+      db.getAll(...keys.map(k => db.doc(`analyticsErrors/${k}`))),
+    ]);
+    const days = snaps.map((s, i) => ({ date: keys[i], counts: (s.exists && s.data().counts) || {}, errors: (errSnaps[i]?.exists && errSnaps[i].data().errors) || {} }));
     res.status(200).json({ days });
   } catch (err) {
     console.error('[FTB] usage read error:', err.message);

@@ -59,7 +59,11 @@ module.exports = async function handler (req, res) {
       if (!HANDLE_RE.test(handle)) return res.status(200).json({ found: false });
       const doc = (await db.doc(`handles/${handle}`).get()).data();
       if (!doc || doc.uid === uid) return res.status(200).json({ found: false, self: doc?.uid === uid });
-      return res.status(200).json({ found: true, u: String(doc.u || handle).slice(0, 30), id: doc.id });
+      // Only a live profile that really belongs to the username's owner, and
+      // with that profile's own name (not whatever was sent when claiming).
+      const profile = (await db.doc(`profiles/${doc.id}`).get()).data();
+      if (!profile || profile.uid !== doc.uid) return res.status(200).json({ found: false });
+      return res.status(200).json({ found: true, u: String(profile.u || doc.u || handle).slice(0, 30), id: doc.id });
     }
 
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });

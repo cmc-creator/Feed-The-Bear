@@ -72,11 +72,14 @@ module.exports = async function handler (req, res) {
     await Promise.all(published.docs.map(d => db.doc(`followers/${d.id}`).delete()));
     const follows = (await db.doc(`pushFollows/${uid}`).get()).data()?.ids || [];
     await Promise.all(follows.map(id => db.doc(`followers/${id}`).set({ uids: fb.firestore.FieldValue.arrayRemove(uid) }, { merge: true })));
+    // Feedback notes they sent from the app keep their email (api/feedback.js).
+    const notes = await db.collection('feedback').where('uid', '==', uid).get();
+    await Promise.all(notes.docs.map(d => d.ref.delete()));
     // Their username, if they picked one (api/handle.js).
     const handle = (await db.doc(`handleOf/${uid}`).get()).data()?.handle;
     if (handle) await db.doc(`handles/${handle}`).delete();
     // Server-only records keyed by this account (the weekly email list holds their address).
-    const serverDocs = ['digestSubscribers', 'rewards', 'trials', 'referrals', 'pushTokens', 'pushFollows', 'apiQuota', 'handleOf'].map(c => `${c}/${uid}`);
+    const serverDocs = ['digestSubscribers', 'rewards', 'trials', 'referrals', 'pushTokens', 'pushFollows', 'apiQuota', 'aiQuota', 'handleOf'].map(c => `${c}/${uid}`);
     if (customerId) serverDocs.push(`stripeCustomers/${customerId}`);
     await Promise.all(serverDocs.map(p => db.doc(p).delete()));
     await db.recursiveDelete(db.doc(`users/${uid}`));

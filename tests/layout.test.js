@@ -26,7 +26,7 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
   check(await l.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'the landing page fits a 360px phone');
   check(await l.locator('.step-icon').count() === 0 && await l.locator('.step-num').count() === 3, 'each step shows one number');
   const pricing = await l.locator('#pricing').innerText();
-  check(!/LOCK/.test(pricing) && await l.locator('.pricing-lock svg').count() >= 4, 'locked features use a padlock icon, not the word LOCK');
+  check(!/\bLOCK\b/.test(pricing) && await l.locator('.pricing-lock svg').count() >= 4, 'locked features use a padlock icon, not the word LOCK');
   check(await l.locator('.feature-icon svg').count() === await l.locator('.feature-icon').count(), 'every feature has a drawn icon');
   check(!/Grizzly keeps new saves in sync/.test(await l.locator('body').innerText()), 'sync is not described as Grizzly-only');
   await browser.close();

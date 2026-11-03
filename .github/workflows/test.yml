@@ -209,3 +209,6 @@ jobs:
       - name: Find friends by username
         working-directory: tests
         run: node handle.test.js
+      - name: Byte Cub AI on the server (plan check, daily cap)
+        working-directory: tests
+        run: node aiproxy.test.js
