@@ -101,7 +101,17 @@ const NEARBY = [
   await p.evaluate(() => { sessionStorage.removeItem('ftb_cub_tip_session'); Cub.tip(); });
   const tip = await p.locator('#cub-buddy .cub-bubble-text').innerText();
   check(/What did you order at/.test(tip), `the cub offers a relevant tip ("${tip}")`);
+  // Tapping him opens the chat on that question, and the answer is understood.
+  const askedAbout = await p.evaluate(() => document.querySelector('#cub-buddy .cub-bubble').dataset.restaurant);
   await p.click('#cub-buddy .cub-btn');
+  await p.waitForTimeout(200);
+  check(/What did you order at/.test(await p.locator('#chat-messages').innerText()), 'tapping the cub after his question asks it in the chat');
+  await p.fill('#chat-input', 'the birria tacos and a horchata');
+  await p.press('#chat-input', 'Enter');
+  await p.waitForTimeout(300);
+  const dishes = await p.evaluate(id => (state.restaurants.find(r => r.id === id)?.dishes || []).map(d => d.name), askedAbout);
+  check(dishes.includes('birria tacos') && dishes.includes('horchata'), `the answer is saved as dishes there (${dishes.join(', ')})`);
+  check(/Got it/.test(await p.locator('#chat-messages').innerText()), 'and he confirms instead of being confused');
   await p.click('#chat-hide-cub-btn');
   check(await p.locator('#cub-buddy').count() === 0, '"Hide cub" in the chat hides it');
   check(await p.evaluate(() => sessionStorage.getItem('ftb_cub_hidden_until') === '1' && !localStorage.getItem('ftb_cub_hidden_until')), 'only until the app is opened again');

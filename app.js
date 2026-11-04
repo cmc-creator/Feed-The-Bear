@@ -3306,20 +3306,30 @@ function mergeSpots (a, b) {
     updatedAt: Date.now(),
   });
   state.restaurants = state.restaurants.filter(r => r.id !== drop.id);
+  // Like a delete: otherwise the cloud copy of the merged-away spot comes back
+  // on the next sync and the same pair is asked about again.
+  recordRestaurantDeletion(drop.id);
   return keep;
 }
 
 function renderDuplicateBanner (grid) {
-  const [pair] = findDuplicateSpots();
+  const pairs = findDuplicateSpots();
+  const [pair] = pairs;
   if (!pair) return;
   const [a, b] = pair;
+  // How many extra copies there are (three of one place is two merges, not three pairs).
+  const group = {};
+  const root = id => (group[id] && group[id] !== id ? (group[id] = root(group[id])) : id);
+  pairs.forEach(([x, y]) => { group[x.id] = root(x.id); group[y.id] = root(y.id); if (group[x.id] !== group[y.id]) group[root(y.id)] = root(x.id); });
+  const extras = Object.keys(group).length - new Set(Object.keys(group).map(root)).size;
   const bar = document.createElement('div');
   bar.className = 'dupe-banner';
-  bar.innerHTML = `<div class="dupe-q">Same place saved twice?</div>
+  bar.innerHTML = `<div class="dupe-q">Same place saved twice?${extras > 1 ? ` <span class="dupe-count">1 of ${extras}</span>` : ''}</div>
     <div class="dupe-names"><strong>${escHtml(a.name)}</strong> and <strong>${escHtml(b.name)}</strong>${a.address || b.address ? `<span>${escHtml(a.address || b.address)}</span>` : ''}</div>
     <div class="dupe-actions">
       <button type="button" class="btn-primary btn-sm dupe-merge">Merge them</button>
       <button type="button" class="btn-ghost btn-sm dupe-keep">They're different</button>
+      ${extras > 1 ? `<button type="button" class="btn-ghost btn-sm dupe-merge-all">Merge all ${extras}</button>` : ''}
     </div>`;
   bar.querySelector('.dupe-merge').onclick = () => {
     const kept = mergeSpots(a, b);
@@ -3328,6 +3338,15 @@ function renderDuplicateBanner (grid) {
     renderAll();
     showToast('Merged', `${kept.name} now has everything from both.`, 'success');
   };
+  bar.querySelector('.dupe-merge-all')?.addEventListener('click', () => {
+    // One pair at a time: a merge can change what the next pair is.
+    let merged = 0;
+    for (let next = findDuplicateSpots()[0]; next && merged < 200; next = findDuplicateSpots()[0]) { mergeSpots(next[0], next[1]); merged++; }
+    trackProductEvent('spots_merged', { all: merged });
+    saveData();
+    renderAll();
+    showToast('All merged', `${merged} duplicate${merged === 1 ? '' : 's'} folded together. Nothing was lost.`, 'success');
+  });
   bar.querySelector('.dupe-keep').onclick = () => {
     state.settings.notDuplicates = [...(state.settings.notDuplicates || []), duplicateKey(a, b)].slice(-200);
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); } catch { /* storage full */ }
@@ -5143,6 +5162,66 @@ async function handleCubCommand (cmd) {
   if (cmd.kind === 'import') { closeChat(); showImportBookmarks(); }
 }
 
+/* Byte Cub asked you something ("What did you order at Bacanora?"), so the
+   next thing you type is the answer, not a new request. */
+let _cubAwaiting = null; // { kind: 'dish', rid, want }
+
+function askDishInChat (rid) {
+  const r = state.restaurants.find(x => x.id === rid);
+  if (!r) return;
+  const want = r.status !== 'visited';
+  openChat();
+  _cubAwaiting = { kind: 'dish', rid, want };
+  cubSay(want
+    ? `Heard what to order at ${r.name}? Type the dish and I'll put it on your Crave List.`
+    : `What did you order at ${r.name}? Type the dish (or a few, with commas) and I'll remember it.`, [
+    { label: 'Not sure', run: () => { _cubAwaiting = null; skipCubAsk(rid); cubSay('No problem! Ask me anything else.'); } },
+  ]);
+}
+window.askDishInChat = askDishInChat;
+
+// "Not sure": don't ask about that place again (cub.js pickTip reads this).
+function skipCubAsk (rid) {
+  try {
+    const list = JSON.parse(localStorage.getItem('ftb_cub_ask_skip_v1') || '[]');
+    localStorage.setItem('ftb_cub_ask_skip_v1', JSON.stringify([...new Set([...(Array.isArray(list) ? list : []), rid])].slice(-200)));
+  } catch { /* private mode */ }
+}
+
+function answerCubQuestion (text) {
+  const ask = _cubAwaiting;
+  _cubAwaiting = null;
+  const r = state.restaurants.find(x => x.id === ask.rid);
+  if (!r) return false;
+  if (/^(no|nope|nah|not sure|idk|i don'?t (know|remember)|nothing|skip|never ?mind|cancel)\b/i.test(text)) {
+    skipCubAsk(r.id);
+    cubSay('No problem! Ask me anything else.');
+    return true;
+  }
+  const dishes = text.replace(/^(i (had|ordered|got|tried)|we (had|got)|the|they have|heard( about)?|try)\s+/i, '')
+    .split(/\s*(?:,|\band\b|&|\+)\s*/i).map(s => s.replace(/[.!]+$/, '').replace(/^(a|an|the|some)\s+/i, '').trim()).filter(s => s && s.length <= 60).slice(0, 5);
+  if (!dishes.length) return false;
+  dishes.forEach(name => upsertDish(r, { name, verdict: ask.want ? 'want' : 'ok' }));
+  r.updatedAt = Date.now();
+  saveData();
+  renderAll();
+  trackProductEvent('cub_dish_answered', { count: dishes.length, want: ask.want });
+  const list = dishes.join(', ');
+  if (ask.want) {
+    cubSay(`Saved! ${list} ${dishes.length === 1 ? 'is' : 'are'} on your Crave List for ${r.name}.`, [
+      { label: `Open ${r.name}`, primary: true, run: () => { closeChat(); openDetailModal(r.id); } },
+    ]);
+    return true;
+  }
+  const verdictButtons = dish => ['again', 'ok', 'skip'].map(v => ({
+    label: DISH_VERDICT_LABEL[v], primary: v === 'again',
+    run: () => { upsertDish(r, { name: dish, verdict: v }); r.updatedAt = Date.now(); saveData(); renderAll(); cubSay(v === 'again' ? 'Noted. A keeper!' : v === 'skip' ? "Noted. I'll steer you away from it." : 'Noted.'); },
+  }));
+  cubSay(`Got it: ${list} at ${r.name}. ${dishes.length === 1 ? 'Would you order it again?' : 'Saved them all.'}`,
+    dishes.length === 1 ? verdictButtons(dishes[0]) : [{ label: `Open ${r.name}`, run: () => { closeChat(); openDetailModal(r.id); } }]);
+  return true;
+}
+
 async function sendChat () {
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
@@ -5150,6 +5229,12 @@ async function sendChat () {
   input.value = '';
   addChatMsg(text, 'user');
   _cubChatHistory.push({ role: 'user', text });
+
+  // An answer to Byte Cub's question, unless it's clearly a new question or request.
+  if (_cubAwaiting) {
+    if (/\?\s*$/.test(text) || parseCubCommand(text)) _cubAwaiting = null;
+    else if (answerCubQuestion(text)) return;
+  }
 
   const cmd = parseCubCommand(text);
   if (cmd) { trackProductEvent('cub_command', { kind: cmd.kind }); await handleCubCommand(cmd); return; }

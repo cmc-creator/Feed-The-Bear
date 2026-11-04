@@ -585,6 +585,7 @@ window.Cub = (() => {
   /* ── Buddy ───────────────────────────────────────────────── */
   let buddy = null;
   let bubbleTimer = null;
+  let lastAsk = null; // { rid, at }: the restaurant his last tip asked about
 
   const ACTIONS = [
     ['ask', 'Chat with Byte Cub', () => app().openChat?.()],
@@ -611,18 +612,24 @@ window.Cub = (() => {
       <button type="button" class="cub-btn" aria-label="Chat with Byte Cub, your food assistant"><img src="${AVATAR}" alt="" /><span class="cub-btn-dot" aria-hidden="true"></span></button>`;
     document.body.appendChild(el);
     // Tapping the cub opens Byte Cub's chat, where every action lives.
+    // If he just asked about a restaurant ("What did you order at …?"), the
+    // chat opens on that question, so typing the answer works.
     el.querySelector('.cub-btn').addEventListener('click', () => {
+      const asked = lastAsk && Date.now() - lastAsk.at < 2 * 60 * 1000 ? lastAsk.rid : '';
       hideBubble();
-      track('cub_chat_opened', {});
-      app().openChat?.();
+      lastAsk = null;
+      track('cub_chat_opened', { asked: !!asked });
+      if (asked && app().askDishInChat) app().askDishInChat(asked);
+      else app().openChat?.();
     });
-    el.querySelector('.cub-bubble-x').addEventListener('click', e => { e.stopPropagation(); hideBubble(); });
+    el.querySelector('.cub-bubble-x').addEventListener('click', e => { e.stopPropagation(); hideBubble(); lastAsk = null; });
     el.querySelector('.cub-bubble').addEventListener('click', e => {
       if (e.target.closest('.cub-bubble-x')) return;
-      const act = el.querySelector('.cub-bubble').dataset.act;
+      const { act, restaurant } = el.querySelector('.cub-bubble').dataset;
       hideBubble();
+      lastAsk = null;
       if (act) ACTIONS.find(([k]) => k === act)?.[2]();
-      else if (el.querySelector('.cub-bubble').dataset.restaurant) app().openDetailModal(el.querySelector('.cub-bubble').dataset.restaurant);
+      else if (restaurant) (app().askDishInChat || app().openDetailModal)(restaurant);
     });
     return el;
   }
@@ -643,10 +650,14 @@ window.Cub = (() => {
   function pickTip () {
     const list = state?.restaurants || [];
     if (!list.length) return { text: "Let's add your first spot! Tap here.", act: 'add' };
-    const visitedNoDish = list.find(r => r.status === 'visited' && !(r.dishes || []).length);
-    if (visitedNoDish) return { text: `What did you order at ${visitedNoDish.name}? Tell me so I remember.`, restaurant: visitedNoDish.id };
-    const wantNoDish = list.find(r => r.status === 'want-to-try' && !(r.dishes || []).length);
-    if (wantNoDish) return { text: `Heard what to order at ${wantNoDish.name}? Save it to your Crave List.`, restaurant: wantNoDish.id };
+    // Places you said "Not sure" about aren't asked again.
+    let skip = [];
+    try { skip = JSON.parse(localStorage.getItem('ftb_cub_ask_skip_v1') || '[]'); } catch { /* private mode */ }
+    const ask = r => !(r.dishes || []).length && !(Array.isArray(skip) && skip.includes(r.id));
+    const visitedNoDish = list.find(r => r.status === 'visited' && ask(r));
+    if (visitedNoDish) return { text: `What did you order at ${visitedNoDish.name}? Tap me to tell me.`, restaurant: visitedNoDish.id };
+    const wantNoDish = list.find(r => r.status === 'want-to-try' && ask(r));
+    if (wantNoDish) return { text: `Heard what to order at ${wantNoDish.name}? Tap me to add it to your Crave List.`, restaurant: wantNoDish.id };
     return { text: "Hungry? Let's swipe some dishes.", act: 'swipe' };
   }
 
@@ -661,6 +672,7 @@ window.Cub = (() => {
     bubble.querySelector('.cub-bubble-text').textContent = tip.text;
     bubble.dataset.act = tip.act || '';
     bubble.dataset.restaurant = tip.restaurant || '';
+    lastAsk = tip.restaurant ? { rid: tip.restaurant, at: Date.now() } : null;
     bubble.classList.remove('hidden');
     try { sessionStorage.setItem(TIP_KEY, '1'); } catch { /* private mode */ }
     clearTimeout(bubbleTimer);

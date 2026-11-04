@@ -36,12 +36,26 @@ const spot = (id, name, extra) => ({ id, name, cuisine: 'Mexican', status: 'want
   check(r.x.links.length === 1 && r.x.tags.sort().join() === 'date night,tiktok', 'and the TikTok link and both tags');
   check(r.x.placeId === 'g1' && r.x.name === 'Bacanora PHX' && r.x.address === '1301 Grand Ave, Phoenix', 'and the real-place link');
   check(await p.locator('.dupe-banner').count() === 0, 'and the question goes away');
+  check(await p.evaluate(() => getDeletedRestaurantIds().includes('b')), "the merged-away copy is marked deleted, so a cloud sync can't bring it back and ask again");
 
   // "They're different" is remembered.
   await p.evaluate(() => { state.restaurants.push({ id: 'e', name: 'Bacanora PHX', status: 'want-to-try', tags: [], visits: [], dishes: [] }); renderCards(); });
   await p.click('.dupe-banner .dupe-keep');
   await p.evaluate(() => renderCards());
   check(await p.locator('.dupe-banner').count() === 0 && await p.evaluate(() => state.restaurants.length) === 4, '"They\'re different" keeps both and stops asking');
+
+  // Several duplicates at once: a count, and Merge all.
+  await p.evaluate(() => {
+    const s = (id, name) => ({ id, name, cuisine: 'Thai', status: 'want-to-try', tags: [], visits: [], dishes: [], dateAdded: '2026-10-0' + id.slice(1) });
+    state.restaurants.push(s('t1', 'Lotus of Siam'), s('t2', 'Lotus of Siam'), s('t3', 'Lotus of Siam'), s('u1', 'Pho Cao'), s('u2', 'Pho Cao'));
+    renderCards();
+  });
+  const many = await p.locator('.dupe-banner').innerText();
+  check(/1 of 3/.test(many) && /Merge all 3/.test(many), `it says how many are left and offers Merge all (${many.replace(/\s+/g, ' ')})`);
+  await p.click('.dupe-banner .dupe-merge-all');
+  await p.waitForTimeout(300);
+  const left = await p.evaluate(() => state.restaurants.filter(r => /Lotus|Pho Cao/.test(r.name)).map(r => r.id).sort().join());
+  check(left === 't1,u1' && await p.locator('.dupe-banner').count() === 0, `Merge all folds every copy into one and stops asking (${left})`);
 
   check(!p.errors.length, `no page errors ${p.errors.join(' | ')}`);
   await browser.close();
