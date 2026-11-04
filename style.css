@@ -9182,3 +9182,16 @@ button.map-group-row { cursor: pointer; }
 .friend-mutual { flex: 0 0 auto; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; font-weight: 800; color: #2e9d5b; background: rgba(46,204,113,.14); }
 .friend-info .friend-sent { justify-self: start; margin-top: 2px; padding: 2px 8px; border-radius: 999px; font-size: .7rem; font-weight: 700; color: #b7791f; background: rgba(232,177,90,.16); }
 .friend-invite-row { opacity: .9; }
+/* "Who's this invite for?" (friends.js askInviteRecipient), above the Friends screen */
+.invite-who { z-index: 260; }
+.invite-who-card { position: relative; width: 100%; max-width: 360px; display: grid; gap: 10px; padding: 22px 18px 16px; border-radius: var(--radius-xl, 18px); background: var(--surface); color: var(--text); border: 1px solid var(--border); box-shadow: 0 18px 50px rgba(0,0,0,.35); }
+.invite-who-card h3 { margin: 0 28px 0 0; font-size: 1.1rem; }
+.invite-who-hint { margin: 0; font-size: .82rem; color: var(--text-dim); }
+.invite-who-contacts, .invite-who-send { width: 100%; min-height: 44px; }
+.invite-who-name { width: 100%; min-height: 44px; }
+.invite-who-skip { background: none; border: 0; color: var(--text-dim); font: inherit; font-size: .85rem; padding: 6px; cursor: pointer; text-decoration: underline; }
+.invite-who-close { position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; }
+.invite-status { flex: 0 0 auto; padding: 3px 10px; border-radius: 999px; font-size: .72rem; font-weight: 700; }
+.invite-status-sent { color: var(--text-dim); background: rgba(127,127,127,.14); }
+.invite-status-opened { color: #b7791f; background: rgba(232,177,90,.18); }
+.friend-invite-follow { flex: 0 0 auto; }

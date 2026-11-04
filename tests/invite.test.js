@@ -60,7 +60,7 @@ asGrizzly(); // uses Grizzly-only features
   // ── Inviting friends ──
   await p.goto(`${BASE}/app.html`);
   await p.waitForTimeout(2000);
-  const shared = await p.evaluate(async () => {
+  const sharing = p.evaluate(async () => {
     const u = { uid: 'me000000001', email: 'me@example.com', providerData: [{ providerId: 'password' }], getIdToken: async () => 'tok' };
     _auth = { currentUser: u };
     localStorage.setItem('ftb_user_v1', JSON.stringify({ name: 'Connie' }));
@@ -69,8 +69,10 @@ asGrizzly(); // uses Grizzly-only features
     await shareInvite();
     return got;
   });
+  await p.click('#invite-who .invite-who-skip');
+  const shared = await sharing;
   // One link: the free-month code plus your profile so they can follow you.
-  check(/invite\.html\?ref=me000000001#profile=/.test(shared?.url || '') && /30 days of Grizzly free/.test(shared?.text || ''), `the invite shares your personal link (${shared?.url})`);
+  check(/invite\.html\?ref=me000000001(&i=[a-z0-9]{16,32})?#profile=/.test(shared?.url || '') && /30 days of Grizzly free/.test(shared?.text || ''), `the invite shares your personal link (${shared?.url})`);
 
   // A free month from invites shows on the account.
   rewards = { grizzlyUntil: new Date(Date.now() + 20 * 864e5).toISOString(), invites: 2 };

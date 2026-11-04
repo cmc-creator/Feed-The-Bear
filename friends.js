@@ -177,16 +177,23 @@ function buildInviteLink (ref = window._ftbUid || '') {
   return ref && /^[A-Za-z0-9]{10,64}$/.test(ref) ? link.replace('#profile=', `?ref=${ref}#profile=`) : link;
 }
 
-// Invites you've sent (newest first), so Friends can show them as "Sent".
+// Invites you've sent (newest first). Each has its own random code, so the
+// server can say when it was opened and who joined; the name you gave it
+// ("Mom", from your contacts or typed) never leaves this phone.
 const INVITES_SENT_KEY = 'ftb_invites_sent_v1';
 function getSentInvites () {
   try {
     const list = JSON.parse(localStorage.getItem(INVITES_SENT_KEY) || '[]');
-    return Array.isArray(list) ? list.filter(s => typeof s === 'string') : [];
+    if (!Array.isArray(list)) return [];
+    // Older entries were just the date.
+    return list.map(e => (typeof e === 'string' ? { at: e, code: '', name: '' } : e))
+      .filter(e => e && typeof e.at === 'string')
+      .map(e => ({ at: e.at, code: /^[a-z0-9]{16,32}$/.test(e.code || '') ? e.code : '', name: String(e.name || '').slice(0, 40) }));
   } catch { return []; }
 }
-function noteInviteSent () {
-  try { localStorage.setItem(INVITES_SENT_KEY, JSON.stringify([new Date().toISOString(), ...getSentInvites()].slice(0, 50))); } catch { /* private mode */ }
+function noteInviteSent (entry = {}) {
+  const item = { at: new Date().toISOString(), code: entry.code || '', name: entry.name || '' };
+  try { localStorage.setItem(INVITES_SENT_KEY, JSON.stringify([item, ...getSentInvites()].slice(0, 50))); } catch { /* private mode */ }
   if (!document.getElementById('friends-overlay')?.classList.contains('hidden')) renderFriendsList();
 }
 function fmtInviteDate (iso) {
@@ -198,27 +205,133 @@ function fmtInviteDate (iso) {
   if (days < 7) return `${days} days ago`;
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
+function newInviteCode () {
+  const abc = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = new Uint8Array(20);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, b => abc[b % abc.length]).join('');
+}
+
+// Picking someone from the phone's contacts: just their name, no permission
+// prompt. The Android app uses the system picker (ContactPickerPlugin.java);
+// Chrome on Android has navigator.contacts. Elsewhere you type the name.
+function contactPicker () {
+  const native = window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins?.ContactPicker : null;
+  if (native) return async () => String((await native.pick())?.name || '');
+  if (navigator.contacts?.select && 'ContactsManager' in window) {
+    return async () => String((await navigator.contacts.select(['name'], { multiple: false }))?.[0]?.name?.[0] || '');
+  }
+  return null;
+}
+
+// "Who's this invite for?" Resolves to the name ('' to skip it), or null if closed.
+function askInviteRecipient () {
+  return new Promise(resolve => {
+    document.getElementById('invite-who')?.remove();
+    const pick = contactPicker();
+    const el = document.createElement('div');
+    el.id = 'invite-who';
+    el.className = 'modal-overlay invite-who';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-labelledby', 'invite-who-title');
+    el.innerHTML = `<form class="invite-who-card">
+      <button type="button" class="invite-who-close icon-btn" aria-label="Close">✕</button>
+      <h3 id="invite-who-title">Who's this invite for?</h3>
+      <p class="invite-who-hint">So you can see when they open it and join. Only you see this name.</p>
+      ${pick ? '<button type="button" class="btn-secondary invite-who-contacts">📇 Pick from contacts</button>' : ''}
+      <input class="form-input invite-who-name" type="text" maxlength="40" placeholder="Their name" autocomplete="off" aria-label="Their name" />
+      <button type="submit" class="btn-primary invite-who-send">Send invite</button>
+      <button type="button" class="invite-who-skip">Skip</button>
+    </form>`;
+    document.body.appendChild(el);
+    const input = el.querySelector('.invite-who-name');
+    const done = val => { el.remove(); resolve(val); };
+    el.querySelector('form').addEventListener('submit', e => { e.preventDefault(); done(input.value.trim().slice(0, 40)); });
+    el.querySelector('.invite-who-skip').addEventListener('click', () => done(''));
+    el.querySelector('.invite-who-close').addEventListener('click', () => done(null));
+    el.addEventListener('click', e => { if (e.target === el) done(null); });
+    el.addEventListener('keydown', e => { if (e.key === 'Escape') done(null); });
+    el.querySelector('.invite-who-contacts')?.addEventListener('click', async () => {
+      try {
+        const name = (await pick()).trim();
+        if (name) { input.value = name.slice(0, 40); el.querySelector('.invite-who-send').focus(); }
+      } catch { input.focus(); }
+    });
+    if (!pick) setTimeout(() => input.focus(), 60);
+  });
+}
 
 // `ref` is your account id for the free-month reward (firebase.js passes it).
 async function inviteFriend ({ ref = window._ftbUid || '' } = {}) {
   if (grizzlyLocked('friends') || !ensureInviteName()) return;
+  const who = await askInviteRecipient();
+  if (who === null) return;
   const data = buildProfileData();
-  const url = buildInviteLink(ref);
+  // Signed in: a code of its own, so this invite can be followed up.
+  const code = window._ftbUid ? newInviteCode() : '';
+  let url = buildInviteLink(ref);
+  if (code) {
+    handleApi('POST', { body: { action: 'invite', code } }).catch(() => {});
+    const [base, hash] = url.split('#');
+    url = `${base}${base.includes('?') ? '&' : '?'}i=${code}${hash ? `#${hash}` : ''}`;
+  }
   const hasPicks = profileHasContent(data);
-  const text = (hasPicks
+  const hi = who ? `Hey ${who.split(/\s+/)[0]}! ` : '';
+  const text = hi + (hasPicks
     ? "Here's where I eat and what I order. Follow me on Feed the Bear and send me yours!"
     : "I'm keeping track of every place I want to eat with Feed the Bear. Follow me and add yours!")
     + (ref ? ' (You get 30 days of Grizzly free with this link.)' : '');
   startSharingLive();
-  trackProductEvent('friend_invite', { withProfile: hasPicks, withRef: !!ref });
+  trackProductEvent('friend_invite', { withProfile: hasPicks, withRef: !!ref, named: !!who, tracked: !!code });
   try {
-    if (navigator.share) { await navigator.share({ title: 'Feed the Bear', text, url }); noteInviteSent(); return; }
+    if (navigator.share) { await navigator.share({ title: 'Feed the Bear', text, url }); noteInviteSent({ code, name: who }); return; }
   } catch (err) {
     if (err && err.name === 'AbortError') return;
   }
   try { await navigator.clipboard.writeText(`${text} ${url}`); } catch { /* no clipboard */ }
-  noteInviteSent();
+  noteInviteSent({ code, name: who });
   showToast('Invite copied', 'Paste it in a text to a friend.', 'success');
+}
+
+// Opened from an invite (app.html?i=<code>): tell the inviter it was opened,
+// and keep the code so it can be marked joined once they sign in.
+const INVITE_CODE_KEY = 'ftb_invite_code_v1';
+(function captureInviteCode () {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('i') || '';
+    if (!/^[a-z0-9]{16,32}$/.test(code)) return;
+    params.delete('i');
+    const rest = params.toString();
+    history.replaceState(history.state, '', window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash);
+    if (getSentInvites().some(e => e.code === code)) return; // your own link
+    localStorage.setItem(INVITE_CODE_KEY, code);
+    fetch('/api/handle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'inviteOpened', code }) }).catch(() => {});
+  } catch { /* private mode */ }
+})();
+async function noteInviteJoined () {
+  let code = '';
+  try { code = localStorage.getItem(INVITE_CODE_KEY) || ''; } catch { return; }
+  if (!code || !window._ftbUid) return;
+  try {
+    startSharingLive();
+    if (typeof fbPublishFriendProfile === 'function') await fbPublishFriendProfile();
+    const { ok, status } = await handleApi('POST', { body: { action: 'inviteJoined', code, me: getProfileShareId() } });
+    if (ok || status === 400) localStorage.removeItem(INVITE_CODE_KEY);
+  } catch { /* next time */ }
+}
+window.noteInviteJoined = noteInviteJoined;
+
+let _inviteStatus = {};
+async function loadInviteStatus () {
+  if (!window._ftbUid || !getSentInvites().some(e => e.code)) return;
+  try {
+    const { ok, data } = await handleApi('GET', { query: '?invites=1' });
+    if (!ok || !Array.isArray(data.invites)) return;
+    _inviteStatus = Object.fromEntries(data.invites.map(r => [r.code, r]));
+    if (!document.getElementById('friends-overlay')?.classList.contains('hidden')) renderFriendsList();
+  } catch { /* keep what we had */ }
 }
 
 function sanitizeRecent (list) {
@@ -814,13 +927,29 @@ function renderFriendsList () {
         </div>`;
       }).join('')
     : '';
-  // Invites go out as links, so the phone keeps its own list of when you sent them.
+  // Invites you sent: who it was for (kept on this phone) and how far it got.
   const invites = getSentInvites();
+  const shown = invites.slice(0, 15);
   const invitesHtml = invites.length
-    ? `<div class="friends-section-title">Sent invites (${invites.length})</div>` + invites.slice(0, 10).map(at => `<div class="friend-row friend-invite-row">
-          <span class="friend-info"><strong>Invite sent</strong><span>${escHtml(fmtInviteDate(at))} · they show up under Following you when they join</span></span>
-        </div>`).join('')
-      + (invites.length > 10 ? `<div class="friends-empty">and ${invites.length - 10} more</div>` : '')
+    ? `<div class="friends-section-title">Sent invites (${invites.length})</div>` + shown.map((e, i) => {
+        const st = (e.code && _inviteStatus[e.code]) || {};
+        const name = e.name || (st.joined ? st.u : '') || 'Invite';
+        const when = fmtInviteDate(e.at);
+        const line = st.joined
+          ? `Joined${e.name && st.u ? ` as ${escHtml(st.u)}` : ''} · sent ${escHtml(when.toLowerCase())}`
+          : st.opened ? `Opened the link · hasn't joined yet · sent ${escHtml(when.toLowerCase())}`
+            : `Sent ${escHtml(when.toLowerCase())}${e.code ? ' · not opened yet' : ''}`;
+        const badge = st.joined
+          ? (following.has(st.id)
+              ? '<span class="friend-mutual" aria-label="You follow them">✓</span>'
+              : `<button type="button" class="btn-sm btn-orange friend-invite-follow" data-i="${i}">Follow back</button>`)
+          : `<span class="invite-status invite-status-${st.opened ? 'opened' : 'sent'}">${st.opened ? 'Opened' : 'Sent'}</span>`;
+        return `<div class="friend-row friend-invite-row">
+          <span class="friend-info"><strong>${escHtml(name)}</strong><span>${line}</span></span>
+          ${badge}
+        </div>`;
+      }).join('')
+      + (invites.length > shown.length ? `<div class="friends-empty">and ${invites.length - shown.length} more</div>` : '')
     : '';
   el.innerHTML = followersHtml + followingHtml + invitesHtml || (_followers === null && window._ftbUid
     ? '<div class="friends-empty">Loading your friends…</div>'
@@ -833,6 +962,14 @@ function renderFriendsList () {
       trackProductEvent('friend_followed_back');
     }
   }));
+  el.querySelectorAll('.friend-invite-follow').forEach(b => b.addEventListener('click', () => {
+    const st = _inviteStatus[shown[Number(b.dataset.i)]?.code];
+    if (st?.id && followFriend({ id: st.id, u: st.u || 'Friend', picks: [], w: [] })) {
+      renderFriendsList();
+      refreshFriendsLive(true);
+      trackProductEvent('friend_followed_back', { from: 'invite' });
+    }
+  }));
 }
 
 function openFoodieFriends () {
@@ -840,6 +977,7 @@ function openFoodieFriends () {
   // checks), so it needs this screen to find them. Inviting stays Grizzly.
   renderFriendsList();
   loadFollowers();
+  loadInviteStatus();
   noteExistingFollows();
   renderMyHandle();
   const found = document.getElementById('friends-find-result');

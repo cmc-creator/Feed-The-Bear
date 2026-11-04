@@ -26,6 +26,7 @@ const OLD_LINK_FRIEND = { key: 'name:jo', name: 'Jo', savedAt: 1, data: { id: ''
   // No name yet: the invite asks for one so friends know who it's from.
   e.once('dialog', d => d.accept('Me'));
   await e.locator('#header-invite-btn').click();
+  await e.click('#invite-who .invite-who-skip');
   await e.waitForTimeout(300);
   check(await e.evaluate(() => state.settings.shareLive === true), 'inviting turns on live sharing');
 

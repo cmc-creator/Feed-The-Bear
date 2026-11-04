@@ -13,25 +13,29 @@ asGrizzly(); // uses Grizzly-only features
   await me.waitForTimeout(1500);
   await me.evaluate(() => { localStorage.setItem('ftb_user_v1', JSON.stringify({ name: 'Foodie' })); window._ftbUid = 'inviterUid1234567890'; });
   me.once('dialog', d => d.accept('Connie'));
-  const link = await me.evaluate(async () => {
+  const linking = me.evaluate(async () => {
     let shared = '';
     navigator.share = async ({ text, url }) => { shared = url; };
     await inviteFriend();
     return shared;
   });
-  check(/\?ref=inviterUid1234567890#profile=/.test(link), `one link carries the free month and the profile (${link.slice(0, 90)})`);
+  await me.click('#invite-who .invite-who-skip');
+  const link = await linking;
+  check(/\?ref=inviterUid1234567890(&i=[a-z0-9]{16,32})?#profile=/.test(link), `one link carries the free month and the profile (${link.slice(0, 90)})`);
   check(await me.evaluate(() => loadUserProfile()?.name) === 'Connie', 'asked for a name before sending');
   check(await me.evaluate(() => state.settings.shareLive === true), 'sharing live starts so followers get updates');
 
   // Account menu invite sends the same link.
-  const viaAccount = await me.evaluate(async () => {
+  const viaAccountP = me.evaluate(async () => {
     let shared = '';
     navigator.share = async ({ url }) => { shared = url; };
     _auth = { currentUser: { uid: 'inviterUid1234567890' } };
     await shareInvite();
     return shared;
   }).catch(e => 'ERR ' + e.message);
-  check(/\?ref=inviterUid1234567890#profile=/.test(viaAccount), `account Invite uses the same link (${String(viaAccount).slice(0, 60)})`);
+  await me.click('#invite-who .invite-who-skip', { timeout: 5000 }).catch(() => {});
+  const viaAccount = await viaAccountP;
+  check(/\?ref=inviterUid1234567890(&i=[a-z0-9]{16,32})?#profile=/.test(viaAccount), `account Invite uses the same link (${String(viaAccount).slice(0, 60)})`);
   await me.context().close();
 
   // ── The friend: brand new, opens the link ──

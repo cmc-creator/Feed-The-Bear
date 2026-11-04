@@ -13,6 +13,13 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
     auth: () => ({ verifyIdToken: async t => { if (!t.startsWith('token-')) throw new Error('bad'); return { uid: t.slice(6) }; } }),
     firestore: () => ({
       doc: ref,
+      collection: c => {
+        const where = (field, op, val) => {
+          const q = { limit: () => q, get: async () => ({ docs: Object.keys(docs).filter(k => k.startsWith(c + '/') && docs[k][field] === val).map(k => ({ id: k.slice(c.length + 1), data: () => docs[k], ref: ref(k) })) }) };
+          return q;
+        };
+        return { where };
+      },
       runTransaction: async fn => fn({ get: r => r.get(), set: (r, d) => { docs[r.p] = d; }, delete: r => { delete docs[r.p]; } }),
     }),
   };
@@ -65,16 +72,43 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
   await call('sam', { method: 'POST', body: { action: 'unfollowed', id: 'connieshare01', me: 'samshare0001' } });
   check((await call('connie', { query: { followers: '1' } })).data.followers.length === 0, 'unfollowing takes them off');
 
+  // Invites: each has a code; Connie sees it opened, then who joined.
+  const code = 'abcdefghij0123456789';
+  r = await call('connie', { method: 'POST', body: { action: 'invite', code } });
+  check(r.status === 200 && docs[`invites/${code}`]?.owner === 'connie', 'sending an invite records its code with your account');
+  check((await call('sam', { method: 'POST', body: { action: 'invite', code } })).status === 409, "someone else can't take an invite code");
+  check((await call('connie', { method: 'POST', body: { action: 'invite', code: 'BAD' } })).status === 400, 'a malformed code is refused');
+  r = await call('connie', { query: { invites: '1' } });
+  check(r.data.invites?.length === 1 && !r.data.invites[0].opened && !r.data.invites[0].joined, 'a new invite is just Sent');
+  r = await call(null, { method: 'POST', body: { action: 'inviteOpened', code } });
+  check(r.status === 200 && docs[`invites/${code}`].openedAt, 'tapping the link marks it opened, no account needed');
+  check((await call('connie', { query: { invites: '1' } })).data.invites[0].opened === true, 'Connie sees it was opened');
+  r = await call('mallory', { method: 'POST', body: { action: 'inviteJoined', code, me: 'samshare0001' } });
+  check(r.status === 403, "you can't join in someone else's name");
+  r = await call('connie', { method: 'POST', body: { action: 'inviteJoined', code, me: 'connieshare01' } });
+  check(r.data.ok === false && !docs[`invites/${code}`].joinedUid, "you can't join from your own invite");
+  r = await call('sam', { method: 'POST', body: { action: 'inviteJoined', code, me: 'samshare0001' } });
+  check(r.data.ok === true, 'the friend signing in marks it joined');
+  r = await call('connie', { query: { invites: '1' } });
+  check(r.data.invites[0].joined && r.data.invites[0].u === 'Sam' && r.data.invites[0].id === 'samshare0001', `Connie sees Sam joined from it (${JSON.stringify(r.data.invites)})`);
+  docs['profiles/joshare00001'] = { uid: 'jo', u: 'Jo' };
+  r = await call('jo', { method: 'POST', body: { action: 'inviteJoined', code, me: 'joshare00001' } });
+  check(r.data.ok === false && docs[`invites/${code}`].joinedUid === 'sam', 'an invite counts one person joining');
+  check((await call('sam', { query: { invites: '1' } })).data.invites.length === 0, "nobody sees other people's invites");
+  check((await call(null, { query: { invites: '1' } })).status === 401, 'the invite list needs sign-in');
+
   // ── The Friends screen ──
   const browser = await launch();
   const p = await newPage(browser, { seed: [{ id: 'a', name: 'Bacanora', cuisine: 'Mexican', status: 'visited', myRating: 5, tags: [], visits: [], dishes: [] }] });
   await p.route(/overpass|nominatim|open-meteo|place-info|restaurant-image|place-photo|wikipedia/, r => r.abort());
   const claims = [];
+  let inviteRows = [];
   await p.route('**/api/handle**', route => {
     const req = route.request();
     const url = new URL(req.url());
     if (req.method() === 'POST') { const b = JSON.parse(req.postData()); claims.push(b); return route.fulfill({ json: b.action === 'claim' ? { handle: b.handle } : { ok: true } }); }
     if (url.searchParams.get('mine')) return route.fulfill({ json: { handle: '' } });
+    if (url.searchParams.get('invites')) return route.fulfill({ json: { invites: inviteRows } });
     if (url.searchParams.get('followers')) return route.fulfill({ json: { followers: [{ id: 'jojoshare001', u: 'Jo' }] } });
     return route.fulfill({ json: url.searchParams.get('q') === 'sam_i_am' ? { found: true, u: 'Sam', id: 'samshare0001' } : { found: false } });
   });
@@ -111,10 +145,53 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
   check(/Sent · waiting for them to follow back/.test(await samRow.innerText()), 'someone you follow who has not followed back shows as Sent');
   const joRow = p.locator('.friend-row', { hasText: 'Jo' }).last();
   check(!/Sent ·/.test(await joRow.innerText()), 'a friend who follows you back is not marked Sent');
-  await p.evaluate(() => { noteInviteSent(); noteInviteSent(); });
+  // Inviting: "Who's this for?", then a link with its own code.
+  await p.evaluate(() => { window._shared = null; navigator.share = async d => { window._shared = d; }; inviteFriend(); });
+  await p.waitForSelector('#invite-who', { timeout: 3000 });
+  check(await p.locator('#invite-who .invite-who-name').isVisible(), 'Invite asks who it is for');
+  await p.fill('#invite-who .invite-who-name', 'Mom');
+  await p.click('#invite-who .invite-who-send');
+  await p.waitForTimeout(400);
+  const shared = await p.evaluate(() => window._shared);
+  const icode = (String(shared?.url || '').match(/[?&]i=([a-z0-9]{16,32})/) || [])[1];
+  check(!!icode && /^Hey Mom!/.test(shared.text), `the invite has its own code and says hi to them (${shared?.url})`);
+  check(claims.some(b => b.action === 'invite' && b.code === icode), 'and the code is registered with the server');
+  check(!claims.some(b => JSON.stringify(b).includes('Mom')), 'the name stays on the phone, never sent');
+  let listText = await p.locator('#friends-list').innerText();
+  check(/Sent invites \(1\)/i.test(listText) && /Mom/.test(listText) && /not opened yet/.test(listText), 'it shows under Sent invites by name, not opened yet');
+  inviteRows = [{ code: icode, opened: true, joined: false }];
+  await p.evaluate(() => loadInviteStatus());
+  await p.waitForTimeout(300);
+  check(/Opened the link/.test(await p.locator('#friends-list').innerText()), 'once they tap it, it says Opened');
+  inviteRows = [{ code: icode, opened: true, joined: true, id: 'momshare0001', u: 'Linda' }];
+  await p.evaluate(() => loadInviteStatus());
+  await p.waitForTimeout(300);
+  listText = await p.locator('#friends-list').innerText();
+  check(/Mom/.test(listText) && /Joined as Linda/.test(listText) && await p.locator('.friend-invite-follow').isVisible(), 'once they join, it says who joined, with Follow back');
+  await p.click('.friend-invite-follow');
+  await p.waitForTimeout(300);
+  check(await p.evaluate(() => getFriends().some(f => f.data?.id === 'momshare0001')), 'Follow back from the invite follows them');
+  await p.evaluate(() => { inviteFriend(); });
+  await p.waitForSelector('#invite-who');
+  await p.click('#invite-who .invite-who-close');
   await p.waitForTimeout(200);
-  const listText = await p.locator('#friends-list').innerText();
-  check(/Sent invites \(2\)/i.test(listText) && /Today/.test(listText), 'invites you sent show under "Sent invites"');
+  check(await p.locator('#invite-who').count() === 0 && (await p.evaluate(() => getSentInvites().length)) === 1, "closing \"Who's this for?\" sends nothing");
+
+  // The friend's side: opening the link tells the server, and joining marks it.
+  const q = await newPage(browser, { seed: [] });
+  await q.route(/overpass|nominatim|open-meteo|place-info|restaurant-image|place-photo|wikipedia/, r => r.abort());
+  const friendCalls = [];
+  await q.route('**/api/handle**', route => {
+    if (route.request().method() === 'POST') { friendCalls.push(JSON.parse(route.request().postData())); return route.fulfill({ json: { ok: true } }); }
+    return route.fulfill({ json: {} });
+  });
+  await q.goto(`${BASE}/app.html?i=${icode}`);
+  await q.waitForTimeout(1200);
+  check(friendCalls.some(b => b.action === 'inviteOpened' && b.code === icode) && !/[?&]i=/.test(q.url()), 'opening the invite tells the inviter it was opened');
+  await q.evaluate(() => { window._ftbUid = 'momUser000001'; return noteInviteJoined(); });
+  check(friendCalls.some(b => b.action === 'inviteJoined' && b.code === icode && b.me), 'signing in marks the invite joined');
+  check(await q.evaluate(() => !localStorage.getItem('ftb_invite_code_v1')), 'only once');
+  await q.close();
 
   // Picking your own username.
   await p.click('.friends-handle-edit');

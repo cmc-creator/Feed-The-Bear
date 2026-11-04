@@ -79,6 +79,11 @@ module.exports = async function handler (req, res) {
     const handle = (await db.doc(`handleOf/${uid}`).get()).data()?.handle;
     if (handle) await db.doc(`handles/${handle}`).delete();
     // Server-only records keyed by this account (the weekly email list holds their address).
+    // Invites you sent go; on invites you joined from, your name comes off.
+    const sent = await db.collection('invites').where('owner', '==', uid).get();
+    await Promise.all(sent.docs.map(d => d.ref.delete()));
+    const joined = await db.collection('invites').where('joinedUid', '==', uid).get();
+    await Promise.all(joined.docs.map(d => { const { owner, at, openedAt } = d.data(); return d.ref.set({ owner, at, ...(openedAt ? { openedAt } : {}) }); }));
     const serverDocs = ['digestSubscribers', 'rewards', 'trials', 'referrals', 'pushTokens', 'pushFollows', 'apiQuota', 'aiQuota', 'handleOf', 'followedBy'].map(c => `${c}/${uid}`);
     if (customerId) serverDocs.push(`stripeCustomers/${customerId}`);
     await Promise.all(serverDocs.map(p => db.doc(p).delete()));

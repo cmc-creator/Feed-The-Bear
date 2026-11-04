@@ -12,8 +12,15 @@
      POST { action: 'followed', id, me }    -> { ok }   (you follow profile `id`; `me` is your own profile)
      POST { action: 'unfollowed', id, me }  -> { ok }
      GET  ?followers=1                      -> { followers: [{ id, u, at }] }  (who follows you)
+   Invites: each one you send has its own random code, so you can see which
+   were opened and who joined. Who you sent it to stays on your phone.
+     POST { action: 'invite', code }        -> { ok }   (you're sending an invite)
+     POST { action: 'inviteOpened', code }  -> { ok }   (no sign-in: the friend tapped the link)
+     POST { action: 'inviteJoined', code, me } -> { ok } (the friend signed in; `me` is their profile)
+     GET  ?invites=1                        -> { invites: [{ code, opened, joined, id, u }] }
    Server-only data (Admin SDK): handles/{handle} = { uid, id, u },
-   handleOf/{uid} = { handle }, followedBy/{uid} = { list: [{ id, u, at }] }.
+   handleOf/{uid} = { handle }, followedBy/{uid} = { list: [{ id, u, at }] },
+   invites/{code} = { owner, at, openedAt?, joinedAt?, joinedUid?, joinedId?, joinedName? }.
    Following is one-way; the followers list is what lets an inviter see who
    joined from their link and follow them back.
    ════════════════════════════════════════════════════════════ */
@@ -24,6 +31,7 @@ const { overLimit } = require('./_limit');
 const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
 const ID_RE = /^[a-z0-9]{8,40}$/;
 const MAX_FOLLOWERS = 200;
+const CODE_RE = /^[a-z0-9]{16,32}$/;
 const RESERVED = new Set(['admin', 'support', 'help', 'feedthebear', 'feed_the_bear', 'grizzly', 'cub', 'bytecub', 'byte_cub', 'official', 'team', 'staff', 'moderator', 'root', 'null', 'undefined']);
 
 // Rate limits live in the database, so they hold across server restarts (_limit.js).
@@ -39,8 +47,28 @@ function getAdmin () {
 
 const cleanHandle = v => String(v || '').trim().replace(/^@/, '').toLowerCase();
 
+const bodyOf = req => (typeof req.body === 'string' ? (() => { try { return JSON.parse(req.body); } catch { return {}; } })() : (req.body || {}));
+
+// The invited friend tapped the link: they may not have an account yet.
+async function inviteOpened (req, res) {
+  const ip = String(req.headers?.['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
+  const code = String(bodyOf(req).code || '');
+  if (!CODE_RE.test(code)) return res.status(400).json({ error: 'Bad invite.' });
+  try {
+    if (await overLimit(`handle:o:${ip}`, 30, 600)) return res.status(429).json({ error: 'Slow down a little and try again soon.' });
+    const ref = getAdmin().firestore().doc(`invites/${code}`);
+    const cur = (await ref.get()).data();
+    if (cur && !cur.openedAt) await ref.set({ ...cur, openedAt: new Date().toISOString() });
+    return res.status(200).json({ ok: !!cur });
+  } catch (err) {
+    console.error('[FTB] invite opened error:', err.message);
+    return res.status(500).json({ error: 'Could not do that.' });
+  }
+}
+
 module.exports = async function handler (req, res) {
   res.setHeader('Cache-Control', 'no-store');
+  if (req.method === 'POST' && bodyOf(req).action === 'inviteOpened') return inviteOpened(req, res);
   let fb, user;
   try {
     fb = getAdmin();
@@ -62,6 +90,17 @@ module.exports = async function handler (req, res) {
         const followers = recent.filter((f, i) => live[i]).map((f, i) => ({ id: f.id, u: String(f.u || 'Friend').slice(0, 30), at: f.at || '' }));
         return res.status(200).json({ followers });
       }
+      if (req.query?.invites) {
+        const snap = await db.collection('invites').where('owner', '==', uid).limit(100).get();
+        const rows = snap.docs.map(d => ({ code: d.id, ...d.data() }));
+        // A friend who joined shows by their profile's name, while it's still live.
+        const live = await Promise.all(rows.map(r => (r.joinedId ? db.doc(`profiles/${r.joinedId}`).get().then(s => s.data()).catch(() => null) : null)));
+        const invites = rows.map((r, i) => {
+          const joined = !!(r.joinedAt && live[i]);
+          return { code: r.code, at: r.at || '', opened: !!(r.openedAt || r.joinedAt), joined, id: joined ? r.joinedId : '', u: joined ? String(live[i].u || r.joinedName || 'Friend').slice(0, 30) : '' };
+        });
+        return res.status(200).json({ invites });
+      }
       if (await overLimit(`handle:q:${uid}`, 30, 600)) return res.status(429).json({ error: 'Slow down a little and try again soon.' });
       const handle = cleanHandle(req.query?.q);
       if (!HANDLE_RE.test(handle)) return res.status(200).json({ found: false });
@@ -75,7 +114,33 @@ module.exports = async function handler (req, res) {
     }
 
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-    const body = typeof req.body === 'string' ? (() => { try { return JSON.parse(req.body); } catch { return {}; } })() : (req.body || {});
+    const body = bodyOf(req);
+
+    if (body.action === 'invite') {
+      if (await overLimit(`handle:i:${uid}`, 30, 600)) return res.status(429).json({ error: 'Slow down a little and try again soon.' });
+      const code = String(body.code || '');
+      if (!CODE_RE.test(code)) return res.status(400).json({ error: 'Bad invite.' });
+      const ref = db.doc(`invites/${code}`);
+      if ((await ref.get()).data()) return res.status(409).json({ error: 'Try again.' });
+      await ref.set({ owner: uid, at: new Date().toISOString() });
+      return res.status(200).json({ ok: true });
+    }
+
+    // The invited friend signed in: mark the invite joined, once, with their profile.
+    if (body.action === 'inviteJoined') {
+      if (await overLimit(`handle:j:${uid}`, 20, 600)) return res.status(429).json({ error: 'Slow down a little and try again soon.' });
+      const code = String(body.code || '');
+      const me = String(body.me || '');
+      if (!CODE_RE.test(code) || !ID_RE.test(me)) return res.status(400).json({ error: 'Bad invite.' });
+      const mine = (await db.doc(`profiles/${me}`).get()).data();
+      if (!mine || mine.uid !== uid) return res.status(403).json({ error: 'Share your profile first.' });
+      const ref = db.doc(`invites/${code}`);
+      const cur = (await ref.get()).data();
+      if (!cur || cur.owner === uid || (cur.joinedUid && cur.joinedUid !== uid)) return res.status(200).json({ ok: false });
+      const now = new Date().toISOString();
+      await ref.set({ ...cur, openedAt: cur.openedAt || now, joinedAt: cur.joinedAt || now, joinedUid: uid, joinedId: me, joinedName: String(mine.u || 'Friend').slice(0, 30) });
+      return res.status(200).json({ ok: true });
+    }
 
     if (body.action === 'release') {
       const mine = (await db.doc(`handleOf/${uid}`).get()).data()?.handle;

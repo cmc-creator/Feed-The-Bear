@@ -2246,7 +2246,7 @@ async function setNearAlerts (miles) {
    expects one the installed app doesn't have, a banner offers the newest
    build (published by .github/workflows/android.yml; it installs over the old one). */
 const ANDROID_APP_URL = 'https://github.com/cmc-creator/Feed-The-Bear/releases/latest/download/feed-the-bear.apk';
-const ANDROID_APP_NEEDS = ['PushNotifications'];
+const ANDROID_APP_NEEDS = ['PushNotifications', 'ContactPicker'];
 
 function checkAndroidAppVersion () {
   const cap = window.Capacitor;
@@ -2258,7 +2258,7 @@ function checkAndroidAppVersion () {
   bar.id = 'app-update-banner';
   bar.className = 'app-update-banner';
   bar.setAttribute('role', 'status');
-  bar.innerHTML = `<span>📲 A new version of the app is ready, with friend notifications.</span>
+  bar.innerHTML = `<span>📲 A new version of the app is ready: pick friends from your contacts when you invite them.</span>
     <button type="button" class="btn-primary btn-sm app-update-go">Update</button>
     <button type="button" class="app-update-later" aria-label="Later">✕</button>`;
   document.body.appendChild(bar);

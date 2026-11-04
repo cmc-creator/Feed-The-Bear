@@ -12,6 +12,7 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
     window.Capacitor = {
       isNativePlatform: () => true,
       Plugins: {
+        ContactPicker: { pick: async () => ({ name: '' }) },
         PushNotifications: {
           checkPermissions: async () => ({ receive: window._push.perm }),
           requestPermissions: async () => { window._push.asked++; window._push.perm = 'granted'; return { receive: 'granted' }; },

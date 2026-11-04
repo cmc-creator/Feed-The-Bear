@@ -22,6 +22,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(NearbyAlertsPlugin.class);
+        registerPlugin(ContactPickerPlugin.class);
         super.onCreate(savedInstanceState);
         route(getIntent());
         // Geofences may have been cleared (reboot, update, or Play services reset).
