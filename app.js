@@ -7314,6 +7314,7 @@ function setupEvents () {
   document.getElementById('chat-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') sendChat();
   });
+  initChatMic();
 
   // Overlay click dismisses panels
   document.getElementById('ui-overlay').addEventListener('click', () => {
@@ -9658,6 +9659,38 @@ function startVoiceAdd () {
   };
   _voiceRecognition.onend = () => stopVoice();
   _voiceRecognition.start();
+}
+// Talk to Byte Cub: words fill the chat box as you speak, then send.
+// Hidden where the browser has no speech recognition.
+let _chatRecognition = null;
+function initChatMic () {
+  const btn = document.getElementById('chat-mic-btn');
+  if (!btn) return;
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) { btn.hidden = true; return; }
+  btn.addEventListener('click', () => {
+    if (_chatRecognition) { _chatRecognition.stop(); return; }
+    const input = document.getElementById('chat-input');
+    const rec = new SpeechRecognition();
+    rec.lang = 'en-US';
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+    rec.onresult = e => {
+      input.value = Array.from(e.results).map(r => r[0].transcript).join('');
+      if (e.results[e.results.length - 1].isFinal) { rec.stop(); sendChat(); }
+    };
+    rec.onerror = e => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        showToast('Microphone blocked', 'Allow microphone access for this site to talk to Byte Cub.', 'error');
+      }
+    };
+    const placeholder = input.placeholder;
+    rec.onend = () => { _chatRecognition = null; btn.classList.remove('listening'); input.placeholder = placeholder; };
+    _chatRecognition = rec;
+    btn.classList.add('listening');
+    input.placeholder = 'Listening…';
+    try { rec.start(); } catch (_) { rec.onend(); }
+  });
 }
 function stopVoice () {
   if (_voiceRecognition) { try { _voiceRecognition.stop(); } catch(_){} _voiceRecognition = null; }

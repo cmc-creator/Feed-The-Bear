@@ -1904,6 +1904,8 @@ body.celebrate-glow::before {
 #chat-input { flex: 1; padding: 10px 14px; font-size: .85rem; border-radius: var(--radius-xl); }
 #chat-send-btn { width: 42px; height: 42px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 #chat-send-btn svg { width: 16px; height: 16px; }
+#chat-mic-btn { width: 42px; height: 42px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 999px; }
+#chat-mic-btn.listening { border-color: rgba(231,76,60,.62); background: rgba(231,76,60,.24); animation: voicePulse 1s ease-in-out infinite; }
 
 /* ── Misc Overlay ────────────────────────────────────────── */
 .ui-overlay {
