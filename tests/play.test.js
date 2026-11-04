@@ -14,7 +14,7 @@ const { BASE, check, launch, newPage, finish } = require('./lib');
   }
   const links = await p.goto(`${BASE}/.well-known/assetlinks.json`);
   const json = await links.json();
-  check(json[0].target.package_name === 'com.feedthebear.app' && json[0].target.sha256_cert_fingerprints.length === 1, 'assetlinks.json names the Android app');
+  check(json[0].target.package_name === 'com.feedthebear.app' && json[0].target.sha256_cert_fingerprints.includes('1D:28:D1:28:8F:AE:75:01:EB:49:03:94:03:AA:3A:86:9E:28:11:95:20:4D:7B:C4:1D:5B:40:6E:33:2D:85:57'), 'assetlinks.json names the Android app with its Google Play signing key');
 
   // In the app: Delete Account only when signed in, guarded by typing DELETE.
   await p.goto(`${BASE}/app.html`);

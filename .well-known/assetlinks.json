@@ -3,6 +3,9 @@
       "target": {
         "namespace": "android_app",
         "package_name": "com.feedthebear.app",
-        "sha256_cert_fingerprints": ["31:58:04:E2:41:95:FD:21:0E:72:5D:19:55:51:53:CC:87:B5:9C:6E:6B:D4:5B:F3:D8:20:95:5C:90:02:B2:46"]
+        "sha256_cert_fingerprints": [
+          "1D:28:D1:28:8F:AE:75:01:EB:49:03:94:03:AA:3A:86:9E:28:11:95:20:4D:7B:C4:1D:5B:40:6E:33:2D:85:57",
+          "92:7B:F8:14:A1:2B:A9:5B:FD:6B:D5:2F:C5:17:4D:29:AE:B2:E9:E7:9D:7D:1B:A5:4C:0B:68:45:C7:86:45:C1"
+        ]
       }
     }]
