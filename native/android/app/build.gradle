@@ -35,6 +35,7 @@ android {
             def ks = System.getenv("FTB_KEYSTORE_PATH")
             if (ks) {
                 storeFile file(ks)
+                storeType "pkcs12"
                 storePassword System.getenv("FTB_KEYSTORE_PASSWORD")
                 keyAlias System.getenv("FTB_KEY_ALIAS")
                 keyPassword System.getenv("FTB_KEY_PASSWORD")
