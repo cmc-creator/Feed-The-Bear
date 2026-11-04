@@ -54,6 +54,21 @@ const TIKTOK = 'https://www.tiktok.com/@phxeats/video/7312345678901234567';
   await p.waitForTimeout(2500);
   check(await p.locator('#quick-add-overlay').isVisible() && /Tacos Chiwas/.test(await p.locator('.qa-suggs').innerText()), 'sharing a TikTok to the app opens Add a spot with the restaurant');
   check(await p.locator('#add-modal, #add-overlay').evaluateAll(els => els.every(e => e.classList.contains('hidden'))), 'it does not open the long form');
+  // A tap on the dim background while it's still reading the post doesn't lose it.
+  await p.evaluate(() => window.Cub.close());
+  await p.route('**/api/link-spot**', async r => { await new Promise(res => setTimeout(res, 2500)); r.fallback(); });
+  await p.evaluate(t => window.Cub.openAdd('Check this out ' + t), TIKTOK);
+  await p.mouse.click(5, 5);
+  await p.waitForTimeout(300);
+  check(await p.locator('#quick-add-overlay').isVisible(), 'a stray tap outside while reading the post does not close it');
+  // The page reloads before saving (the Android app reopening its page): the post comes back.
+  await p.goto(`${BASE}/app.html`);
+  await p.waitForTimeout(4500);
+  check(await p.locator('#quick-add-overlay').isVisible() && /Tacos Chiwas/.test(await p.locator('.qa-suggs').innerText()), 'a share lost to a reload is picked back up');
+  await p.click('#quick-add-overlay .qa-close');
+  await p.goto(`${BASE}/app.html`);
+  await p.waitForTimeout(2000);
+  check(!(await p.locator('#quick-add-overlay').isVisible()), 'once closed on purpose, it stays closed');
   check(p.errors.length === 0, `no page errors (${p.errors.slice(0, 2).join(' | ')})`);
 
   await browser.close();

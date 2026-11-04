@@ -10287,7 +10287,8 @@ function handleWebShareTarget () {
   return;
   }
   const isShare = params.has('share-target') || ((!reserved) && (title || url || looksLikeSharedUrl(text)));
-  if (!isShare) return;
+  // Nothing shared just now: pick up a shared post the page lost (reloaded) before saving.
+  if (!isShare) { if (!reserved) window.Cub?.resumeShare?.(); return; }
   const sharedUrl = url || (looksLikeSharedUrl(text) ? text.trim().split(/\s+/).find(looksLikeSharedUrl) || '' : '');
   if (!title && !sharedUrl && !text) return;
   history.replaceState(null,'', window.location.pathname);

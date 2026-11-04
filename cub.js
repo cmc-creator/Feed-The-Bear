@@ -17,6 +17,7 @@ window.Cub = (() => {
   const AVATAR = 'assets/cub-avatar.jpg';
   const HIDE_KEY = 'ftb_cub_hidden_until';
   const TIP_KEY = 'ftb_cub_tip_session';
+  const PENDING_SHARE_KEY = 'ftb_pending_share_v1';
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const track = (n, d) => { try { window.trackProductEvent?.(n, d); } catch { /* optional */ } };
   // app.js/firebase.js functions live on window; their let/const values
@@ -181,9 +182,14 @@ window.Cub = (() => {
   }
 
   let linkSeq = 0;
+  let linkBusy = false;
   async function lookupLink (text) {
     clearTimeout(searchTimer);
     const seq = ++linkSeq;
+    linkBusy = true;
+    try { return await lookupLinkNow(text, seq); } finally { if (seq === linkSeq) linkBusy = false; }
+  }
+  async function lookupLinkNow (text, seq) {
     const box = sheet.querySelector('.qa-suggs');
     box.innerHTML = '<div class="qa-hint qa-link-wait">Watching that post for the restaurant… 🍿</div>';
     say('Ooh, a food post! Let me see where that is.');
@@ -415,7 +421,8 @@ window.Cub = (() => {
     el.querySelector('.qa-save').addEventListener('click', save);
     el.querySelector('.qa-more').addEventListener('click', moreDetails);
     el.querySelector('.qa-close').addEventListener('click', close);
-    el.addEventListener('click', e => { if (e.target === el) close(); });
+    // A stray tap on the backdrop while a shared post is being read would lose it.
+    el.addEventListener('click', e => { if (e.target === el && !linkBusy) close(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && !el.classList.contains('hidden')) close(); });
     return el;
   }
@@ -441,6 +448,9 @@ window.Cub = (() => {
     // Shared to the app or pasted in: look it up right away.
     const shared = String(prefill || '').trim();
     if (shared) {
+      // Kept until it's saved or closed, so a reload (or the Android app
+      // reopening its page) picks the post back up instead of losing it.
+      try { localStorage.setItem(PENDING_SHARE_KEY, JSON.stringify({ text: shared.slice(0, 2000), at: Date.now() })); } catch { /* private mode */ }
       const input = sheet.querySelector('.qa-input');
       const maps = parseMapsLink((shared.match(/https?:\/\/\S+/) || [shared])[0]);
       if (maps) { choose(maps); return; }
@@ -451,6 +461,9 @@ window.Cub = (() => {
   }
 
   function close () {
+    // Closed on purpose (or saved): the shared post is dealt with.
+    try { localStorage.removeItem(PENDING_SHARE_KEY); } catch { /* private mode */ }
+    linkBusy = false;
     const wasOpen = sheet && !sheet.classList.contains('hidden');
     sheet?.classList.add('hidden');
     clearTimeout(searchTimer);
@@ -665,7 +678,21 @@ window.Cub = (() => {
     }
   }
 
-  return { init, openAdd, close, welcome, guessCuisine, parseMapsLink, tip: buddyTip, hide: hideBuddy };
+  // A post shared in the last few minutes that was never saved or closed
+  // (the page reloaded under it): open it again. True if it did.
+  function resumeShare () {
+    let pending = null;
+    try { pending = JSON.parse(localStorage.getItem(PENDING_SHARE_KEY) || 'null'); } catch { /* bad value */ }
+    if (!pending?.text || !(Date.now() - Number(pending.at) < 5 * 60 * 1000)) {
+      try { localStorage.removeItem(PENDING_SHARE_KEY); } catch { /* private mode */ }
+      return false;
+    }
+    track('quick_add_share_resumed', {});
+    openAdd(pending.text);
+    return true;
+  }
+
+  return { init, openAdd, close, welcome, guessCuisine, parseMapsLink, tip: buddyTip, hide: hideBuddy, resumeShare };
 })();
 
 document.addEventListener('DOMContentLoaded', () => window.Cub.init());

@@ -200,13 +200,17 @@ module.exports = async function handler (req, res) {
   // The TikTok app's share text ("Check out this video…") says nothing useful.
   const words = tiktok?.text ? typed.replace(/check out .{0,60}?(video|tiktok)!?|#tiktok/gi, '').trim() : typed;
   const text = [words, caption].filter(Boolean).join('\n');
-  const guess = await guessRestaurant(text);
-  // A location-tagged TikTok names the place outright; otherwise Gemini's guess,
+  // A location-tagged TikTok names the place outright, so Places and Gemini
+  // (just for the dish) run side by side; otherwise Gemini's guess is searched,
   // and without one, plain typed text is searched as-is.
   const poi = tiktok?.poi;
-  const query = poi ? [poi.name, poi.address || poi.city].filter(Boolean).join(', ')
-    : guess?.name ? [guess.name, guess.city].filter(Boolean).join(', ') : (link ? '' : typed);
-  const places = await findPlaces(query, lat, lng);
+  let guess, places;
+  if (poi) {
+    [guess, places] = await Promise.all([guessRestaurant(text), findPlaces([poi.name, poi.address || poi.city].filter(Boolean).join(', '), lat, lng)]);
+  } else {
+    guess = await guessRestaurant(text);
+    places = await findPlaces(guess?.name ? [guess.name, guess.city].filter(Boolean).join(', ') : (link ? '' : typed), lat, lng);
+  }
 
   res.setHeader('Cache-Control', 'private, max-age=0');
   return res.status(200).json({
