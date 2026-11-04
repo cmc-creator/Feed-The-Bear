@@ -60,10 +60,10 @@ const INFO = {
   check(asked.length === before, 'no repeat lookup within a week');
   await closeAllDialogs(p);
 
-  // No match: honest "Not available", no fake hours.
+  // No match: no empty "Not available" box, and no fake hours.
   await p.evaluate(() => openDetailModal('r2'));
   await p.waitForTimeout(800);
-  check((await p.locator('#detail-google-rating').innerText()).includes('Not available'), 'unmatched spot says Not available');
+  check(await p.locator('#detail-google-rating').isHidden(), 'unmatched spot hides the empty Google rating box');
   check(await p.locator('#detail-hours').isHidden(), 'and shows no hours');
   await closeAllDialogs(p);
 

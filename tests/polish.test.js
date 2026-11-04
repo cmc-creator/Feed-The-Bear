@@ -39,7 +39,9 @@ const SEED = [
   // The map shows your saved spots.
   await p.locator('[data-view="map"]:visible').first().click();
   await p.waitForTimeout(1500);
-  check(await p.evaluate(() => state.mapMarkers.length) === 3, `the map has a pin for each saved spot (${await p.evaluate(() => state.mapMarkers.length)})`);
+  // Pins close together share one numbered pin, so count the spots the pins stand for.
+  const pinned = () => p.evaluate(() => state.mapMarkers.reduce((n, m) => n + (m.spotCount || 1), 0));
+  check(await pinned() === 3, `the map has a pin for each saved spot (${await pinned()})`);
   await p.locator('[data-view="all"]:visible').first().click().catch(() => {});
 
   // Mood calendar colors the day you ate out.

@@ -848,6 +848,11 @@ button:focus-visible,
   border: 1px solid rgba(255,255,255,.24);
   z-index: 2;
 }
+/* Not a favorite yet: just a star to tap, so it doesn't read as a label. */
+.card-favorite-btn:not(.active) {
+  width: 34px; height: 34px; padding: 0; display: grid; place-items: center;
+  font-size: 1.05rem; line-height: 1; cursor: pointer;
+}
 
 .card-favorite-btn.active {
   background: rgba(255,215,0,.18);
@@ -5995,9 +6000,13 @@ body.light-mode .today-vibe-pill {
 .list-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .list-tab {
   display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; cursor: pointer;
-  font: inherit; font-size: .98rem; font-weight: 800; color: #f6ecdc;
-  border-radius: 14px; border: 1px solid rgba(246, 236, 220, .25); background: rgba(13, 13, 26, .45);
+  font: inherit; font-size: .98rem; font-weight: 800; color: var(--text);
+  border-radius: 14px; border: 1px solid var(--border); background: var(--surface2);
+  transition: background .15s, box-shadow .15s, transform .1s;
 }
+.list-tab:not(.active):hover { border-color: rgba(var(--primary-rgb), .5); }
+.list-tab:active { transform: scale(.98); }
+.list-tab:not(.active) .list-tab-count { background: rgba(var(--primary-rgb), .16); }
 .list-tab.active { color: #2a1a05; background: linear-gradient(135deg, #ffe2a3, #f0b850); border-color: #fff3d6; box-shadow: 0 6px 18px rgba(232, 169, 58, .35); }
 .list-tab-count { min-width: 26px; padding: 2px 8px; border-radius: 999px; font-size: .8rem; background: rgba(0, 0, 0, .25); }
 .list-tab.active .list-tab-count { background: rgba(42, 26, 5, .15); }
@@ -7257,7 +7266,7 @@ body[data-ui-motion='playful'] .restaurant-grid.card-enter-run .restaurant-card:
 }
 .nearby-home-subtitle {
   font-size: .76rem;
-  color: #bea889;
+  color: var(--text-dim);
   margin-top: 2px;
 }
 
@@ -9116,3 +9125,54 @@ body.overlay-open .app-update-banner { display: none; }
 .friends-handle { font-size: .82rem; color: var(--text-dim); }
 .friends-handle-msg { font-size: .8rem; color: var(--rose); margin-top: 4px; }
 .link-btn { background: none; border: 0; padding: 0; color: var(--primary); font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; }
+
+/* A photo that failed to load: no broken-image icon or stray alt text. */
+img.img-failed { visibility: hidden; }
+
+/* Dropdowns in forms and Settings: same look as text inputs, with a chevron. */
+.form-select {
+  width: 100%; min-height: 44px; padding: 10px 40px 10px 14px;
+  background-color: var(--surface2);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a07a4a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center; background-size: 16px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  color: var(--text); font-family: var(--font); font-size: .9rem; font-weight: 600;
+  -webkit-appearance: none; appearance: none; cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+/* Themes reset select backgrounds with the `background` shorthand; keep the chevron. */
+body select.form-select, body.light-mode select.form-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a07a4a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center; background-size: 16px;
+}
+.form-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(var(--primary-rgb), .16); }
+.personalize-body .form-select {
+  background-color: color-mix(in srgb, var(--surface2) 88%, rgba(255,229,190,.08));
+  border-color: color-mix(in srgb, var(--border) 70%, rgba(255,214,158,.28));
+}
+.form-select option { color: #2a1d12; background: #fff; }
+
+/* Small print under the upgrade button. */
+.upgrade-legal { margin: 6px 0 0; text-align: center; font-size: .72rem; line-height: 1.45; color: var(--text-dim); }
+.upgrade-legal a { color: inherit; text-decoration: underline; }
+
+/* Phones: the floating Byte Cub already opens the chat, so the header's AI
+   button only shows if the cub has been hidden for this visit. */
+@media (max-width: 768px) { body:has(#cub-buddy) .header-actions .chat-toggle-btn { display: none; } }
+
+/* Map: several spots close together share one numbered pin. */
+.map-group-pin {
+  width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+  font: 800 1rem/1 var(--font, system-ui); color: #fff;
+  background: rgba(74,144,217,.95); border: 3px solid #9B7BE0;
+  box-shadow: 0 0 0 5px rgba(74,144,217,.28), 0 3px 12px rgba(0,0,0,.5);
+}
+.map-group-pin.visited { background: rgba(46,204,113,.95); border-color: #2ECC71; box-shadow: 0 0 0 5px rgba(46,204,113,.28), 0 3px 12px rgba(0,0,0,.5); }
+.map-group-list { display: grid; gap: 4px; min-width: 190px; font-family: system-ui, sans-serif; }
+.map-group-row {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border-radius: 10px;
+  border: 1px solid rgba(0,0,0,.08); background: rgba(232,177,90,.12); font: inherit; font-size: .85rem; text-align: left; color: inherit;
+}
+button.map-group-row { cursor: pointer; }
+.map-group-row b { flex: 1; font-weight: 700; }
+.map-group-row i { font-style: normal; font-size: .75rem; color: #a46a2a; font-weight: 700; }

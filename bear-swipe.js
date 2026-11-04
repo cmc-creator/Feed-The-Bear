@@ -48,6 +48,34 @@ window.BearSwipe = (() => {
     return manifest;
   }
 
+  // Dish photos bundled with the app (assets/food). When Wikimedia is slow,
+  // throttled or offline, the round carries on with these instead of a blank card.
+  const LOCAL = [
+    ['pancakes', 'Pancakes', 'Breakfast'], ['waffles', 'Waffles', 'Breakfast'], ['omelette', 'Omelette', 'Breakfast'],
+    ['french_toast', 'French toast', 'Breakfast'], ['eggs_benedict', 'Eggs Benedict', 'Breakfast'],
+    ['burger', 'Cheeseburger', 'American'], ['fries', 'French fries', 'American'], ['fried_chicken', 'Fried chicken', 'Southern'],
+    ['mac_and_cheese', 'Mac and cheese', 'American'], ['grilled_cheese', 'Grilled cheese', 'American'],
+    ['caesar_salad', 'Caesar salad', 'American'], ['steak', 'Sirloin steak', 'Steakhouse'],
+    ['pizza', 'Pizza margherita', 'Pizza'], ['pasta', 'Spaghetti and meatballs', 'Italian'], ['lasagna', 'Lasagna', 'Italian'],
+    ['gnocchi', 'Gnocchi', 'Italian'], ['gelato', 'Gelato', 'Dessert'], ['cheesecake', 'Cheesecake', 'Dessert'],
+    ['sushi', 'Sushi', 'Japanese'], ['ramen', 'Ramen', 'Japanese'], ['udon', 'Udon', 'Japanese'], ['poke_bowl', 'Poke bowl', 'Healthy'],
+    ['dumplings', 'Dumplings', 'Chinese'], ['fried_rice', 'Fried rice', 'Chinese'], ['chow_mein', 'Chow mein', 'Chinese'],
+    ['bibimbap', 'Bibimbap', 'Korean'], ['korean_bbq', 'Korean BBQ', 'Korean'],
+    ['biryani', 'Biryani', 'Indian'], ['butter_chicken', 'Butter chicken', 'Indian'], ['tikka_masala', 'Chicken tikka masala', 'Indian'], ['dosa', 'Dosa', 'Indian'],
+    ['pad_thai', 'Pad thai', 'Thai'], ['thai_curry', 'Thai green curry', 'Thai'], ['pho', 'Pho', 'Vietnamese'], ['banh_mi', 'Bánh mì', 'Vietnamese'],
+    ['tacos', 'Tacos', 'Mexican'], ['burrito', 'Burrito', 'Mexican'], ['quesadilla', 'Quesadilla', 'Mexican'],
+    ['enchiladas', 'Enchiladas', 'Mexican'], ['churros', 'Churros', 'Mexican'],
+    ['shawarma', 'Shawarma', 'Middle Eastern'], ['falafel', 'Falafel', 'Middle Eastern'], ['paella', 'Paella', 'Spanish'],
+    ['seafood', 'Seafood platter', 'Seafood'], ['salmon', 'Grilled salmon', 'Seafood'], ['shrimp', 'Shrimp', 'Seafood'],
+  ].map(([file, dish, cuisine]) => ({ dish, cuisine, url: `assets/food/${file}.jpg`, local: true }));
+
+  // Swap the rest of this round to bundled photos, keeping what's been swiped.
+  function useLocalPhotos () {
+    const done = deck.slice(0, index);
+    const rest = buildDeck(LOCAL.filter(p => !failedUrls.has(p.url))).filter(p => !done.some(d => d.dish === p.dish));
+    deck = done.concat(rest).slice(0, Math.max(ROUND, done.length + 1));
+  }
+
   // One photo per dish, varied cuisines, leaning toward what you like, and
   // skipping photos you've seen recently.
   // What most people in the US decide between on a normal night.
@@ -122,7 +150,7 @@ window.BearSwipe = (() => {
         <span class="bs-cuisine">${esc(d.cuisine)}</span>
         <div class="bs-dish">${esc(d.dish)}</div>
       </div>
-      <a class="bs-credit" href="${esc(d.page)}" target="_blank" rel="noopener">Photo: ${esc(d.credit)} · ${esc(d.license)}</a>
+      ${d.page ? `<a class="bs-credit" href="${esc(d.page)}" target="_blank" rel="noopener">Photo: ${esc(d.credit)} · ${esc(d.license)}</a>` : ''}
     </div>`;
   }
 
@@ -154,7 +182,12 @@ window.BearSwipe = (() => {
   async function replaceBrokenPhoto (broken) {
     if (deck[index] !== broken) return;
     failedUrls.add(broken.url);
-    if (++swapsThisRound > 8) {
+    // Online photos keep failing: finish the round with the bundled ones.
+    if (++swapsThisRound > 3 && !broken.local) {
+      useLocalPhotos();
+      if (index < deck.length) { render(); return; }
+    }
+    if (broken.local || swapsThisRound > 60) {
       els.stage.innerHTML = '<div class="bs-loading">Dish photos are having trouble loading. Tap ↻ to try again.</div>';
       return;
     }
@@ -379,12 +412,14 @@ window.BearSwipe = (() => {
     els.stage.innerHTML = '<div class="bs-loading">Plating up dishes…</div>';
     els.result.classList.add('hidden');
     els.stage.classList.remove('hidden');
-    const photos = await loadPhotos();
+    const remote = (await loadPhotos()).filter(p => !failedUrls.has(p.url));
+    // Offline, or the online photos already failed a lot: use the bundled ones.
+    const photos = remote.length >= ROUND && failedUrls.size < 8 ? remote : LOCAL.filter(p => !failedUrls.has(p.url));
     if (!photos.length) {
       els.stage.innerHTML = '<div class="bs-loading">Couldn\'t load dishes. Check your connection and tap ↻.</div>';
       return;
     }
-    deck = buildDeck(photos.filter(p => !failedUrls.has(p.url)));
+    deck = buildDeck(photos);
     index = 0;
     swapsThisRound = 0;
     round = { yes: [], no: [] };
