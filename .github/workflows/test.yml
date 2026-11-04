@@ -10,7 +10,9 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Pinned: the browser install (playwright --with-deps) fails on Ubuntu 26,
+    # which ubuntu-latest moved to in Oct 2026.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Checkout
