@@ -9,8 +9,13 @@
      GET  ?mine=1                           -> { handle }
      POST { action: 'claim', handle, id }   -> { handle }   (409 if taken)
      POST { action: 'release' }             -> { ok }
+     POST { action: 'followed', id, me }    -> { ok }   (you follow profile `id`; `me` is your own profile)
+     POST { action: 'unfollowed', id, me }  -> { ok }
+     GET  ?followers=1                      -> { followers: [{ id, u, at }] }  (who follows you)
    Server-only data (Admin SDK): handles/{handle} = { uid, id, u },
-   handleOf/{uid} = { handle }.
+   handleOf/{uid} = { handle }, followedBy/{uid} = { list: [{ id, u, at }] }.
+   Following is one-way; the followers list is what lets an inviter see who
+   joined from their link and follow them back.
    ════════════════════════════════════════════════════════════ */
 
 const admin = require('firebase-admin');
@@ -18,6 +23,7 @@ const { overLimit } = require('./_limit');
 
 const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
 const ID_RE = /^[a-z0-9]{8,40}$/;
+const MAX_FOLLOWERS = 200;
 const RESERVED = new Set(['admin', 'support', 'help', 'feedthebear', 'feed_the_bear', 'grizzly', 'cub', 'bytecub', 'byte_cub', 'official', 'team', 'staff', 'moderator', 'root', 'null', 'undefined']);
 
 // Rate limits live in the database, so they hold across server restarts (_limit.js).
@@ -48,6 +54,14 @@ module.exports = async function handler (req, res) {
   try {
     if (req.method === 'GET') {
       if (req.query?.mine) return res.status(200).json({ handle: (await db.doc(`handleOf/${uid}`).get()).data()?.handle || '' });
+      if (req.query?.followers) {
+        const list = (await db.doc(`followedBy/${uid}`).get()).data()?.list;
+        const recent = (Array.isArray(list) ? list : []).slice(0, 100);
+        // Only followers whose profile is still live (deleted accounts drop off).
+        const live = await Promise.all(recent.map(f => db.doc(`profiles/${f.id}`).get().then(s => s.data()).catch(() => null)));
+        const followers = recent.filter((f, i) => live[i]).map((f, i) => ({ id: f.id, u: String(f.u || 'Friend').slice(0, 30), at: f.at || '' }));
+        return res.status(200).json({ followers });
+      }
       if (await overLimit(`handle:q:${uid}`, 30, 600)) return res.status(429).json({ error: 'Slow down a little and try again soon.' });
       const handle = cleanHandle(req.query?.q);
       if (!HANDLE_RE.test(handle)) return res.status(200).json({ found: false });
@@ -67,6 +81,29 @@ module.exports = async function handler (req, res) {
       const mine = (await db.doc(`handleOf/${uid}`).get()).data()?.handle;
       if (mine) await db.doc(`handles/${mine}`).delete();
       await db.doc(`handleOf/${uid}`).delete();
+      return res.status(200).json({ ok: true });
+    }
+
+    // You followed (or unfollowed) someone: note it on their followers list.
+    // `me` must be your own live profile, so nobody can follow in someone
+    // else's name, and the name shown is that profile's own.
+    if (body.action === 'followed' || body.action === 'unfollowed') {
+      if (await overLimit(`handle:f:${uid}`, 60, 600)) return res.status(429).json({ error: 'Slow down a little and try again soon.' });
+      const id = String(body.id || '');
+      const me = String(body.me || '');
+      if (!ID_RE.test(id) || !ID_RE.test(me) || id === me) return res.status(400).json({ error: 'Bad profile.' });
+      const [theirs, mine] = await Promise.all([db.doc(`profiles/${id}`).get(), db.doc(`profiles/${me}`).get()]);
+      const owner = theirs.data()?.uid;
+      if (!mine.data() || mine.data().uid !== uid) return res.status(403).json({ error: 'Share your profile first.' });
+      if (!owner || owner === uid) return res.status(200).json({ ok: true });
+      const name = String(mine.data().u || 'Friend').slice(0, 30);
+      await db.runTransaction(async tx => {
+        const ref = db.doc(`followedBy/${owner}`);
+        const cur = (await tx.get(ref)).data()?.list;
+        const list = (Array.isArray(cur) ? cur : []).filter(f => f && f.id !== me);
+        if (body.action === 'followed') list.unshift({ id: me, u: name, at: new Date().toISOString() });
+        tx.set(ref, { list: list.slice(0, MAX_FOLLOWERS) });
+      });
       return res.status(200).json({ ok: true });
     }
 

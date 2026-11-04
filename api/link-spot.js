@@ -15,8 +15,9 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
 
 // Only these sites are fetched, so the function can't be pointed at anything else.
 const PAGE_HOSTS = ['tiktok.com', 'instagram.com', 'youtube.com', 'youtu.be', 'facebook.com', 'fb.watch', 'x.com', 'twitter.com', 'yelp.com', 'threads.net'];
+// TikTok's oEmbed stopped returning captions, so TikTok is read from the
+// video page instead (tiktokPost below).
 const OEMBED = {
-  'tiktok.com': u => `https://www.tiktok.com/oembed?url=${encodeURIComponent(u)}`,
   'youtube.com': u => `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(u)}`,
   'youtu.be': u => `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(u)}`,
 };
@@ -45,6 +46,51 @@ function metaTag (html, prop) {
   return decode((html.match(re) || html.match(re2) || [])[1] || '');
 }
 
+const UA = 'Mozilla/5.0 (compatible; FeedTheBear/1.0; +https://www.feed-the-bear.com)';
+const TIKTOK_ID_RE = /\/(?:video|photo)\/(\d{8,25})/;
+
+// A TikTok share is usually a short link (vm.tiktok.com/…, tiktok.com/t/…)
+// that redirects to /@user/video/<id>. Follow it, staying on TikTok, to the id.
+async function tiktokId (link) {
+  let url = link;
+  for (let hop = 0; hop < 5; hop++) {
+    const m = url.match(TIKTOK_ID_RE);
+    if (m) return m[1];
+    if (!/^https:\/\//.test(url) || allowedHost(hostOf(url)) !== 'tiktok.com') return '';
+    const r = await timedFetch(url, { headers: { 'User-Agent': UA }, redirect: 'manual' }, 5000);
+    const next = r.status >= 300 && r.status < 400 ? r.headers.get('location') : '';
+    if (!next) return '';
+    url = new URL(next, url).toString();
+  }
+  return (url.match(TIKTOK_ID_RE) || [])[1] || '';
+}
+
+// The video page carries the post as JSON: caption, creator, on-screen text,
+// and the location tag (for a restaurant video, usually the restaurant).
+async function tiktokPost (link) {
+  try {
+    const id = await tiktokId(link);
+    if (!id) return null;
+    const r = await timedFetch(`https://www.tiktok.com/@/video/${id}`, { headers: { 'User-Agent': UA, 'Accept-Language': 'en' } }, 7000);
+    if (!r.ok) return null;
+    const html = (await r.text()).slice(0, 2500000);
+    const m = html.match(/<script[^>]*id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>([\s\S]*?)<\/script>/);
+    if (!m) return null;
+    const it = JSON.parse(m[1])?.__DEFAULT_SCOPE__?.['webapp.video-detail']?.itemInfo?.itemStruct;
+    if (!it) return null;
+    const stickers = (it.stickersOnItem || []).flatMap(s => s?.stickerText || []);
+    const extra = (it.contents || []).map(c => c?.desc).filter(d => d && d !== it.desc);
+    const poi = it.poi?.name ? {
+      name: String(it.poi.name).slice(0, 100),
+      address: String(it.poi.address || '').slice(0, 160),
+      city: String(it.poi.city || '').slice(0, 80),
+    } : null;
+    const text = [it.desc, ...extra, ...stickers, it.author?.nickname, poi ? `Location: ${[poi.name, poi.address, poi.city].filter(Boolean).join(', ')}` : '']
+      .filter(Boolean).map(s => String(s).trim()).join('\n').slice(0, 1500);
+    return { text, poi };
+  } catch { return null; }
+}
+
 // The words of the post: oEmbed when the site has it, else the page's share tags.
 async function captionFor (link) {
   const host = allowedHost(hostOf(link));
@@ -66,7 +112,7 @@ async function captionFor (link) {
       let r = null;
       for (let hop = 0; hop < 4; hop++) {
         if (!/^https:\/\//.test(url) || !allowedHost(hostOf(url))) { r = null; break; }
-        r = await timedFetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FeedTheBear/1.0; +https://www.feed-the-bear.com)', 'Accept-Language': 'en' }, redirect: 'manual' });
+        r = await timedFetch(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'en' }, redirect: 'manual' });
         const next = r.status >= 300 && r.status < 400 ? r.headers.get('location') : '';
         if (!next) break;
         url = new URL(next, url).toString();
@@ -149,11 +195,17 @@ module.exports = async function handler (req, res) {
     return res.status(200).json({ caption: '', guess: null, places: [], error: 'That link is not from TikTok, Instagram, YouTube, Facebook, X, Threads or Yelp. Try typing the restaurant name instead.' });
   }
 
-  const caption = link ? await captionFor(link) : '';
-  const text = [typed, caption].filter(Boolean).join('\n');
+  const tiktok = link && allowedHost(hostOf(link)) === 'tiktok.com' ? await tiktokPost(link) : null;
+  const caption = tiktok?.text || (link ? await captionFor(link) : '');
+  // The TikTok app's share text ("Check out this video…") says nothing useful.
+  const words = tiktok?.text ? typed.replace(/check out .{0,60}?(video|tiktok)!?|#tiktok/gi, '').trim() : typed;
+  const text = [words, caption].filter(Boolean).join('\n');
   const guess = await guessRestaurant(text);
-  // Without a guess, plain typed text is searched as-is.
-  const query = guess?.name ? [guess.name, guess.city].filter(Boolean).join(', ') : (link ? '' : typed);
+  // A location-tagged TikTok names the place outright; otherwise Gemini's guess,
+  // and without one, plain typed text is searched as-is.
+  const poi = tiktok?.poi;
+  const query = poi ? [poi.name, poi.address || poi.city].filter(Boolean).join(', ')
+    : guess?.name ? [guess.name, guess.city].filter(Boolean).join(', ') : (link ? '' : typed);
   const places = await findPlaces(query, lat, lng);
 
   res.setHeader('Cache-Control', 'private, max-age=0');
@@ -164,3 +216,4 @@ module.exports = async function handler (req, res) {
     error: places.length ? '' : (link && !caption ? 'We could not read that post. Try typing the restaurant name instead.' : 'We could not tell which restaurant that is. Try typing its name.'),
   });
 };
+module.exports.tiktokPost = tiktokPost; // tests

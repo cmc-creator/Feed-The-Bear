@@ -687,6 +687,8 @@ function initFirebaseAuth () {
       }
 
       _mergeFriendsFromCloud(cloudProfile);
+      // Let the people you follow see you under "Following you" (once each).
+      setTimeout(() => window.noteExistingFollows?.(), 5000);
 
       // Merge profile (cloud wins for plan fields)
       if (cloudProfile) {

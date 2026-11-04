@@ -9176,3 +9176,9 @@ body select.form-select, body.light-mode select.form-select {
 button.map-group-row { cursor: pointer; }
 .map-group-row b { flex: 1; font-weight: 700; }
 .map-group-row i { font-style: normal; font-size: .75rem; color: #a46a2a; font-weight: 700; }
+
+/* Friends: people who follow you. */
+.friend-follow-back { flex: 0 0 auto; }
+.friend-mutual { flex: 0 0 auto; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; font-weight: 800; color: #2e9d5b; background: rgba(46,204,113,.14); }
+.friend-info .friend-sent { justify-self: start; margin-top: 2px; padding: 2px 8px; border-radius: 999px; font-size: .7rem; font-weight: 700; color: #b7791f; background: rgba(232,177,90,.16); }
+.friend-invite-row { opacity: .9; }

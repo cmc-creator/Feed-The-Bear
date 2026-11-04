@@ -177,6 +177,28 @@ function buildInviteLink (ref = window._ftbUid || '') {
   return ref && /^[A-Za-z0-9]{10,64}$/.test(ref) ? link.replace('#profile=', `?ref=${ref}#profile=`) : link;
 }
 
+// Invites you've sent (newest first), so Friends can show them as "Sent".
+const INVITES_SENT_KEY = 'ftb_invites_sent_v1';
+function getSentInvites () {
+  try {
+    const list = JSON.parse(localStorage.getItem(INVITES_SENT_KEY) || '[]');
+    return Array.isArray(list) ? list.filter(s => typeof s === 'string') : [];
+  } catch { return []; }
+}
+function noteInviteSent () {
+  try { localStorage.setItem(INVITES_SENT_KEY, JSON.stringify([new Date().toISOString(), ...getSentInvites()].slice(0, 50))); } catch { /* private mode */ }
+  if (!document.getElementById('friends-overlay')?.classList.contains('hidden')) renderFriendsList();
+}
+function fmtInviteDate (iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 'Sent';
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  if (days < 1) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 // `ref` is your account id for the free-month reward (firebase.js passes it).
 async function inviteFriend ({ ref = window._ftbUid || '' } = {}) {
   if (grizzlyLocked('friends') || !ensureInviteName()) return;
@@ -190,11 +212,12 @@ async function inviteFriend ({ ref = window._ftbUid || '' } = {}) {
   startSharingLive();
   trackProductEvent('friend_invite', { withProfile: hasPicks, withRef: !!ref });
   try {
-    if (navigator.share) { await navigator.share({ title: 'Feed the Bear', text, url }); return; }
+    if (navigator.share) { await navigator.share({ title: 'Feed the Bear', text, url }); noteInviteSent(); return; }
   } catch (err) {
     if (err && err.name === 'AbortError') return;
   }
   try { await navigator.clipboard.writeText(`${text} ${url}`); } catch { /* no clipboard */ }
+  noteInviteSent();
   showToast('Invite copied', 'Paste it in a text to a friend.', 'success');
 }
 
@@ -378,8 +401,10 @@ function followFriend (data) {
   if (i < 0 && list.length >= FREE_FRIENDS && grizzlyLocked('friends')) return null;
   if (i >= 0) list[i] = entry; else list.unshift(entry);
   saveFriends(list);
+  if (i < 0) noteFollow(data.id);
   trackProductEvent('friend_followed', { updated: i >= 0 });
-  showToast(i >= 0 ? `Updated ${entry.name}` : `Following ${entry.name}`, 'Their go-to orders now show on matching restaurants.', 'success');
+  showToast(i >= 0 ? `Updated ${entry.name}` : `Following ${entry.name}`,
+    window._ftbUid ? 'Their go-to orders now show on matching restaurants, and they can follow you back.' : 'Their go-to orders now show on matching restaurants.', 'success');
   renderAll();
   // Android app: offer a ping when they eat somewhere new (asks once).
   if (i < 0) window.FriendPings?.offer();
@@ -387,8 +412,59 @@ function followFriend (data) {
 }
 
 function unfollowFriend (key) {
+  const gone = getFriends().find(f => f.key === key);
   saveFriends(getFriends().filter(f => f.key !== key));
+  if (gone?.data?.id) noteFollow(gone.data.id, 'unfollowed');
   renderAll();
+}
+
+/* ── Followers: who follows you ──
+   Following is one-way, so when a friend joins from your invite and follows
+   you, the server notes it (api/handle.js) and Friends shows them under
+   "Following you" with a Follow back button. Your profile goes live when you
+   follow someone, so they can see you back. */
+const FOLLOW_NOTED_KEY = 'ftb_follow_noted_v1';
+function followNoted () {
+  try { return new Set(JSON.parse(localStorage.getItem(FOLLOW_NOTED_KEY)) || []); } catch { return new Set(); }
+}
+async function noteFollow (id, action = 'followed') {
+  if (!id || !window._ftbUid || !/^[a-z0-9]{8,40}$/.test(String(id))) return false;
+  try {
+    startSharingLive();
+    if (typeof fbPublishFriendProfile === 'function') await fbPublishFriendProfile();
+    const { ok } = await handleApi('POST', { body: { action, id, me: getProfileShareId() } });
+    if (ok) {
+      const noted = followNoted();
+      if (action === 'followed') noted.add(id); else noted.delete(id);
+      localStorage.setItem(FOLLOW_NOTED_KEY, JSON.stringify([...noted].slice(-100)));
+    }
+    return ok;
+  } catch { return false; }
+}
+// Friends followed before followers existed (or on another device) are noted
+// once, so the people you follow see you under "Following you".
+let _notingFollows = false;
+async function noteExistingFollows () {
+  if (_notingFollows || !window._ftbUid) return;
+  _notingFollows = true;
+  try {
+    const noted = followNoted();
+    for (const f of getFriends()) {
+      if (f.data?.id && !noted.has(f.data.id)) await noteFollow(f.data.id);
+    }
+  } finally { _notingFollows = false; }
+}
+
+let _followers = null;
+async function loadFollowers () {
+  if (!window._ftbUid) { _followers = []; return; }
+  try {
+    const { ok, data } = await handleApi('GET', { query: '?followers=1' });
+    _followers = ok && Array.isArray(data.followers) ? data.followers.slice(0, 200).map(f => ({
+      id: String(f?.id || '').slice(0, 40), u: String(f?.u || 'Friend').slice(0, 30),
+    })).filter(f => /^[a-z0-9]{8,40}$/.test(f.id)) : [];
+  } catch { _followers = []; }
+  if (!document.getElementById('friends-overlay')?.classList.contains('hidden')) renderFriendsList();
 }
 
 // What your friends say about one spot: their rating, orders, and cravings.
@@ -714,22 +790,57 @@ function renderFriendsList () {
   const el = document.getElementById('friends-list');
   if (!el) return;
   const friends = getFriends();
-  el.innerHTML = friends.length
+  const following = new Set(friends.map(f => f.data?.id).filter(Boolean));
+  const followers = _followers || [];
+  const followersHtml = followers.length
+    ? `<div class="friends-section-title">Following you (${followers.length})</div>` + followers.map((f, i) => `<div class="friend-row">
+          <span class="friend-info"><strong>${escHtml(f.u)}</strong><span>${following.has(f.id) ? 'You follow each other' : 'Follows you'}</span></span>
+          ${following.has(f.id)
+            ? '<span class="friend-mutual" aria-label="You follow each other">✓</span>'
+            : `<button type="button" class="btn-sm btn-orange friend-follow-back" data-i="${i}">Follow back</button>`}
+        </div>`).join('')
+    : '';
+  // Someone you follow who hasn't followed back yet: your follow is "sent".
+  const followerIds = new Set(followers.map(f => f.id));
+  const followingHtml = friends.length
     ? `<div class="friends-section-title">Following (${friends.length})</div>` + friends.map(f => {
         const orders = (f.data?.picks || []).reduce((n, p) => n + (p.g?.length || 0), 0);
+        const waiting = _followers !== null && f.data?.id && !followerIds.has(f.data.id);
         return `<div class="friend-row">
           <span class="friend-info"><strong>${escHtml(f.name)}</strong>
-            <span>${(f.data?.picks || []).length} spots · ${orders} go-to orders · ${(f.data?.w || []).length} cravings</span></span>
+            <span>${(f.data?.picks || []).length} spots · ${orders} go-to orders · ${(f.data?.w || []).length} cravings</span>
+            ${waiting ? '<span class="friend-sent">Sent · waiting for them to follow back</span>' : ''}</span>
           <button type="button" class="friend-remove icon-btn" data-key="${escHtml(f.key)}" aria-label="Unfollow ${escHtml(f.name)}">✕</button>
         </div>`;
       }).join('')
-    : '<div class="friends-empty">No friends yet. Send an invite: when they open it, they can follow you, and you can follow them back from their link.</div>';
+    : '';
+  // Invites go out as links, so the phone keeps its own list of when you sent them.
+  const invites = getSentInvites();
+  const invitesHtml = invites.length
+    ? `<div class="friends-section-title">Sent invites (${invites.length})</div>` + invites.slice(0, 10).map(at => `<div class="friend-row friend-invite-row">
+          <span class="friend-info"><strong>Invite sent</strong><span>${escHtml(fmtInviteDate(at))} · they show up under Following you when they join</span></span>
+        </div>`).join('')
+      + (invites.length > 10 ? `<div class="friends-empty">and ${invites.length - 10} more</div>` : '')
+    : '';
+  el.innerHTML = followersHtml + followingHtml + invitesHtml || (_followers === null && window._ftbUid
+    ? '<div class="friends-empty">Loading your friends…</div>'
+    : '<div class="friends-empty">No friends yet. Send an invite: when a friend joins from it, they show up here and you can follow each other.</div>');
+  el.querySelectorAll('.friend-follow-back').forEach(b => b.addEventListener('click', () => {
+    const f = followers[Number(b.dataset.i)];
+    if (f && followFriend({ id: f.id, u: f.u, picks: [], w: [] })) {
+      renderFriendsList();
+      refreshFriendsLive(true);
+      trackProductEvent('friend_followed_back');
+    }
+  }));
 }
 
 function openFoodieFriends () {
   // Open to everyone: a free account can follow one friend (followFriend
   // checks), so it needs this screen to find them. Inviting stays Grizzly.
   renderFriendsList();
+  loadFollowers();
+  noteExistingFollows();
   renderMyHandle();
   const found = document.getElementById('friends-find-result');
   if (found) found.innerHTML = '';

@@ -79,7 +79,7 @@ module.exports = async function handler (req, res) {
     const handle = (await db.doc(`handleOf/${uid}`).get()).data()?.handle;
     if (handle) await db.doc(`handles/${handle}`).delete();
     // Server-only records keyed by this account (the weekly email list holds their address).
-    const serverDocs = ['digestSubscribers', 'rewards', 'trials', 'referrals', 'pushTokens', 'pushFollows', 'apiQuota', 'aiQuota', 'handleOf'].map(c => `${c}/${uid}`);
+    const serverDocs = ['digestSubscribers', 'rewards', 'trials', 'referrals', 'pushTokens', 'pushFollows', 'apiQuota', 'aiQuota', 'handleOf', 'followedBy'].map(c => `${c}/${uid}`);
     if (customerId) serverDocs.push(`stripeCustomers/${customerId}`);
     await Promise.all(serverDocs.map(p => db.doc(p).delete()));
     await db.recursiveDelete(db.doc(`users/${uid}`));

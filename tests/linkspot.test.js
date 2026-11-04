@@ -9,7 +9,11 @@ global.fetch = async (url, opts = {}) => {
   url = String(url);
   fetched.push(url);
   const json = data => ({ ok: true, status: 200, json: async () => data, text: async () => JSON.stringify(data), headers: { get: () => '' } });
-  if (url.startsWith('https://www.tiktok.com/oembed')) return json({ title: 'The best birria in Phoenix 🌮 @tacosch #phxfood', author_name: 'phxeats' });
+  // TikTok: the video page's JSON (oEmbed no longer has the caption).
+  const ttPage = item => ({ ok: true, status: 200, headers: { get: () => '' }, text: async () => '<html><script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">' + JSON.stringify({ __DEFAULT_SCOPE__: { 'webapp.video-detail': { itemInfo: { itemStruct: item } } } }) + '</script></html>' });
+  if (url === 'https://www.tiktok.com/@/video/7312345678901234567') return ttPage({ desc: 'The best birria in Phoenix 🌮 @tacosch #phxfood', author: { nickname: 'phxeats' } });
+  if (url === 'https://www.tiktok.com/@/video/7400000000000000001') return ttPage({ desc: 'must try 🤪 #foodtok', author: { nickname: 'barrett' }, poi: { name: 'Cocina Adamex', address: '416 N 7th Ave, Phoenix, AZ 85007', city: 'Phoenix' } });
+  if (url.startsWith('https://vm.tiktok.com/ZMgood')) return { ok: false, status: 301, headers: { get: h => (h === 'location' ? 'https://www.tiktok.com/@barrett/video/7400000000000000001?_r=1' : '') }, text: async () => '' };
   if (url.startsWith('https://vm.tiktok.com/')) return { ok: false, status: 301, headers: { get: h => (h === 'location' ? 'http://169.254.169.254/latest' : '') }, text: async () => '' };
   if (url.includes('instagram.com/p/')) return { ok: true, status: 200, headers: { get: () => '' }, text: async () => '<meta property="og:description" content="Pizzeria Bianco in Phoenix, still the best margherita" />' };
   if (url.includes('generativelanguage.googleapis.com')) {
@@ -47,6 +51,9 @@ const call = q => new Promise(resolve => {
 (async () => {
   let r = await call('https://www.tiktok.com/@phxeats/video/7312345678901234567');
   check(r.places[0]?.name === 'Tacos Chiwas' && /birria/.test(r.caption), `a TikTok link finds the restaurant (${r.places[0]?.name})`);
+  r = await call("Check out barrett's video! #TikTok https://vm.tiktok.com/ZMgood/");
+  check(r.places[0]?.name === 'Cocina Adamex' && /Adamex/.test(r.caption), `a shared TikTok short link is followed and its location tag names the place (${r.places[0]?.name})`);
+  check(fetched.some(u => u === 'https://www.tiktok.com/@/video/7400000000000000001'), 'the short link resolves to the video page');
   r = await call('https://www.instagram.com/p/C1abcDEF/');
   check(r.places[0]?.name === 'Pizzeria Bianco', 'an Instagram post is read from its share tags');
   r = await call('Pizzeria Bianco downtown');
