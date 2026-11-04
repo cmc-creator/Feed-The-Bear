@@ -4876,11 +4876,71 @@ function parseCubCommand (text) {
     const name = placeFromText(m[1]);
     if (name.length >= 2) return { kind: 'want', name };
   }
+  const food = foodToFind(t);
+  if (food) return { kind: 'find', food };
   if (/\b(what|where)\b.*\b(eat|go|dinner|lunch|breakfast|brunch|tonight)\b|\bpick (?:for me|something|a place)\b|\bi'?m hungry\b|\bhelp me (?:decide|choose)\b/.test(low)) return { kind: 'pick' };
   if (/\binvite\b/.test(low)) return { kind: 'invite' };
   if (/\b(dinner vote|group vote|vote)\b/.test(low)) return { kind: 'vote' };
   if (/\bimport\b/.test(low)) return { kind: 'import' };
   return null;
+}
+
+// "places to get subs near me", "where can I get pho", "find me tacos nearby"
+// → "subs" / "pho" / "tacos". '' when it isn't a search for real places.
+const NEAR_WORDS = /\b(?:near(?:by| me| here)|around (?:me|here)|close (?:by|to me)|in (?:the|my) area|in town)\b/i;
+function foodToFind (t) {
+  const low = t.toLowerCase().replace(/[?.!]+$/, '');
+  const asks = NEAR_WORDS.test(low)
+    || /\bwhere (?:can|could|should|do) (?:i|we) (?:get|find|grab|buy)\b/.test(low)
+    || /\b(?:find|search for|look for|looking for|show me|recommend|suggest)\b.*\b(?:places?|spots?|restaurants?|shops?)\b/.test(low)
+    || /\bfind me\b/.test(low);
+  if (!asks) return '';
+  const food = low
+    .replace(NEAR_WORDS, ' ')
+    .replace(/\b(?:can|could|would) you\b|\bplease\b|\b(?:i|we) (?:want|need|feel like|am craving|'?m craving)\b|\bi'?m (?:looking|craving)\b/g, ' ')
+    .replace(/\bwhere (?:can|could|should|do) (?:i|we) (?:get|find|grab|buy)\b/g, ' ')
+    .replace(/\b(?:show|find|search|look(?:ing)?|recommend|suggest|give|tell)(?: me| us)?(?: for)?\b/g, ' ')
+    .replace(/\b(?:is|are) there\b|\bwhat(?:'?s| is)\b|\bwhats\b|\b(?:anything|something|to eat|eat)\b/g, ' ')
+    .replace(/\b(?:some|any|good|great|best|the|a|an|me|us|of|my|nice|cheap|local)\b/g, ' ')
+    .replace(/\b(?:places?|spots?|restaurants?|shops?|options?|joints?)\b(?:\s+(?:to|for|that|which|with|where))?(?:\s+(?:get|eat|grab|have|serve|serves|sell|sells|has|find))?/g, ' ')
+    .replace(/\b(?:to|for)\s+(?:get|eat|grab|have)\b/g, ' ')
+    .replace(/[^\p{L}\p{N}&' -]/gu, ' ')
+    .replace(/\s+/g, ' ').trim()
+    .replace(/^(?:for|to|get|eat)\s+/, '').trim();
+  if (/\b(?:my|saved|list|been there|want to try)\b/.test(food)) return '';
+  return food.length >= 2 && food !== 'food' ? food.slice(0, 60) : 'restaurants';
+}
+
+// Real places near you for a food ("subs"), whether or not you've saved any.
+async function cubFindNearby (food) {
+  showTyping();
+  const located = await ensureLocationForDiscovery();
+  const query = food.length < 3 ? `${food} restaurant` : food;
+  const found = await searchRealPlaces(query);
+  hideTyping();
+  const here = located && Number.isFinite(state.userLat);
+  const places = found
+    .map(p => ({ ...p, m: here && Number.isFinite(p.lat) ? haversine(state.userLat, state.userLng, p.lat, p.lng) : null }))
+    .filter(p => p.m == null || p.m < 40000)
+    .sort((a, b) => (a.m ?? Infinity) - (b.m ?? Infinity));
+  trackProductEvent('cub_find_nearby', { results: places.length, located: here });
+  if (!places.length) {
+    cubSay(here ? `I couldn't find ${food} near you. Try another word, like "sandwiches" or "pizza".`
+      : `Turn on location so I can find ${food} near you.`,
+      here ? [] : [{ label: '📍 Use my location', primary: true, run: () => cubFindNearby(food) }]);
+    return;
+  }
+  const lines = places.map((p, i) => {
+    const bits = [p.m != null ? fmtDist(p.m) : '', p.rating ? `★ ${p.rating.toFixed(1)}` : '', p.address.split(',')[0]].filter(Boolean);
+    return `${i + 1}. **${p.name}**${bits.length ? `: ${bits.join(' · ')}` : ''}`;
+  });
+  cubSay(`${here ? 'Closest' : 'Top'} spots for ${food}${here ? ' near you' : ''}:\n${lines.join('\n')}\n\nTap one to save it to Want to Try.`,
+    places.slice(0, 4).map((p, i) => ({ label: `🔖 ${p.name}`, primary: i === 0, run: () => {
+      const r = savedSpotNamed(p.name);
+      if (r) { cubSay(`**${r.name}** is already saved.`, [{ label: 'Open it', primary: true, run: () => { closeChat(); openDetailModal(r.id); } }]); return; }
+      const spot = createSpotFrom({ found: p, status: 'want-to-try' });
+      if (spot) { saveData(); renderAll(); cubAddWant(spot); }
+    } })));
 }
 
 function savedSpotNamed (name) {
@@ -5019,6 +5079,7 @@ async function handleCubCommand (cmd) {
         { label: 'Put them to a vote', run: () => { closeChat(); openDinnerRooms(top.map(x => x.r.id)); } }]);
     return;
   }
+  if (cmd.kind === 'find') { await cubFindNearby(cmd.food); return; }
   if (cmd.kind === 'invite') { cubSay('Sending an invite. They will see your picks and can follow you.'); inviteFriend(); return; }
   if (cmd.kind === 'vote') { closeChat(); openDinnerRooms(); return; }
   if (cmd.kind === 'import') { closeChat(); showImportBookmarks(); }
@@ -7566,6 +7627,11 @@ function setupEvents () {
   });
 
   // Phase 7 - Voice
+  // No speech recognition (e.g. the Android app's web view): hide the mic.
+  if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) {
+    const mic = document.getElementById('search-voice-btn');
+    if (mic) mic.classList.add('hidden');
+  }
   document.getElementById('search-voice-btn')?.addEventListener('click', startVoiceAdd);
   document.getElementById('voice-btn')?.addEventListener('click', startVoiceAdd);
   document.getElementById('voice-cancel-btn').addEventListener('click', stopVoice);
@@ -9635,31 +9701,45 @@ function startVoiceAdd () {
   const overlay = document.getElementById('voice-overlay');
   const status = document.getElementById('voice-status');
   const transcript = document.getElementById('voice-transcript');
+  if (_voiceRecognition) { stopVoice(); return; }
   overlay.classList.remove('hidden');
   setVoiceButtonsListening(true);
   status.textContent = 'Listening...';
-  transcript.textContent = 'Say: "Add [name] on [address]" or just "[name]"';
+  transcript.textContent = 'Say a spot or dish to search, or "add [name]" to save one';
 
-  _voiceRecognition = new SpeechRecognition();
-  _voiceRecognition.lang = 'en-US';
-  _voiceRecognition.interimResults = true;
-  _voiceRecognition.maxAlternatives = 1;
+  const rec = new SpeechRecognition();
+  rec.lang = 'en-US';
+  rec.interimResults = true;
+  rec.maxAlternatives = 1;
+  let failed = false;
 
-  _voiceRecognition.onresult = e => {
+  rec.onresult = e => {
     const text = Array.from(e.results).map(r => r[0].transcript).join('');
     transcript.textContent = '"' + text + '"';
     if (e.results[e.results.length - 1].isFinal) {
-      parseVoiceInput(text);
       stopVoice();
+      parseVoiceInput(text);
     }
   };
-  _voiceRecognition.onerror = e => {
-    status.textContent = 'Error: ' + e.error;
-    setTimeout(stopVoice, 1200);
+  // Keep the card up long enough to read what went wrong.
+  rec.onerror = e => {
+    if (e.error === 'aborted') return;
+    failed = true;
+    status.textContent = VOICE_ERRORS[e.error] || "Couldn't hear that. Try again.";
+    transcript.textContent = '';
+    setTimeout(() => { if (_voiceRecognition === rec) stopVoice(); }, 2500);
   };
-  _voiceRecognition.onend = () => stopVoice();
-  _voiceRecognition.start();
+  rec.onend = () => { if (!failed && _voiceRecognition === rec) stopVoice(); };
+  _voiceRecognition = rec;
+  try { rec.start(); } catch (_) { stopVoice(); }
 }
+const VOICE_ERRORS = {
+  'not-allowed': 'Microphone blocked. Allow it for this site in your browser settings.',
+  'service-not-allowed': 'Microphone blocked. Allow it for this site in your browser settings.',
+  'no-speech': "Didn't hear anything. Tap the mic and try again.",
+  'audio-capture': 'No microphone found.',
+  'network': 'Voice needs an internet connection.'
+};
 // Talk to Byte Cub: words fill the chat box as you speak, then send.
 // Hidden where the browser has no speech recognition.
 let _chatRecognition = null;
@@ -9667,7 +9747,7 @@ function initChatMic () {
   const btn = document.getElementById('chat-mic-btn');
   if (!btn) return;
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) { btn.hidden = true; return; }
+  if (!SpeechRecognition) { btn.classList.add('hidden'); return; }
   btn.addEventListener('click', () => {
     if (_chatRecognition) { _chatRecognition.stop(); return; }
     const input = document.getElementById('chat-input');
@@ -9693,22 +9773,25 @@ function initChatMic () {
   });
 }
 function stopVoice () {
-  if (_voiceRecognition) { try { _voiceRecognition.stop(); } catch(_){} _voiceRecognition = null; }
+  // abort, not stop: a cancelled listen shouldn't still search or add.
+  if (_voiceRecognition) { try { _voiceRecognition.abort(); } catch(_){} _voiceRecognition = null; }
   document.getElementById('voice-overlay').classList.add('hidden');
   setVoiceButtonsListening(false);
 }
 function parseVoiceInput (text) {
-  text = text.trim();
+  text = text.trim().replace(/[.?!]+$/, '');
+  if (!text) { showToast('Couldn\'t hear that', 'Please try again.', 'error'); return; }
   // "add nobu on 105 hudson street"
   const addMatch = text.match(/^add\s+(.+?)(?:\s+(?:on|at|in)\s+(.+))?$/i);
-  let name = '', address = '';
-  if (addMatch) {
-    name    = addMatch[1].trim();
-    address = (addMatch[2] || '').trim();
-  } else {
-    name = text;
+  if (!addMatch) {
+    // Anything else is a search, same as typing it.
+    const search = document.getElementById('search-input');
+    search.value = text;
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    return;
   }
-  if (!name) { showToast('Couldn\'t parse', 'Please try again.', 'error'); return; }
+  const name    = addMatch[1].trim();
+  const address = (addMatch[2] || '').trim();
   // Open add modal pre-filled
   openAddModal();
   document.getElementById('form-name').value = name;

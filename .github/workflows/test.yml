@@ -167,6 +167,9 @@ jobs:
       - name: Byte Cub assistant, spot location, header invite
         working-directory: tests
         run: node bytecub.test.js
+      - name: Voice search and talking to Byte Cub
+        working-directory: tests
+        run: node voice.test.js
       - name: Sign-in required, free plan limits
         working-directory: tests
         run: node signin.test.js

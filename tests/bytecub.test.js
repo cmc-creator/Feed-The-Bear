@@ -69,6 +69,24 @@ const say = async (p, text) => {
   // Header invite.
   check(await p.locator('#header-invite-btn').isVisible(), 'a small Invite button in the header');
 
+  // "places to get subs near me" searches real places, not just saved ones.
+  let asked = '';
+  await p.route('**/api/place-info?mode=search**', r => { asked = new URL(r.request().url()).searchParams.get('q'); return r.fulfill({ json: { places: [
+    { placeId: 's2', name: 'Far Subs', address: '9 Far Rd, Mesa', lat: 33.42, lng: -111.80, kind: 'Sandwich Shop', rating: 4.2, reviews: 90 },
+    { placeId: 's1', name: 'Cheba Hut', address: '7 Near St, Scottsdale', lat: 33.495, lng: -111.927, kind: 'Sandwich Shop', rating: 4.5, reviews: 300 }] } }); });
+  await p.evaluate(() => openChat());
+  await say(p, 'show me places to get subs near me');
+  await p.waitForTimeout(800);
+  const subs = await p.locator('#chat-messages').innerText();
+  check(asked === 'subs', `searches for "subs" (${asked})`);
+  check(/spots for subs near you/.test(subs) && subs.indexOf('Cheba Hut') < subs.indexOf('Far Subs'), 'lists real places, closest first');
+  check(!/save a few|don't have any|no saved/i.test(subs.split('subs near me').pop()), 'never says you need saved places');
+  await p.locator('#chat-messages button', { hasText: 'Cheba Hut' }).click();
+  await p.waitForTimeout(300);
+  check(await p.evaluate(() => state.restaurants.some(r => r.name === 'Cheba Hut' && r.status === 'want-to-try')), 'tapping one saves it to Want to Try');
+  check(await p.evaluate(() => parseCubCommand('where should we eat tonight')?.kind) === 'pick', '"where should we eat" still picks from your list');
+  await closeAllDialogs(p);
+
   check(!p.errors.length, `no page errors ${p.errors.join(' | ')}`);
   await browser.close();
   finish('bytecub');
