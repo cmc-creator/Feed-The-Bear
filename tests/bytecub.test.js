@@ -70,21 +70,29 @@ const say = async (p, text) => {
   check(await p.locator('#header-invite-btn').isVisible(), 'a small Invite button in the header');
 
   // "places to get subs near me" searches real places, not just saved ones.
-  let asked = '';
-  await p.route('**/api/place-info?mode=search**', r => { asked = new URL(r.request().url()).searchParams.get('q'); return r.fulfill({ json: { places: [
+  const asked = [];
+  await p.route('**/api/place-info?mode=search**', r => { asked.push(new URL(r.request().url()).searchParams.get('q')); return r.fulfill({ json: { places: [
     { placeId: 's2', name: 'Far Subs', address: '9 Far Rd, Mesa', lat: 33.42, lng: -111.80, kind: 'Sandwich Shop', rating: 4.2, reviews: 90 },
     { placeId: 's1', name: 'Cheba Hut', address: '7 Near St, Scottsdale', lat: 33.495, lng: -111.927, kind: 'Sandwich Shop', rating: 4.5, reviews: 300 }] } }); });
   await p.evaluate(() => openChat());
   await say(p, 'show me places to get subs near me');
   await p.waitForTimeout(800);
   const subs = await p.locator('#chat-messages').innerText();
-  check(asked === 'subs', `searches for "subs" (${asked})`);
+  check(asked.includes('subs'), `searches for "subs" (${asked})`);
   check(/spots for subs near you/.test(subs) && subs.indexOf('Cheba Hut') < subs.indexOf('Far Subs'), 'lists real places, closest first');
   check(!/save a few|don't have any|no saved/i.test(subs.split('subs near me').pop()), 'never says you need saved places');
   await p.locator('#chat-messages button', { hasText: 'Cheba Hut' }).click();
   await p.waitForTimeout(300);
   check(await p.evaluate(() => state.restaurants.some(r => r.name === 'Cheba Hut' && r.status === 'want-to-try')), 'tapping one saves it to Want to Try');
   check(await p.evaluate(() => parseCubCommand('where should we eat tonight')?.kind) === 'pick', '"where should we eat" still picks from your list');
+
+  // Grizzly AI: any other way of asking turns into a real nearby search, never "where are you?".
+  check(await p.evaluate(() => /Never ask for their location/.test(AI.chat.toString())), 'the AI is told never to ask where you are');
+  await p.evaluate(() => { window.AI.hasAccess = () => true; window.AI.chat = async () => '[[FIND: Hoagies]]'; });
+  await say(p, 'craving a big hoagie, ideas?');
+  await p.waitForTimeout(800);
+  check(asked.includes('hoagies'), `the AI's search runs for real (${asked})`);
+  check(!/\[\[FIND/.test(await p.locator('#chat-messages').innerText()), 'the search tag is never shown');
   await closeAllDialogs(p);
 
   check(!p.errors.length, `no page errors ${p.errors.join(' | ')}`);

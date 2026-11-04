@@ -1927,7 +1927,8 @@ async function ensureLocationForDiscovery () {
   }
   try {
     const pos = await new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 12000 });
+      // A fix from the last few minutes is close enough to search nearby.
+      navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, maximumAge: 300000, timeout: 12000 });
     });
     state.userLat = pos.coords.latitude;
     state.userLng = pos.coords.longitude;
@@ -4991,33 +4992,35 @@ function foodToFind (t) {
 // Real places near you for a food ("subs"), whether or not you've saved any.
 async function cubFindNearby (food) {
   showTyping();
-  const located = await ensureLocationForDiscovery();
-  const query = food.length < 3 ? `${food} restaurant` : food;
-  const found = await searchRealPlaces(query);
+  const here = await ensureLocationForDiscovery() && Number.isFinite(state.userLat);
+  if (!here) {
+    hideTyping();
+    cubSay("I couldn't get your location just now. Make sure location is allowed for Feed The Bear, then tap below.",
+      [{ label: '📍 Try again', primary: true, run: () => cubFindNearby(food) }]);
+    return;
+  }
+  const found = await searchRealPlaces(food.length < 3 ? `${food} restaurant` : food);
   hideTyping();
-  const here = located && Number.isFinite(state.userLat);
   const places = found
-  .map(p => ({ ...p, m: here && Number.isFinite(p.lat) ? haversine(state.userLat, state.userLng, p.lat, p.lng) : null }))
-  .filter(p => p.m == null || p.m < 40000)
-  .sort((a, b) => (a.m ?? Infinity) - (b.m ?? Infinity));
-  trackProductEvent('cub_find_nearby', { results: places.length, located: here });
+    .map(p => ({ ...p, m: Number.isFinite(p.lat) ? haversine(state.userLat, state.userLng, p.lat, p.lng) : null }))
+    .filter(p => p.m == null || p.m < 40000)
+    .sort((a, b) => (a.m ?? Infinity) - (b.m ?? Infinity));
+  trackProductEvent('cub_find_nearby', { results: places.length });
   if (!places.length) {
-  cubSay(here ? `I couldn't find ${food} near you. Try another word, like "sandwiches" or "pizza".`
-    : `Turn on location so I can find ${food} near you.`,
-    here ? [] : [{ label: '📍 Use my location', primary: true, run: () => cubFindNearby(food) }]);
-  return;
+    cubSay(`I couldn't find ${food} near you. Try another word, like "sandwiches" or "pizza".`);
+    return;
   }
   const lines = places.map((p, i) => {
   const bits = [p.m != null ? fmtDist(p.m) : '', p.rating ? `★ ${p.rating.toFixed(1)}` : '', p.address.split(',')[0]].filter(Boolean);
   return `${i + 1}. **${p.name}**${bits.length ? `: ${bits.join(' · ')}` : ''}`;
   });
-  cubSay(`${here ? 'Closest' : 'Top'} spots for ${food}${here ? ' near you' : ''}:\n${lines.join('\n')}\n\nTap one to save it to Want to Try.`,
-  places.slice(0, 4).map((p, i) => ({ label: `🔖 ${p.name}`, primary: i === 0, run: () => {
-    const r = savedSpotNamed(p.name);
-    if (r) { cubSay(`**${r.name}** is already saved.`, [{ label: 'Open it', primary: true, run: () => { closeChat(); openDetailModal(r.id); } }]); return; }
-    const spot = createSpotFrom({ found: p, status: 'want-to-try' });
-    if (spot) { saveData(); renderAll(); cubAddWant(spot); }
-  } })));
+  cubSay(`Closest spots for ${food} near you:\n${lines.join('\n')}\n\nTap one to save it to Want to Try.`,
+    places.slice(0, 4).map((p, i) => ({ label: `🔖 ${p.name}`, primary: i === 0, run: () => {
+      const r = savedSpotNamed(p.name);
+      if (r) { cubSay(`**${r.name}** is already saved.`, [{ label: 'Open it', primary: true, run: () => { closeChat(); openDetailModal(r.id); } }]); return; }
+      const spot = createSpotFrom({ found: p, status: 'want-to-try' });
+      if (spot) { saveData(); renderAll(); cubAddWant(spot); }
+    } })));
 }
 
 function savedSpotNamed (name) {
@@ -5248,12 +5251,15 @@ async function sendChat () {
 
   showTyping();
   if (window.AI?.hasAccess?.()) {
-  try {
-    const reply = await AI.chat(text, _cubChatHistory.slice(-12), state.restaurants);
-    hideTyping();
-    cubSay(reply);
-    return;
-  } catch { /* fall through to the built-in answers */ }
+    try {
+      const reply = await AI.chat(text, _cubChatHistory.slice(-12), state.restaurants);
+      hideTyping();
+      // He asks the app to search real places near you rather than asking where you are.
+      const find = String(reply).match(/\[\[\s*FIND:\s*([^\]]{2,60})\]\]/i);
+      if (find) { await cubFindNearby(find[1].trim().toLowerCase()); return; }
+      cubSay(reply);
+      return;
+    } catch { /* fall through to the built-in answers */ }
   }
   setTimeout(() => { hideTyping(); cubSay(chatResponse(text)); }, 350);
 }
