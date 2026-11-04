@@ -62,7 +62,7 @@ const call = (body, headers = {}) => new Promise(resolve => {
       isNativePlatform: () => true,
       Plugins: {
         NearbyAlerts: {
-          status: async () => ({ location: true, background: window.__native.bg || false, notifications: true }),
+          status: async () => ({ location: true, background: !window.__native.noBg && (window.__native.bg || false), notifications: true, ...(window.__native.noBg ? { backgroundSupported: false } : {}) }),
           setSpots: async o => { window.__native.setSpots.push(o); return {}; },
           requestLocation: async () => { window.__native.asked.push('location'); return {}; },
           requestNotifications: async () => { window.__native.asked.push('notifications'); return {}; },
@@ -114,6 +114,18 @@ const call = (body, headers = {}) => new Promise(resolve => {
   await p.evaluate(() => { state.restaurants.push({ id: 'new', name: 'New Taco', status: 'want-to-try', lat: 33.50, lng: -111.93, tags: [], visits: [] }); saveData(); });
   await p.waitForFunction(() => window.__native.setSpots.at(-1)?.spots.some(s => s.id === 'new'), null, { timeout: 8000 }).catch(() => {});
   check(await p.evaluate(() => window.__native.setSpots.at(-1).spots.some(s => s.id === 'new')), 'a newly saved spot is handed to Android');
+
+  // The Google Play build has no background location: no "closed" choice, no geofences.
+  await p.evaluate(async () => { window.__native.noBg = true; await NativeAlerts.refresh(); NativeAlerts.schedule(); openAccountModal(); });
+  await p.waitForFunction(() => window.__native.setSpots.at(-1)?.enabled === false, null, { timeout: 8000 }).catch(() => {});
+  check(await p.evaluate(() => window.__native.setSpots.at(-1).enabled) === false, 'the Play build never turns on geofences');
+  const playRow = await p.locator('#account-nearalerts-state').innerText();
+  check(/while the app is open\.$/.test(playRow), `the Play build says alerts work while the app is open, with no offer for closed (${playRow})`);
+  await p.click('#account-nearalerts-row');
+  check(await p.locator('#nearalerts-when').isHidden(), 'the Play build has no "even when closed" choice');
+  await p.evaluate(() => { closeNearAlerts(); NativeAlerts.askBackground(); });
+  check(await p.locator('#bg-location-overlay').isHidden(), 'the Play build never asks for "Allow all the time"');
+  await p.evaluate(() => { closeAccountModal(); window.__native.noBg = false; return NativeAlerts.refresh(); });
 
   // ── Google sign-in goes through Chrome ──
   await p.evaluate(() => _handleGoogleAuth());

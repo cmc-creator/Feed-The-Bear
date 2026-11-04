@@ -2,6 +2,8 @@ package com.feedthebear.app;
 
 import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
@@ -34,10 +36,27 @@ import org.json.JSONObject;
 )
 public class NearbyAlertsPlugin extends Plugin {
 
+    // The Google Play build leaves ACCESS_BACKGROUND_LOCATION out of the
+    // manifest, so "even when the app is closed" isn't offered there.
+    private boolean backgroundSupported() {
+        if (Build.VERSION.SDK_INT < 29) return true;
+        try {
+            PackageInfo info = getContext().getPackageManager().getPackageInfo(getContext().getPackageName(), PackageManager.GET_PERMISSIONS);
+            if (info.requestedPermissions != null) {
+                for (String p : info.requestedPermissions) {
+                    if (Manifest.permission.ACCESS_BACKGROUND_LOCATION.equals(p)) return true;
+                }
+            }
+        } catch (PackageManager.NameNotFoundException e) { /* our own package */ }
+        return false;
+    }
+
     private JSObject statusObject() {
         JSObject out = new JSObject();
+        boolean supported = backgroundSupported();
         out.put("location", getPermissionState("location") == PermissionState.GRANTED);
-        out.put("background", Build.VERSION.SDK_INT < 29 || getPermissionState("background") == PermissionState.GRANTED);
+        out.put("backgroundSupported", supported);
+        out.put("background", supported && (Build.VERSION.SDK_INT < 29 || getPermissionState("background") == PermissionState.GRANTED));
         out.put("notifications", Build.VERSION.SDK_INT < 33 || getPermissionState("notifications") == PermissionState.GRANTED);
         out.put("registered", GeofenceStore.registeredCount(getContext()));
         return out;
@@ -58,6 +77,7 @@ public class NearbyAlertsPlugin extends Plugin {
     // so the app explains why first (see app.js) and then this opens it.
     @PluginMethod
     public void requestBackground(PluginCall call) {
+        if (!backgroundSupported()) { call.resolve(statusObject()); return; }
         if (Build.VERSION.SDK_INT < 29 || getPermissionState("background") == PermissionState.GRANTED) { call.resolve(statusObject()); return; }
         if (getPermissionState("location") != PermissionState.GRANTED) { call.reject("Allow location first"); return; }
         if (Build.VERSION.SDK_INT >= 30) {

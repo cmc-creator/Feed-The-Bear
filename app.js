@@ -2168,7 +2168,7 @@ function renderNearAlertsRow () {
   const blocked = !native && 'Notification' in window && Notification.permission === 'denied';
   el.textContent = !on ? 'Off. Tap to get a heads-up near spots you want to try.'
     : native && NativeAlerts.closedToo() ? `On, within ${milesLabel(nearAlertMiles())}, even when the app is closed.`
-    : native ? `On, within ${milesLabel(nearAlertMiles())}, while the app is open.${state.settings.nearAlertsClosed === false ? '' : " Tap to get them when it's closed too."}`
+    : native ? `On, within ${milesLabel(nearAlertMiles())}, while the app is open.${state.settings.nearAlertsClosed === false || !NativeAlerts.canClose() ? '' : " Tap to get them when it's closed too."}`
     : blocked ? `On, within ${milesLabel(nearAlertMiles())}. Phone notifications are blocked in settings.`
     : `On, within ${milesLabel(nearAlertMiles())}, while Feed The Bear is open.`;
 }
@@ -2189,7 +2189,7 @@ function openNearAlerts () {
   // Android: alerts while open need nothing extra; "even when closed" needs
   // background location, so it's asked for only when chosen.
   const when = document.getElementById('nearalerts-when');
-  when?.classList.toggle('hidden', !native);
+  when?.classList.toggle('hidden', !native || !NativeAlerts.canClose());
   when?.querySelectorAll('[data-when]').forEach(b => {
     b.classList.toggle('active', (b.dataset.when === 'closed') === (state.settings.nearAlertsClosed === true));
     b.onclick = () => {
@@ -2285,13 +2285,15 @@ var NativeAlerts = (() => {
   let lastSig = '';
   let timer = null;
   let background = false;
+  // The Google Play build has no background location (older installs don't report it).
+  let supported = true;
 
   async function sync () {
     const p = plugin();
     if (!p) return;
     // Geofences wake the app when it's closed, which needs background
     // location: only when they chose "even when the app is closed".
-    const on = nearAlertsOn() && !!state.settings.locationEnabled && state.settings.nearAlertsClosed !== false;
+    const on = supported && nearAlertsOn() && !!state.settings.locationEnabled && state.settings.nearAlertsClosed !== false;
     const here = Number.isFinite(state.userLat) && Number.isFinite(state.userLng);
     // Android allows 100 geofences: keep the closest Want to Try spots.
     const spots = state.restaurants
@@ -2310,13 +2312,18 @@ var NativeAlerts = (() => {
   async function refresh () {
     const p = plugin();
     if (!p) return;
-    try { background = !!(await p.status()).background; } catch { /* plugin missing */ }
+    try {
+      const st = await p.status();
+      background = !!st.background;
+      supported = st.backgroundSupported !== false;
+    } catch { /* plugin missing */ }
     renderNearAlertsRow();
   }
 
   return {
     available: () => !!plugin(),
     closedToo: () => background,
+    canClose: () => supported,
     schedule () {
       if (!plugin()) return;
       clearTimeout(timer);
@@ -2325,7 +2332,7 @@ var NativeAlerts = (() => {
     refresh,
     // Explain first (Google Play requires it), then ask for "Allow all the time".
     askBackground () {
-      if (!plugin() || background) return;
+      if (!plugin() || background || !supported) return;
       document.getElementById('bg-location-overlay')?.classList.remove('hidden');
       document.body.classList.add('overlay-open');
     },
