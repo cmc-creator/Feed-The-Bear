@@ -1106,7 +1106,11 @@ function renderFriendsList () {
     : '';
   el.innerHTML = followersHtml + followingHtml + invitesHtml || (_followers === null && window._ftbUid
     ? '<div class="friends-empty">Loading your friends…</div>'
-    : '<div class="friends-empty">No friends yet. Send an invite: when a friend joins from it, they show up here and you can follow each other.</div>');
+    : '<div class="friends-empty">No friends yet. Send an invite: when a friend joins from it, they show up here and you can follow each other.</div>'
+      // Friends belong to an account: an empty list usually means a different (or new) one.
+      + (window._ftbUserEmail
+        ? `<div class="friends-empty friends-account">Signed in as <strong>${escHtml(window._ftbUserEmail)}</strong>. Had friends before? They're on the account you used then. Sign out (Account) and sign in with that one.</div>`
+        : ''));
   el.querySelectorAll('.friend-spots').forEach(b => b.addEventListener('click', () => {
     const f = getFriends().find(x => x.key === b.dataset.key);
     if (f) openFriendSpots(f.data);

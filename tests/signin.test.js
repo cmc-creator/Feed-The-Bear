@@ -31,6 +31,35 @@ async function upgradeTitle (p) {
   await p.mouse.click(5, 5);
   await p.evaluate(() => closeAuthModal());
   check(await auth.isVisible(), 'Escape, tapping outside or closing it in code does not dismiss it');
+  check(await p.locator('.auth-tab[data-auth-mode="signup"]').evaluate(e => e.classList.contains('active')), 'the Create account tab is highlighted');
+  await p.locator('.auth-tab[data-auth-mode="signin"]').click();
+  check(await p.locator('#auth-title').innerText() === 'Welcome back' && await p.locator('#auth-submit-btn').innerText() === 'Sign In', 'the Sign in tab switches to signing in');
+  check(await p.locator('#auth-forgot-btn').isVisible(), 'signing in offers Forgot password');
+  await p.locator('.auth-tab[data-auth-mode="signup"]').click();
+  check(await p.locator('#auth-forgot-btn').isHidden(), 'creating an account hides Forgot password');
+
+  // Typing an existing account under Create account signs you in instead of an error.
+  await p.evaluate(() => {
+    window._calls = [];
+    window.fbSignUpEmail = async () => { window._calls.push('up'); const e = new Error('in use'); e.code = 'auth/email-already-in-use'; throw e; };
+    window.fbSignInEmail = async () => { window._calls.push('in'); };
+  });
+  await p.fill('#auth-email', 'me@example.com');
+  await p.fill('#auth-password', 'password123');
+  await p.locator('#auth-submit-btn').click();
+  await p.waitForTimeout(300);
+  check(await p.evaluate(() => window._calls.join(',')) === 'up,in', 'an existing email under Create account signs in with that password');
+  check(await auth.evaluate(el => el.dataset.mode) === 'signin', 'and the sheet is on Sign in after');
+  await p.close();
+
+  // ── Signed in on this phone before: opens on Sign in with the email filled ──
+  p = await newPage(browser, { seed: SEED });
+  await p.addInitScript(() => { localStorage.setItem('ftb_test_auth_gate', '1'); localStorage.setItem('ftb_last_account_v1', 'me@example.com'); });
+  await p.goto(`${BASE}/app.html`);
+  await p.waitForSelector('#auth-overlay.auth-required:not(.hidden)', { timeout: 15000 }).catch(() => {});
+  check(await p.locator('#auth-title').innerText() === 'Welcome back', 'a returning phone opens on Sign in');
+  check(await p.inputValue('#auth-email') === 'me@example.com', 'with their email already filled in');
+  check(/Welcome back/.test(await p.locator('#auth-overlay .auth-sub').innerText()), 'and says welcome back');
   await p.close();
 
   // ── Free account: 25 spots and the Grizzly-only features ──

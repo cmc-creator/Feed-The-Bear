@@ -8293,6 +8293,29 @@ body.light-mode .auth-card .form-label { color: #e3d1b6; }
 }
 .auth-divider::before,
 .auth-divider::after { content: ''; flex: 1; height: 1px; background: rgba(206,168,125,.28); }
+.auth-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin: 4px 0 14px;
+  border-radius: 12px;
+  background: rgba(206,168,125,.14);
+}
+.auth-tab {
+  flex: 1;
+  min-height: 40px;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: #c7b195;
+  font-family: var(--font);
+  font-size: .9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.auth-tab.active { background: var(--primary); color: #fff; }
+.auth-forgot { text-align: center; margin: 10px 0 0; }
+#auth-overlay[data-mode="signup"] .auth-forgot { display: none; }
 .auth-toggle-text {
   text-align: center;
   font-size: .82rem;

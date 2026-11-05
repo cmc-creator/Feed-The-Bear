@@ -249,6 +249,7 @@ async function fbDeleteAccount () {
     window._ftbPlan = 'free';
     localStorage.removeItem('ftb_plan_v1');
     localStorage.removeItem('ftb_uid_v1');
+    localStorage.removeItem(LAST_ACCOUNT_KEY);
     if (eraseLocal) eraseLocalData();
     closeDeleteAccount();
     showToast('Account deleted', eraseLocal ? 'Your account and this device are wiped clean.' : 'Your account is gone. Spots on this device were kept.', 'success');
@@ -616,6 +617,8 @@ function initFirebaseAuth () {
     if (user) {
       window._ftbUid       = user.uid;
       window._ftbUserEmail = user.email;
+      // Next time this phone is signed out, the sheet opens on Sign in with the email filled.
+      try { localStorage.setItem(LAST_ACCOUNT_KEY, user.email || '1'); } catch { /* private mode */ }
       // A brand-new account (signed in for the first time just now), counted once for the funnel.
       try {
         const m = user.metadata || {};
@@ -831,6 +834,7 @@ function _requiredAuthSub () {
     return `${by} invited you! Create your free account and you'll follow ${by} and see their favorite spots.`
       + (invited ? ' You also get 30 days of Grizzly free.' : '');
   }
+  if (_lastAccount()) return 'Welcome back! Sign in to see your spots.';
   if (invited) return 'A friend invited you! Create your free account, then get 30 days of Grizzly free.';
   if (hasSpots) return 'Create your free account to keep going. The spots on this phone come with you.';
   return 'Create your free account to start saving the places you want to eat.';
@@ -846,7 +850,27 @@ function openAuthModal ({ forUpgrade = false } = {}) {
   if (sub) sub.textContent = forUpgrade ? AUTH_SUB_UPGRADE : required ? _requiredAuthSub() : AUTH_SUB_DEFAULT;
   overlay.classList.remove('hidden');
   document.body.classList.add('overlay-open');
-  _setAuthMode(required && !forUpgrade ? 'signup' : 'signin');
+  // Someone who has signed in on this phone before is signing back in, not starting over.
+  const last = _lastAccount();
+  const emailInput = document.getElementById('auth-email');
+  if (emailInput && !emailInput.value && last.includes('@')) emailInput.value = last;
+  _setAuthMode(required && !forUpgrade && !last ? 'signup' : 'signin');
+}
+
+const LAST_ACCOUNT_KEY = 'ftb_last_account_v1';
+function _lastAccount () {
+  try { return localStorage.getItem(LAST_ACCOUNT_KEY) || ''; } catch { return ''; }
+}
+
+async function _handleForgotPassword () {
+  const email = document.getElementById('auth-email')?.value.trim();
+  if (!email) { showToast('Enter your email', 'Type the email you signed up with, then tap Forgot password again.', 'info'); return; }
+  try {
+    await _auth.sendPasswordResetEmail(email);
+    showToast('Check your email', `If ${email} has an account, a link to set a new password is on its way. If you signed up with Google, use Continue with Google instead.`, 'success');
+  } catch (err) {
+    showToast('Could not send it', err.code === 'auth/invalid-email' ? 'That email does not look right.' : (err.message || 'Please try again.'), 'error');
+  }
 }
 
 function closeAuthModal () {
@@ -868,6 +892,13 @@ function _setAuthMode (mode) {
     : `New here? <button class="auth-link-btn" id="auth-mode-toggle">${forUpgrade ? 'Create an account' : 'Sign up, it\'s free'}</button>`;
   document.getElementById('auth-overlay').dataset.mode = mode;
   document.getElementById('auth-mode-toggle')?.addEventListener('click', () => _setAuthMode(isSignup ? 'signin' : 'signup'));
+  document.querySelectorAll('#auth-overlay .auth-tab').forEach(tab => {
+    const on = tab.dataset.authMode === mode;
+    tab.classList.toggle('active', on);
+    tab.setAttribute('aria-selected', on ? 'true' : 'false');
+    tab.onclick = () => _setAuthMode(tab.dataset.authMode);
+  });
+  el('auth-password')?.setAttribute('autocomplete', isSignup ? 'new-password' : 'current-password');
 }
 
 async function _handleAuthSubmit () {
@@ -884,9 +915,22 @@ async function _handleAuthSubmit () {
 
   btn.disabled    = true;
   btn.textContent = 'Signing you in...';
+  let nextMode = mode;
   try {
     if (mode === 'signup') {
-      await fbSignUpEmail(email, password);
+      try {
+        await fbSignUpEmail(email, password);
+      } catch (err) {
+        // Already has an account: sign them in with what they typed instead of an error.
+        if (err.code !== 'auth/email-already-in-use') throw err;
+        nextMode = 'signin';
+        try {
+          await fbSignInEmail(email, password);
+        } catch {
+          showToast('You already have an account', 'Enter your password to sign in, or tap Forgot password.', 'info');
+          return;
+        }
+      }
     } else {
       await fbSignInEmail(email, password);
     }
@@ -898,15 +942,17 @@ async function _handleAuthSubmit () {
     );
   } catch (err) {
     const msg =
-      err.code === 'auth/wrong-password'        ? 'Wrong password. Please try again.'    :
-      err.code === 'auth/user-not-found'        ? 'No account found with that email.'    :
-      err.code === 'auth/email-already-in-use'  ? 'That email is already in use.'   :
-      err.code === 'auth/weak-password'         ? 'Password needs at least 8 characters.' :
-      err.message;
-    showToast('Auth error', msg, 'error');
+      ['auth/wrong-password', 'auth/invalid-credential', 'auth/invalid-login-credentials', 'auth/user-not-found'].includes(err.code)
+        ? "That email and password don't match. Signed up with Google? Use Continue with Google. New here? Tap Create account."
+        : err.code === 'auth/invalid-email'      ? 'That email does not look right.'
+        : err.code === 'auth/weak-password'      ? 'Password needs at least 8 characters.'
+        : err.code === 'auth/too-many-requests'  ? 'Too many tries. Wait a minute, or tap Forgot password.'
+        : err.code === 'auth/network-request-failed' ? 'No connection. Check your internet and try again.'
+        : err.message;
+    showToast("Couldn't sign in", msg, 'error');
   } finally {
     btn.disabled = false;
-    _setAuthMode(mode);
+    _setAuthMode(nextMode);
   }
 }
 
@@ -1277,6 +1323,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('auth-close-btn')?.addEventListener('click', closeAuthModal);
   document.getElementById('auth-google-btn')?.addEventListener('click', _handleGoogleAuth);
   document.getElementById('auth-submit-btn')?.addEventListener('click', _handleAuthSubmit);
+  document.getElementById('auth-forgot-btn')?.addEventListener('click', _handleForgotPassword);
   document.getElementById('auth-password')?.addEventListener('keydown', e => { if (e.key === 'Enter') _handleAuthSubmit(); });
 
   // Upgrade modal
