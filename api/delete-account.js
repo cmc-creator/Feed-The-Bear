@@ -84,7 +84,7 @@ module.exports = async function handler (req, res) {
     await Promise.all(sent.docs.map(d => d.ref.delete()));
     const joined = await db.collection('invites').where('joinedUid', '==', uid).get();
     await Promise.all(joined.docs.map(d => { const { owner, at, openedAt } = d.data(); return d.ref.set({ owner, at, ...(openedAt ? { openedAt } : {}) }); }));
-    const serverDocs = ['digestSubscribers', 'rewards', 'trials', 'referrals', 'pushTokens', 'pushFollows', 'apiQuota', 'aiQuota', 'handleOf', 'followedBy'].map(c => `${c}/${uid}`);
+    const serverDocs = ['digestSubscribers', 'rewards', 'trials', 'referrals', 'pushTokens', 'pushFollows', 'apiQuota', 'aiQuota', 'handleOf', 'followedBy', 'pageJoins'].map(c => `${c}/${uid}`);
     if (customerId) serverDocs.push(`stripeCustomers/${customerId}`);
     await Promise.all(serverDocs.map(p => db.doc(p).delete()));
     await db.recursiveDelete(db.doc(`users/${uid}`));

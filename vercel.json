@@ -1,6 +1,10 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": ".",
+  "rewrites": [
+    { "source": "/@:handle", "destination": "/api/creator?h=:handle" },
+    { "source": "/u/:handle", "destination": "/api/creator?h=:handle" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

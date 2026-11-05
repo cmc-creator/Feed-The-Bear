@@ -319,7 +319,32 @@ const INVITE_CODE_KEY = 'ftb_invite_code_v1';
     fetch('/api/handle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'inviteOpened', code }) }).catch(() => {});
   } catch { /* private mode */ }
 })();
+// Came from someone's public page (app.html?src=<handle>, api/creator.js):
+// counted as a join on their page once they sign in.
+const PAGE_SRC_KEY = 'ftb_page_src_v1';
+(function capturePageSource () {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const src = String(params.get('src') || '').toLowerCase();
+    if (!params.has('src')) return;
+    params.delete('src');
+    const rest = params.toString();
+    history.replaceState(history.state, '', window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash);
+    if (/^[a-z0-9_]{3,20}$/.test(src)) localStorage.setItem(PAGE_SRC_KEY, src); // HANDLE_RE isn't defined yet here
+  } catch { /* private mode */ }
+})();
+async function notePageJoined () {
+  let handle = '';
+  try { handle = localStorage.getItem(PAGE_SRC_KEY) || ''; } catch { return; }
+  if (!handle || !window._ftbUid) return;
+  try {
+    const { ok, status } = await handleApi('POST', { body: { action: 'pageJoined', handle } });
+    if (ok || (status >= 200 && status < 500 && status !== 429)) localStorage.removeItem(PAGE_SRC_KEY);
+  } catch { /* next time */ }
+}
+
 async function noteInviteJoined () {
+  notePageJoined();
   let code = '';
   try { code = localStorage.getItem(INVITE_CODE_KEY) || ''; } catch { return; }
   if (!code || !window._ftbUid) return;
@@ -1242,12 +1267,71 @@ async function renderMyHandle () {
   if (!window._ftbUid) { box.innerHTML = ''; return; }
   if (_myHandleFor !== window._ftbUid) { _myHandle = null; _myHandleFor = window._ftbUid; }
   if (_myHandle === null) {
-    try { _myHandle = (await handleApi('GET', { query: '?mine=1' })).data.handle || ''; } catch { _myHandle = ''; }
+    try {
+      const { data } = await handleApi('GET', { query: '?mine=1' });
+      _myHandle = data.handle || '';
+      _myPage = { public: !!data.public, views: Number(data.views) || 0, joins: Number(data.joins) || 0 };
+    } catch { _myHandle = ''; }
   }
-  box.innerHTML = _myHandle
+  box.innerHTML = (_myHandle
     ? `Friends can find you as <strong>@${escHtml(_myHandle)}</strong> · <button type="button" class="link-btn friends-handle-edit">Change</button>`
-    : `<button type="button" class="link-btn friends-handle-edit">Pick a username</button> so friends can find you.`;
+    : `<button type="button" class="link-btn friends-handle-edit">Pick a username</button> so friends can find you.`)
+    + myPageHtml();
   box.querySelector('.friends-handle-edit').onclick = editMyHandle;
+  wireMyPage(box);
+}
+
+/* ── Your public page (api/creator.js): feed-the-bear.com/@you ──
+   For a TikTok or Instagram bio. Off until you turn it on. */
+let _myPage = { public: false, views: 0, joins: 0 };
+function myPageUrl () { return `https://www.feed-the-bear.com/@${_myHandle}`; }
+function myPageHtml () {
+  const intro = '<strong>Your public page</strong><span>Put a link in your TikTok or Instagram bio. Anyone can see your top spots and what to order, then join free and follow you. When someone who joined goes Grizzly, you get a free month.</span>';
+  if (!_myHandle) return `<div class="my-page">${intro}<span class="my-page-note">Pick a username above to get your page.</span></div>`;
+  if (!_myPage.public) {
+    return `<div class="my-page">${intro}
+      <button type="button" class="btn-sm btn-orange my-page-on">Turn on my page</button></div>`;
+  }
+  const n = (x, one, many) => `${x} ${x === 1 ? one : many}`;
+  return `<div class="my-page is-on">
+      <strong>Your public page is on</strong>
+      <a class="my-page-link" href="${escHtml(myPageUrl())}" target="_blank" rel="noopener">feed-the-bear.com/@${escHtml(_myHandle)}</a>
+      <span class="my-page-stats">${n(_myPage.views, 'visit', 'visits')} · ${n(_myPage.joins, 'person joined', 'people joined')}</span>
+      <div class="my-page-actions">
+        <button type="button" class="btn-sm btn-orange my-page-copy">Copy link</button>
+        <button type="button" class="btn-sm btn-ghost my-page-share">Share</button>
+        <button type="button" class="btn-sm btn-ghost my-page-off">Turn off</button>
+      </div>
+    </div>`;
+}
+function wireMyPage (box) {
+  const setPublic = async on => {
+    if (on) {
+      if (!ensureInviteName()) return;
+      // The page shows your live profile, so it needs to be published.
+      startSharingLive();
+      if (typeof fbPublishFriendProfile === 'function') await fbPublishFriendProfile();
+    }
+    const { ok, data } = await handleApi('POST', { body: { action: 'publicPage', on } });
+    if (!ok) { showToast('Could not do that', data.error || 'Please try again.', 'error'); return; }
+    _myPage.public = !!data.public;
+    trackProductEvent(on ? 'public_page_on' : 'public_page_off');
+    if (on) showToast('Your page is live', 'Copy the link and put it in your bio.', 'success');
+    renderMyHandle();
+  };
+  box.querySelector('.my-page-on')?.addEventListener('click', () => setPublic(true));
+  box.querySelector('.my-page-off')?.addEventListener('click', () => setPublic(false));
+  box.querySelector('.my-page-copy')?.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(myPageUrl()); showToast('Link copied', 'Paste it in your TikTok or Instagram bio.', 'success'); }
+    catch { window.prompt('Copy your page link:', myPageUrl()); }
+    trackProductEvent('public_page_copied');
+  });
+  box.querySelector('.my-page-share')?.addEventListener('click', async () => {
+    trackProductEvent('public_page_shared');
+    if (!navigator.share) { box.querySelector('.my-page-copy')?.click(); return; }
+    try { await navigator.share({ title: 'My food spots', text: 'Where I eat and what to order:', url: myPageUrl() }); }
+    catch { /* closed the share sheet */ }
+  });
 }
 
 function editMyHandle () {

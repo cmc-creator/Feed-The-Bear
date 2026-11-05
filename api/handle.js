@@ -81,7 +81,11 @@ module.exports = async function handler (req, res) {
 
   try {
     if (req.method === 'GET') {
-      if (req.query?.mine) return res.status(200).json({ handle: (await db.doc(`handleOf/${uid}`).get()).data()?.handle || '' });
+      if (req.query?.mine) {
+        const handle = (await db.doc(`handleOf/${uid}`).get()).data()?.handle || '';
+        const h = handle ? (await db.doc(`handles/${handle}`).get()).data() || {} : {};
+        return res.status(200).json({ handle, public: !!h.public, views: Number(h.views) || 0, joins: Number(h.joins) || 0 });
+      }
       if (req.query?.followers) {
         const list = (await db.doc(`followedBy/${uid}`).get()).data()?.list;
         const recent = (Array.isArray(list) ? list : []).slice(0, 100);
@@ -189,13 +193,45 @@ module.exports = async function handler (req, res) {
         if (cur && cur.uid !== uid) return true;
         const oldRef = db.doc(`handleOf/${uid}`);
         const old = (await tx.get(oldRef)).data()?.handle;
+        // A public page and its counts move with you to a new username.
+        const prev = old ? (old === handle ? cur : (await tx.get(db.doc(`handles/${old}`))).data()) || {} : {};
         if (old && old !== handle) tx.delete(db.doc(`handles/${old}`));
-        tx.set(ref, { uid, id, u: name || handle, at: new Date().toISOString() });
+        tx.set(ref, { uid, id, u: name || handle, at: new Date().toISOString(),
+          ...(prev.public ? { public: true } : {}), views: Number(prev.views) || 0, joins: Number(prev.joins) || 0 });
         tx.set(oldRef, { handle });
         return false;
       });
       if (taken) return res.status(409).json({ error: 'That username is taken.' });
       return res.status(200).json({ handle });
+    }
+
+    // Public page (feed-the-bear.com/@handle, api/creator.js): opt-in, off by default.
+    if (body.action === 'publicPage') {
+      const handle = (await db.doc(`handleOf/${uid}`).get()).data()?.handle;
+      if (!handle) return res.status(400).json({ error: 'Pick a username first.' });
+      const ref = db.doc(`handles/${handle}`);
+      const cur = (await ref.get()).data();
+      if (!cur || cur.uid !== uid) return res.status(400).json({ error: 'Pick a username first.' });
+      const on = body.on === true;
+      const next = { ...cur };
+      if (on) next.public = true; else delete next.public;
+      await ref.set(next);
+      return res.status(200).json({ public: on, handle });
+    }
+
+    // Joined from someone's public page: counted once per new member.
+    if (body.action === 'pageJoined') {
+      if (await overLimit(`handle:p:${uid}`, 10, 600)) return res.status(429).json({ error: 'Slow down a little and try again soon.' });
+      const handle = cleanHandle(body.handle);
+      if (!HANDLE_RE.test(handle)) return res.status(400).json({ error: 'Bad page.' });
+      const ref = db.doc(`handles/${handle}`);
+      const cur = (await ref.get()).data();
+      if (!cur?.public || cur.uid === uid) return res.status(200).json({ ok: false });
+      const mark = db.doc(`pageJoins/${uid}`);
+      if ((await mark.get()).data()) return res.status(200).json({ ok: false });
+      await mark.set({ handle, at: new Date().toISOString() });
+      await ref.set({ ...cur, joins: (Number(cur.joins) || 0) + 1 });
+      return res.status(200).json({ ok: true });
     }
 
     return res.status(400).json({ error: 'Unknown action' });

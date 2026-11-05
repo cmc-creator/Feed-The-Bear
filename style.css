@@ -9145,6 +9145,17 @@ body.overlay-open .app-update-banner { display: none; }
 .friends-find-hit button { margin-left: auto; }
 .friends-handle { font-size: .82rem; color: var(--text-dim); }
 .friends-handle-msg { font-size: .8rem; color: var(--rose); margin-top: 4px; }
+/* Your public page (feed-the-bear.com/@you) */
+.my-page {
+  display: grid; gap: 6px; justify-items: start; margin-top: 12px; padding: 12px 14px; border-radius: 14px;
+  background: var(--surface2, rgba(255,255,255,.05)); border: 1px solid var(--border); color: var(--text); font-size: .84rem; line-height: 1.4;
+}
+.my-page.is-on { border-color: rgba(var(--primary-rgb), .45); }
+.my-page strong { font-size: .92rem; }
+.my-page span { color: var(--text-dim); }
+.my-page-link { color: var(--primary); font-weight: 700; word-break: break-all; }
+.my-page-stats { font-weight: 700; }
+.my-page-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .link-btn { background: none; border: 0; padding: 0; color: var(--primary); font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; }
 
 /* A photo that failed to load: no broken-image icon or stray alt text. */
