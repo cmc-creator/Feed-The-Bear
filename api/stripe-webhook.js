@@ -12,6 +12,7 @@
              customer.subscription.deleted,
              invoice.paid                    (invite rewards)
              customer.subscription.trial_will_end (reminder email, 3 days before)
+             charge.refunded                 (Google Play sale reports, _play.js)
 
    Environment variables required (set in Vercel dashboard):
      STRIPE_SECRET_KEY        - Stripe secret key
@@ -22,6 +23,7 @@
 const Stripe = require('stripe');
 const admin  = require('firebase-admin');
 const { rewardInviter } = require('./_referral');
+const play = require('./_play');
 const { sendEmail, emailHtml, esc } = require('./_email');
 
 function getAdmin () {
@@ -147,6 +149,11 @@ module.exports = async function handler (req, res) {
         });
         if (obj.customer) await db.doc(`stripeCustomers/${obj.customer}`).set({ uid }, { merge: true });
         await bump(db, obj.payment_status === 'no_payment_required' ? 'trial_started' : 'paid_signup');
+        // Bought in the Play app: report it to Google (never blocks Grizzly).
+        try {
+          const invoice = obj.invoice ? await stripe.invoices.retrieve(obj.invoice) : null;
+          await play.reportStart(db, { session: obj, sub, invoice });
+        } catch (err) { console.error('[FTB] play start report:', err.message); }
       }
     }
 
@@ -171,6 +178,15 @@ module.exports = async function handler (req, res) {
       if (invite) await rewardInviter({ db, stripe, inviterUid: invite.ref, friendUid: invite.uid });
     }
 
+    if (event.type === 'invoice.paid') {
+      const subId = obj.subscription || obj.parent?.subscription_details?.subscription;
+      await play.reportRenewal(db, obj, typeof subId === 'string' ? subId : subId?.id).catch(err => console.error('[FTB] play renewal report:', err.message));
+    }
+
+    if (event.type === 'charge.refunded') {
+      await play.reportRefund(db, obj).catch(err => console.error('[FTB] play refund report:', err.message));
+    }
+
     if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
       const uid = await uidForCustomer(db, obj.customer, obj.metadata?.uid);
       // 'incomplete' happens mid-checkout and may arrive late, so it changes nothing.
@@ -184,6 +200,7 @@ module.exports = async function handler (req, res) {
       await trialEndingEmail(db, obj).catch(err => console.error('[FTB] trial email failed:', err.message));
     }
 
+    await play.retryPending(db);
     res.status(200).json({ received: true });
   } catch (err) {
     console.error('[FTB] stripe-webhook error:', err.message);

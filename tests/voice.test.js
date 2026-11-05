@@ -87,7 +87,52 @@ const FAKE = () => {
   check(!(await q.locator('#search-voice-btn').isVisible()), 'no search mic where voice is unsupported');
   check(await q.locator('#chat-mic-btn.hidden').count() === 1, 'no chat mic either');
 
-  check(!p.errors.length && !q.errors.length, `no page errors ${[...p.errors, ...q.errors].join(' | ')}`);
+  // Android app: no browser speech, so both mics use the phone's (SpeechPlugin).
+  const a = await newPage(browser, {});
+  await a.addInitScript(() => {
+    window.SpeechRecognition = undefined; window.webkitSpeechRecognition = undefined;
+    window.__speech = { listeners: {}, starts: 0, aborts: 0 };
+    window.Capacitor = { isNativePlatform: () => true, isPluginAvailable: () => true, Plugins: {
+      Speech: {
+        addListener: async (ev, fn) => { __speech.listeners[ev] = fn; return { remove: () => { delete __speech.listeners[ev]; } }; },
+        start: () => { __speech.starts++; return new Promise((res, rej) => { __speech.finish = res; __speech.fail = rej; }); },
+        stop: async () => {}, abort: async () => { __speech.aborts++; },
+      },
+      PlayBilling: { checkoutToken: async () => (window.__billing || { token: 'TOK' }) },
+    } };
+  });
+  await a.route(/overpass|nominatim|open-meteo|place-info/, r => r.abort());
+  await a.goto(`${BASE}/app.html`);
+  await a.waitForTimeout(1800);
+  await closeAllDialogs(a);
+  check(await a.locator('#search-voice-btn').isVisible(), 'Android app: the search mic shows');
+  await a.click('#search-voice-btn');
+  await a.waitForTimeout(200);
+  await a.evaluate(() => __speech.listeners.partial?.({ text: 'pi' }));
+  check(/pi/.test(await a.locator('#voice-transcript').innerText()), 'words show as you speak');
+  await a.evaluate(() => __speech.finish({ text: 'pizza' }));
+  await a.waitForTimeout(300);
+  check(await a.inputValue('#search-input') === 'pizza', 'and it searches what you said');
+  await a.click('#search-voice-btn');
+  await a.waitForTimeout(200);
+  await a.evaluate(() => __speech.fail(Object.assign(new Error('not-allowed'), { code: 'not-allowed' })));
+  await a.waitForTimeout(200);
+  check(/Microphone blocked/.test(await a.locator('#voice-status').innerText()), 'a refused microphone says so');
+  await a.waitForTimeout(2700);
+  await a.evaluate(() => openChat());
+  await a.waitForTimeout(300);
+  check(await a.locator('#chat-mic-btn').isVisible(), 'Android app: Byte Cub has a mic');
+  await a.click('#chat-mic-btn');
+  await a.waitForTimeout(200);
+  await a.evaluate(() => __speech.finish({ text: 'show my want to try' }));
+  await a.waitForTimeout(700);
+  check(/show my want to try/.test(await a.locator('#chat-messages').innerText()), 'and what you say is sent');
+  // Checkout in the Play app gets Google's token; backing out of Google's notice stops it.
+  check(await a.evaluate(() => _playBillingToken()) === 'TOK', 'Play checkout gets the reporting token');
+  check(await a.evaluate(() => { window.Capacitor.Plugins.PlayBilling.checkoutToken = async () => { throw Object.assign(new Error('canceled'), { code: 'canceled' }); }; return _playBillingToken(); }) === false, "backing out of Google's notice stops checkout");
+  check(await a.evaluate(() => { window.Capacitor.Plugins.PlayBilling.checkoutToken = async () => ({ unavailable: true }); return _playBillingToken(); }) === '', 'not from Play: checkout goes ahead without a token');
+
+  check(!p.errors.length && !q.errors.length && !a.errors.length, `no page errors ${[...p.errors, ...q.errors, ...a.errors].join(' | ')}`);
   await browser.close();
   finish('voice');
 })();

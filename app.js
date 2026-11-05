@@ -7777,7 +7777,7 @@ function setupEvents () {
 
   // Phase 7 - Voice
   // No speech recognition (e.g. the Android app's web view): hide the mic.
-  if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) {
+  if (!speechRecognitionClass()) {
   const mic = document.getElementById('search-voice-btn');
   if (mic) mic.classList.add('hidden');
   }
@@ -9843,6 +9843,43 @@ function updateChallengeBtnBadge () {
 
 let _voiceRecognition = null;
 
+// The browser's speech recognition, or in the Android app (whose web view has
+// none) the phone's own, through SpeechPlugin.java in the same shape.
+function speechRecognitionClass () {
+  const native = window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins?.Speech : null;
+  if (native?.start) return NativeSpeechRecognition;
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+class NativeSpeechRecognition {
+  constructor () { this.lang = 'en-US'; this.interimResults = false; this._ended = false; }
+  _results (text, isFinal) {
+    const r = [{ transcript: text }]; r.isFinal = isFinal;
+    return { results: [r] };
+  }
+  async start () {
+    const plugin = window.Capacitor.Plugins.Speech;
+    this._sub = await plugin.addListener('partial', d => {
+      if (this.interimResults && d?.text && !this._ended) this.onresult?.(this._results(d.text, false));
+    });
+    try {
+      const { text } = await plugin.start({ lang: this.lang });
+      if (!this._ended && text) this.onresult?.(this._results(text, true));
+      else if (!this._ended) this.onerror?.({ error: 'no-speech' });
+    } catch (err) {
+      if (!this._ended) this.onerror?.({ error: err?.code || 'no-speech' });
+    }
+    this._end();
+  }
+  stop () { window.Capacitor.Plugins.Speech.stop().catch(() => {}); }
+  abort () { window.Capacitor.Plugins.Speech.abort().catch(() => {}); this._end(); }
+  _end () {
+    if (this._ended) return;
+    this._ended = true;
+    this._sub?.remove?.();
+    this.onend?.();
+  }
+}
+
 function setVoiceButtonsListening (isListening) {
   document.querySelectorAll('#search-voice-btn, #voice-btn').forEach(el => {
   if (isListening) el.classList.add('listening');
@@ -9851,7 +9888,7 @@ function setVoiceButtonsListening (isListening) {
 }
 
 function startVoiceAdd () {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const SpeechRecognition = speechRecognitionClass();
   if (!SpeechRecognition) {
   showToast('Not Supported', 'Voice input is not supported in this browser. Try Chrome.', 'error');
   return;
@@ -9904,7 +9941,7 @@ let _chatRecognition = null;
 function initChatMic () {
   const btn = document.getElementById('chat-mic-btn');
   if (!btn) return;
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const SpeechRecognition = speechRecognitionClass();
   if (!SpeechRecognition) { btn.classList.add('hidden'); return; }
   btn.addEventListener('click', () => {
   if (_chatRecognition) { _chatRecognition.stop(); return; }

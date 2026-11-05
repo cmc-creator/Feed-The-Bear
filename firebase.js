@@ -1006,6 +1006,22 @@ function _inviteRef () {
   try { return localStorage.getItem(REF_KEY) || ''; } catch { return ''; }
 }
 
+// In the Play app, Google's alternative billing: its one-time notice, then a
+// token that lets the server report the Stripe sale to Google (api/_play.js).
+// '' outside the Play app (website, sideloaded app, older app versions);
+// false if they backed out of Google's notice.
+async function _playBillingToken () {
+  const plugin = _isNativeApp() ? window.Capacitor.Plugins?.PlayBilling : null;
+  if (!plugin?.checkoutToken) return '';
+  try {
+    const res = await plugin.checkoutToken();
+    return res?.token || '';
+  } catch (err) {
+    if (err?.code === 'canceled' || /canceled/.test(err?.message || '')) return false;
+    return '';
+  }
+}
+
 // app.html?ref=<uid> from a friend's invite: remember it until they upgrade.
 function _captureInviteRef () {
   const params = new URLSearchParams(window.location.search);
@@ -1184,10 +1200,12 @@ async function _handleUpgradeClick () {
   const priceId = period === 'yearly' ? _PRICES.yearly : _PRICES.monthly;
   if (btn) { btn.disabled = true; btn.textContent = 'Opening secure checkout...'; }
   try {
+    const playToken = await _playBillingToken();
+    if (playToken === false) { if (btn) { btn.disabled = false; btn.textContent = _upgradeLabel(); } return; }
     const resp = await fetch('/api/create-checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid: user.uid, email: user.email, priceId, ref: _inviteRef() }),
+      body: JSON.stringify({ uid: user.uid, email: user.email, priceId, ref: _inviteRef(), ...(playToken ? { playToken } : {}) }),
     });
     const { url, error } = await resp.json();
     if (error) throw new Error(error);

@@ -2,8 +2,9 @@
    Feed The Bear - Vercel Serverless: Create Stripe Checkout
    ════════════════════════════════════════════════════════════
    GET  ?uid=…&email=…&ref=…  → { trial, days }  (is a free trial on offer, and how long?)
-   POST { uid, email, priceId, ref } → { url, trial, days }  (Stripe Checkout link)
+   POST { uid, email, priceId, ref, playToken } → { url, trial, days }  (Stripe Checkout link)
    ref is the uid from a friend's invite link: 30 days instead of 7.
+   playToken: from Google in the Play app, so the sale is reported to Google (_play.js).
 
    Environment variables required (set in Vercel dashboard):
      STRIPE_SECRET_KEY        - Stripe secret key (sk_live_… or sk_test_…)
@@ -77,7 +78,7 @@ module.exports = async function handler (req, res) {
     return;
   }
 
-  const { uid, email, priceId, ref } = req.body || {};
+  const { uid, email, priceId, ref, playToken } = req.body || {};
   if (!uid || !priceId) {
     res.status(400).json({ error: 'Missing uid or priceId' });
     return;
@@ -111,6 +112,11 @@ module.exports = async function handler (req, res) {
       cancel_url:           `${appUrl}/app.html?upgrade=cancel`,
       allow_promotion_codes: true,
     });
+
+    // Kept until checkout finishes; the webhook reports the sale to Google with it.
+    if (typeof playToken === 'string' && playToken && playToken.length < 4000) {
+      await getAdmin().firestore().doc(`playCheckouts/${session.id}`).set({ token: playToken, uid, at: new Date().toISOString() });
+    }
 
     res.status(200).json({ url: session.url, trial, days });
   } catch (err) {

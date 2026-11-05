@@ -24,6 +24,18 @@ Grizzly is sold with Stripe inside the app. Google allows that **only for US use
 - Current rules: https://support.google.com/googleplay/android-developer/answer/15582165
 - The website (www.feed-the-bear.com) is not affected: Stripe there is fine everywhere.
 
+## 2b. Reporting app sales to Google (alternative billing)
+Each Grizzly sale made in the Play app must be reported to Google within 24 hours. From version 2.2.0 (versionCode 24) this is automatic:
+- The app gets a token from Google before Stripe checkout (`PlayBillingPlugin.java`, `_playBillingToken` in firebase.js). Google shows its one-time "this app uses another payment system" notice.
+- `api/_play.js`, called by the Stripe webhook, reports the first transaction ($0 for a free trial), every renewal, and refunds (`charge.refunded`).
+
+One-time setup so the server may report:
+1. **Turn on the API:** https://console.cloud.google.com/apis/library/androidpublisher.googleapis.com?project=feed-the-bear-app-2-102926 → **Enable**.
+2. **Let the server's account in:** Play Console → **Users and permissions** → **Invite new users** → email: the `client_email` of the Firebase service account (FIREBASE_SERVICE_ACCOUNT in Vercel) → **App permissions**: Feed the Bear → **View financial data** → Invite.
+3. Stripe webhook: the endpoint also needs the **charge.refunded** event.
+
+Sales on the website, and in app versions before 2.2.0, aren't reported (no token). Failed reports wait in Firestore `playPending` and retry on the next webhook call.
+
 ## 3. After the first upload: one fingerprint for Claude
 Google re-signs the app with its own key. Go to **Test and release → App integrity → App signing** and copy the **SHA-256 certificate fingerprint** under "App signing key certificate". Send it to Claude; it gets added to the site's `assetlinks.json`. Without it, the installed app shows a browser address bar at the top.
 
