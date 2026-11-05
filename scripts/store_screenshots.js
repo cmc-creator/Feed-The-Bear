@@ -32,6 +32,11 @@ const SPOTS = [
   spot('s5', 'Stack Burger', 'Burgers', { status: 'visited', myRating: 4, dateVisited: day(14), visits: [{ date: day(14), rating: 4 }], dishes: [{ id: 'd6', name: 'Cheeseburger', verdict: 'again', date: day(14) }], googleRating: 4.3 }),
   spot('s6', 'Kumo Sushi', 'Japanese', { priceRange: 4, googleRating: 4.5 }),
 ];
+const NEARBY_SUBS = [
+  { placeId: 'n1', name: 'Hoagie Hut', address: '15 Palm Ln', lat: 33.497, lng: -111.924, kind: 'Sandwich Shop', rating: 4.7, reviews: 640 },
+  { placeId: 'n2', name: 'Sub Station Deli', address: '402 Grove St', lat: 33.503, lng: -111.931, kind: 'Deli', rating: 4.5, reviews: 380 },
+  { placeId: 'n3', name: 'The Italian Hero', address: '77 Market Sq', lat: 33.481, lng: -111.915, kind: 'Sandwich Shop', rating: 4.6, reviews: 910 },
+];
 const FRIENDS = [
   { key: 'id:sam', name: 'Sam', av: 'panda', data: { id: 'sam', u: 'Sam', picks: [], w: [] }, recent: [
     { k: 'dish', n: 'La Esquina', c: 'Mexican', d: 'Carne asada', at: day(0) },
@@ -46,7 +51,8 @@ const FRIENDS = [
 async function shoot (browser, dev) {
   const dir = path.join(OUT, dev.dir);
   fs.mkdirSync(dir, { recursive: true });
-  const ctx = await browser.newContext({ viewport: { width: dev.width, height: dev.height }, deviceScaleFactor: dev.scale, isMobile: true, hasTouch: true });
+  const ctx = await browser.newContext({ viewport: { width: dev.width, height: dev.height }, deviceScaleFactor: dev.scale, isMobile: true, hasTouch: true,
+    geolocation: { latitude: 33.4942, longitude: -111.9261 }, permissions: ['geolocation'] });
   await ctx.addInitScript(([spots, friends]) => {
     localStorage.setItem('ftb_onboarded_v1', '1');
     localStorage.setItem('ftb_restaurants_v2', JSON.stringify(spots));
@@ -58,6 +64,8 @@ async function shoot (browser, dev) {
   }, [SPOTS, FRIENDS]);
   const p = await ctx.newPage();
   await p.route(/overpass|nominatim|place-info/, r => r.abort());
+  // Byte Cub's nearby search: made-up sub shops close to the location above.
+  await p.route('**/api/place-info?mode=search**', r => r.fulfill({ json: { places: NEARBY_SUBS } }));
   await p.goto(`${BASE}/app.html`);
   await p.waitForTimeout(3000);
   const clean = () => p.evaluate(() => {
@@ -82,12 +90,20 @@ async function shoot (browser, dev) {
   await p.evaluate(() => { document.getElementById('home-quick-actions')?.scrollIntoView({ block: 'start' }); openSwipeDeck(); });
   await snap('4-swipe.png');
   await p.evaluate(() => closeSwipeDeck());
-  // 5. Discover & Play.
+  // 5. Byte Cub finds real places near you.
+  await p.evaluate(() => openChat());
+  await p.fill('#chat-input', 'show me places to get subs near me');
+  await p.press('#chat-input', 'Enter');
+  await p.waitForTimeout(1500);
+  await p.evaluate(() => { const m = document.getElementById('chat-messages'); m.scrollTop = m.scrollHeight; document.getElementById('chat-input').blur(); });
+  await snap('5-bytecub.png');
+  await p.evaluate(() => closeChat());
+  // 6. Discover & Play.
   await p.evaluate(() => openMobileHub());
   await p.waitForTimeout(1500);
-  await snap('5-play.png');
+  await snap('6-play.png');
   await ctx.close();
-  console.log(`${dev.dir}: 5 screenshots`);
+  console.log(`${dev.dir}: 6 screenshots`);
 }
 
 (async () => {

@@ -44,7 +44,7 @@ Google re-signs the app with its own key. Go to **Test and release → App integ
 - Short and full description: from `store/listing.md`
 - App icon (512×512): `store/icon-512.png`
 - Feature graphic (1024×500): `store/feature-graphic.png`
-- Phone screenshots: the 5 files in `store/screenshots/android/`
+- Phone screenshots: the 6 files in `store/screenshots/android/`
 
 ## 5. App content (Policy → App content)
 - **Privacy policy:** https://www.feed-the-bear.com/privacy.html
