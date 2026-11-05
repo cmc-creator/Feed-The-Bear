@@ -52,6 +52,38 @@ function showGrizzlyUpsell (key = 'general') {
   if (typeof openUpgradeModal === 'function') openUpgradeModal({ key, ...pitch });
 }
 
+// A spot saved past the free limit isn't lost: it waits here, the pitch names
+// it, and it's saved the moment they go Grizzly (renderGrizzlyUi runs then).
+const WAITING_SPOT_KEY = 'ftb_waiting_spot_v1';
+function holdSpotForGrizzly (r, dish = null) {
+  if (!r?.name) { showGrizzlyUpsell('limit'); return; }
+  // Photos are too big to park in storage; the spot and its dish are what matter.
+  const spot = { ...r, photo: /^https?:/i.test(r.photo || '') ? r.photo : '', visits: (r.visits || []).map(v => ({ ...v, photo: '', video: undefined })) };
+  try { localStorage.setItem(WAITING_SPOT_KEY, JSON.stringify({ r: spot, dish, at: Date.now() })); } catch { /* private mode */ }
+  trackProductEvent('free_limit_hit', { held: true });
+  if (typeof openUpgradeModal === 'function') {
+    openUpgradeModal({ key: 'limit', title: `Save ${r.name}?`,
+      body: `You've used all ${FREE_RESTAURANT_LIMIT} free spots. Go Grizzly and ${r.name} is saved right away, plus every spot after it.` });
+  }
+}
+function releaseWaitingSpot () {
+  if (!hasGrizzly()) return;
+  let held = null;
+  try { held = JSON.parse(localStorage.getItem(WAITING_SPOT_KEY) || 'null'); localStorage.removeItem(WAITING_SPOT_KEY); } catch { return; }
+  const r = held?.r;
+  if (!r?.name || Date.now() - (held.at || 0) > 30 * 86400000) return;
+  const key = typeof normalizeName === 'function' ? normalizeName(r.name) : r.name.toLowerCase();
+  if ((state.restaurants || []).some(x => (typeof normalizeName === 'function' ? normalizeName(x.name) : x.name.toLowerCase()) === key)) return;
+  r.updatedAt = Date.now();
+  state.restaurants.unshift(r);
+  if (held.dish?.name && typeof upsertDish === 'function') upsertDish(r, held.dish);
+  else saveData();
+  if (!Number.isFinite(r.lat) && r.address && typeof geocodeAddress === 'function') geocodeAddress(r.id, r.address);
+  renderAll();
+  trackProductEvent('waiting_spot_saved');
+  showToast(`${r.name} saved`, 'It was waiting for you. Welcome to Grizzly!', 'success');
+}
+
 // The inline "unlock" card used where an AI result would appear.
 function grizzlyUnlockHtml (key) {
   const pitch = GRIZZLY_PITCH[key] || GRIZZLY_PITCH.general;
@@ -120,6 +152,7 @@ function renderTrialReminder () {
 
 function renderGrizzlyUi () {
   const free = !hasGrizzly();
+  if (!free) releaseWaitingSpot();
   const count = (state.restaurants || []).length;
   const left = FREE_RESTAURANT_LIMIT - count;
   document.getElementById('grizzly-pill')?.classList.toggle('hidden', !free);

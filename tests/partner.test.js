@@ -27,6 +27,27 @@ const { BASE, check, launch, newPage, finish } = require('./lib');
   const order = await p.$$eval('#partner-links a', as => as.map(a => a.href));
   check(order.some(h => /doordash\.com\/search\/store\/Pizzeria%20Bianco\//.test(h)) && order.some(h => /ubereats\.com\/search\?q=Pizzeria%20Bianco/.test(h)) && order.some(h => /grubhub\.com/.test(h)), 'delivery opens DoorDash, Uber Eats and Grubhub for this spot');
   check(await p.$$eval('#partner-links a', as => as.every(a => a.target === '_blank' && /noopener/.test(a.rel))), 'links open in a new tab safely');
+  await p.evaluate(() => closePartnerSheet());
+
+  // Affiliate codes, in either form a program gives them.
+  const urls = await p.evaluate(() => {
+    PARTNER_REFS.ubereats = 'https://ubereats.example.com/c/1/2?u={url}';
+    PARTNER_REFS.opentable = 'ref=ftb';
+    const o = partnerLinks('order', state.restaurants[0]).find(l => l.key === 'ubereats').url;
+    const b = partnerLinks('book', state.restaurants[0]).find(l => l.key === 'opentable').url;
+    PARTNER_REFS.ubereats = ''; PARTNER_REFS.opentable = '';
+    return { o, b };
+  });
+  check(urls.o === 'https://ubereats.example.com/c/1/2?u=' + encodeURIComponent('https://www.ubereats.com/search?q=Pizzeria%20Bianco'), `a tracking link wraps the page (${urls.o})`);
+  check(/opentable\.com\/s\?term=Pizzeria%20Bianco&latitude=33\.4492&longitude=-112\.0653&ref=ftb$/.test(urls.b), `a plain code is added to the link (${urls.b})`);
+
+  // Decision mode: the winner can be booked or ordered right there.
+  await p.evaluate(() => { closeDetailModal(); renderDecisionModeResults(buildDecisionModeShortlist().length ? buildDecisionModeShortlist() : [{ r: state.restaurants[0], score: 8, reasons: ['on your list'], distance: NaN }]); document.getElementById('decision-mode-overlay').classList.remove('hidden'); });
+  await p.waitForTimeout(200);
+  check(await p.locator('.decision-result-card.winner [data-action=order]').isVisible(), 'the Decision mode winner has Order and Book');
+  await p.click('.decision-result-card.winner [data-action=order]');
+  await p.waitForTimeout(200);
+  check(await p.locator('#partner-overlay').isVisible() && /Order from Pizzeria Bianco/.test(await p.locator('#partner-title').innerText()), 'Order opens the delivery apps for the winner');
   check(p.errors.length === 0, `no page errors (${p.errors.slice(0, 2).join(' | ')})`);
   await browser.close();
   finish('partner');

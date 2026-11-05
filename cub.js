@@ -283,10 +283,7 @@ window.Cub = (() => {
   function save () {
     if (!pick || !status) return;
     const a = app();
-    if (typeof a.isPremium === 'function' && !a.isPremium() && state.restaurants.length >= FREE_RESTAURANT_LIMIT) {
-      a.showGrizzlyUpsell('limit');
-      return;
-    }
+    const atLimit = typeof a.isPremium === 'function' && !a.isPremium() && state.restaurants.length >= FREE_RESTAURANT_LIMIT;
     const today = a.iso();
     const cuisine = sheet.querySelector('.qa-cuisine').value.trim().slice(0, 40);
     const dish = sheet.querySelector('.qa-dish').value.trim().slice(0, 80);
@@ -301,6 +298,15 @@ window.Cub = (() => {
     };
     if (status === 'visited') r.visits.push({ date: today, note: '', rating: stars, dish, photo, ...(video ? { video } : {}) });
     if (photo) r.photo = photo;
+    if (atLimit) {
+      // Over the free limit: the spot waits, and is saved the moment they go Grizzly.
+      if (typeof a.holdSpotForGrizzly === 'function') a.holdSpotForGrizzly(r, dish ? { name: dish, verdict: status === 'visited' ? (verdict || 'ok') : 'want' } : null);
+      else a.showGrizzlyUpsell('limit');
+      saving = true;
+      close();
+      saving = false;
+      return;
+    }
     state.restaurants.unshift(r);
     if (dish) a.upsertDish(r, { name: dish, verdict: status === 'visited' ? (verdict || (stars >= 4 ? 'again' : stars && stars <= 2 ? 'skip' : 'ok')) : 'want', photo, video });
     else a.saveData();

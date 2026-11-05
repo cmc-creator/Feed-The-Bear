@@ -4193,27 +4193,35 @@ function openMapsSearch (r) {
 }
 
 /* ── Book a table / Order delivery ────────────────────────── */
-// Each service's own search for this spot. Add an affiliate code to
-// PARTNER_REFS once a program approves the app (it is appended as-is).
+// Each service's own search for this spot. Once an affiliate program approves
+// the app, put its code in PARTNER_REFS, in either form the program gives:
+//   - a tracking link with {url} where the page goes (Impact, CJ, Partnerize):
+//       'https://ubereats.example-network.com/c/123/456?u={url}'
+//   - extra query text added to the page's own link: 'ref=feedthebear'
 const PARTNER_REFS = { opentable: '', resy: '', yelp: '', doordash: '', ubereats: '', grubhub: '' };
+function partnerUrl (key, url) {
+  const code = String(PARTNER_REFS[key] || '').trim();
+  if (!code) return url;
+  if (code.includes('{url}')) return code.replace('{url}', encodeURIComponent(url));
+  return url + (url.includes('?') ? '&' : '?') + code.replace(/^[?&]/, '');
+}
 function partnerLinks (kind, r) {
   const name = encodeURIComponent(r.name || '');
   const city = String(r.address || '').split(',').slice(-3, -1).join(',').trim();
   const where = encodeURIComponent(city || r.address || '');
   const near = Number.isFinite(Number(r.lat)) && r.lat != null ? `&latitude=${Number(r.lat)}&longitude=${Number(r.lng)}` : '';
-  const ref = key => PARTNER_REFS[key] ? `&${PARTNER_REFS[key]}` : '';
   if (kind === 'book') {
     return [
-      { key: 'opentable', label: 'OpenTable', url: `https://www.opentable.com/s?term=${name}${near}${ref('opentable')}` },
-      { key: 'resy', label: 'Resy', url: `https://resy.com/search?query=${name}${ref('resy')}` },
-      { key: 'yelp', label: 'Yelp', url: `https://www.yelp.com/search?find_desc=${name}&find_loc=${where}${ref('yelp')}` },
+      { key: 'opentable', label: 'OpenTable', url: partnerUrl('opentable', `https://www.opentable.com/s?term=${name}${near}`) },
+      { key: 'resy', label: 'Resy', url: partnerUrl('resy', `https://resy.com/search?query=${name}`) },
+      { key: 'yelp', label: 'Yelp', url: partnerUrl('yelp', `https://www.yelp.com/search?find_desc=${name}&find_loc=${where}`) },
       r.phone ? { key: 'call', label: 'Call them', url: `tel:${String(r.phone).replace(/[^\d+]/g, '')}`, note: r.phone } : null,
     ].filter(Boolean);
   }
   return [
-    { key: 'doordash', label: 'DoorDash', url: `https://www.doordash.com/search/store/${name}/${ref('doordash').replace(/^&/, '?')}` },
-    { key: 'ubereats', label: 'Uber Eats', url: `https://www.ubereats.com/search?q=${name}${ref('ubereats')}` },
-    { key: 'grubhub', label: 'Grubhub', url: `https://www.grubhub.com/search?queryText=${name}${ref('grubhub')}` },
+    { key: 'doordash', label: 'DoorDash', url: partnerUrl('doordash', `https://www.doordash.com/search/store/${name}/`) },
+    { key: 'ubereats', label: 'Uber Eats', url: partnerUrl('ubereats', `https://www.ubereats.com/search?q=${name}`) },
+    { key: 'grubhub', label: 'Grubhub', url: partnerUrl('grubhub', `https://www.grubhub.com/search?queryText=${name}`) },
   ];
 }
 
@@ -5147,10 +5155,7 @@ function savedSpotNamed (name) {
 
 // Creates a spot from a real place (or just a name). Respects the Cub limit.
 function createSpotFrom ({ found = null, name = '', status = 'want-to-try' }) {
-  if (typeof isPremium === 'function' && !isPremium() && state.restaurants.length >= FREE_RESTAURANT_LIMIT) {
-  showGrizzlyUpsell('limit');
-  return null;
-  }
+  const atLimit = typeof isPremium === 'function' && !isPremium() && state.restaurants.length >= FREE_RESTAURANT_LIMIT;
   const today = iso();
   const kind = String(found?.kind || '').replace(/\s*(restaurant|food|place)$/i, '').replace(/^(restaurant|food)$/i, '');
   const r = {
@@ -5160,6 +5165,8 @@ function createSpotFrom ({ found = null, name = '', status = 'want-to-try' }) {
   collectionId: null, priority: '', status, dateAdded: today, dateVisited: status === 'visited' ? today : null,
   updatedAt: Date.now(), visits: [], links: [],
   };
+  // Over the free limit: it waits and is saved the moment they go Grizzly.
+  if (atLimit) { holdSpotForGrizzly(r); return null; }
   state.restaurants.unshift(r);
   return r;
 }
@@ -6982,6 +6989,8 @@ function renderDecisionModeResults (shortlist = []) {
     </div>
     <div class="decision-result-actions">
       <button class="btn-primary btn-sm decision-result-action" data-action="choose" data-id="${r.id}" type="button">Choose This</button>
+      ${idx === 0 ? `<button class="btn-secondary btn-sm decision-result-action" data-action="book" data-id="${r.id}" type="button">🍽️ Book</button>
+      <button class="btn-secondary btn-sm decision-result-action" data-action="order" data-id="${r.id}" type="button">🛵 Order</button>` : ''}
       <button class="btn-secondary btn-sm decision-result-action" data-action="backup" data-id="${r.id}" type="button">Save Backup</button>
       <button class="btn-ghost btn-sm decision-result-action" data-action="menu" data-id="${r.id}" ${canMenu ? '' : 'disabled'} type="button">View Menu</button>
       <button class="btn-ghost btn-sm decision-result-action" data-action="directions" data-id="${r.id}" ${canDirections ? '' : 'disabled'} type="button">Directions</button>
@@ -7020,6 +7029,11 @@ function handleDecisionModeActionClick (btn) {
   });
   closeDecisionMode();
   setTimeout(() => openDetailModal(id), 120);
+  return;
+  }
+
+  if (action === 'book' || action === 'order') {
+  openPartnerSheet(action, r);
   return;
   }
 

@@ -444,13 +444,11 @@ function renderFriendsFeedHome () {
 }
 
 // `quiet`: no redraw or toast (adding several at once). Returns the new spot.
-function saveFromFriend (x, { quiet = false } = {}) {
+function saveFromFriend (x, { quiet = false, bulk = false } = {}) {
   if (!x?.n) return null;
   if (onMyList(x.n)) return null;
-  if (typeof isPremium === 'function' && !isPremium() && state.restaurants.length >= FREE_RESTAURANT_LIMIT) {
-    showGrizzlyUpsell('limit');
-    return null;
-  }
+  const atLimit = typeof isPremium === 'function' && !isPremium() && state.restaurants.length >= FREE_RESTAURANT_LIMIT;
+  if (atLimit && bulk) { showGrizzlyUpsell('limit'); return null; }
   const today = iso();
   const r = {
     id: uid(), name: x.n.slice(0, 80), cuisine: x.c || '', priceRange: 0, address: x.a || '', lat: null, lng: null,
@@ -458,6 +456,7 @@ function saveFromFriend (x, { quiet = false } = {}) {
     notes: `${x.who.name} recommended it.`, tags: ['From a friend'], collectionId: null, priority: '',
     status: 'want-to-try', dateAdded: today, dateVisited: null, updatedAt: Date.now(), visits: [],
   };
+  if (atLimit) { holdSpotForGrizzly(r, x.d ? { name: x.d, verdict: 'want' } : null); return null; }
   state.restaurants.unshift(r);
   if (x.d) upsertDish(r, { name: x.d, verdict: 'want' });
   else saveData();
@@ -992,7 +991,7 @@ function openFriendSpots (data, { invited = false } = {}) {
     allBtn.onclick = () => {
       let added = 0;
       for (const x of fresh) {
-        if (!saveFromFriend({ ...x, who: { name: who } }, { quiet: true })) break;
+        if (!saveFromFriend({ ...x, who: { name: who } }, { quiet: true, bulk: true })) break;
         added++;
       }
       if (added) {
