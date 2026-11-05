@@ -159,8 +159,9 @@ function drawQr (canvas, text) {
 }
 
 // Friends: a QR code a friend scans with their camera to follow you.
+// Free for everyone, like inviting: more people on Feed The Bear.
 function showFollowQr () {
-  if (grizzlyLocked('friends') || !ensureInviteName()) return;
+  if (!ensureInviteName()) return;
   startSharingLive();
   const box = document.getElementById('friends-qr');
   if (!box) return;
@@ -263,8 +264,9 @@ function askInviteRecipient () {
 }
 
 // `ref` is your account id for the free-month reward (firebase.js passes it).
+// Anyone can invite, free or Grizzly (following more than one friend is Grizzly).
 async function inviteFriend ({ ref = window._ftbUid || '' } = {}) {
-  if (grizzlyLocked('friends') || !ensureInviteName()) return;
+  if (!ensureInviteName()) return;
   const who = await askInviteRecipient();
   if (who === null) return;
   const data = buildProfileData();

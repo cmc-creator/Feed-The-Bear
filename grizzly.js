@@ -24,7 +24,7 @@ const GRIZZLY_PITCH = {
   smartfill:   { title: 'Let the cub do the typing', body: 'Byte Cub fills in cuisine, price, tags, and a short description for every spot you add.' },
   video:       { title: 'Save food videos', body: 'Catch the cheese pull, the sizzle, the steam. Grizzly saves 15-second videos with every dish you log.' },
   review:      { title: 'Your foodie Year in Review', body: 'Your top spots, cuisines, and streaks, wrapped up and ready to share.' },
-  friends:     { title: 'Eat with all your friends', body: "Cub follows one friend. Grizzly follows everyone, shows where they go and what they order, and lets you invite friends (they get 30 days of Grizzly free)." },
+  friends:     { title: 'Eat with all your friends', body: "Cub follows one friend. Grizzly follows everyone, and shows where they go and what they order." },
   vote:        { title: 'End the "where should we eat" debate', body: 'Start a Dinner Vote: friends tap yes or no on your picks, no app needed, and the bear names the winner.' },
   swipe:       { title: 'Find out what you are craving', body: 'Bear Swipe reads your swipes, names your craving, and finds it near you.' },
   pick:        { title: "Today's Pick, every meal", body: 'The bear picks a spot from your list for breakfast, lunch and dinner, and tells you why.' },

@@ -55,6 +55,41 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
   check((await calls()).filter(c => c.fn === 'openUrl').length === before, 'our own pages are not sent out');
   check(!a.errors.length, `no page errors ${a.errors.join(' | ')}`);
 
+  // The app now on Google Play (before 2.2.0): no share sheet at all, free account.
+  const old = await newPage(browser, { grizzly: false, seed: [
+    { id: 's1', name: 'Casa Birria', cuisine: 'Mexican', status: 'want-to-try', tags: [], visits: [], dishes: [] },
+  ] });
+  await old.addInitScript(() => {
+    delete Navigator.prototype.share;
+    window.Capacitor = { isNativePlatform: () => true, isPluginAvailable: n => n === 'PushNotifications', Plugins: {} }; // what version 2.1.0 has
+    localStorage.setItem('ftb_user_v1', JSON.stringify({ name: 'Connie', avatar: 'bear-chef' }));
+  });
+  await old.route(/overpass|nominatim|open-meteo|place-info|wikimedia/, r => r.abort());
+  await old.goto(`${BASE}/app.html`);
+  await old.waitForTimeout(1800);
+  await closeAllDialogs(old);
+  await old.waitForTimeout(2200);
+  check(!(await old.locator('#app-update-banner').count()), 'no "update" banner for the version on Google Play');
+  await old.click('#header-invite-btn');
+  await old.waitForTimeout(300);
+  check(!(await old.locator('#upgrade-overlay:not(.hidden)').count()), 'a free account can invite (no upgrade wall)');
+  await old.click('.invite-who-skip');
+  await old.waitForTimeout(400);
+  check(await old.locator('#share-menu').isVisible(), 'with no share sheet, a share menu opens');
+  check(/Text message/.test(await old.locator('#share-menu').innerText()) && /WhatsApp/.test(await old.locator('#share-menu').innerText()) && /Email/.test(await old.locator('#share-menu').innerText()), 'with Text message, WhatsApp and Email');
+  await old.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await old.click('#share-menu [data-via="copy"]');
+  await old.waitForTimeout(300);
+  const copied = await old.evaluate(() => navigator.clipboard.readText());
+  check(/invite\.html/.test(copied) && /Feed the Bear/i.test(copied), 'Copy puts the invite with its link on the clipboard');
+  check(await old.evaluate(() => JSON.parse(localStorage.getItem('ftb_invites_sent_v1') || '[]').length) === 1, 'and the invite is listed as sent');
+  // Any other Share button (a spot) uses the same menu; Cancel closes it.
+  const p2 = old.evaluate(() => navigator.share({ title: 'Casa Birria', text: 'Try this', url: 'https://www.feed-the-bear.com/x' }).then(() => 'ok', e => e.name));
+  await old.waitForTimeout(200);
+  await old.click('#share-menu .share-menu-cancel');
+  check(await p2 === 'AbortError' && !(await old.locator('#share-menu').count()), 'Cancel closes it like closing a share sheet');
+  check(!old.errors.length, `no page errors ${old.errors.join(' | ')}`);
+
   // Website: untouched.
   const w = await newPage(browser, {});
   await w.route(/overpass|nominatim|open-meteo|place-info|wikimedia/, r => r.abort());

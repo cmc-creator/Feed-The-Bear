@@ -69,7 +69,7 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
     return new Promise(r => setTimeout(() => r(url), 50));
   });
   check(await p.locator('#app-update-banner').isVisible(), 'an older app offers the update');
-  check(opened === 'https://github.com/cmc-creator/Feed-The-Bear/releases/latest/download/feed-the-bear.apk', `Update opens the newest build (${opened})`);
+  check(opened === 'https://play.google.com/store/apps/details?id=com.feedthebear.app', `Update opens the app on Google Play (${opened})`);
   await p.click('#app-update-banner .app-update-later');
   await p.evaluate(() => checkAndroidAppVersion());
   check(await p.locator('#app-update-banner').count() === 0, '"Later" hides it for the day');

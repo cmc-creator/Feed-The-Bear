@@ -88,6 +88,58 @@ const _blobToBase64 = blob => new Promise((resolve, reject) => {
   } catch { /* leave the browser's own behaviour */ }
 })();
 
+/* ── Share menu when there's no share sheet ───────────────────
+   The Android app before 2.2.0 (and some desktop browsers) have no
+   navigator.share, so Share buttons did nothing. This menu sends the text
+   by Messages, WhatsApp or Email, or copies it. Those open as links, which
+   the app hands to the phone. */
+(function shareMenuFallback () {
+  if (navigator.share) return;
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const go = url => { location.href = url; };
+  try {
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: ({ title = '', text = '', url = '', files } = {}) => new Promise((resolve, reject) => {
+        const body = [text, url].filter(Boolean).join(' ').trim();
+        if (!body) { reject(new DOMException(files?.length ? 'Files not supported' : 'Nothing to share', 'NotAllowedError')); return; }
+        document.getElementById('share-menu')?.remove();
+        const el = document.createElement('div');
+        el.id = 'share-menu';
+        el.className = 'modal-overlay share-menu';
+        el.setAttribute('role', 'dialog');
+        el.setAttribute('aria-modal', 'true');
+        el.setAttribute('aria-label', 'Share');
+        el.innerHTML = `<div class="share-menu-card">
+          <h3>${esc(title || 'Share')}</h3>
+          <button type="button" class="btn-primary" data-via="sms">💬 Text message</button>
+          <button type="button" class="btn-secondary" data-via="whatsapp">🟢 WhatsApp</button>
+          <button type="button" class="btn-secondary" data-via="email">✉️ Email</button>
+          <button type="button" class="btn-secondary" data-via="copy">📋 Copy</button>
+          <button type="button" class="share-menu-cancel">Cancel</button>
+        </div>`;
+        document.body.appendChild(el);
+        const close = ok => { el.remove(); ok ? resolve() : reject(new DOMException('Share canceled', 'AbortError')); };
+        el.addEventListener('click', async e => {
+          if (e.target === el || e.target.closest('.share-menu-cancel')) { close(false); return; }
+          const via = e.target.closest('[data-via]')?.dataset.via;
+          if (!via) return;
+          if (via === 'sms') go(`sms:?&body=${encodeURIComponent(body)}`);
+          if (via === 'whatsapp') go(`https://wa.me/?text=${encodeURIComponent(body)}`);
+          if (via === 'email') go(`mailto:?subject=${encodeURIComponent(title || 'Feed The Bear')}&body=${encodeURIComponent(body)}`);
+          if (via === 'copy') {
+            try { await navigator.clipboard.writeText(body); showToast('Copied', 'Paste it to a friend.', 'success'); }
+            catch { window.prompt('Copy this and send it to a friend:', body); }
+          }
+          close(true);
+        });
+        el.addEventListener('keydown', e => { if (e.key === 'Escape') close(false); });
+        el.querySelector('[data-via="sms"]').focus();
+      }),
+    });
+  } catch { /* leave Share buttons as they were */ }
+})();
+
 /* ── Constants ───────────────────────────────────────────── */
 const STORAGE_KEY   = 'ftb_restaurants_v2';
 const SETTINGS_KEY  = 'ftb_settings_v1';
@@ -2306,10 +2358,13 @@ async function setNearAlerts (miles) {
 /* ── Android app: tell people when the app itself is out of date ──
    Almost everything updates by itself (the app loads this website). Only
    Android features, like notifications, need a new install. When this site
-   expects one the installed app doesn't have, a banner offers the newest
-   build (published by .github/workflows/android.yml; it installs over the old one). */
-const ANDROID_APP_URL = 'https://github.com/cmc-creator/Feed-The-Bear/releases/latest/download/feed-the-bear.apk';
-const ANDROID_APP_NEEDS = ['PushNotifications', 'ContactPicker'];
+   expects one the installed app doesn't have, a banner sends people to the
+   app on Google Play. (It used to offer the GitHub build, which can't install
+   over the Play app.) List only what the version on Google Play has: the
+   Play version 2.1.0 has no ContactPicker, so asking for it showed every
+   Play user an update they couldn't get. Add 'ShareSheet' once 2.2.0 is live. */
+const ANDROID_APP_URL = 'https://play.google.com/store/apps/details?id=com.feedthebear.app';
+const ANDROID_APP_NEEDS = ['PushNotifications'];
 
 function checkAndroidAppVersion () {
   const cap = window.Capacitor;
@@ -2321,7 +2376,7 @@ function checkAndroidAppVersion () {
   bar.id = 'app-update-banner';
   bar.className = 'app-update-banner';
   bar.setAttribute('role', 'status');
-  bar.innerHTML = `<span>📲 A new version of the app is ready: pick friends from your contacts when you invite them.</span>
+  bar.innerHTML = `<span>📲 A new version of Feed The Bear is on Google Play.</span>
     <button type="button" class="btn-primary btn-sm app-update-go">Update</button>
     <button type="button" class="app-update-later" aria-label="Later">✕</button>`;
   document.body.appendChild(bar);
