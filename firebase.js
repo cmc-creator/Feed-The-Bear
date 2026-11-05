@@ -875,12 +875,12 @@ function _lastAccount () {
 
 async function _handleForgotPassword () {
   const email = document.getElementById('auth-email')?.value.trim();
-  if (!email) { showToast('Enter your email', 'Type the email you signed up with, then tap Forgot password again.', 'info'); return; }
+  if (!email) { _authError('Type your email above, then tap Forgot password again.'); return; }
   try {
     await _auth.sendPasswordResetEmail(email);
-    showToast('Check your email', `If ${email} has an account, a link to set a new password is on its way. If you signed up with Google, use Continue with Google instead.`, 'success');
+    _authError(`Sent! Check ${email} for a link to set a new password (look in spam too). Then come back and sign in.`);
   } catch (err) {
-    showToast('Could not send it', err.code === 'auth/invalid-email' ? 'That email does not look right.' : (err.message || 'Please try again.'), 'error');
+    _authError(err.code === 'auth/invalid-email' ? 'That email does not look right.' : (err.message || 'Could not send it. Try again.'));
   }
 }
 
@@ -907,7 +907,7 @@ function _setAuthMode (mode) {
     const on = tab.dataset.authMode === mode;
     tab.classList.toggle('active', on);
     tab.setAttribute('aria-selected', on ? 'true' : 'false');
-    tab.onclick = () => _setAuthMode(tab.dataset.authMode);
+    tab.onclick = () => { _authError(''); _setAuthMode(tab.dataset.authMode); };
   });
   el('auth-password')?.setAttribute('autocomplete', isSignup ? 'new-password' : 'current-password');
 }
@@ -918,11 +918,9 @@ async function _handleAuthSubmit () {
   const email    = document.getElementById('auth-email')?.value.trim();
   const password = document.getElementById('auth-password')?.value;
   const btn      = document.getElementById('auth-submit-btn');
-  if (!email || !password) { showToast('Missing info', 'Enter your email and password.', 'error'); return; }
-  if (mode === 'signup' && password.length < 8) {
-    showToast('Password too short', 'Use at least 8 characters.', 'error');
-    return;
-  }
+  _authError('');
+  if (!email || !password) { _authError('Enter your email and password.'); return; }
+  if (mode === 'signup' && password.length < 8) { _authError('Your password needs at least 8 characters.'); return; }
 
   btn.disabled    = true;
   btn.textContent = 'Signing you in...';
@@ -935,12 +933,7 @@ async function _handleAuthSubmit () {
         // Already has an account: sign them in with what they typed instead of an error.
         if (err.code !== 'auth/email-already-in-use') throw err;
         nextMode = 'signin';
-        try {
-          await fbSignInEmail(email, password);
-        } catch {
-          showToast('You already have an account', 'Enter your password to sign in, or tap Forgot password.', 'info');
-          return;
-        }
+        await fbSignInEmail(email, password);
       }
     } else {
       await fbSignInEmail(email, password);
@@ -952,19 +945,59 @@ async function _handleAuthSubmit () {
       'success'
     );
   } catch (err) {
-    const msg =
-      ['auth/wrong-password', 'auth/invalid-credential', 'auth/invalid-login-credentials', 'auth/user-not-found'].includes(err.code)
-        ? "That email and password don't match. Signed up with Google? Use Continue with Google. New here? Tap Create account."
-        : err.code === 'auth/invalid-email'      ? 'That email does not look right.'
-        : err.code === 'auth/weak-password'      ? 'Password needs at least 8 characters.'
-        : err.code === 'auth/too-many-requests'  ? 'Too many tries. Wait a minute, or tap Forgot password.'
+    const BAD_LOGIN = ['auth/wrong-password', 'auth/invalid-credential', 'auth/invalid-login-credentials', 'auth/user-not-found', 'auth/email-already-in-use'];
+    if (BAD_LOGIN.includes(err.code)) {
+      btn.textContent = 'Checking…';
+      const why = await _signInHelp(email);
+      if (why === 'none') {
+        _authError(`There's no account for ${email}. Check the spelling, or create one.`, { label: 'Create account', run: () => { _setAuthMode('signup'); _authError(''); } });
+      } else if (why === 'google') {
+        nextMode = 'signin';
+        _authError(`${email} signs in with Google, not a password.`, { label: 'Continue with Google', run: _handleGoogleAuth });
+      } else if (why === 'password') {
+        nextMode = 'signin';
+        _authError(`Wrong password for ${email}. Try again, or reset it.`, { label: 'Reset my password', run: _handleForgotPassword });
+      } else {
+        _authError("That email and password don't match. If you signed up with Google, use Continue with Google.");
+      }
+    } else {
+      _authError(
+        err.code === 'auth/invalid-email'          ? 'That email does not look right.'
+        : err.code === 'auth/weak-password'        ? 'Your password needs at least 8 characters.'
+        : err.code === 'auth/too-many-requests'    ? 'Too many tries. Wait a minute, or reset your password.'
         : err.code === 'auth/network-request-failed' ? 'No connection. Check your internet and try again.'
-        : err.message;
-    showToast("Couldn't sign in", msg, 'error');
+        : (err.message || 'Something went wrong. Try again.'));
+    }
   } finally {
     btn.disabled = false;
     _setAuthMode(nextMode);
   }
+}
+
+// Errors show inside the sign-in sheet (it covers everything, toasts included),
+// with one button for the fix when there is one.
+function _authError (text, action = null) {
+  const box = document.getElementById('auth-error');
+  if (!box) { if (text) showToast("Couldn't sign in", text, 'error'); return; }
+  box.textContent = text;
+  box.classList.toggle('hidden', !text);
+  if (text && action) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'auth-error-btn';
+    b.textContent = action.label;
+    b.addEventListener('click', () => action.run());
+    box.appendChild(b);
+  }
+  if (text) box.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+}
+
+// Which it was: no account, a Google account, or a wrong password (api/signin-help.js).
+async function _signInHelp (email) {
+  try {
+    const resp = await fetch('/api/signin-help', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+    return resp.ok ? (await resp.json()).status || '' : '';
+  } catch { return ''; }
 }
 
 // ─── ANDROID APP: GOOGLE SIGN-IN IN CHROME ────────────────────
@@ -1251,9 +1284,16 @@ async function openBilling () {
   try {
     const { ok, status, data } = await _accountAction('portal');
     if (ok && data.url) { window.location.href = data.url; return; }
-    showToast('Nothing to manage', status === 404
-      ? (window._ftbRewardUntil ? 'Your Grizzly is a free month from invites, so there is no bill.' : 'There is no subscription on this account.')
-      : (data.error || 'Please try again.'), 'info');
+    if (status !== 404) { showToast('Could not open billing', data.error || 'Please try again.', 'error'); return; }
+    // Say which account this is and why there's no bill, so a paid account
+    // signed in under another email is easy to spot.
+    const email = window._ftbUserEmail || 'this account';
+    const grizzly = window._ftbPlan === 'grizzly';
+    const msg = grizzly && window._ftbRewardUntil ? `${email} has Grizzly as a free month from invites, so there's no bill to manage.`
+      : grizzly && window._ftbTrialEnd ? `${email} is on a free Grizzly trial, so there's no bill yet.`
+      : grizzly ? `${email} has Grizzly without a card on file, so there's no bill to manage.`
+      : `${email} is on the free Cub plan, with no subscription. If you paid for Grizzly, it's on a different account: sign out, then sign in with the email your receipt went to.`;
+    showToast(grizzly ? 'No bill on this account' : 'No subscription on this account', msg, 'info');
   } catch (err) {
     showToast('Could not open billing', err.message || 'Please try again.', 'error');
   } finally {

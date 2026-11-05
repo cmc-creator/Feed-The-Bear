@@ -8394,6 +8394,30 @@ body.light-mode .auth-card .form-label { color: #e3d1b6; }
 .auth-tab.active { background: var(--primary); color: #fff; }
 .auth-forgot { text-align: center; margin: 10px 0 0; }
 #auth-overlay[data-mode="signup"] .auth-forgot { display: none; }
+/* What went wrong signing in, inside the sheet, with the one button that fixes it. */
+.auth-error {
+  margin-top: 12px; padding: 12px 14px; border-radius: 12px; display: grid; gap: 10px;
+  background: rgba(255, 214, 196, .96); color: #4a1d0c; border: 1px solid #f0a07a;
+  font-size: .9rem; font-weight: 600; line-height: 1.45;
+}
+.auth-error-btn {
+  justify-self: start; min-height: 38px; padding: 6px 14px; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: .86rem; font-weight: 800; color: #fff; background: #b4532a; border: 0;
+}
+/* Fits any phone, even with large text: never wider than the screen, scrolls if taller. */
+#auth-overlay { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+#auth-overlay .auth-card { width: min(430px, calc(100vw - 20px)); max-width: calc(100vw - 20px); box-sizing: border-box; margin-block: 10px; }
+#auth-overlay .auth-body > * { max-width: 100%; box-sizing: border-box; }
+#auth-overlay .form-input { width: 100%; min-width: 0; box-sizing: border-box; }
+@media (max-width: 480px) {
+  #auth-overlay .auth-body { padding: 6px 16px 20px; }
+  #auth-overlay .auth-hero-bear { max-height: 110px; width: auto; max-width: 70%; margin-bottom: 10px; }
+  #auth-overlay .auth-sub { font-size: .9rem; margin-bottom: 12px; }
+  #auth-overlay .auth-tab { font-size: .84rem; padding: 0 6px; }
+}
+@media (max-height: 700px) { #auth-overlay .auth-hero-bear { display: none; } }
+/* Messages show above the sign-in sheet, not hidden behind it. */
+#toast-container { z-index: 10050 !important; }
 .auth-toggle-text {
   text-align: center;
   font-size: .82rem;

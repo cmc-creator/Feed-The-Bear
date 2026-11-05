@@ -50,6 +50,39 @@ async function upgradeTitle (p) {
   await p.waitForTimeout(300);
   check(await p.evaluate(() => window._calls.join(',')) === 'up,in', 'an existing email under Create account signs in with that password');
   check(await auth.evaluate(el => el.dataset.mode) === 'signin', 'and the sheet is on Sign in after');
+
+  // A failed sign-in says exactly why, inside the sheet, with the fix.
+  let why = 'none';
+  await p.route('**/api/signin-help', r => r.fulfill({ json: { status: why } }));
+  await p.evaluate(() => {
+    window.fbSignInEmail = async () => { const e = new Error('bad'); e.code = 'auth/invalid-credential'; throw e; };
+    window._sentReset = '';
+    _auth.sendPasswordResetEmail = async email => { window._sentReset = email; };
+  });
+  const tryIn = async () => { await p.locator('.auth-tab[data-auth-mode="signin"]').click(); await p.fill('#auth-email', 'me@example.com'); await p.fill('#auth-password', 'password123'); await p.locator('#auth-submit-btn').click(); await p.waitForTimeout(400); };
+  await tryIn();
+  check(await p.locator('#auth-error').isVisible() && /no account for me@example.com/.test(await p.locator('#auth-error').innerText()), 'no account: says so in the sheet');
+  await p.locator('.auth-error-btn').click();
+  check(await auth.evaluate(el => el.dataset.mode) === 'signup', 'and its button switches to Create account');
+  why = 'google';
+  await tryIn();
+  check(/signs in with Google/.test(await p.locator('#auth-error').innerText()) && /Continue with Google/.test(await p.locator('.auth-error-btn').innerText()), 'a Google account: says to use Google, with the button');
+  why = 'password';
+  await tryIn();
+  check(/Wrong password for me@example.com/.test(await p.locator('#auth-error').innerText()), 'wrong password: says so');
+  await p.locator('.auth-error-btn').click();
+  await p.waitForTimeout(200);
+  check(await p.evaluate(() => window._sentReset) === 'me@example.com' && /Sent! Check me@example.com/.test(await p.locator('#auth-error').innerText()), 'and Reset my password sends the email and says so');
+  check(await p.evaluate(() => getComputedStyle(document.getElementById('toast-container')).zIndex) > await p.evaluate(() => getComputedStyle(document.getElementById('auth-overlay')).zIndex), 'messages show above the sign-in sheet');
+  await p.close();
+
+  // The sheet fits a small phone, with no sideways scrolling.
+  p = await newPage(browser, { seed: SEED, viewport: { width: 320, height: 640 } });
+  await p.addInitScript(() => localStorage.setItem('ftb_test_auth_gate', '1'));
+  await p.goto(`${BASE}/app.html`);
+  await p.waitForSelector('#auth-overlay.auth-required:not(.hidden)', { timeout: 15000 }).catch(() => {});
+  const fit = await p.evaluate(() => { const r = document.querySelector('#auth-overlay .auth-card').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && document.documentElement.scrollWidth <= innerWidth; });
+  check(fit, 'the sign-in sheet fits a 320px-wide phone');
   await p.close();
 
   // ── Signed in on this phone before: opens on Sign in with the email filled ──
