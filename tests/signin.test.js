@@ -41,7 +41,6 @@ async function upgradeTitle (p) {
   check(await p.evaluate(() => FREE_RESTAURANT_LIMIT) === 25, 'a free account holds 25 spots');
 
   for (const [label, run, title] of [
-    ['Inviting a friend', () => inviteFriend(), 'Eat with all your friends'],
     ['Dinner Vote', () => runToolAction('rooms'), 'End the "where should we eat" debate'],
     ['Swipe to Decide', () => runToolAction('swipe'), 'Find out what you are craving'],
   ]) {
@@ -53,6 +52,13 @@ async function upgradeTitle (p) {
   await closeAllDialogs(p);
   await p.evaluate(() => runToolAction('friends'));
   check(await p.locator('#friends-overlay').isVisible(), 'a free account can open Friends (to find the one friend it can follow)');
+  // Inviting is free for everyone: it asks who it's for, no upgrade wall.
+  await closeAllDialogs(p);
+  await p.evaluate(() => { saveUserProfile({ ...(loadUserProfile() || {}), name: 'Connie' }); inviteFriend(); });
+  await p.waitForTimeout(300);
+  check(await p.locator('#invite-who').isVisible() && !(await p.locator('#upgrade-overlay:not(.hidden)').count()), 'a free account can invite friends');
+  await p.evaluate(() => document.getElementById('invite-who')?.remove());
+
   await closeAllDialogs(p);
   check(!!(await p.evaluate(() => followFriend({ id: 'abc', u: 'Sam', picks: [], w: [] }))) && await p.evaluate(() => getFriends().length) === 1, 'a free account can follow one friend');
   check(await p.evaluate(() => followFriend({ id: 'def', u: 'Alex', picks: [], w: [] })) === null && await p.evaluate(() => getFriends().length) === 1, 'but not a second');

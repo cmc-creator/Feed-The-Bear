@@ -161,6 +161,9 @@
       box-shadow: 0 4px 20px rgba(255,107,53,.4);
     }
     .btn-hero-primary:hover { background: var(--primary-dk); transform: translateY(-2px); box-shadow: 0 8px 30px rgba(255,107,53,.5); }
+    .hero-play { display: inline-flex; align-items: center; gap: 10px; margin: -40px auto 44px; padding: 8px 18px; border-radius: 12px; background: #111; color: #fff; text-decoration: none; border: 1px solid #444; }
+    .hero-play span { display: grid; text-align: left; font-weight: 700; font-size: 1rem; line-height: 1.1; }
+    .hero-play small { font-weight: 500; font-size: .66rem; letter-spacing: .04em; text-transform: uppercase; opacity: .85; }
     .btn-hero-secondary {
       background: var(--surface2); color: var(--text);
       font-size: 1.05rem; font-weight: 600;
@@ -422,6 +425,10 @@
       <a href="auth.html?mode=signup" class="btn-hero-primary">Start For Free</a>
       <a href="auth.html?mode=signin" class="btn-hero-secondary">Sign In</a>
     </div>
+    <a class="hero-play" href="https://play.google.com/store/apps/details?id=com.feedthebear.app" rel="noopener">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M4 2.6v18.8c0 .5.5.8.9.6l16.3-9.4c.4-.2.4-.8 0-1L4.9 2c-.4-.2-.9.1-.9.6z"/></svg>
+      <span><small>Get it on</small>Google Play</span>
+    </a>
     <div class="hero-social-proof">
       <div class="hero-proof-kicker">Sniff. Swipe. Supper.</div>
       <span>Less app-juggling, more paw-picked meals.</span>
@@ -581,7 +588,7 @@
           <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Map, nearby &amp; Open now</li>
           <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Ratings &amp; notes</li>
           <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Backup &amp; sync on every device</li>
-          <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Follow one friend</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Follow one friend, invite anyone</li>
           <li><span class="pricing-lock"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span> <span style="color:var(--text-dim)"><span class="sr-only">Not included: </span>More friends &amp; Dinner Vote</span></li>
           <li><span class="pricing-lock"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span> <span style="color:var(--text-dim)"><span class="sr-only">Not included: </span>Bear Swipe &amp; Today's Pick</span></li>
           <li><span class="pricing-lock"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span> <span style="color:var(--text-dim)"><span class="sr-only">Not included: </span>Byte Cub AI</span></li>
@@ -602,7 +609,7 @@
         <ul class="pricing-features">
           <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> <strong>Unlimited</strong> restaurants</li>
           <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Everything in Cub</li>
-          <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> All your friends, invites &amp; Dinner Vote</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> All your friends &amp; Dinner Vote</li>
           <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Bear Swipe &amp; Today's Pick</li>
           <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> Byte Cub AI assistant</li>
           <li><span class="pricing-check"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span> AI dish recommendations</li>
