@@ -939,11 +939,14 @@ function _guestShow (data, { accept = false } = {}) {
 }
 
 // A friend's spots in one list: their top picks, then what they've been up to.
+// Any spot can be missing a name (old data, a half-saved add): never crash on it.
+const spotKey = name => normalizeName(String(name ?? ''));
 function friendSpotItems (data, recent = []) {
   const seen = new Set();
   const out = [];
   const add = x => {
-    const k = normalizeName(x.n);
+    if (!x) return;
+    const k = spotKey(x.n);
     if (!k || seen.has(k)) return;
     seen.add(k);
     out.push(x);
@@ -953,8 +956,8 @@ function friendSpotItems (data, recent = []) {
   return out;
 }
 function onMyList (name) {
-  const k = normalizeName(name);
-  return (state.restaurants || []).some(r => normalizeName(r.name) === k);
+  const k = spotKey(name);
+  return !!k && (state.restaurants || []).some(r => r && spotKey(r.name) === k);
 }
 function friendNewSpots (entry) {
   return friendSpotItems(entry?.data, entry?.recent).filter(x => !onMyList(x.n));
@@ -1136,15 +1139,15 @@ function renderFriendsList () {
 function openFoodieFriends () {
   // Open to everyone: a free account can follow one friend (followFriend
   // checks), so it needs this screen to find them. Inviting stays Grizzly.
-  renderFriendsList();
-  loadFollowers();
-  loadInviteStatus();
-  noteExistingFollows();
-  renderMyHandle();
+  // Each part draws on its own: one bad record must never blank the whole screen.
+  for (const step of [renderFriendsList, loadFollowers, loadInviteStatus, noteExistingFollows, renderMyHandle, renderFriendsLiveNote, () => refreshFriendsLive(true)]) {
+    try {
+      const out = step();
+      if (out && typeof out.catch === 'function') out.catch(err => console.warn('[FTB] friends:', err));
+    } catch (err) { console.warn('[FTB] friends:', err); window.reportError?.(err); }
+  }
   const found = document.getElementById('friends-find-result');
   if (found) found.innerHTML = '';
-  renderFriendsLiveNote();
-  refreshFriendsLive(true);
   document.getElementById('friends-link-input').value = '';
   document.getElementById('friends-result').classList.add('hidden');
   document.getElementById('friends-result').innerHTML = '';

@@ -9266,7 +9266,8 @@ async function aiPhotoFill () {
    ------------------------------------------------------------ */
 
 function normalizeName (s) {
-  return s.toLowerCase().replace(/[^a-z0-9]/g,'').trim();
+  // A spot with no name (old or half-saved data) must not crash whole screens.
+  return String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g,'').trim();
 }
 function levenshtein (a, b) {
   const m = a.length, n = b.length;

@@ -73,7 +73,7 @@ function releaseWaitingSpot () {
   const r = held?.r;
   if (!r?.name || Date.now() - (held.at || 0) > 30 * 86400000) return;
   const key = typeof normalizeName === 'function' ? normalizeName(r.name) : r.name.toLowerCase();
-  if ((state.restaurants || []).some(x => (typeof normalizeName === 'function' ? normalizeName(x.name) : x.name.toLowerCase()) === key)) return;
+  if ((state.restaurants || []).some(x => (typeof normalizeName === 'function' ? normalizeName(x?.name) : String(x?.name || '').toLowerCase()) === key)) return;
   r.updatedAt = Date.now();
   state.restaurants.unshift(r);
   if (held.dish?.name && typeof upsertDish === 'function') upsertDish(r, held.dish);
