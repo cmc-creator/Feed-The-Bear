@@ -25,6 +25,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ContactPickerPlugin.class);
         registerPlugin(SpeechPlugin.class);
         registerPlugin(PlayBillingPlugin.class);
+        registerPlugin(ShareSheetPlugin.class);
         super.onCreate(savedInstanceState);
         route(getIntent());
         // Geofences may have been cleared (reboot, update, or Play services reset).

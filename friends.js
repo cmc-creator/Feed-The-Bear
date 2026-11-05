@@ -289,9 +289,14 @@ async function inviteFriend ({ ref = window._ftbUid || '' } = {}) {
   } catch (err) {
     if (err && err.name === 'AbortError') return;
   }
-  try { await navigator.clipboard.writeText(`${text} ${url}`); } catch { /* no clipboard */ }
   noteInviteSent({ code, name: who });
-  showToast('Invite copied', 'Paste it in a text to a friend.', 'success');
+  try {
+    await navigator.clipboard.writeText(`${text} ${url}`);
+    showToast('Invite copied', 'Paste it in a text to a friend.', 'success');
+  } catch {
+    // No share sheet and no clipboard (older Android app): show it to copy by hand.
+    window.prompt('Copy your invite and send it to a friend:', `${text} ${url}`);
+  }
 }
 
 // Opened from an invite (app.html?i=<code>): tell the inviter it was opened,

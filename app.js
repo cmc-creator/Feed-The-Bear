@@ -26,6 +26,24 @@ if (typeof AI === 'undefined') {
   };
 }
 
+/* ── Share sheet in the Android app ─────────────────────────
+   Android's web view has no navigator.share, so every Share and Invite
+   button fell back to copying (which can fail there). App 2.2.0+ has the
+   phone's own share sheet (ShareSheetPlugin.java); use it for text and links. */
+(function nativeShareSheet () {
+  const sheet = window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins?.ShareSheet : null;
+  if (!sheet?.share || navigator.share) return;
+  try {
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: ({ title = '', text = '', url = '', files } = {}) => {
+        if (files?.length && !text && !url) return Promise.reject(new DOMException('Files not supported', 'NotAllowedError'));
+        return sheet.share({ title: String(title), text: String(text), url: String(url) });
+      },
+    });
+  } catch { /* leave the copy fallbacks */ }
+})();
+
 /* ── Constants ───────────────────────────────────────────── */
 const STORAGE_KEY   = 'ftb_restaurants_v2';
 const SETTINGS_KEY  = 'ftb_settings_v1';

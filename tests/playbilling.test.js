@@ -148,7 +148,7 @@ const PRICE = 'price_1UW2DmLzFIsRCvKRfFexC3P8';
   const main = fs.readFileSync(path.join(root, 'src/main/java/com/feedthebear/app/MainActivity.java'), 'utf8');
   const manifest = fs.readFileSync(path.join(root, 'src/main/AndroidManifest.xml'), 'utf8');
   check(/com\.android\.billingclient:billing:\d/.test(gradle), 'Play Billing Library in the build');
-  check(/registerPlugin\(PlayBillingPlugin\.class\)/.test(main) && /registerPlugin\(SpeechPlugin\.class\)/.test(main), 'billing and speech plugins registered');
+  check(/registerPlugin\(PlayBillingPlugin\.class\)/.test(main) && /registerPlugin\(SpeechPlugin\.class\)/.test(main) && /registerPlugin\(ShareSheetPlugin\.class\)/.test(main), 'billing, speech and share plugins registered');
   check(/RECORD_AUDIO/.test(manifest) && /android\.speech\.RecognitionService/.test(manifest), 'microphone permission and speech service query');
   check(!/ACCESS_BACKGROUND_LOCATION"/.test(manifest.replace(/<!--[\s\S]*?-->/g, '')), 'still no background location');
 

@@ -91,6 +91,7 @@ const FAKE = () => {
   const a = await newPage(browser, {});
   await a.addInitScript(() => {
     window.SpeechRecognition = undefined; window.webkitSpeechRecognition = undefined;
+    delete Navigator.prototype.share; // like Android's web view
     window.__speech = { listeners: {}, starts: 0, aborts: 0 };
     window.Capacitor = { isNativePlatform: () => true, isPluginAvailable: () => true, Plugins: {
       Speech: {
@@ -99,6 +100,7 @@ const FAKE = () => {
         stop: async () => {}, abort: async () => { __speech.aborts++; },
       },
       PlayBilling: { checkoutToken: async () => (window.__billing || { token: 'TOK' }) },
+      ShareSheet: { share: async o => { window.__shared = o; } },
     } };
   });
   await a.route(/overpass|nominatim|open-meteo|place-info/, r => r.abort());
@@ -127,6 +129,10 @@ const FAKE = () => {
   await a.evaluate(() => __speech.finish({ text: 'show my want to try' }));
   await a.waitForTimeout(700);
   check(/show my want to try/.test(await a.locator('#chat-messages').innerText()), 'and what you say is sent');
+  // Share and Invite buttons use the phone's share sheet (the web view has none).
+  await a.evaluate(() => navigator.share({ title: 'Feed the Bear', text: 'Follow me', url: 'https://www.feed-the-bear.com/invite.html' }));
+  check(await a.evaluate(() => window.__shared?.url === 'https://www.feed-the-bear.com/invite.html' && window.__shared.text === 'Follow me'), 'Android app: Share opens the phone share sheet');
+
   // Checkout in the Play app gets Google's token; backing out of Google's notice stops it.
   check(await a.evaluate(() => _playBillingToken()) === 'TOK', 'Play checkout gets the reporting token');
   check(await a.evaluate(() => { window.Capacitor.Plugins.PlayBilling.checkoutToken = async () => { throw Object.assign(new Error('canceled'), { code: 'canceled' }); }; return _playBillingToken(); }) === false, "backing out of Google's notice stops checkout");
