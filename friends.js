@@ -962,6 +962,7 @@ function friendNewSpots (entry) {
 
 // "Connie's spots": add any of them to your Want to Try with one tap, or all at once.
 function openFriendSpots (data, { invited = false } = {}) {
+  if (!data) return;
   const overlay = document.getElementById('guest-profile-overlay');
   const list = document.getElementById('guest-profile-list');
   if (!overlay || !list) return;
