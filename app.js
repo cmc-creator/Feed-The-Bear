@@ -5252,7 +5252,7 @@ async function sendChat () {
   showTyping();
   if (window.AI?.hasAccess?.()) {
     try {
-      const reply = await AI.chat(text, _cubChatHistory.slice(-12), state.restaurants);
+      const reply = await AI.chat(text, _cubChatHistory.slice(-12), state.restaurants, await userAreaName());
       hideTyping();
       // He asks the app to search real places near you rather than asking where you are.
       const find = String(reply).match(/\[\[\s*FIND:\s*([^\]]{2,60})\]\]/i);
@@ -11328,6 +11328,26 @@ let _justAte = { placeId: null, verdict: null, media: [], stars: 0, found: null,
 let _justAteSearchTimer = null;
 let _justAteSearchSeq = 0;
 
+// Neighborhood, city and state where you are now ("Arcadia, Phoenix, Arizona"),
+// for Byte Cub to talk about. Looked up once per ~1 km moved; '' when unknown.
+let _areaName = { key: '', name: '' };
+async function userAreaName () {
+  if (!Number.isFinite(state.userLat)) return '';
+  const key = `${state.userLat.toFixed(2)},${state.userLng.toFixed(2)}`;
+  if (_areaName.key === key) return _areaName.name;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 3000);
+    const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=14&lat=${state.userLat.toFixed(3)}&lon=${state.userLng.toFixed(3)}`,
+      { headers: { 'Accept-Language': 'en' }, signal: ctrl.signal }).finally(() => clearTimeout(timer));
+    const a = (await resp.json())?.address || {};
+    const name = [a.neighbourhood || a.suburb, a.city || a.town || a.village || a.county, a.state]
+      .filter(Boolean).filter((x, i, all) => all.indexOf(x) === i).join(', ').slice(0, 120);
+    _areaName = { key, name };
+    return name;
+  } catch { return ''; }
+}
+
 // Real restaurants matching what's typed (our Google Places search). [] when unavailable.
 async function searchRealPlaces (q) {
   const at = Number.isFinite(state.userLat) ? `&lat=${state.userLat.toFixed(2)}&lng=${state.userLng.toFixed(2)}` : '';
@@ -14801,8 +14821,16 @@ async function sendAiMessage (userText) {
 
   const thinking = _showAiThinking();
   try {
-  const reply = await AI.chat(userText, _aiHistory.slice(-12), state.restaurants);
+  const reply = await AI.chat(userText, _aiHistory.slice(-12), state.restaurants, await userAreaName());
   thinking.remove();
+  // A search for real places runs in Byte Cub's chat, which shows them with save buttons.
+  const find = String(reply).match(/\[\[\s*FIND:\s*([^\]]{2,60})\]\]/i);
+  if (find) {
+    _appendAiMsg('assistant', `Looking for ${find[1].trim()} near you…`);
+    openChat();
+    await cubFindNearby(find[1].trim().toLowerCase());
+    return;
+  }
   _appendAiMsg('assistant', reply);
   } catch (err) {
   thinking.remove();

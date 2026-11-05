@@ -93,6 +93,13 @@ const say = async (p, text) => {
   await p.waitForTimeout(800);
   check(asked.includes('hoagies'), `the AI's search runs for real (${asked})`);
   check(!/\[\[FIND/.test(await p.locator('#chat-messages').innerText()), 'the search tag is never shown');
+
+  // He knows what part of town you're in.
+  await p.route('**/nominatim.openstreetmap.org/reverse**', r => r.fulfill({ json: { address: { neighbourhood: 'Arcadia', city: 'Phoenix', state: 'Arizona' } } }));
+  await p.evaluate(() => { window.__area = null; window.AI.chat = async (t, h, rs, area) => { window.__area = area; return 'Arcadia has great options!'; }; });
+  await say(p, 'what is good around my neighborhood for date night');
+  await p.waitForTimeout(500);
+  check(await p.evaluate(() => window.__area) === 'Arcadia, Phoenix, Arizona', `the AI is told your area (${await p.evaluate(() => window.__area)})`);
   await closeAllDialogs(p);
 
   check(!p.errors.length, `no page errors ${p.errors.join(' | ')}`);
