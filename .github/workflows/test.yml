@@ -175,6 +175,9 @@ jobs:
       - name: Google Play sale reports (alternative billing)
         working-directory: tests
         run: node playbilling.test.js
+      - name: Android app - share, downloads, print, outside links
+        working-directory: tests
+        run: node androidweb.test.js
       - name: Sign-in required, free plan limits
         working-directory: tests
         run: node signin.test.js

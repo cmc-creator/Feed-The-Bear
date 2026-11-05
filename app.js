@@ -26,22 +26,66 @@ if (typeof AI === 'undefined') {
   };
 }
 
-/* ── Share sheet in the Android app ─────────────────────────
-   Android's web view has no navigator.share, so every Share and Invite
-   button fell back to copying (which can fail there). App 2.2.0+ has the
-   phone's own share sheet (ShareSheetPlugin.java); use it for text and links. */
-(function nativeShareSheet () {
+/* ── What Android's web view can't do, in the Android app ────
+   No share sheet, no file downloads, no printing, and links meant for Maps
+   or a restaurant's site open inside the app. App 2.2.0+ has
+   ShareSheetPlugin.java for these; the site's buttons stay as they are. */
+const _blobToBase64 = blob => new Promise((resolve, reject) => {
+  const fr = new FileReader();
+  fr.onload = () => resolve(String(fr.result).split(',')[1] || '');
+  fr.onerror = () => reject(fr.error);
+  fr.readAsDataURL(blob);
+});
+(function nativeAndroidBridges () {
   const sheet = window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins?.ShareSheet : null;
-  if (!sheet?.share || navigator.share) return;
+  if (!sheet?.share) return;
+  const shareFile = async (file, { title = '', text = '' } = {}) => sheet.shareFile({
+    name: file.name || 'feed-the-bear', mime: file.type || 'application/octet-stream',
+    base64: await _blobToBase64(file), title: String(title), text: String(text),
+  });
   try {
-    Object.defineProperty(navigator, 'share', {
-      configurable: true,
-      value: ({ title = '', text = '', url = '', files } = {}) => {
-        if (files?.length && !text && !url) return Promise.reject(new DOMException('Files not supported', 'NotAllowedError'));
-        return sheet.share({ title: String(title), text: String(text), url: String(url) });
-      },
-    });
-  } catch { /* leave the copy fallbacks */ }
+    // Share: text and links, or an image/file (the first one).
+    if (!navigator.share || !sheet.shareFile) {
+      Object.defineProperty(navigator, 'share', {
+        configurable: true,
+        value: ({ title = '', text = '', url = '', files } = {}) => {
+          if (files?.length && sheet.shareFile) return shareFile(files[0], { title, text: [text, url].filter(Boolean).join(' ') });
+          if (files?.length && !text && !url) return Promise.reject(new DOMException('Files not supported', 'NotAllowedError'));
+          return sheet.share({ title: String(title), text: String(text), url: String(url) });
+        },
+      });
+      Object.defineProperty(navigator, 'canShare', {
+        configurable: true,
+        value: (data = {}) => !data.files?.length || !!sheet.shareFile,
+      });
+    }
+    if (!sheet.shareFile) return;
+    // Downloads (backup, CSV, photos, story cards): a link with `download` and
+    // a blob: address. Hand the file to the share sheet, which can save it too.
+    const click = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () {
+      if (this.hasAttribute('download') && /^(blob|data):/.test(this.href)) {
+        const name = this.getAttribute('download') || 'feed-the-bear';
+        fetch(this.href).then(r => r.blob())
+          .then(blob => shareFile(new File([blob], name, { type: blob.type })))
+          .catch(() => showToast('Could not save', 'Please try again.', 'error'));
+        return;
+      }
+      return click.call(this);
+    };
+    // Print: Android's print screen, which also saves a PDF.
+    window.print = () => { sheet.print({ title: 'Feed The Bear' }).catch(() => showToast('Printing unavailable', 'This phone has no print service.', 'error')); };
+    // Links to other sites and apps (Maps, Directions, websites, texts): open
+    // them in the app made for them, not inside Feed The Bear.
+    const open = window.open.bind(window);
+    window.open = (url, target, features) => {
+      try {
+        const u = new URL(String(url), location.href);
+        if (u.origin !== location.origin) { sheet.openUrl({ url: u.href }).catch(() => open(url, target, features)); return null; }
+      } catch { /* not a URL: let the web view try */ }
+      return open(url, target, features);
+    };
+  } catch { /* leave the browser's own behaviour */ }
 })();
 
 /* ── Constants ───────────────────────────────────────────── */
