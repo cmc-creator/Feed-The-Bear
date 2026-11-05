@@ -49,16 +49,22 @@ asGrizzly(); // uses Grizzly-only features
   f.on('pageerror', e => errs.push(e.message));
   await f.route(/overpass|nominatim|place-info|open-meteo/, r => r.abort());
   await f.goto(`${BASE}${path}`);
+  await f.waitForTimeout(800);
+  // The invite page says who it's from and what happens next, then one tap.
+  check(/Connie invited you to Feed The Bear/.test(await f.locator('h1').innerText()), 'the invite page names who sent it');
+  check(/follow Connie automatically/.test(await f.locator('ol').innerText()), 'and explains what happens next');
+  check(await f.locator('#gift').isVisible(), 'and mentions the free month');
+  await f.click('#go');
   await f.waitForTimeout(2500);
   check(await f.locator('#guest-profile-overlay').isVisible(), 'the friend sees the invite even though Connie has no ratings yet');
-  check((await f.locator('#guest-profile-name').innerText()) === "Connie's food picks", 'it names who sent it');
-  check(/Connie invited you.*30 days of Grizzly free/.test(await f.locator('#guest-profile-sub').innerText()), 'and mentions the free month');
+  check((await f.locator('#guest-profile-name').innerText()) === 'Connie invited you 🐻', 'it names who sent it');
+  check(/following Connie.*30 days of Grizzly free/.test(await f.locator('#guest-profile-sub').innerText()), 'says they follow Connie now, and the free month');
   check(/just getting started/.test(await f.locator('#guest-profile-list').innerText()), 'an empty profile explains itself');
   check(await f.evaluate(() => localStorage.getItem('ftb_ref_v1')) === 'inviterUid1234567890', 'the free-month invite is remembered');
-  // A free account can follow one friend: whoever invited them.
+  // Accepting followed Connie, even on a free account (one friend is free).
+  check(!(await f.locator('#upgrade-overlay').isVisible().catch(() => false)) && await f.evaluate(() => getFriends().some(x => x.name === 'Connie')), 'accepting the invite follows the friend who sent it');
+  check(await f.locator('#guest-profile-follow').isHidden(), 'no Follow button to figure out: already following');
   await f.evaluate(() => { window._ftbUid = 'friendUid12345678'; window._ftbPlan = 'free'; });
-  await f.click('#guest-profile-follow');
-  check(!(await f.locator('#upgrade-overlay').isVisible().catch(() => false)) && await f.evaluate(() => getFriends().some(x => x.name === 'Connie')), 'a free account can follow the friend who invited them');
   check(await f.evaluate(() => friendsUpdatedAt() > 0), 'and is stamped for syncing');
   // A second friend is Grizzly.
   check(await f.evaluate(() => followFriend({ id: 'other1', u: 'Sam', picks: [], w: [] })) === null && await f.locator('#upgrade-overlay').isVisible(), 'following a second friend offers Grizzly');

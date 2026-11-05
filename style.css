@@ -4062,6 +4062,27 @@ body.light-mode #profile-btn {
 .guest-item-name { font-weight:700; font-size:.92rem; }
 .guest-item-meta { font-size:.74rem; color:var(--text-dim); margin-top:2px; }
 .guest-item-stars { color:var(--gold); font-size:.78rem; }
+.guest-item-photo img { width:100%; height:100%; object-fit:cover; border-radius:10px; }
+.guest-item-body { min-width:0; }
+.guest-item-order { font-size:.78rem; margin-top:3px; color:var(--text); }
+.guest-item .btn-sm { flex-shrink:0; }
+.guest-have { flex-shrink:0; font-size:.76rem; font-weight:700; color:var(--text-dim); white-space:nowrap; }
+/* Buttons stay in reach at the bottom while the list scrolls. */
+.guest-actions {
+  position:sticky; bottom:0; display:grid; gap:8px; margin-top:16px;
+  padding:12px 0 calc(12px + env(safe-area-inset-bottom, 0px)); background:var(--bg);
+}
+.guest-actions .btn-primary, .guest-actions .btn-ghost { width:100%; }
+/* An upsell from the spots sheet shows on top of it. */
+body.guest-open #upgrade-overlay { z-index:7100; }
+/* Home: "Connie has 12 spots you don't have yet." */
+.ff-new {
+  display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:14px;
+  background:rgba(var(--primary-rgb), .12); border:1px solid rgba(var(--primary-rgb), .35);
+  font-size:.9rem; line-height:1.35;
+}
+.ff-new span { flex:1; min-width:0; }
+.ff-new .btn-sm { flex-shrink:0; }
 /* ------------------------------------------------------------
    MOBILE FIX � Header overflow menu + general polish
    ------------------------------------------------------------ */

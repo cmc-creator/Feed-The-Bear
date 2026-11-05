@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- Invite links point here so texts and chats show an inviting preview.
-       It forwards straight to the app, keeping ?ref= (free month) and
-       #profile= (the inviter's picks) exactly as they were. -->
+  <!-- Invite links point here: texts and chats show an inviting preview, and the
+       friend sees who invited them and what happens next before one tap to accept.
+       Accept keeps ?ref= (free month), ?i= (invite status) and #profile= (the
+       inviter's picks) and adds ?accept=1, so the app follows the inviter for them. -->
   <title>You're invited to Feed The Bear</title>
   <meta name="description" content="Follow my food picks: where I eat, what I order, and what I'm craving. Free to join." />
   <meta property="og:title" content="You're invited to Feed The Bear 🐻" />
@@ -17,14 +18,59 @@
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="theme-color" content="#1b241c" />
-  <script>location.replace('app.html' + location.search + location.hash);</script>
+  <link rel="icon" href="feedbear-sm.jpg" />
   <style>
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #1b241c; color: #f6ecdc; font: 600 1rem system-ui, sans-serif; text-align: center; padding: 16px; }
-    a { color: #ffd98a; }
+    :root { --bg: #1b241c; --card: #26322a; --text: #f6ecdc; --dim: #c9bfae; --accent: #ff8a3d; --gold: #ffd98a; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--text); font: 500 1rem/1.45 system-ui, -apple-system, sans-serif; padding: 24px 16px; }
+    main { width: 100%; max-width: 420px; text-align: center; }
+    .bear { width: 84px; height: 84px; border-radius: 50%; object-fit: cover; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+    h1 { font-size: 1.6rem; line-height: 1.2; margin: 16px 0 8px; }
+    .lead { color: var(--dim); margin: 0 0 20px; }
+    ol { list-style: none; padding: 0; margin: 0 0 22px; text-align: left; display: grid; gap: 10px; }
+    li { display: flex; gap: 12px; align-items: center; background: var(--card); border-radius: 14px; padding: 12px 14px; }
+    li b { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #1b130b; display: grid; place-items: center; font-size: .9rem; }
+    .go { display: block; width: 100%; padding: 16px; border: 0; border-radius: 16px; background: var(--accent); color: #1b130b; font: 800 1.1rem system-ui, sans-serif; text-decoration: none; }
+    .gift { margin: 14px 0 0; color: var(--gold); font-weight: 700; font-size: .92rem; }
+    .play { margin-top: 22px; font-size: .86rem; color: var(--dim); }
+    .play a { color: var(--gold); }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
-  <p>Opening your invite… <a id="go" href="app.html">Tap here if nothing happens</a></p>
-  <script>document.getElementById('go').href = 'app.html' + location.search + location.hash;</script>
+  <main>
+    <img class="bear" src="feedbear-sm.jpg" alt="" />
+    <h1 id="title">You're invited to Feed The Bear</h1>
+    <p class="lead">The app for saving the places you want to eat and what to order there.</p>
+    <ol>
+      <li><b>1</b><span>Tap <strong>Accept invite</strong> and make your free account.</span></li>
+      <li><b>2</b><span id="step2">You'll follow your friend automatically.</span></li>
+      <li><b>3</b><span id="step3">Add any of their spots to your list with one tap.</span></li>
+    </ol>
+    <a id="go" class="go" href="app.html?accept=1">Accept invite</a>
+    <p id="gift" class="gift hidden">🎁 You also get 30 days of Grizzly free.</p>
+    <p id="play" class="play hidden">On Android? <a href="https://play.google.com/store/apps/details?id=com.feedthebear.app">Get the app on Google Play</a>, then tap your invite link again.</p>
+  </main>
+  <script>
+    (function () {
+      var params = new URLSearchParams(location.search);
+      params.set('accept', '1');
+      document.getElementById('go').href = 'app.html?' + params.toString() + location.hash;
+      if (params.has('ref')) document.getElementById('gift').classList.remove('hidden');
+      if (/Android/i.test(navigator.userAgent) && !/wv\)|FeedTheBear/i.test(navigator.userAgent)) document.getElementById('play').classList.remove('hidden');
+      // Who it's from: the name is inside the #profile= part of the link.
+      var name = '';
+      try {
+        var m = location.hash.match(/#profile=(.+)$/);
+        if (m) name = String(JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(m[1]))))).u || '').trim().slice(0, 30);
+      } catch (e) { /* older or broken link: generic wording */ }
+      if (name) {
+        document.getElementById('title').textContent = name + ' invited you to Feed The Bear';
+        document.getElementById('step2').textContent = "You'll follow " + name + ' automatically.';
+        document.getElementById('step3').textContent = 'See ' + name + "'s favorite spots and add any to your list with one tap.";
+        document.title = name + ' invited you to Feed The Bear';
+      }
+    })();
+  </script>
 </body>
 </html>

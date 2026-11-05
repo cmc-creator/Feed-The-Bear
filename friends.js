@@ -280,10 +280,12 @@ async function inviteFriend ({ ref = window._ftbUid || '' } = {}) {
   }
   const hasPicks = profileHasContent(data);
   const hi = who ? `Hey ${who.split(/\s+/)[0]}! ` : '';
-  const text = hi + (hasPicks
-    ? "Here's where I eat and what I order. Follow me on Feed the Bear and send me yours!"
-    : "I'm keeping track of every place I want to eat with Feed the Bear. Follow me and add yours!")
-    + (ref ? ' (You get 30 days of Grizzly free with this link.)' : '');
+  // Says what the app is and exactly what tapping the link does.
+  const text = hi + "I'm using Feed the Bear to save places to eat and what to order there. "
+    + (hasPicks
+      ? 'Tap my link to join free. You\'ll follow me and can add any of my spots to your list with one tap.'
+      : 'Tap my link to join free and follow me, so we can share spots.')
+    + (ref ? ' (You get 30 days of Grizzly free with it.)' : '');
   startSharingLive();
   trackProductEvent('friend_invite', { withProfile: hasPicks, withRef: !!ref, named: !!who, tracked: !!code });
   try {
@@ -412,10 +414,16 @@ function renderFriendsFeedHome () {
   if (!section || !list) return;
   // Only when friends have something to show; inviting is the small header button.
   const items = (state.restaurants || []).length ? friendsFeedItems() : [];
-  section.classList.toggle('hidden', !items.length);
-  if (!items.length) { list.innerHTML = ''; return; }
+  // The friend with the most spots you don't have yet: one tap to see and add them.
+  const best = getFriends().map(f => ({ f, n: friendNewSpots(f).length })).sort((a, b) => b.n - a.n)[0];
+  const nudge = best && best.n ? `<div class="ff-new">
+      <span>${escHtml(best.f.name)} has <strong>${best.n} spot${best.n === 1 ? '' : 's'}</strong> you don't have yet.</span>
+      <button type="button" class="btn-sm btn-orange ff-new-see">See ${best.n === 1 ? 'it' : 'them'}</button>
+    </div>` : '';
+  section.classList.toggle('hidden', !items.length && !nudge);
+  if (!items.length && !nudge) { list.innerHTML = ''; return; }
   const mine = new Map((state.restaurants || []).map(r => [normalizeName(r.name), r]));
-  list.innerHTML = items.map((x, i) => {
+  list.innerHTML = nudge + items.map((x, i) => {
     const who = `<strong>${escHtml(x.who.name)}</strong>`;
     const at = `<strong>${escHtml(x.n)}</strong>`;
     const stars = x.r ? ` <span class="ff-stars">${'★'.repeat(x.r)}</span>` : '';
@@ -432,13 +440,16 @@ function renderFriendsFeedHome () {
   }).join('');
   list.querySelectorAll('.ff-view').forEach(b => b.addEventListener('click', () => openDetailModal(b.dataset.id)));
   list.querySelectorAll('.ff-save').forEach(b => b.addEventListener('click', () => saveFromFriend(items[Number(b.dataset.i)])));
+  list.querySelector('.ff-new-see')?.addEventListener('click', () => openFriendSpots(best.f.data));
 }
 
-function saveFromFriend (x) {
-  if (!x) return;
+// `quiet`: no redraw or toast (adding several at once). Returns the new spot.
+function saveFromFriend (x, { quiet = false } = {}) {
+  if (!x?.n) return null;
+  if (onMyList(x.n)) return null;
   if (typeof isPremium === 'function' && !isPremium() && state.restaurants.length >= FREE_RESTAURANT_LIMIT) {
     showGrizzlyUpsell('limit');
-    return;
+    return null;
   }
   const today = iso();
   const r = {
@@ -451,9 +462,11 @@ function saveFromFriend (x) {
   if (x.d) upsertDish(r, { name: x.d, verdict: 'want' });
   else saveData();
   if (r.address && typeof geocodeAddress === 'function') geocodeAddress(r.id, r.address);
-  renderAll();
   trackProductEvent('friend_spot_saved');
+  if (quiet) return r;
+  renderAll();
   showToast(`${r.name} saved`, x.d ? `On your list, with the ${x.d} to try.` : 'On your Want to Try list.', 'success');
+  return r;
 }
 
 /* ── Friends: follow someone's profile link, see their orders ──
@@ -510,7 +523,7 @@ function isFollowing (data) { return getFriends().some(f => f.key === friendKey(
 const FREE_FRIENDS = 1;
 
 // Following again with a newer link updates that friend's profile.
-function followFriend (data) {
+function followFriend (data, { quiet = false } = {}) {
   if (data.id && data.id === state.settings.profileShareId) {
     showToast("That's your link", 'Send it to a friend so they can follow you.', 'info');
     return null;
@@ -523,7 +536,7 @@ function followFriend (data) {
   saveFriends(list);
   if (i < 0) noteFollow(data.id);
   trackProductEvent('friend_followed', { updated: i >= 0 });
-  showToast(i >= 0 ? `Updated ${entry.name}` : `Following ${entry.name}`,
+  if (!quiet) showToast(i >= 0 ? `Updated ${entry.name}` : `Following ${entry.name}`,
     window._ftbUid ? 'Their go-to orders now show on matching restaurants, and they can follow you back.' : 'Their go-to orders now show on matching restaurants.', 'success');
   renderAll();
   // Android app: offer a ping when they eat somewhere new (asks once).
@@ -848,59 +861,165 @@ function shareProfile () {
   else copyProfileLink();
 }
 
-// Check for incoming profile hash on load
+// Opened a friend's link (#profile=). Signed out, the sign-in sheet comes
+// first (and says who invited them), so the link waits here until they're in.
+// From an invite (?accept / ?i=), accepting it follows the friend for them.
+const PENDING_INVITE_KEY = 'ftb_pending_invite_v1';
+function pendingInvite () {
+  try {
+    const p = JSON.parse(localStorage.getItem(PENDING_INVITE_KEY) || 'null');
+    return p?.data && Date.now() - (p.at || 0) < 7 * 86400000 ? p : null;
+  } catch { return null; }
+}
+window.pendingInviteName = () => pendingInvite()?.data?.u || '';
+
 function checkGuestProfile () {
   const hash = window.location.hash;
-  if (!hash.startsWith('#profile=')) return;
+  if (!hash.startsWith('#profile=')) { resumePendingInvite(); return; }
+  let data;
+  try { data = decodeProfileLink(hash); } catch { return; /* invalid link: ignore */ }
+  const params = new URLSearchParams(window.location.search);
+  const accept = params.has('accept') || params.has('i');
   try {
-    renderGuestProfile(decodeProfileLink(hash));
-  } catch(_) { /* invalid hash - ignore */ }
+    localStorage.setItem(PENDING_INVITE_KEY, JSON.stringify({ data, accept, at: Date.now() }));
+    if (data.u) localStorage.setItem('ftb_invited_by_v1', data.u);
+  } catch { /* private mode: shown right away below if we can */ }
+  params.delete('accept');
+  const rest = params.toString();
+  history.replaceState(null, '', window.location.pathname + (rest ? `?${rest}` : ''));
+  if (!pendingInvite()) { _guestShow(data, { accept }); return; }
+  resumePendingInvite();
 }
-function renderGuestProfile (data) {
+
+function resumePendingInvite () {
+  const p = pendingInvite();
+  if (!p) return;
+  if (typeof _signInRequired === 'function' && _signInRequired()) {
+    // The sign-in sheet is up: make sure it names who invited them.
+    const sub = document.querySelector('#auth-overlay.auth-required .auth-sub');
+    if (sub && typeof _requiredAuthSub === 'function') sub.textContent = _requiredAuthSub();
+    return;
+  }
+  try { localStorage.removeItem(PENDING_INVITE_KEY); } catch { /* private mode */ }
+  _guestShow(sanitizeFriendData(p.data), { accept: !!p.accept });
+}
+window.resumePendingInvite = resumePendingInvite;
+
+function _guestShow (data, { accept = false } = {}) {
+  if (data.id && data.id === state.settings.profileShareId) return; // your own link
+  // Accepting an invite follows them, unless that needs Grizzly (then they get the button).
+  const premium = typeof isPremium === 'function' && isPremium();
+  if (accept && !isFollowing(data) && (premium || getFriends().length < FREE_FRIENDS)) followFriend(data, { quiet: true });
+  if (isFollowing(data)) refreshFriendsLive(true);
+  openFriendSpots(data, { invited: accept });
+}
+
+// A friend's spots in one list: their top picks, then what they've been up to.
+function friendSpotItems (data, recent = []) {
+  const seen = new Set();
+  const out = [];
+  const add = x => {
+    const k = normalizeName(x.n);
+    if (!k || seen.has(k)) return;
+    seen.add(k);
+    out.push(x);
+  };
+  (data?.picks || []).forEach(p => add({ n: p.n, c: p.c, a: p.a, r: p.r, p: p.p, g: p.g || [], d: p.g?.[0] || '' }));
+  (recent || []).forEach(x => add({ n: x.n, c: x.c, a: x.a, r: x.r, p: '', g: x.d ? [x.d] : [], d: x.d || '' }));
+  return out;
+}
+function onMyList (name) {
+  const k = normalizeName(name);
+  return (state.restaurants || []).some(r => normalizeName(r.name) === k);
+}
+function friendNewSpots (entry) {
+  return friendSpotItems(entry?.data, entry?.recent).filter(x => !onMyList(x.n));
+}
+
+// "Connie's spots": add any of them to your Want to Try with one tap, or all at once.
+function openFriendSpots (data, { invited = false } = {}) {
   const overlay = document.getElementById('guest-profile-overlay');
-  const list    = document.getElementById('guest-profile-list');
-  const medals  = ['🥇','🥈','🥉'];
-  const priceMap = ['','$','$$','$$$','$$$$'];
-  const nameEl = document.getElementById('guest-profile-name');
-  if (nameEl) nameEl.textContent = data.u ? `${data.u}'s food picks` : 'Foodie Profile';
-  // Opened from an invite: say who it's from and what the friend gets.
-  let invited = false;
-  try { invited = new URLSearchParams(window.location.search).has('ref') || !!localStorage.getItem('ftb_ref_v1'); } catch { /* private mode */ }
-  if (data.u) { try { localStorage.setItem('ftb_invited_by_v1', data.u); } catch { /* private mode */ } }
-  const subEl = document.getElementById('guest-profile-sub');
-  if (subEl) {
-    subEl.textContent = data.u
-      ? `${data.u} invited you to Feed The Bear${invited ? '. You get 30 days of Grizzly free when you join.' : '.'}`
-      : 'Top picks shared via Feed The Bear';
-  }
-  const followBtn = document.getElementById('guest-profile-follow');
-  if (followBtn) {
-    followBtn.textContent = isFollowing(data) ? `Update ${data.u || 'friend'}` : `Follow ${data.u || 'this foodie'}`;
+  const list = document.getElementById('guest-profile-list');
+  if (!overlay || !list) return;
+  const who = data.u || 'Your friend';
+  const entry = getFriends().find(f => f.key === friendKey(data));
+  const items = friendSpotItems(entry?.data?.picks?.length ? entry.data : data, entry?.recent);
+  let ref = false;
+  try { ref = !!localStorage.getItem('ftb_ref_v1'); } catch { /* private mode */ }
+  const medals = ['🥇', '🥈', '🥉'];
+
+  const draw = () => {
+    const following = isFollowing(data);
+    const fresh = items.filter(x => !onMyList(x.n));
+    document.getElementById('guest-profile-name').textContent = invited ? `${who} invited you 🐻` : `${who}'s spots`;
+    document.getElementById('guest-profile-sub').textContent = (following
+      ? (items.length
+        ? `You're following ${who}. Tap ＋ Add on any spot to put it on your Want to Try list.`
+        : `You're following ${who}.`)
+      : `Follow ${who} to see where they eat and what they order.`)
+      + (invited && ref ? ' You also get 30 days of Grizzly free.' : '');
+    list.innerHTML = !items.length
+      ? `<div class="guest-empty">${escHtml(who)} is just getting started. As they save spots, they'll show up on your home screen under Friends' Feed, ready to add to your list.</div>`
+      : items.map((p, i) => {
+        const have = onMyList(p.n);
+        const photo = safeUrl(p.p || '');
+        return `<div class="guest-item">
+          <div class="guest-item-photo">${/^https?:/i.test(photo) ? `<img src="${escHtml(photo)}" alt="" />` : (cuisineEmoji(p.c) || '🍽️')}</div>
+          <div class="guest-item-body">
+            <div class="guest-item-name">${medals[i] && p.r ? medals[i] + ' ' : ''}${escHtml(p.n)}</div>
+            <div class="guest-item-meta">${escHtml(p.c || 'Restaurant')}${p.a ? ' · ' + escHtml(p.a.slice(0, 40)) : ''}${p.r ? ` <span class="guest-item-stars">${'★'.repeat(p.r)}</span>` : ''}</div>
+            ${p.g.length ? `<div class="guest-item-order">Get: ${p.g.map(escHtml).join(', ')}</div>` : ''}
+          </div>
+          ${have
+            ? '<span class="guest-have">✓ On your list</span>'
+            : `<button type="button" class="btn-sm btn-orange guest-add" data-i="${i}">＋ Add</button>`}
+        </div>`;
+      }).join('');
+    list.querySelectorAll('.guest-add').forEach(b => b.addEventListener('click', () => {
+      if (saveFromFriend({ ...items[Number(b.dataset.i)], who: { name: who } }, { quiet: true })) {
+        renderAll();
+        draw();
+      }
+    }));
+    const followBtn = document.getElementById('guest-profile-follow');
+    followBtn.classList.toggle('hidden', following);
+    followBtn.textContent = `Follow ${who}`;
     followBtn.disabled = false;
-    followBtn.onclick = () => { if (followFriend(data)) { followBtn.textContent = 'Following'; followBtn.disabled = true; } };
-  }
-  list.innerHTML = !data.picks.length
-    ? `<div class="guest-empty">${escHtml(data.u || 'Your friend')} is just getting started. Follow them and their favorite spots and what to order will show up here as they add them.</div>`
-    : data.picks.map((p,i) =>
-    '<div class="guest-item">'
-    + '<div class="guest-item-photo">' + (safeUrl(p.p) ? `<img src="${escHtml(safeUrl(p.p))}" alt="${escHtml(p.n)}" style="width:100%;height:100%;object-fit:cover;border-radius:10px" />` : (CUISINE_EMOJI[(p.c||'').toLowerCase()] || '')) + '</div>'
-    + '<div class="guest-item-body">'
-    + '<div class="guest-item-name">' + (medals[i]||'') + ' ' + escHtml(p.n) + '</div>'
-    + '<div class="guest-item-meta">' + escHtml(p.c||'Restaurant') + (p.a ? ' · ' + escHtml(p.a.slice(0,40)) : '') + '</div>'
-    + '<div class="guest-item-stars">' + '★'.repeat(p.r) + '</div>'
-    + (p.g?.length ? '<div class="guest-item-order">Get: ' + p.g.map(escHtml).join(', ') + '</div>' : '')
-    + '</div>'
-    + '</div>'
-  ).join('');
+    followBtn.onclick = () => { if (followFriend(data)) { refreshFriendsLive(true); draw(); } };
+    const allBtn = document.getElementById('guest-profile-addall');
+    allBtn.classList.toggle('hidden', fresh.length < 2);
+    allBtn.textContent = `＋ Add all ${fresh.length} to my Want to Try`;
+    allBtn.onclick = () => {
+      let added = 0;
+      for (const x of fresh) {
+        if (!saveFromFriend({ ...x, who: { name: who } }, { quiet: true })) break;
+        added++;
+      }
+      if (added) {
+        renderAll();
+        showToast(`Added ${added} spot${added === 1 ? '' : 's'} from ${who}`, 'They\'re on your Want to Try list.', 'success');
+        trackProductEvent('friend_spots_added_all', { count: added });
+      }
+      draw();
+    };
+    document.getElementById('guest-profile-close').textContent = invited && !(state.restaurants || []).length ? "Let's go" : 'Done';
+  };
+  draw();
   overlay.classList.remove('hidden');
-  document.getElementById('guest-profile-close').addEventListener('click', () => {
+  document.body.classList.add('guest-open');
+  overlay.scrollTop = 0;
+  trackProductEvent('friend_spots_opened', { invited, count: items.length });
+  document.getElementById('guest-profile-close').onclick = () => {
     overlay.classList.add('hidden');
+    document.body.classList.remove('guest-open');
     // The Cub welcome underneath was drawn before we knew the inviter's name.
     const hi = document.querySelector('#cub-welcome[data-step="hi"] .cw-body');
     if (hi && data.u) hi.textContent = hi.textContent.replace(/^A friend invited you!/, `${data.u} invited you!`);
-    history.replaceState(null, '', window.location.pathname + window.location.search);
-  });
+    renderFriendsFeedHome();
+    if (!document.getElementById('friends-overlay')?.classList.contains('hidden')) renderFriendsList();
+  };
 }
+window.openFriendSpots = openFriendSpots;
 
 /* ------------------------------------------------------------
    PHASE 8 • ❤ FOODIE FRIENDS
@@ -926,10 +1045,12 @@ function renderFriendsList () {
     ? `<div class="friends-section-title">Following (${friends.length})</div>` + friends.map(f => {
         const orders = (f.data?.picks || []).reduce((n, p) => n + (p.g?.length || 0), 0);
         const waiting = _followers !== null && f.data?.id && !followerIds.has(f.data.id);
+        const fresh = friendNewSpots(f).length;
         return `<div class="friend-row">
           <span class="friend-info"><strong>${escHtml(f.name)}</strong>
             <span>${(f.data?.picks || []).length} spots · ${orders} go-to orders · ${(f.data?.w || []).length} cravings</span>
             ${waiting ? '<span class="friend-sent">Sent · waiting for them to follow back</span>' : ''}</span>
+          <button type="button" class="btn-sm ${fresh ? 'btn-orange' : 'btn-ghost'} friend-spots" data-key="${escHtml(f.key)}">${fresh ? `${fresh} new spot${fresh === 1 ? '' : 's'}` : 'Spots'}</button>
           <button type="button" class="friend-remove icon-btn" data-key="${escHtml(f.key)}" aria-label="Unfollow ${escHtml(f.name)}">✕</button>
         </div>`;
       }).join('')
@@ -961,6 +1082,10 @@ function renderFriendsList () {
   el.innerHTML = followersHtml + followingHtml + invitesHtml || (_followers === null && window._ftbUid
     ? '<div class="friends-empty">Loading your friends…</div>'
     : '<div class="friends-empty">No friends yet. Send an invite: when a friend joins from it, they show up here and you can follow each other.</div>');
+  el.querySelectorAll('.friend-spots').forEach(b => b.addEventListener('click', () => {
+    const f = getFriends().find(x => x.key === b.dataset.key);
+    if (f) openFriendSpots(f.data);
+  }));
   el.querySelectorAll('.friend-follow-back').forEach(b => b.addEventListener('click', () => {
     const f = followers[Number(b.dataset.i)];
     if (f && followFriend({ id: f.id, u: f.u, picks: [], w: [] })) {

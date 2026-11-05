@@ -692,6 +692,8 @@ function initFirebaseAuth () {
       _mergeFriendsFromCloud(cloudProfile);
       // Let the people you follow see you under "Following you" (once each).
       setTimeout(() => { window.noteExistingFollows?.(); window.noteInviteJoined?.(); }, 5000);
+      // Opened an invite before signing in: follow them and show their spots now.
+      setTimeout(() => window.resumePendingInvite?.(), 600);
 
       // Merge profile (cloud wins for plan fields)
       if (cloudProfile) {
@@ -824,6 +826,11 @@ function _requiredAuthSub () {
     invited = !!localStorage.getItem(REF_KEY);
     hasSpots = JSON.parse(localStorage.getItem('ftb_restaurants_v2') || '[]').length > 0;
   } catch { /* storage blocked */ }
+  const by = typeof window.pendingInviteName === 'function' ? window.pendingInviteName() : '';
+  if (by) {
+    return `${by} invited you! Create your free account and you'll follow ${by} and see their favorite spots.`
+      + (invited ? ' You also get 30 days of Grizzly free.' : '');
+  }
   if (invited) return 'A friend invited you! Create your free account, then get 30 days of Grizzly free.';
   if (hasSpots) return 'Create your free account to keep going. The spots on this phone come with you.';
   return 'Create your free account to start saving the places you want to eat.';

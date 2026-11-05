@@ -41,7 +41,7 @@ const ME = [
   await me.goto(`${BASE}/app.html${hash}`);
   await me.waitForTimeout(2000);
   check(await me.locator('#guest-profile-overlay').isVisible(), 'incoming profile link opens the preview');
-  check((await me.locator('#guest-profile-name').innerText()) === "Sam's food picks", 'preview shows the friend name');
+  check((await me.locator('#guest-profile-name').innerText()) === "Sam's spots", 'preview shows the friend name');
   check(/Get: Birria quesatacos/.test(await me.locator('#guest-profile-list').innerText()), 'preview shows their go-to order');
   await me.click('#guest-profile-follow');
   await me.waitForTimeout(300);
