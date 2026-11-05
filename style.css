@@ -2264,7 +2264,28 @@ body.celebrate-glow::before {
 .chat-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: -2px 0 10px 44px; }
 .chat-actions .btn-sm { min-height: 36px; padding: 6px 12px; font-size: .8rem; }
 .chat-actions button:disabled { opacity: .55; }
-.chat-hide-cub { margin-left: auto; margin-right: 6px; background: none; border: 0; cursor: pointer; font: inherit; font-size: .72rem; color: var(--text-dim); text-decoration: underline; }
+.chat-hide-cub { margin-right: 6px; background: none; border: 0; cursor: pointer; font: inherit; font-size: .72rem; color: var(--text-dim); text-decoration: underline; }
+/* Past chats and New chat (app.js CubChats). */
+.chat-header { gap: 8px; }
+#chat-history-btn { margin-left: auto; }
+.chat-head-btn { width: 34px; height: 34px; flex: none; }
+.chat-header > div:nth-child(2) { min-width: 0; }
+.chat-subtitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-history { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px 20px; background: var(--surface); }
+.chat-history-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.chat-history-title { font-weight: 800; font-size: .95rem; }
+.chat-history-list { display: grid; gap: 8px; }
+.chat-history-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2, rgba(255,255,255,.03)); }
+.chat-history-row.current { border-color: rgba(var(--primary-rgb), .6); }
+.chat-history-open { min-width: 0; text-align: left; background: none; border: 0; color: inherit; font: inherit; padding: 10px 12px; cursor: pointer; display: grid; gap: 2px; }
+.chat-history-open strong { font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-history-open span { font-size: .74rem; color: var(--text-muted); }
+.chat-history-row .chat-history-del { margin-right: 6px; width: 30px; height: 30px; background: none; box-shadow: none; border: 0; color: var(--text-muted); font-size: .85rem; }
+.chat-history-empty { color: var(--text-muted); font-size: .86rem; padding: 18px 4px; text-align: center; }
+.chat-panel.history-open .chat-messages,
+.chat-panel.history-open .chat-suggestions,
+.chat-panel.history-open .chat-input-row { display: none; }
+@media (max-width: 420px) { .chat-subtitle { display: none; } .chat-header { padding: 12px 12px; } }
 /* The floating cub steps aside while his chat or any screen is open. */
 body.chat-open .cub-buddy,
 body:has(.modal-overlay:not(.hidden)) .cub-buddy { display: none; }

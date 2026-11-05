@@ -5010,6 +5010,7 @@ let _cubChatHistory = [];
 function cubSay (text, buttons = []) {
   addChatMsg(text, 'bot');
   _cubChatHistory.push({ role: 'assistant', text });
+  CubChats.record('b', text);
   if (!buttons.length) return;
   const row = document.createElement('div');
   row.className = 'chat-actions';
@@ -5356,6 +5357,7 @@ async function sendChat () {
   input.value = '';
   addChatMsg(text, 'user');
   _cubChatHistory.push({ role: 'user', text });
+  CubChats.record('u', text);
 
   // An answer to Byte Cub's question, unless it's clearly a new question or request.
   if (_cubAwaiting) {
@@ -5394,13 +5396,200 @@ function openChat () {
   document.body.classList.add('chat-open');
   document.getElementById('chat-input').focus();
 
-  // Show welcome message if first time
+  // Your last conversation is still here; otherwise a fresh hello.
   const messages = document.getElementById('chat-messages');
-  if (!messages.children.length) {
+  if (!messages.children.length && !CubChats.restore()) {
   addChatMsg(randomFrom(GREETINGS), 'bot');
   renderQuickReplies();
   }
 }
+
+/* ── Byte Cub chat history ──────────────────────────────────────
+   Every chat is kept: on this phone (the newest 10 in full) and, signed in,
+   on your account (api/chats.js, the newest 30), so "Past chats" can pick
+   any of them up again on any device and Byte Cub remembers what was said. */
+const CubChats = (() => {
+  const KEY = 'ftb_cub_chats_v1';
+  const LOCAL_FULL = 10, KEEP = 30, MAX_MSGS = 80, MAX_TEXT = 1500;
+  let saveTimer = null;
+
+  function load () {
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { d = null; }
+    if (!d || typeof d !== 'object' || !d.chats || typeof d.chats !== 'object') d = { uid: '', current: '', chats: {} };
+    // Chats from a different account on this phone aren't yours.
+    if (d.uid && window._ftbUid && d.uid !== window._ftbUid) d = { uid: window._ftbUid, current: '', chats: {} };
+    return d;
+  }
+  function store (d) {
+    d.uid = window._ftbUid || d.uid || '';
+    const list = Object.values(d.chats).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, KEEP);
+    d.chats = {};
+    list.forEach((c, i) => { d.chats[c.id] = i < LOCAL_FULL || c.id === d.current ? c : { ...c, messages: null }; });
+    try { localStorage.setItem(KEY, JSON.stringify(d)); } catch { /* storage full: the account copy still has it */ }
+  }
+  const newId = () => Array.from(crypto.getRandomValues(new Uint8Array(10)), b => (b % 36).toString(36)).join('') + Date.now().toString(36);
+  const titleOf = c => (c.messages || []).find(m => m.r === 'u')?.t.slice(0, 60) || 'Chat with Byte Cub';
+
+  async function api (method, { query = '', body = null } = {}) {
+    if (!window._ftbUid) return null;
+    const headers = { 'Content-Type': 'application/json', ...(typeof ftbApiHeaders === 'function' ? await ftbApiHeaders() : {}) };
+    const resp = await fetch(`/api/chats${query}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    return resp.ok ? resp.json().catch(() => ({})) : null;
+  }
+
+  function record (r, t) {
+    const text = String(t ?? '').trim().slice(0, MAX_TEXT);
+    if (!text) return;
+    const d = load();
+    let c = d.current && d.chats[d.current];
+    if (!c || !Array.isArray(c.messages)) { c = { id: newId(), title: '', updatedAt: 0, messages: [] }; d.current = c.id; }
+    c.messages = [...c.messages, { r, t: text, at: Date.now() }].slice(-MAX_MSGS);
+    c.updatedAt = Date.now();
+    c.title = titleOf(c);
+    c.count = c.messages.length;
+    d.chats[c.id] = c;
+    store(d);
+    // A chat with only Byte Cub talking isn't worth keeping on the account yet.
+    if (c.messages.some(m => m.r === 'u')) {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => api('POST', { body: { id: c.id, title: c.title, messages: c.messages } }).catch(() => {}), 1500);
+    }
+  }
+
+  function show (c) {
+    const box = document.getElementById('chat-messages');
+    box.innerHTML = '';
+    document.getElementById('chat-suggestions').innerHTML = '';
+    _cubChatHistory = [];
+    _cubAwaiting = null;
+    (c.messages || []).forEach(m => {
+      addChatMsg(m.t, m.r === 'u' ? 'user' : 'bot');
+      _cubChatHistory.push({ role: m.r === 'u' ? 'user' : 'assistant', text: m.t });
+    });
+  }
+
+  // Opening the chat: your last conversation, if there is one.
+  function restore () {
+    const d = load();
+    const c = d.current && d.chats[d.current];
+    if (!c || !Array.isArray(c.messages) || !c.messages.some(m => m.r === 'u')) return false;
+    show(c);
+    return true;
+  }
+
+  function startNew () {
+    const d = load();
+    d.current = '';
+    store(d);
+    closeHistory();
+    document.getElementById('chat-messages').innerHTML = '';
+    _cubChatHistory = [];
+    _cubAwaiting = null;
+    addChatMsg(randomFrom(GREETINGS), 'bot');
+    renderQuickReplies();
+    document.getElementById('chat-input')?.focus();
+  }
+
+  function when (ms) {
+    const d = new Date(ms);
+    const days = Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(ms).setHours(0, 0, 0, 0)) / 86400000);
+    if (days <= 0) return `Today, ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+    if (days === 1) return 'Yesterday';
+    if (days < 7) return d.toLocaleDateString(undefined, { weekday: 'long' });
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  function drawList (note = '') {
+    const d = load();
+    const el = document.getElementById('chat-history-list');
+    const list = Object.values(d.chats).filter(c => (c.count || c.messages?.length)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    el.innerHTML = list.length
+      ? list.map(c => `<div class="chat-history-row${c.id === d.current ? ' current' : ''}">
+          <button type="button" class="chat-history-open" data-id="${escHtml(c.id)}">
+            <strong>${escHtml(c.title || 'Chat with Byte Cub')}</strong>
+            <span>${escHtml(when(c.updatedAt || 0))} · ${c.count || c.messages?.length || 0} messages${c.id === d.current ? ' · open now' : ''}</span>
+          </button>
+          <button type="button" class="icon-btn chat-history-del" data-id="${escHtml(c.id)}" aria-label="Delete this chat">✕</button>
+        </div>`).join('')
+      : `<div class="chat-history-empty">${note || 'No past chats yet. Tell Byte Cub where you ate, or ask him anything, and the chat is kept here.'}</div>`;
+  }
+
+  async function showHistory () {
+    document.getElementById('chat-history').classList.remove('hidden');
+    document.getElementById('chat-panel').classList.add('history-open');
+    drawList(window._ftbUid ? 'Looking for your chats…' : '');
+    try {
+      const data = await api('GET');
+      if (Array.isArray(data?.chats)) {
+        const d = load();
+        data.chats.forEach(s => {
+          if (!/^[a-z0-9]{8,32}$/.test(s.id || '')) return;
+          const mine = d.chats[s.id];
+          if (!mine || (s.updatedAt || 0) > (mine.updatedAt || 0)) d.chats[s.id] = { id: s.id, title: String(s.title || ''), updatedAt: Number(s.updatedAt) || 0, count: Number(s.count) || 0, messages: null };
+        });
+        store(d);
+      }
+    } catch { /* show what this phone has */ }
+    if (!document.getElementById('chat-history').classList.contains('hidden')) drawList();
+  }
+  function closeHistory () {
+    document.getElementById('chat-history')?.classList.add('hidden');
+    document.getElementById('chat-panel')?.classList.remove('history-open');
+  }
+
+  async function openById (id) {
+    const d = load();
+    let c = d.chats[id];
+    if (!c) return;
+    if (!Array.isArray(c.messages)) {
+      const data = await api('GET', { query: `?id=${encodeURIComponent(id)}` }).catch(() => null);
+      if (!data?.chat) { showToast("Couldn't open that chat", 'Check your connection and try again.', 'error'); return; }
+      c = { ...c, ...data.chat, count: data.chat.messages.length };
+    }
+    const fresh = load();
+    fresh.chats[id] = c;
+    fresh.current = id;
+    store(fresh);
+    closeHistory();
+    show(c);
+    cubSayQuiet('Picking up where we left off. What else?');
+    document.getElementById('chat-input')?.focus();
+  }
+  // A note from Byte Cub that isn't saved into the chat itself.
+  function cubSayQuiet (text) { addChatMsg(text, 'bot'); }
+
+  function remove (id) {
+    const d = load();
+    delete d.chats[id];
+    const wasCurrent = d.current === id;
+    if (wasCurrent) d.current = '';
+    store(d);
+    api('POST', { body: { action: 'delete', id } }).catch(() => {});
+    drawList();
+    if (wasCurrent) document.getElementById('chat-messages').innerHTML = '';
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('chat-history-btn')?.addEventListener('click', () => {
+      if (document.getElementById('chat-history').classList.contains('hidden')) showHistory(); else closeHistory();
+    });
+    document.getElementById('chat-history-back')?.addEventListener('click', () => {
+      closeHistory();
+      if (!document.getElementById('chat-messages').children.length && !restore()) startNew();
+    });
+    document.getElementById('chat-new-btn')?.addEventListener('click', startNew);
+    document.getElementById('chat-history-list')?.addEventListener('click', e => {
+      const del = e.target.closest('.chat-history-del');
+      if (del) { remove(del.dataset.id); return; }
+      const open = e.target.closest('.chat-history-open');
+      if (open) openById(open.dataset.id);
+    });
+  });
+
+  return { record, restore, startNew, showHistory, closeHistory, openById };
+})();
+window.CubChats = CubChats;
 
 function closeChat () {
   document.getElementById('chat-panel').classList.add('hidden');
