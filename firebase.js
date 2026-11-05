@@ -55,6 +55,9 @@ function requiresPremium (featureName, fn) {
 // ─── AUTH FUNCTIONS ───────────────────────────────────────────
 async function fbSignInGoogle () {
   const provider = new firebase.auth.GoogleAuthProvider();
+  // Always ask which Google account: a phone signed in to several picks one
+  // silently, and the wrong one is a different (free) Feed The Bear account.
+  provider.setCustomParameters({ prompt: 'select_account' });
   return _auth.signInWithPopup(provider);
 }
 
@@ -920,8 +923,17 @@ async function _nativeGoogleSignIn () {
   else window.open(url, '_blank', 'noopener');
 }
 
+// Back from Chrome, the app opens app.html#native-signin-done. If app.html was
+// already open that only changes the #hash (no reload), so this also runs on
+// hashchange, not just at startup.
+let _nativeFinishing = false;
+window.addEventListener('hashchange', () => _finishNativeSignIn());
 async function _finishNativeSignIn () {
-  if (location.hash !== '#native-signin-done') return;
+  if (location.hash !== '#native-signin-done' || _nativeFinishing) return;
+  _nativeFinishing = true;
+  try { await _finishNativeSignInNow(); } finally { _nativeFinishing = false; }
+}
+async function _finishNativeSignInNow () {
   history.replaceState(null, '', location.pathname + location.search);
   try { window.Capacitor?.Plugins?.Browser?.close?.(); } catch { /* already closed */ }
   let verifier = null;

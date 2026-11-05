@@ -56,7 +56,10 @@
       $('ns-google').addEventListener('click', async () => {
         $('ns-google').disabled = true;
         try {
-          const cred = await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+          // Always ask which Google account (Chrome would otherwise pick one silently).
+          const provider = new firebase.auth.GoogleAuthProvider();
+          provider.setCustomParameters({ prompt: 'select_account' });
+          const cred = await auth.signInWithPopup(provider);
           await handBack(cred.user);
         } catch (err) {
           $('ns-sub').textContent = err?.code === 'auth/popup-closed-by-user' ? 'Sign-in was cancelled.' : (err.message || 'Sign-in failed. Please try again.');

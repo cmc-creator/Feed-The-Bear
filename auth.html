@@ -397,6 +397,7 @@
     async function handleGoogle () {
       clearMsg();
       const provider = new firebase.auth.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' }); // choose the account every time
       try {
         await auth.signInWithPopup(provider);
         redirectToApp();

@@ -134,9 +134,9 @@ const call = (body, headers = {}) => new Promise(resolve => {
   const c = new URL(opened).searchParams.get('c');
   const v = await p.evaluate(() => localStorage.getItem('ftb_native_verifier_v1'));
   check(/native-signin\.html\?c=/.test(opened) && c === crypto.createHash('sha256').update(v).digest('base64url'), 'Google sign-in opens Chrome with only the challenge');
-  await p.evaluate(() => { window.__signedIn = null; _auth.signInWithCustomToken = async t => { window.__signedIn = t; }; location.hash = 'native-signin-done'; _finishNativeSignIn(); });
+  await p.evaluate(() => { window.__signedIn = null; _auth.signInWithCustomToken = async t => { window.__signedIn = t; }; location.hash = 'native-signin-done'; });
   await p.waitForTimeout(600);
-  check(await p.evaluate(() => window.__signedIn) === 'custom-abc' && await p.evaluate(() => !localStorage.getItem('ftb_native_verifier_v1') && location.hash === ''), 'back in the app it finishes signing in and forgets the verifier');
+  check(await p.evaluate(() => window.__signedIn) === 'custom-abc' && await p.evaluate(() => !localStorage.getItem('ftb_native_verifier_v1') && location.hash === ''), 'back in the app (only the #hash changes, no reload) it finishes signing in and forgets the verifier');
   check(p.errors.length === 0, `no page errors (${p.errors.slice(0, 2).join(' | ')})`);
 
   // On the website, none of the Android parts run.
