@@ -447,6 +447,13 @@ function renderFriendsFeedHome () {
   const items = (state.restaurants || []).length ? friendsFeedItems() : [];
   // The friend with the most spots you don't have yet: one tap to see and add them.
   const best = getFriends().map(f => ({ f, n: friendNewSpots(f).length })).sort((a, b) => b.n - a.n)[0];
+  // The moss Friends button in the header gets a dot when there's something new.
+  const dot = document.getElementById('header-friends-dot');
+  if (dot) {
+    const fresh = best?.n || 0;
+    dot.classList.toggle('hidden', !fresh);
+    document.getElementById('header-friends-btn')?.setAttribute('aria-label', fresh ? `Friends: ${best.f.name} has ${fresh} new spot${fresh === 1 ? '' : 's'}` : 'Friends');
+  }
   const nudge = best && best.n ? `<div class="ff-new">
       <span>${escHtml(best.f.name)} has <strong>${best.n} spot${best.n === 1 ? '' : 's'}</strong> you don't have yet.</span>
       <button type="button" class="btn-sm btn-orange ff-new-see">See ${best.n === 1 ? 'it' : 'them'}</button>

@@ -70,7 +70,9 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
   await closeAllDialogs(old);
   await old.waitForTimeout(2200);
   check(!(await old.locator('#app-update-banner').count()), 'no "update" banner for the version on Google Play');
-  await old.click('#header-invite-btn');
+  await old.click('#header-friends-btn');
+  await old.waitForTimeout(300);
+  await old.click('#friends-invite-btn');
   await old.waitForTimeout(300);
   check(!(await old.locator('#upgrade-overlay:not(.hidden)').count()), 'a free account can invite (no upgrade wall)');
   await old.click('.invite-who-skip');

@@ -2202,6 +2202,63 @@ body.celebrate-glow::before {
 }
 @media (max-width: 420px) { .header-invite-btn span { display: none; } .header-invite-btn { width: 32px; padding: 0; justify-content: center; } }
 
+/* Friends in the header: a moss ring with sunlight sliding around it.
+   Phones give it the Invite button's spot (Invite is first in Friends). */
+.moss-friends-btn {
+  position: relative; flex: none; width: 42px; height: 42px; padding: 0; border: 0; border-radius: 50%;
+  background: none; cursor: pointer; display: grid; place-items: center; -webkit-tap-highlight-color: transparent;
+}
+.moss-ring, .moss-glint { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; }
+.moss-ring {
+  /* Clumpy moss: uneven greens around the circle, with a soft inner shadow. */
+  background:
+    radial-gradient(circle at 30% 20%, rgba(214, 232, 140, .55) 0 2px, transparent 3px),
+    radial-gradient(circle at 78% 30%, rgba(190, 214, 110, .5) 0 1.6px, transparent 2.6px),
+    radial-gradient(circle at 18% 72%, rgba(170, 200, 96, .45) 0 1.8px, transparent 2.8px),
+    radial-gradient(circle at 70% 84%, rgba(214, 232, 140, .45) 0 1.4px, transparent 2.4px),
+    conic-gradient(from 20deg, #3d5a25, #5f8a32, #4a6e2a, #7fa544, #3f5f27, #6b9438, #48692a, #86ad4c, #3d5a25);
+  box-shadow: inset 0 0 0 1px rgba(30, 48, 16, .55), 0 2px 8px rgba(40, 70, 20, .35);
+  -webkit-mask: radial-gradient(circle, transparent 14px, #000 14.5px);
+          mask: radial-gradient(circle, transparent 14px, #000 14.5px);
+}
+.moss-glint {
+  /* The sun catching the moss: a bright band that drifts around the ring. */
+  background: conic-gradient(from 0deg, transparent 0deg, transparent 300deg, rgba(255, 250, 210, .15) 318deg, rgba(255, 252, 225, .95) 334deg, rgba(255, 246, 190, .2) 348deg, transparent 360deg);
+  -webkit-mask: radial-gradient(circle, transparent 14px, #000 14.5px);
+          mask: radial-gradient(circle, transparent 14px, #000 14.5px);
+  mix-blend-mode: screen;
+  animation: moss-sun 4.8s linear infinite;
+}
+.moss-core {
+  position: relative; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 35% 30%, #fff6e2, #f3dfb8); color: #3d5a25;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, .8), inset 0 -1px 3px rgba(90, 60, 20, .25);
+}
+.moss-sparkle {
+  position: absolute; width: 7px; height: 7px; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle, #fffbe6 0 1px, transparent 1.5px),
+              linear-gradient(#fffbe6, #fffbe6) center / 1px 100% no-repeat,
+              linear-gradient(#fffbe6, #fffbe6) center / 100% 1px no-repeat;
+  filter: drop-shadow(0 0 2px rgba(255, 244, 180, .9));
+  animation: moss-twinkle 4.8s ease-in-out infinite;
+}
+.moss-sparkle.s1 { top: 1px; right: 6px; animation-delay: .9s; }
+.moss-sparkle.s2 { bottom: 4px; left: 2px; width: 5px; height: 5px; animation-delay: 3.3s; }
+.moss-dot {
+  position: absolute; top: 0; right: 0; width: 11px; height: 11px; border-radius: 50%;
+  background: #f0a24a; border: 2px solid #fff6e2; box-shadow: 0 0 6px rgba(240, 162, 74, .8);
+}
+.moss-friends-btn:hover .moss-core { background: radial-gradient(circle at 35% 30%, #fffaf0, #f7e6c4); }
+.moss-friends-btn:active { transform: scale(.94); }
+.moss-friends-btn:focus-visible { outline: 3px solid #86ad4c; outline-offset: 2px; }
+@keyframes moss-sun { to { transform: rotate(360deg); } }
+@keyframes moss-twinkle { 0%, 70%, 100% { opacity: 0; transform: scale(.4) rotate(0deg); } 78% { opacity: 1; transform: scale(1) rotate(20deg); } 86% { opacity: 0; transform: scale(.5) rotate(45deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .moss-glint { animation: none; transform: rotate(-40deg); }
+  .moss-sparkle { animation: none; }
+}
+@media (max-width: 420px) { #header-invite-btn { display: none; } .moss-friends-btn { width: 38px; height: 38px; } .moss-core { width: 25px; height: 25px; } .moss-ring, .moss-glint { -webkit-mask: radial-gradient(circle, transparent 12.5px, #000 13px); mask: radial-gradient(circle, transparent 12.5px, #000 13px); } }
+
 /* Byte Cub's chat: above everything, with his action buttons under a message. */
 .chat-panel { z-index: 300; }
 .chat-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: -2px 0 10px 44px; }

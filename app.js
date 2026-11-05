@@ -7509,6 +7509,7 @@ function setupEvents () {
   document.getElementById('empty-add-btn')?.addEventListener('click', openQuickAdd);
   document.getElementById('empty-import-btn')?.addEventListener('click', () => showImportBookmarks());
   document.getElementById('header-invite-btn')?.addEventListener('click', () => { hapticTap('light'); inviteFriend(); });
+  document.getElementById('header-friends-btn')?.addEventListener('click', () => { hapticTap('light'); openFoodieFriends(); });
   document.getElementById('chat-hide-cub-btn')?.addEventListener('click', () => { closeChat(); window.Cub?.hide?.(); });
   // Links on a spot (detail page)
   const addDetailLink = () => {
