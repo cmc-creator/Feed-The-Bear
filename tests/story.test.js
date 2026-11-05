@@ -53,7 +53,10 @@ const SEED = [
   await p.screenshot({ path: path.join(SHOTS, 'story-preview.png') }).catch(() => {});
 
   // With a share sheet, the image file goes to it.
-  await p.evaluate(() => { navigator.canShare = () => true; navigator.share = async d => { window._shared = d; }; });
+  await p.evaluate(() => {
+    Object.defineProperty(navigator, 'canShare', { configurable: true, writable: true, value: () => true });
+    Object.defineProperty(navigator, 'share', { configurable: true, writable: true, value: async d => { window._shared = d; } });
+  });
   await p.click('.story-share');
   const shared = await p.evaluate(() => window._shared && { name: window._shared.files?.[0]?.name, text: window._shared.text });
   check(shared?.name === 'taqueria-el-sol-what-to-order.png' && /Birria tacos/.test(shared.text), `Share sends the image and the text (${shared?.name})`);
