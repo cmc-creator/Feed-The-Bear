@@ -12,6 +12,7 @@
      POST { action: 'followed', id, me }    -> { ok }   (you follow profile `id`; `me` is your own profile)
      POST { action: 'unfollowed', id, me }  -> { ok }
      GET  ?followers=1                      -> { followers: [{ id, u, at }] }  (who follows you)
+     GET  ?following=1                      -> { following: [{ id, u }] }  (who you follow, from their followers lists)
    Invites: each one you send has its own random code, so you can see which
    were opened and who joined. Who you sent it to stays on your phone.
      POST { action: 'invite', code }        -> { ok }   (you're sending an invite)
@@ -93,6 +94,28 @@ module.exports = async function handler (req, res) {
         const live = await Promise.all(recent.map(f => db.doc(`profiles/${f.id}`).get().then(s => s.data()).catch(() => null)));
         const followers = recent.filter((f, i) => live[i]).map((f, i) => ({ id: f.id, u: String(f.u || 'Friend').slice(0, 30), at: f.at || '' }));
         return res.status(200).json({ followers });
+      }
+      // Who you follow, rebuilt from everyone's followers lists. The list on
+      // your account can be lost (a phone that synced before it loaded); this
+      // record can't, so the app uses it to put missing follows back.
+      if (req.query?.following) {
+        if (await overLimit(`handle:fw:${uid}`, 20, 600)) return res.status(429).json({ error: 'Slow down a little and try again soon.' });
+        const mine = await db.collection('profiles').where('uid', '==', uid).limit(20).get();
+        const myIds = new Set(mine.docs.map(d => d.id));
+        if (!myIds.size) return res.status(200).json({ following: [] });
+        const all = await db.collection('followedBy').limit(5000).get();
+        const owners = all.docs
+          .filter(d => d.id !== uid && (d.data()?.list || []).some(f => f && myIds.has(f.id)))
+          .map(d => d.id)
+          .slice(0, 100);
+        // Each person's current live profile (the newest, if they have several).
+        const following = (await Promise.all(owners.map(async owner => {
+          const snap = await db.collection('profiles').where('uid', '==', owner).limit(20).get().catch(() => null);
+          const best = (snap?.docs || []).map(d => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))[0];
+          return best && ID_RE.test(best.id) ? { id: best.id, u: String(best.u || 'Friend').slice(0, 30) } : null;
+        }))).filter(Boolean);
+        return res.status(200).json({ following });
       }
       if (req.query?.invites) {
         const snap = await db.collection('invites').where('owner', '==', uid).limit(100).get();

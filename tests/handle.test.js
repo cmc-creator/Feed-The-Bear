@@ -18,7 +18,8 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
           const q = { limit: () => q, get: async () => ({ docs: Object.keys(docs).filter(k => k.startsWith(c + '/') && docs[k][field] === val).map(k => ({ id: k.slice(c.length + 1), data: () => docs[k], ref: ref(k) })) }) };
           return q;
         };
-        return { where };
+        const all = { get: async () => ({ docs: Object.keys(docs).filter(k => k.startsWith(c + '/') && !k.slice(c.length + 1).includes('/')).map(k => ({ id: k.slice(c.length + 1), data: () => docs[k], ref: ref(k) })) }) };
+        return { where, limit: () => all };
       },
       runTransaction: async fn => fn({ get: r => r.get(), set: (r, d) => { docs[r.p] = d; }, delete: r => { delete docs[r.p]; } }),
     }),
@@ -63,6 +64,13 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
   check(r.data.followers?.length === 1 && r.data.followers[0].id === 'samshare0001' && r.data.followers[0].u === 'Sam', `Connie sees Sam under "Following you" (${JSON.stringify(r.data)})`);
   await call('sam', { method: 'POST', body: { action: 'followed', id: 'connieshare01', me: 'samshare0001' } });
   check((await call('connie', { query: { followers: '1' } })).data.followers.length === 1, 'following twice lists them once');
+  // Sam lost his list in a sync: who he follows comes back from Connie's followers list.
+  docs['profiles/connienewer01'] = { uid: 'connie', u: 'Connie B', updatedAt: '2026-11-01' };
+  r = await call('sam', { query: { following: '1' } });
+  check(r.data.following?.length === 1 && r.data.following[0].id === 'connienewer01' && r.data.following[0].u === 'Connie B', `Sam's follows are rebuilt, with her newest profile (${JSON.stringify(r.data)})`);
+  delete docs['profiles/connienewer01'];
+  check((await call('connie', { query: { following: '1' } })).data.following.length === 0, 'someone who follows nobody gets an empty list');
+  check((await call(null, { query: { following: '1' } })).status === 401, 'rebuilding follows needs sign-in');
   r = await call('mallory', { method: 'POST', body: { action: 'followed', id: 'connieshare01', me: 'samshare0001' } });
   check(r.status === 403, "you can't follow in someone else's name");
   check((await call(null, { query: { followers: '1' } })).status === 401, 'the followers list needs sign-in');

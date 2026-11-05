@@ -393,8 +393,19 @@ function _mergeFriendsFromCloud (cloud) {
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); } catch { /* storage full */ }
   }
   const cloudAt = Number(cloud?.friendsAt) || 0;
-  const localAt = friendsUpdatedAt();
-  if (Array.isArray(cloud?.friends) && cloudAt > localAt) {
+  let localAt = friendsUpdatedAt();
+  // The list on this phone only counts if it's this account's. One left from
+  // another account, or an empty one, never replaces what the account has.
+  let localOwner = '';
+  try { localOwner = localStorage.getItem('ftb_friends_uid_v1') || ''; } catch { /* private mode */ }
+  const cloudHas = Array.isArray(cloud?.friends) && cloud.friends.length > 0;
+  if ((localOwner && localOwner !== window._ftbUid) || (!getFriends().length && cloudHas)) localAt = 0;
+  try { localStorage.setItem('ftb_friends_uid_v1', window._ftbUid || ''); } catch { /* private mode */ }
+  if (localOwner && localOwner !== window._ftbUid && !cloudHas) {
+    // Signed in to a different account with no friends yet: start it clean.
+    try { localStorage.setItem(FRIENDS_KEY, '[]'); localStorage.setItem(FRIENDS_AT_KEY, '0'); } catch { /* storage full */ }
+  }
+  if (Array.isArray(cloud?.friends) && (cloudAt > localAt || (localAt === 0 && cloudHas))) {
     const list = cloud.friends.slice(0, 50).filter(f => f && f.key && f.data).map(f => {
       const data = sanitizeFriendData(f.data);
       return { key: String(f.key).slice(0, 80), name: String(f.name || data.u || 'Friend').slice(0, 30), data, savedAt: Number(f.savedAt) || 0 };
@@ -694,7 +705,7 @@ function initFirebaseAuth () {
 
       _mergeFriendsFromCloud(cloudProfile);
       // Let the people you follow see you under "Following you" (once each).
-      setTimeout(() => { window.noteExistingFollows?.(); window.noteInviteJoined?.(); }, 5000);
+      setTimeout(() => { window.loadFollowing?.(); window.noteExistingFollows?.(); window.noteInviteJoined?.(); }, 5000);
       // Opened an invite before signing in: follow them and show their spots now.
       setTimeout(() => window.resumePendingInvite?.(), 600);
 

@@ -358,12 +358,18 @@ async function noteInviteJoined () {
 window.noteInviteJoined = noteInviteJoined;
 
 let _inviteStatus = {};
+// Every invite you sent is on the server, so they show on any phone you sign
+// in on, not just the one that sent them (that phone also remembers who for).
+let _serverInvites = [];
 async function loadInviteStatus () {
-  if (!window._ftbUid || !getSentInvites().some(e => e.code)) return;
+  if (!window._ftbUid) return;
   try {
     const { ok, data } = await handleApi('GET', { query: '?invites=1' });
     if (!ok || !Array.isArray(data.invites)) return;
     _inviteStatus = Object.fromEntries(data.invites.map(r => [r.code, r]));
+    _serverInvites = data.invites
+      .filter(r => r && /^[a-z0-9]{16,32}$/.test(r.code || ''))
+      .map(r => ({ at: String(r.at || ''), code: r.code, name: '' }));
     if (!document.getElementById('friends-overlay')?.classList.contains('hidden')) renderFriendsList();
   } catch { /* keep what we had */ }
 }
@@ -611,6 +617,34 @@ async function noteExistingFollows () {
     }
   } finally { _notingFollows = false; }
 }
+
+// Put back anyone you follow who is missing from this account's list (the
+// server's followers lists are the record that can't be lost in a sync).
+let _restoringFollows = false;
+async function loadFollowing () {
+  if (!window._ftbUid || _restoringFollows) return;
+  _restoringFollows = true;
+  try {
+    const { ok, data } = await handleApi('GET', { query: '?following=1' });
+    if (!ok || !Array.isArray(data.following)) return;
+    const have = new Set(getFriends().map(f => f.data?.id).filter(Boolean));
+    const missing = data.following
+      .map(f => ({ id: String(f?.id || '').slice(0, 40), u: String(f?.u || 'Friend').slice(0, 30) }))
+      .filter(f => /^[a-z0-9]{8,40}$/.test(f.id) && !have.has(f.id) && f.id !== getProfileShareId());
+    if (!missing.length) return;
+    const now = Date.now();
+    saveFriends([...getFriends(), ...missing.map(f => ({
+      key: `id:${f.id}`, name: f.u, data: { id: f.id, u: f.u, picks: [], w: [], ts: 0 }, savedAt: now,
+    }))]);
+    const noted = followNoted();
+    missing.forEach(f => noted.add(f.id));
+    try { localStorage.setItem(FOLLOW_NOTED_KEY, JSON.stringify([...noted].slice(-100))); } catch { /* storage full */ }
+    await refreshFriendsLive(true);
+    renderAll();
+    if (!document.getElementById('friends-overlay')?.classList.contains('hidden')) renderFriendsList();
+  } catch { /* try again next time */ } finally { _restoringFollows = false; }
+}
+window.loadFollowing = loadFollowing;
 
 let _followers = null;
 async function loadFollowers () {
@@ -1084,7 +1118,10 @@ function renderFriendsList () {
       }).join('')
     : '';
   // Invites you sent: who it was for (kept on this phone) and how far it got.
-  const invites = getSentInvites();
+  const local = getSentInvites();
+  const localCodes = new Set(local.map(e => e.code).filter(Boolean));
+  const invites = [...local, ..._serverInvites.filter(e => !localCodes.has(e.code))]
+    .sort((a, b) => String(b.at).localeCompare(String(a.at)));
   const shown = invites.slice(0, 15);
   const invitesHtml = invites.length
     ? `<div class="friends-section-title">Sent invites (${invites.length})</div>` + shown.map((e, i) => {
@@ -1140,7 +1177,7 @@ function openFoodieFriends () {
   // Open to everyone: a free account can follow one friend (followFriend
   // checks), so it needs this screen to find them. Inviting stays Grizzly.
   // Each part draws on its own: one bad record must never blank the whole screen.
-  for (const step of [renderFriendsList, loadFollowers, loadInviteStatus, noteExistingFollows, renderMyHandle, renderFriendsLiveNote, () => refreshFriendsLive(true)]) {
+  for (const step of [renderFriendsList, loadFollowers, loadInviteStatus, loadFollowing, noteExistingFollows, renderMyHandle, renderFriendsLiveNote, () => refreshFriendsLive(true)]) {
     try {
       const out = step();
       if (out && typeof out.catch === 'function') out.catch(err => console.warn('[FTB] friends:', err));
