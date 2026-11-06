@@ -160,6 +160,9 @@ jobs:
       - name: Share images carry your link and a Google Play badge
         working-directory: tests
         run: node brand.test.js
+      - name: City guides at /eat, with Save buttons
+        working-directory: tests
+        run: node guide.test.js
       - name: Several photos and videos at once
         working-directory: tests
         run: node multiphoto.test.js

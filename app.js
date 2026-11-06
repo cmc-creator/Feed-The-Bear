@@ -10815,9 +10815,13 @@ function handleWebShareTarget () {
   window.Cub.openAdd(shared);
   return;
   }
-  const name = title.replace(/\s*[-|].*$/, '').trim() || (text && !looksLikeSharedUrl(text) ? text.trim() : '') || 'Shared Place';
+  // From a city guide's Save (share-target=1): the exact name, and its address.
+  const fromGuide = params.get('share-target') === '1';
+  const name = (fromGuide ? title.trim() : title.replace(/\s*[-|].*$/, '').trim()) || (text && !looksLikeSharedUrl(text) ? text.trim() : '') || 'Shared Place';
   openAddModal();
   document.getElementById('form-name').value = name;
+  const addr = (params.get('addr') || '').trim().slice(0, 200);
+  if (addr) document.getElementById('form-address').value = addr;
   if (sharedUrl) {
   document.getElementById('form-website').value = sharedUrl;
   if (looksLikeSharedUrl(sharedUrl)) {

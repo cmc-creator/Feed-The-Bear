@@ -17,6 +17,7 @@
 
 const admin = require('firebase-admin');
 const { nationalList } = require('./food-events');
+const { refreshGuides } = require('./guide');
 
 const DAY = 86400000;
 
@@ -82,7 +83,7 @@ module.exports = async function handler (req, res) {
   try { events = (await nationalList(db, { force: !dry })).events; } catch (err) { console.error('[FTB] nudges contests failed:', err.message); }
 
   const areas = await db.collection('pushArea').limit(2000).get();
-  const out = { members: areas.size, contests: events.length, sent: 0, would: [] };
+  const out = { members: areas.size, contests: events.length, sent: 0, would: [], guides: 0 };
   for (const doc of areas.docs) {
     const area = doc.data();
     // The member's state list too, if someone there has opened Play.
@@ -113,6 +114,8 @@ module.exports = async function handler (req, res) {
       console.error('[FTB] nudge send failed:', err.message);
     }
   }
+  // City guides (api/guide.js): the oldest few, searched again.
+  if (!dry) { try { out.guides = await refreshGuides(db, 4); } catch (err) { console.error('[FTB] nudges guides failed:', err.message); } }
   return res.status(200).json(out);
 };
 
