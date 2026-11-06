@@ -1,7 +1,7 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": ".",
-  "functions": { "api/food-events.js": { "maxDuration": 120 }, "api/nudges.js": { "maxDuration": 300 }, "api/guide.js": { "maxDuration": 60 } },
+  "functions": { "api/food-events.js": { "maxDuration": 120 }, "api/nudges.js": { "maxDuration": 300 }, "api/guide.js": { "maxDuration": 60 }, "api/genbears.js": { "maxDuration": 120 } },
   "rewrites": [
     { "source": "/@:handle", "destination": "/api/creator?h=:handle" },
     { "source": "/u/:handle", "destination": "/api/creator?h=:handle" },
