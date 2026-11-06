@@ -22,6 +22,8 @@ const day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
   ], '2026-11-05');
   check(got.map(e => e.name).join(',') === 'Taco Fest,Wing Bowl', `past, duplicate, stateless and undated events are dropped (${got.map(e => e.name)})`);
   check(got[0].url === '' && got[1].state === 'PA', 'bad links are removed and states are normalized');
+  const anyDay = cleanEvents([{ name: 'Big Burger Challenge', kind: 'challenge', date: '', city: 'Mesa', state: 'AZ' }, { name: 'Undated contest', kind: 'contest', date: '', city: 'X', state: 'TX' }, { name: 'Wings', kind: 'contest', date: '2026-12-01', city: 'Y', state: 'PA' }], '2026-11-06');
+  check(anyDay.map(e => e.name).join(',') === 'Wings,Big Burger Challenge', 'restaurant challenges you can take any day are kept (after dated ones); undated contests are not');
   check(parseArray('Here you go:\n```json\n[{"name":"A"}]\n```').length === 1 && parseArray('nothing').length === 0, 'the JSON list is read out of the answer');
 
   // Daily nudges: a contest in your state within 4 days first, once each.

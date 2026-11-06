@@ -41,6 +41,8 @@ function cleanUrl (v) {
 }
 
 // Keep only well-formed, upcoming events; soonest first, no repeats.
+// A restaurant challenge you can take any day has no date (date ''), and
+// comes after the dated ones.
 function cleanEvents (list, today = new Date().toISOString().slice(0, 10), max = 40) {
   const seen = new Set();
   return (Array.isArray(list) ? list : []).map(e => {
@@ -59,13 +61,14 @@ function cleanEvents (list, today = new Date().toISOString().slice(0, 10), max =
       prize: str(e?.prize, 60),
       blurb: str(e?.blurb, 160),
     };
-  }).filter(e => {
-    if (!e.name || !isDay(e.date) || (e.endDate || e.date) < today || !e.state) return false;
+  }).map(e => (e.kind === 'challenge' && !isDay(e.date) ? { ...e, date: '', endDate: '' } : e)).filter(e => {
+    if (!e.name || !e.state) return false;
+    if (e.date === '' ? e.kind !== 'challenge' : (!isDay(e.date) || (e.endDate || e.date) < today)) return false;
     const key = `${e.name.toLowerCase()}|${e.date}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  }).sort((a, b) => a.date.localeCompare(b.date)).slice(0, max);
+  }).sort((a, b) => (a.date === '') - (b.date === '') || a.date.localeCompare(b.date)).slice(0, max);
 }
 
 // The first JSON array in the model's answer.
@@ -88,9 +91,17 @@ const REGIONS = {
 };
 const STATE_NAMES = { AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California', CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', DC: 'Washington, DC', FL: 'Florida', GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa', KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland', MA: 'Massachusetts', MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana', NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire', NJ: 'New Jersey', NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio', OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island', SC: 'South Carolina', SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont', VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming' };
 
-async function searchEvents (key, where = 'the United States', max = 15) {
+const CHALLENGES_PROMPT = (where, today, max) => `Today is ${today}. Search the web for famous restaurant food challenges in ${where} that people can take any day
+(giant burgers, burritos, pizzas, steaks, spicy wings, huge breakfasts and the like: finish it in a time limit to win a prize or a spot on the wall of fame).
+Only include challenges a current source says are still offered. Do not invent anything; leave a field empty if you cannot confirm it.
+Answer with only a JSON array, no other text. Each item:
+{"name": "challenge name at restaurant name", "kind": "challenge", "date": "", "endDate": "",
+ "city": "...", "state": "two-letter code", "venue": "restaurant name", "url": "a page about it", "prize": "short, or empty", "blurb": "one sentence: what you eat and the time limit"}
+Give up to ${max} challenges.`;
+
+async function searchEvents (key, where = 'the United States', max = 15, { challenges = false } = {}) {
   const today = new Date().toISOString().slice(0, 10);
-  const prompt = `Today is ${today}. Search the web for upcoming public eating contests and food challenges in ${where} in the next 6 months:
+  const prompt = challenges ? CHALLENGES_PROMPT(where, today, max) : `Today is ${today}. Search the web for upcoming public eating contests and food challenges in ${where} in the next 6 months:
 competitive eating contests (Major League Eating events, hot dog, wing, pie, taco, burrito, pizza, chili, oyster, rib, cannoli, pickle, ramen contests and the like),
 food festivals and fairs that hold eating contests, and well-known restaurant food challenges people can sign up for.
 Only include events with a confirmed date on or after ${today}. Do not invent anything; leave a field empty if you cannot confirm it.
@@ -141,18 +152,27 @@ async function cachedList (db, docId, search, { force = false } = {}) {
   return { events: cached, at: cur?.at || 0 };
 }
 
-// Every region at once; a region that fails doesn't sink the rest.
+// Every region at once, dated contests and any-day restaurant challenges
+// separately; a search that fails doesn't sink the rest.
 async function searchNational (key) {
-  const lists = await Promise.all(Object.values(REGIONS).map(where => searchEvents(key, where, 15).catch(err => {
+  const searches = Object.values(REGIONS).flatMap(where => [
+    searchEvents(key, where, 15),
+    searchEvents(key, where, 8, { challenges: true }),
+  ]);
+  const lists = await Promise.all(searches.map(s => s.catch(err => {
     console.error('[FTB] food-events region failed:', err.message);
     return [];
   })));
-  return cleanEvents(lists.flat(), undefined, 120);
+  console.log(`[FTB] food-events national: ${lists.map(l => l.length).join(',')}`);
+  return cleanEvents(lists.flat(), undefined, 150);
 }
 
 function nationalList (db, opts) { return cachedList(db, 'current', searchNational, opts); }
 function stateList (db, st, opts) {
-  return cachedList(db, `st_${st}`, key => searchEvents(key, STATE_NAMES[st], 15).then(list => list.filter(e => e.state === st)), opts);
+  return cachedList(db, `st_${st}`, key => Promise.all([
+    searchEvents(key, STATE_NAMES[st], 15).catch(() => []),
+    searchEvents(key, STATE_NAMES[st], 8, { challenges: true }).catch(() => []),
+  ]).then(([a, b]) => cleanEvents([...a, ...b].filter(e => e.state === st), undefined, 40)), opts);
 }
 
 module.exports = async function handler (req, res) {

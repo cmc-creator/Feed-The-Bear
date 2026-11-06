@@ -44,7 +44,7 @@ function pick (area, events, now = Date.now()) {
   const today = new Date(now).toISOString().slice(0, 10);
   const soon = new Date(now + 4 * DAY).toISOString().slice(0, 10);
   const done = new Set(sent.contests || []);
-  const contest = area.state && events.find(e => e.state === area.state && e.date >= today && e.date <= soon && !done.has(`${e.name}|${e.date}`));
+  const contest = area.state && events.find(e => e.state === area.state && e.date && e.date >= today && e.date <= soon && !done.has(`${e.name}|${e.date}`));
   if (contest) {
     return {
       kind: 'contest', key: `${contest.name}|${contest.date}`,

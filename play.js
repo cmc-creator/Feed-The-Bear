@@ -1273,6 +1273,7 @@ async function myStateCode () {
 }
 
 function foodEventDate (e) {
+  if (!e.date) return 'Any day';
   const fmt = d => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   return e.endDate && e.endDate !== e.date ? `${fmt(e.date)} – ${fmt(e.endDate)}` : fmt(e.date);
 }
@@ -1288,7 +1289,7 @@ function openFoodEventLink (url) {
 // Saved first, then your state, then the rest; soonest first within each.
 function sortFoodEvents (events, mine, saved) {
   const rank = e => (saved.has(foodEventKey(e)) ? 0 : e.state === mine ? 1 : 2);
-  return [...events].sort((a, b) => rank(a) - rank(b) || a.date.localeCompare(b.date));
+  return [...events].sort((a, b) => rank(a) - rank(b) || (a.date === '') - (b.date === '') || a.date.localeCompare(b.date));
 }
 
 async function renderFoodEventsHub (body) {
@@ -1304,7 +1305,7 @@ async function renderFoodEventsHub (body) {
   if (!list) return;
   if (!events.length) { list.innerHTML = '<div class="fe-empty">No contests to show right now. Check back soon.</div>'; return; }
   const saved = savedFoodEvents();
-  const sorted = sortFoodEvents(events, mine, saved).slice(0, 40);
+  const sorted = sortFoodEvents(events, mine, saved).slice(0, 60);
   const card = (e, i) => {
     const on = saved.has(foodEventKey(e));
     return `
@@ -1343,7 +1344,8 @@ async function renderFoodEventsHub (body) {
     }
     if (ev.target.closest('.fe-share')) {
       trackProductEvent('food_event_shared', { kind: e.kind });
-      const text = `${e.name}, ${foodEventDate(e)} in ${[e.city, e.state].filter(Boolean).join(', ')}. Want to go? 🐻`;
+      const where = [e.city, e.state].filter(Boolean).join(', ');
+      const text = e.date ? `${e.name}, ${foodEventDate(e)} in ${where}. Want to go? 🐻` : `${e.name} in ${where}. Think we could take it? 🐻`;
       navigator.share?.({ title: e.name, text, url: e.url || 'https://www.feed-the-bear.com' }).catch(() => {});
       return;
     }
@@ -1376,7 +1378,7 @@ async function checkFoodEventHeadsUp () {
   try { noted = new Set(JSON.parse(localStorage.getItem(FOOD_EVENTS_NOTED_KEY)) || []); } catch { noted = new Set(); }
   const today = new Date().toISOString().slice(0, 10);
   const soon = new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10);
-  const e = sortFoodEvents(events, mine, saved).find(x => (saved.has(foodEventKey(x)) || x.state === mine) && x.date >= today && x.date <= soon && !noted.has(foodEventKey(x)));
+  const e = sortFoodEvents(events, mine, saved).find(x => x.date && (saved.has(foodEventKey(x)) || x.state === mine) && x.date >= today && x.date <= soon && !noted.has(foodEventKey(x)));
   if (!e) return;
   noted.add(foodEventKey(e));
   try { localStorage.setItem(FOOD_EVENTS_NOTED_KEY, JSON.stringify([...noted].slice(-100))); } catch { /* storage full */ }
