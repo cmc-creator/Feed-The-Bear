@@ -67,11 +67,12 @@
 
     <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Nearby Want to Try alerts while the app is open. No ACCESS_BACKGROUND_LOCATION:
-         Google Play needs a separate declaration and video for it, so "even when the
-         app is closed" is off in this build (NearbyAlertsPlugin reports backgroundSupported). -->
+    <!-- Nearby Want to Try alerts. Background location lets them arrive when the
+         app is closed (Android geofences need it); the app explains it first and
+         Google Play has its location permissions declaration for it. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Voice search and talking to Byte Cub (SpeechPlugin) -->

@@ -102,6 +102,17 @@ public class NearbyAlertsPlugin extends Plugin {
         call.resolve(statusObject());
     }
 
+    /** { id, title, text }: the open app's own nearby alert, as a real notification
+     *  (the web view can't post one). Tapping it opens that spot. */
+    @PluginMethod
+    public void notify(PluginCall call) {
+        String id = call.getString("id", "");
+        String title = call.getString("title", "");
+        if (id == null || id.isEmpty() || title == null || title.isEmpty()) { call.reject("id and title are needed"); return; }
+        GeofenceReceiver.post(getContext(), id, title, call.getString("text", ""));
+        call.resolve();
+    }
+
     /** { enabled, radiusMeters, spots: [{ id, name, lat, lng }] }, nearest first, at most 100. */
     @PluginMethod
     public void setSpots(PluginCall call) {

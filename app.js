@@ -2245,6 +2245,13 @@ function showProximityAlert (r, distM, crave = null) {
 // Phones only show notifications through the service worker: on Android
 // `new Notification()` throws, so that path is just the desktop fallback.
 async function sendBrowserNotification (r, distM, crave = null) {
+  // The Android app (2.3.0+) posts a real Android notification; the web view can't.
+  const nativeNotify = window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins?.NearbyAlerts?.notify : null;
+  if (nativeNotify && window.Capacitor.isPluginAvailable?.('NearbyAlerts')) {
+    const title = crave ? `${crave.name} is ${fmtDist(distM)} away` : `${r.name} is ${fmtDist(distM)} away`;
+    const text = crave ? `At ${r.name}. It's on your Crave List.` : r.status === 'want-to-try' ? "It's on your Want to Try list. Tap to see it." : 'You have been here before.';
+    try { await window.Capacitor.Plugins.NearbyAlerts.notify({ id: r.id, title, text }); return; } catch { /* an older app: no notify */ }
+  }
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   const tag = `ftb-${r.id}`;
   // The old GitHub bear-icon.png doesn't exist; use the bundled icon.
@@ -2441,6 +2448,13 @@ var NativeAlerts = (() => {
       const st = await p.status();
       background = !!st.background;
       supported = st.backgroundSupported !== false;
+      // An app that can now alert when closed (2.3.0): offer it once to anyone
+      // who has alerts on, unless they chose "only while open".
+      if (supported && !background && nearAlertsOn() && state.settings.locationEnabled && state.settings.nearAlertsClosed !== false) {
+        let asked = false;
+        try { asked = !!localStorage.getItem('ftb_bg_asked_v1'); localStorage.setItem('ftb_bg_asked_v1', '1'); } catch { asked = true; }
+        if (!asked) setTimeout(() => NativeAlerts.askBackground(), 2500);
+      }
     } catch { /* plugin missing */ }
     renderNearAlertsRow();
   }

@@ -25,12 +25,14 @@ import com.google.android.gms.location.GeofencingEvent;
 public class GeofenceReceiver extends BroadcastReceiver {
     static final String CHANNEL = "nearby_want_to_try";
     private static final long SPOT_COOLDOWN = 3L * 24 * 60 * 60 * 1000; // same spot: at most every 3 days
-    private static final long ANY_COOLDOWN = 30L * 60 * 1000;           // any spot: at most every half hour
+    private static final long ANY_COOLDOWN = 2L * 60 * 60 * 1000;       // any spot: at most every two hours
 
     @Override
     public void onReceive(Context context, Intent intent) {
         GeofencingEvent event = GeofencingEvent.fromIntent(intent);
-        if (event == null || event.hasError() || event.getGeofenceTransition() != Geofence.GEOFENCE_TRANSITION_ENTER) return;
+        if (event == null || event.hasError()) return;
+        int t = event.getGeofenceTransition();
+        if (t != Geofence.GEOFENCE_TRANSITION_ENTER && t != Geofence.GEOFENCE_TRANSITION_DWELL) return;
         if (MainActivity.inForeground) return; // the open app shows its own alert
         if (Build.VERSION.SDK_INT >= 33
             && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
@@ -43,12 +45,15 @@ public class GeofenceReceiver extends BroadcastReceiver {
             String name = GeofenceStore.nameFor(context, id);
             if (name == null || now - p.getLong("last_" + id, 0) < SPOT_COOLDOWN) continue;
             p.edit().putLong("last_" + id, now).putLong("last_any", now).apply();
-            notify(context, id, name);
+            post(context, id, name + " is nearby", "It's on your Want to Try list. Tap to see it.");
             return; // one at a time
         }
     }
 
-    private void notify(Context context, String id, String name) {
+    /** One notification that opens spot `id`. Also used by the open app (NearbyAlertsPlugin.notify). */
+    static void post(Context context, String id, String title, String text) {
+        if (Build.VERSION.SDK_INT >= 33
+            && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
         NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(CHANNEL) == null) {
             NotificationChannel ch = new NotificationChannel(CHANNEL, "Nearby Want to Try spots", NotificationManager.IMPORTANCE_DEFAULT);
@@ -62,8 +67,8 @@ public class GeofenceReceiver extends BroadcastReceiver {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         NotificationCompat.Builder b = new NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_bear)
-            .setContentTitle(name + " is nearby")
-            .setContentText("It's on your Want to Try list. Tap to see it.")
+            .setContentTitle(title)
+            .setContentText(text)
             .setAutoCancel(true)
             .setContentIntent(pi)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT);
