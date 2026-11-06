@@ -86,5 +86,9 @@ const call = (token, method, body) => new Promise(resolve => {
   const pub = await new Promise(resolve => owner({ method: 'GET', query: { partners: '1' }, headers: {} }, { setHeader () {}, status (c) { this.c = c; return this; }, json (b) { resolve(b); } }));
   check(pub.partners?.ubereats === 'ref=feedthebear', 'the app can read them without signing in');
 
+  r = await call('owner', 'POST', { action: 'partners', partners: { shop: 'https://feedthebear.printful.me' } });
+  check(r.status === 200 && docs['config/partners'].shop === 'https://feedthebear.printful.me', 'the merch shop link is saved');
+  check((await call('owner', 'POST', { action: 'partners', partners: { shop: 'javascript:alert(1)' } })).status === 400, 'only an https shop link is accepted');
+
   finish('owner');
 })();

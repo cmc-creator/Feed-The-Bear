@@ -134,7 +134,7 @@ async function listCodes (stripe) {
   };
 }
 
-const PARTNER_KEYS = ['opentable', 'resy', 'yelp', 'doordash', 'ubereats', 'grubhub'];
+const PARTNER_KEYS = ['opentable', 'resy', 'yelp', 'doordash', 'ubereats', 'grubhub', 'shop'];
 // Affiliate codes for Book a table / Order delivery (app.js partnerUrl): a
 // tracking link with {url}, or extra query text. Public: they end up in links.
 async function partnerCodes (db) {
@@ -232,6 +232,11 @@ module.exports = async function handler (req, res) {
       const next = {};
       for (const k of PARTNER_KEYS) {
         const v = String(body.partners?.[k] || '').trim().slice(0, 300);
+        if (k === 'shop') {
+          if (v && !/^https:\/\/[^\s<>"]+$/i.test(v)) return res.status(400).json({ error: 'The shop link should start with https://' });
+          next[k] = v;
+          continue;
+        }
         if (v && /^https?:\/\//i.test(v) && !v.includes('{url}')) return res.status(400).json({ error: `The ${k} link needs {url} where the restaurant's page goes.` });
         if (/[<>"\s]/.test(v)) return res.status(400).json({ error: `The ${k} code has spaces or symbols that can't go in a link.` });
         next[k] = v;

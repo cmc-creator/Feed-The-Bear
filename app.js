@@ -4249,10 +4249,15 @@ function openMapsSearch (r) {
 //       'https://ubereats.example-network.com/c/123/456?u={url}'
 //   - extra query text added to the page's own link: 'ref=feedthebear'
 // Set in the owner portal (owner.js 'partners'), fetched at most every few hours.
-const PARTNER_REFS = { opentable: '', resy: '', yelp: '', doordash: '', ubereats: '', grubhub: '' };
+const PARTNER_REFS = { opentable: '', resy: '', yelp: '', doordash: '', ubereats: '', grubhub: '', shop: '' };
 (function loadPartnerRefs () {
   const KEY = 'ftb_partner_refs_v1';
-  const apply = refs => Object.keys(PARTNER_REFS).forEach(k => { if (typeof refs?.[k] === 'string') PARTNER_REFS[k] = refs[k]; });
+  const apply = refs => {
+    Object.keys(PARTNER_REFS).forEach(k => { if (typeof refs?.[k] === 'string') PARTNER_REFS[k] = refs[k]; });
+    // The merch shop (owner portal): a Bear Shop row in Account once it's set.
+    const row = document.getElementById('account-shop-row');
+    if (row) { row.classList.toggle('hidden', !/^https:\/\//.test(PARTNER_REFS.shop)); if (PARTNER_REFS.shop) row.href = PARTNER_REFS.shop; }
+  };
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (saved) apply(saved.refs);

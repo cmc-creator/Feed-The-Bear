@@ -110,6 +110,7 @@
         <label>DoorDash<input id="p-doordash" autocomplete="off" /></label>
         <label>Uber Eats<input id="p-ubereats" autocomplete="off" /></label>
         <label>Grubhub<input id="p-grubhub" autocomplete="off" /></label>
+        <label class="wide">Your merch shop link (Printful store; shows "Bear Shop" in the app and on the website)<input id="p-shop" autocomplete="off" placeholder="https://yourstore.printful.me" /></label>
         <button class="btn" type="submit">Save codes</button>
       </form>
       <p class="msg" id="partner-msg" role="status"></p>
@@ -198,7 +199,7 @@ $('vip-form').addEventListener('submit', async e => {
 $('partner-form').addEventListener('submit', async e => {
   e.preventDefault();
   say('partner-msg', 'Saving…');
-  const partners = Object.fromEntries(['opentable', 'resy', 'yelp', 'doordash', 'ubereats', 'grubhub'].map(k => [k, $(`p-${k}`).value.trim()]));
+  const partners = Object.fromEntries(['opentable', 'resy', 'yelp', 'doordash', 'ubereats', 'grubhub', 'shop'].map(k => [k, $(`p-${k}`).value.trim()]));
   try { say('partner-msg', (await api('POST', { action: 'partners', partners })).message); } catch (err) { say('partner-msg', err.message, false); }
 });
 $('code-duration').addEventListener('change', () => { $('code-months-wrap').hidden = $('code-duration').value !== 'repeating'; });
