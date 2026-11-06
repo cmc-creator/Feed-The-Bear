@@ -163,6 +163,12 @@ jobs:
       - name: City guides at /eat, with Save buttons
         working-directory: tests
         run: node guide.test.js
+      - name: Owner portal (VIP Grizzly, discount codes)
+        working-directory: tests
+        run: node owner.test.js
+      - name: Friends screen and Bear Cave invites
+        working-directory: tests
+        run: node friendscreen.test.js
       - name: Several photos and videos at once
         working-directory: tests
         run: node multiphoto.test.js

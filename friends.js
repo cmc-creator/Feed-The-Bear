@@ -1163,6 +1163,129 @@ window.openFriendSpots = openFriendSpots;
    PHASE 8 • ❤ FOODIE FRIENDS
    ------------------------------------------------------------ */
 
+/* ── Friends screen: what's going on ─────────────────────────
+   Friends' latest bites up top, a 30-day "who ate out most" board, and a
+   card per friend: taste match, their best picks, places you both want or
+   they loved from your list, and their Bear Cave page (or a nudge to make one). */
+let _friendPages = {};      // share id → public username
+let _friendPagesFor = '';
+async function loadFriendPages () {
+  const ids = getFriends().map(f => f.data?.id).filter(Boolean);
+  const sig = ids.join(',');
+  if (!window._ftbUid || !ids.length || sig === _friendPagesFor) return;
+  _friendPagesFor = sig;
+  try {
+    const { ok, data } = await handleApi('GET', { query: `?pagesOf=${encodeURIComponent(sig)}` });
+    if (ok && data.pages) { _friendPages = data.pages; renderFriendsList(); }
+  } catch { _friendPagesFor = ''; }
+}
+
+const fxCuisine = c => String(c || '').toLowerCase().trim();
+// How much your tastes overlap: cuisines you've both rated well, plus any
+// restaurant you both love. null until each of you has a few to compare.
+function tasteMatch (f) {
+  const mine = new Set((state.restaurants || []).filter(r => r.status === 'visited' && (r.myRating || 0) >= 3).map(r => fxCuisine(r.cuisine)).filter(Boolean));
+  const picks = f.data?.picks || [];
+  const theirs = new Set(picks.filter(p => (p.r || 0) >= 3).map(p => fxCuisine(p.c)).filter(Boolean));
+  if (mine.size < 2 || theirs.size < 2) return null;
+  const both = [...mine].filter(c => theirs.has(c)).length;
+  const myLoves = new Set((state.restaurants || []).filter(r => (r.myRating || 0) >= 4).map(r => normalizeName(r.name)));
+  const sameSpots = picks.filter(p => (p.r || 0) >= 4 && myLoves.has(normalizeName(p.n))).length;
+  return Math.min(99, Math.round(100 * both / Math.min(mine.size, theirs.size) * 0.85 + sameSpots * 8));
+}
+
+// Spots on your Want to Try list that this friend rated 4+, or wants too.
+function friendOverlap (f) {
+  const want = (state.restaurants || []).filter(r => r.status === 'want-to-try');
+  const byName = new Map(want.map(r => [normalizeName(r.name), r]));
+  const loved = (f.data?.picks || []).filter(p => (p.r || 0) >= 4 && byName.has(normalizeName(p.n))).map(p => ({ r: byName.get(normalizeName(p.n)), stars: p.r }));
+  const theyWant = new Set([...(f.data?.w || []).map(w => w.at), ...(f.recent || []).filter(x => x.k === 'save').map(x => x.n)].filter(Boolean).map(normalizeName));
+  const both = want.filter(r => theyWant.has(normalizeName(r.name)) && !loved.some(l => l.r.id === r.id));
+  return { loved, both };
+}
+
+// Places eaten in the last 30 days: you and each friend (from their live activity).
+function friendsBoard () {
+  const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+  const count = list => new Set(list.filter(x => (x.k === 'visit' || x.k === 'dish') && String(x.at || '') >= since).map(x => normalizeName(x.n))).size;
+  const rows = getFriends().map(f => ({ name: f.name, av: f.av, n: count(f.recent || []) }));
+  const mineVisits = new Set();
+  (state.restaurants || []).forEach(r => {
+    const dates = [...(r.visits || []).map(v => v.date), r.dateVisited].filter(Boolean).map(d => String(d).slice(0, 10));
+    if (dates.some(d => d >= since)) mineVisits.add(r.id);
+  });
+  const me = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
+  rows.push({ name: 'You', av: me.avatar, n: mineVisits.size, me: true });
+  return rows.filter(r => r.n > 0).sort((a, b) => b.n - a.n).slice(0, 5);
+}
+
+function friendsPulseHtml (feed) {
+  const mine = new Map((state.restaurants || []).map(r => [normalizeName(r.name), r]));
+  const feedHtml = feed.length ? `<div class="friends-section-title">Lately</div><div class="fx-feed">${feed.map((x, i) => {
+    const who = `<strong>${escHtml(x.who.name)}</strong>`;
+    const at = `<strong>${escHtml(x.n)}</strong>`;
+    const line = x.k === 'dish' && x.d ? `${who} would get the <strong>${escHtml(x.d)}</strong> again at ${at}`
+      : x.k === 'save' ? `${who} wants to try ${at}`
+      : `${who} ate at ${at}${x.r ? ` <span class="ff-stars">${'★'.repeat(x.r)}</span>` : ''}`;
+    const have = mine.get(normalizeName(x.n));
+    return `<div class="ff-item"><span class="ff-avatar" aria-hidden="true">${avatarSvg(x.who.av)}</span>
+      <span class="ff-text">${line}<span class="ff-meta">${escHtml([`${cuisineEmoji(x.c)} ${x.c || ''}`.trim(), feedAgo(x.at)].filter(Boolean).join(' · '))}</span></span>
+      ${have ? `<button type="button" class="btn-ghost btn-sm fx-view" data-id="${escHtml(have.id)}">View</button>`
+        : `<button type="button" class="btn-sm btn-orange fx-save" data-i="${i}">＋ Save</button>`}</div>`;
+  }).join('')}</div>` : '';
+  const board = friendsBoard();
+  const boardHtml = board.length > 1 ? `<div class="friends-section-title">Who ate out most · 30 days</div><ol class="fx-board">${board.map((r, i) => `
+    <li class="${r.me ? 'fx-me' : ''}"><span class="fx-rank">${['🥇', '🥈', '🥉'][i] || i + 1}</span><span class="ff-avatar" aria-hidden="true">${avatarSvg(r.av)}</span>
+      <span class="fx-board-name">${escHtml(r.name)}</span><span class="fx-board-n">${r.n} place${r.n === 1 ? '' : 's'}</span></li>`).join('')}</ol>` : '';
+  return feedHtml + boardHtml;
+}
+
+function friendCardHtml (f, { waiting = false } = {}) {
+  const picks = [...(f.data?.picks || [])].sort((a, b) => (b.r || 0) - (a.r || 0));
+  const orders = picks.reduce((n, p) => n + (p.g?.length || 0), 0);
+  const match = tasteMatch(f);
+  const fresh = friendNewSpots(f).length;
+  const { loved, both } = friendOverlap(f);
+  const page = f.data?.id ? _friendPages[f.data.id] : '';
+  const first = String(f.name || 'Friend').split(/\s+/)[0];
+  const top = picks.slice(0, 3).map(p => `<li><span aria-hidden="true">${cuisineEmoji(p.c)}</span> ${escHtml(p.n)}${p.r ? ` <span class="ff-stars">${'★'.repeat(p.r)}</span>` : ''}${p.g?.[0] ? `<small>get the ${escHtml(p.g[0])}</small>` : ''}</li>`).join('');
+  const overlap = loved[0]
+    ? `<div class="fx-overlap">💛 ${escHtml(first)} gave <strong>${escHtml(loved[0].r.name)}</strong> ${'★'.repeat(loved[0].stars)}. It's on your list.
+        <button type="button" class="btn-sm btn-orange fx-plan" data-key="${escHtml(f.key)}" data-id="${escHtml(loved[0].r.id)}">Plan it</button></div>`
+    : both[0]
+      ? `<div class="fx-overlap">🤝 You both want to try <strong>${escHtml(both[0].name)}</strong>.
+        <button type="button" class="btn-sm btn-orange fx-plan" data-key="${escHtml(f.key)}" data-id="${escHtml(both[0].id)}">Plan it</button></div>`
+      : '';
+  return `<div class="fx-card">
+    <div class="fx-head"><span class="fx-avatar" aria-hidden="true">${avatarSvg(f.av)}</span>
+      <span class="fx-who"><strong>${escHtml(f.name)}</strong>
+        <span>${picks.length} spot${picks.length === 1 ? '' : 's'} · ${orders} go-to order${orders === 1 ? '' : 's'}${(f.data?.w || []).length ? ` · ${(f.data.w).length} craving${f.data.w.length === 1 ? '' : 's'}` : ''}</span>
+        ${waiting ? '<span class="friend-sent">Sent · waiting for them to follow back</span>' : ''}</span>
+      ${match !== null ? `<span class="fx-match" title="How much your tastes overlap"><b>${match}%</b>taste match</span>` : ''}
+      <button type="button" class="friend-remove icon-btn" data-key="${escHtml(f.key)}" aria-label="Unfollow ${escHtml(f.name)}">✕</button></div>
+    ${top ? `<ul class="fx-picks">${top}</ul>` : `<p class="fx-quiet">${escHtml(first)} hasn't rated any spots yet.</p>`}
+    ${overlap}
+    <div class="fx-actions">
+      <button type="button" class="btn-sm ${fresh ? 'btn-orange' : 'btn-ghost'} friend-spots" data-key="${escHtml(f.key)}">${fresh ? `${fresh} new spot${fresh === 1 ? '' : 's'}` : 'All their spots'}</button>
+      ${page ? `<a class="btn-sm btn-ghost fx-page" href="/@${encodeURIComponent(page)}" target="_blank" rel="noopener">🐻 Bear Cave</a>`
+        : f.data?.id ? `<button type="button" class="btn-sm btn-ghost fx-page-invite" data-key="${escHtml(f.key)}">Invite to make a Bear Cave page</button>` : ''}
+    </div>
+  </div>`;
+}
+
+// Ask a friend to claim their Bear Cave page: the link opens username setup.
+async function inviteToBearCave (f) {
+  const first = String(f?.name || '').split(/\s+/)[0];
+  const url = 'https://www.feed-the-bear.com/app.html?action=page';
+  const text = `${first ? `Hey ${first}! ` : ''}Your Feed The Bear spots deserve a home 🐻 Claim your Bear Cave page: one link (feed-the-bear.com/@you) with your top spots and what to order there, for your bio or to send around. Pick your username here:`;
+  trackProductEvent('bear_cave_invite_sent');
+  try {
+    if (navigator.share) { await navigator.share({ title: 'Your Bear Cave page', text, url }); return; }
+  } catch (err) { if (err?.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(`${text} ${url}`); showToast('Copied', 'Paste it to them in a text.', 'success'); }
+  catch { window.prompt('Send this to them:', `${text} ${url}`); }
+}
+
 function renderFriendsList () {
   const el = document.getElementById('friends-list');
   if (!el) return;
@@ -1182,18 +1305,14 @@ function renderFriendsList () {
   const followerIds = new Set(followers.map(f => f.id));
   const followingHtml = friends.length
     ? `<div class="friends-section-title">Following (${friends.length})</div>` + friends.map(f => {
-        const orders = (f.data?.picks || []).reduce((n, p) => n + (p.g?.length || 0), 0);
-        const waiting = _followers !== null && f.data?.id && !followerIds.has(f.data.id);
-        const fresh = friendNewSpots(f).length;
-        return `<div class="friend-row">
-          <span class="friend-info"><strong>${escHtml(f.name)}</strong>
-            <span>${(f.data?.picks || []).length} spots · ${orders} go-to orders · ${(f.data?.w || []).length} cravings</span>
-            ${waiting ? '<span class="friend-sent">Sent · waiting for them to follow back</span>' : ''}</span>
-          <button type="button" class="btn-sm ${fresh ? 'btn-orange' : 'btn-ghost'} friend-spots" data-key="${escHtml(f.key)}">${fresh ? `${fresh} new spot${fresh === 1 ? '' : 's'}` : 'Spots'}</button>
-          <button type="button" class="friend-remove icon-btn" data-key="${escHtml(f.key)}" aria-label="Unfollow ${escHtml(f.name)}">✕</button>
-        </div>`;
+        try { return friendCardHtml(f, { waiting: _followers !== null && f.data?.id && !followerIds.has(f.data.id) }); }
+        catch (err) { console.warn('[FTB] friend card:', err); return ''; }
       }).join('')
     : '';
+  let feed = [];
+  try { feed = friends.length ? friendsFeedItems() : []; } catch { feed = []; }
+  let pulseHtml = '';
+  try { pulseHtml = friends.length ? friendsPulseHtml(feed) : ''; } catch (err) { console.warn('[FTB] friends pulse:', err); }
   // Invites you sent: who it was for (kept on this phone) and how far it got.
   const local = getSentInvites();
   const localCodes = new Set(local.map(e => e.code).filter(Boolean));
@@ -1221,7 +1340,7 @@ function renderFriendsList () {
       }).join('')
       + (invites.length > shown.length ? `<div class="friends-empty">and ${invites.length - shown.length} more</div>` : '')
     : '';
-  el.innerHTML = followersHtml + followingHtml + invitesHtml || (_followers === null && window._ftbUid
+  el.innerHTML = pulseHtml + followingHtml + followersHtml + invitesHtml || (_followers === null && window._ftbUid
     ? '<div class="friends-empty">Loading your friends…</div>'
     : '<div class="friends-empty">No friends yet. Send an invite: when a friend joins from it, they show up here and you can follow each other.</div>'
       // Friends belong to an account: an empty list usually means a different (or new) one.
@@ -1232,6 +1351,15 @@ function renderFriendsList () {
     const f = getFriends().find(x => x.key === b.dataset.key);
     if (f) openFriendSpots(f.data);
   }));
+  el.querySelectorAll('.fx-save').forEach(b => b.addEventListener('click', () => { saveFromFriend(feed[Number(b.dataset.i)]); renderFriendsList(); }));
+  el.querySelectorAll('.fx-view').forEach(b => b.addEventListener('click', () => { closeFoodieFriends(); openDetailModal(b.dataset.id); }));
+  el.querySelectorAll('.fx-plan').forEach(b => b.addEventListener('click', () => {
+    const f = getFriends().find(x => x.key === b.dataset.key);
+    const r = (state.restaurants || []).find(x => x.id === b.dataset.id);
+    if (r) askFriendToGo(r, String(f?.name || '').split(/\s+/)[0]);
+  }));
+  el.querySelectorAll('.fx-page-invite').forEach(b => b.addEventListener('click', () => inviteToBearCave(getFriends().find(x => x.key === b.dataset.key))));
+  loadFriendPages();
   el.querySelectorAll('.friend-follow-back').forEach(b => b.addEventListener('click', () => {
     const f = followers[Number(b.dataset.i)];
     if (f && followFriend({ id: f.id, u: f.u, picks: [], w: [] })) {

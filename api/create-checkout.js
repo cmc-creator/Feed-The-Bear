@@ -2,7 +2,8 @@
    Feed The Bear - Vercel Serverless: Create Stripe Checkout
    ════════════════════════════════════════════════════════════
    GET  ?uid=…&email=…&ref=…  → { trial, days }  (is a free trial on offer, and how long?)
-   POST { uid, email, priceId, ref, playToken } → { url, trial, days }  (Stripe Checkout link)
+   POST { uid, email, priceId, ref, playToken, promo } → { url, trial, days }  (Stripe Checkout link)
+   promo: a discount code from an owner's VIP link (owner.js); applied for them.
    ref is the uid from a friend's invite link: 30 days instead of 7.
    playToken: from Google in the Play app, so the sale is reported to Google (_play.js).
 
@@ -78,7 +79,7 @@ module.exports = async function handler (req, res) {
     return;
   }
 
-  const { uid, email, priceId, ref, playToken } = req.body || {};
+  const { uid, email, priceId, ref, playToken, promo } = req.body || {};
   if (!uid || !priceId) {
     res.status(400).json({ error: 'Missing uid or priceId' });
     return;
@@ -94,6 +95,12 @@ module.exports = async function handler (req, res) {
     const trial = await trialEligible(stripe, uid, email);
     const days = trial ? await trialDays(uid, ref) : 0;
     const invitedBy = days === INVITED_TRIAL_DAYS ? ref : '';
+    // A VIP link's code, applied up front (Stripe takes either this or the code box).
+    let promoId = '';
+    if (typeof promo === 'string' && /^[A-Za-z0-9_-]{3,30}$/.test(promo)) {
+      const found = await stripe.promotionCodes.list({ code: promo.toUpperCase(), active: true, limit: 1 }).catch(() => null);
+      promoId = found?.data?.[0]?.id || '';
+    }
     const session = await stripe.checkout.sessions.create({
       mode:                 'subscription',
       payment_method_types: ['card'],
@@ -110,7 +117,7 @@ module.exports = async function handler (req, res) {
       },
       success_url:          `${appUrl}/app.html?upgrade=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url:           `${appUrl}/app.html?upgrade=cancel`,
-      allow_promotion_codes: true,
+      ...(promoId ? { discounts: [{ promotion_code: promoId }] } : { allow_promotion_codes: true }),
     });
 
     // Kept until checkout finishes; the webhook reports the sale to Google with it.

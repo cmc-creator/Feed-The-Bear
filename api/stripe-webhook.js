@@ -24,6 +24,7 @@ const Stripe = require('stripe');
 const admin  = require('firebase-admin');
 const { rewardInviter } = require('./_referral');
 const play = require('./_play');
+const { vipFor } = require('./owner');
 const { sendEmail, emailHtml, esc } = require('./_email');
 
 function getAdmin () {
@@ -192,7 +193,9 @@ module.exports = async function handler (req, res) {
       // 'incomplete' happens mid-checkout and may arrive late, so it changes nothing.
       const plan = event.type === 'customer.subscription.deleted' || ENDED.includes(obj.status) ? 'free'
         : ACTIVE.includes(obj.status) ? 'grizzly' : null;
-      if (uid && plan) await setPlan(db, uid, { plan, ...trialFields(event.type === 'customer.subscription.deleted' ? null : obj) });
+      // A VIP (owner.js) keeps Grizzly when a subscription of theirs ends.
+      const keep = plan === 'free' && uid && await vipFor(db, uid).catch(() => false);
+      if (uid && plan && !keep) await setPlan(db, uid, { plan, ...trialFields(event.type === 'customer.subscription.deleted' ? null : obj) });
     }
 
     if (event.type === 'customer.subscription.trial_will_end') {

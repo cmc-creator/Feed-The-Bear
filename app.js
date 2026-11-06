@@ -54,7 +54,7 @@ const _blobToBase64 = blob => new Promise((resolve, reject) => {
     // Share: text and links, or an image/file (the first one).
     if (!navigator.share || !sheet.shareFile) {
       Object.defineProperty(navigator, 'share', {
-        configurable: true,
+        configurable: true, writable: true,
         value: ({ title = '', text = '', url = '', files } = {}) => {
           if (files?.length && sheet.shareFile) return shareFile(files[0], { title, text: [text, url].filter(Boolean).join(' ') });
           if (files?.length && !text && !url) return Promise.reject(new DOMException('Files not supported', 'NotAllowedError'));
@@ -62,7 +62,7 @@ const _blobToBase64 = blob => new Promise((resolve, reject) => {
         },
       });
       Object.defineProperty(navigator, 'canShare', {
-        configurable: true,
+        configurable: true, writable: true,
         value: (data = {}) => !data.files?.length || !!sheet.shareFile,
       });
     }
@@ -106,7 +106,7 @@ const _blobToBase64 = blob => new Promise((resolve, reject) => {
   const go = url => { location.href = url; };
   try {
     Object.defineProperty(navigator, 'share', {
-      configurable: true,
+      configurable: true, writable: true,
       value: ({ title = '', text = '', url = '', files } = {}) => new Promise((resolve, reject) => {
         const body = [text, url].filter(Boolean).join(' ').trim();
         if (!body) { reject(new DOMException(files?.length ? 'Files not supported' : 'Nothing to share', 'NotAllowedError')); return; }
@@ -10839,6 +10839,16 @@ function handleLaunchActions () {
   history.replaceState(null, '', window.location.pathname + window.location.hash);
   if (action === 'add') {
   openAddModal();
+  return;
+  }
+  // A friend's "make your Bear Cave page" link: pick a username, once signed in.
+  if (action === 'page') {
+  let tries = 0;
+  const open = () => {
+    if (window._ftbUid && typeof openHandleSettings === 'function') { openHandleSettings(); trackProductEvent('bear_cave_invite_opened'); }
+    else if (++tries < 120) setTimeout(open, 1000);
+  };
+  setTimeout(open, 800);
   return;
   }
   if (action === 'discover' || action === 'nearby') {

@@ -1,6 +1,7 @@
 // Shared helpers for the browser tests. The app must be served at BASE
 // (python -m http.server 8765 from the repo root).
 //   PW_CHANNEL=msedge  use an installed browser instead of Playwright's Chromium
+//   PW_NO_SHARE=1      hide the browser's share sheet (as on CI's Linux Chromium)
 //   TEST_BASE=...      point at another server (e.g. a preview deployment)
 const path = require('path');
 const { chromium } = require('playwright-core');
@@ -36,6 +37,11 @@ async function newPage (browser, { seed = null, settings = {}, viewport = { widt
     viewport, isMobile: viewport.width < 500, hasTouch: viewport.width < 500, serviceWorkers: 'block',
     geolocation: geo, permissions: ['geolocation'],
   });
+  // PW_NO_SHARE=1: no built-in share sheet, like CI's Chromium on Linux
+  // (Edge on Windows has one, which hid a CI-only failure).
+  if (process.env.PW_NO_SHARE) {
+    await ctx.addInitScript(() => { delete Navigator.prototype.share; delete Navigator.prototype.canShare; });
+  }
   if (grizzly) {
     await ctx.addInitScript(() => {
       localStorage.setItem('ftb_plan_v1', 'grizzly');

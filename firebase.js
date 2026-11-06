@@ -1169,6 +1169,26 @@ async function _playBillingToken () {
 }
 
 // app.html?ref=<uid> from a friend's invite: remember it until they upgrade.
+// A VIP discount link (app.html?promo=CODE, made in the owner portal): kept
+// for checkout, and the Grizzly screen opens with the discount mentioned.
+const PROMO_KEY = 'ftb_vip_promo_v1';
+function _vipPromo () {
+  try { return localStorage.getItem(PROMO_KEY) || ''; } catch { return ''; }
+}
+(function _capturePromo () {
+  const params = new URLSearchParams(location.search);
+  const code = String(params.get('promo') || '').trim().toUpperCase();
+  if (!/^[A-Z0-9_-]{3,30}$/.test(code)) return;
+  try { localStorage.setItem(PROMO_KEY, code); } catch { /* private mode */ }
+  params.delete('promo');
+  const rest = params.toString();
+  history.replaceState(history.state, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
+  setTimeout(() => {
+    if (typeof showToast === 'function') showToast('VIP discount ready', `Your code ${code} is applied when you upgrade to Grizzly.`, 'success');
+    if (window._ftbPlan !== 'grizzly' && typeof openUpgradeModal === 'function') openUpgradeModal({ key: 'vip', title: 'Your VIP discount is ready', body: `Code ${code} comes off at checkout. Unlimited spots, Byte Cub AI picks and more.` });
+  }, 2500);
+})();
+
 function _captureInviteRef () {
   const params = new URLSearchParams(window.location.search);
   const ref = params.get('ref');
@@ -1251,7 +1271,8 @@ async function _restoreGrizzly (user, { quiet = false } = {}) {
     if (typeof renderGrizzlyUi === 'function') renderGrizzlyUi();
     updateAuthUI(user);
     if (typeof closeUpgradeModal === 'function') closeUpgradeModal();
-    if (data.restored) showToast('Your Grizzly is back', `Found your subscription for ${user.email}. Everything is unlocked.`, 'success');
+    if (data.vip) showToast("You're a VIP 🐻", 'Grizzly is on the house. Everything is unlocked.', 'success');
+    else if (data.restored) showToast('Your Grizzly is back', `Found your subscription for ${user.email}. Everything is unlocked.`, 'success');
     return true;
   } catch { return false; }
 }
@@ -1378,7 +1399,7 @@ async function _handleUpgradeClick () {
     const resp = await fetch('/api/create-checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid: user.uid, email: user.email, priceId, ref: _inviteRef(), ...(playToken ? { playToken } : {}) }),
+      body: JSON.stringify({ uid: user.uid, email: user.email, priceId, ref: _inviteRef(), ...(playToken ? { playToken } : {}), ...(_vipPromo() ? { promo: _vipPromo() } : {}) }),
     });
     const { url, error } = await resp.json();
     if (error) throw new Error(error);

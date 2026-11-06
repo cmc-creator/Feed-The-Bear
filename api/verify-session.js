@@ -14,6 +14,7 @@
 const Stripe  = require('stripe');
 const admin   = require('firebase-admin');
 const { expireReward } = require('./_referral');
+const { applyPendingVip } = require('./owner');
 
 const LIVE = ['active', 'trialing', 'past_due'];
 
@@ -63,6 +64,8 @@ async function restoreByEmail ({ db, stripe, uid, decoded }) {
   const profileRef = db.doc(`users/${uid}/meta/profile`);
   const current = (await profileRef.get()).data() || {};
   if (current.plan === 'grizzly') return { plan: 'grizzly', restored: false };
+  // Made a VIP by the owner before this account existed (owner.js).
+  if (email && await applyPendingVip(db, uid, email).catch(() => false)) return { plan: 'grizzly', restored: true, vip: true };
   if (!stripe || !email || !decoded.email_verified) return { plan: current.plan || 'free', restored: false };
   const customers = await stripe.customers.list({ email, limit: 10 });
   for (const c of customers.data) {

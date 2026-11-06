@@ -18,6 +18,7 @@
 const admin = require('firebase-admin');
 const { nationalList } = require('./food-events');
 const { refreshGuides } = require('./guide');
+const { expireVips } = require('./owner');
 
 const DAY = 86400000;
 
@@ -114,6 +115,8 @@ module.exports = async function handler (req, res) {
       console.error('[FTB] nudge send failed:', err.message);
     }
   }
+  // VIP Grizzly (owner.js) that has run out.
+  if (!dry) { try { out.vipsEnded = await expireVips(db); } catch (err) { console.error('[FTB] nudges vips failed:', err.message); } }
   // City guides (api/guide.js): the oldest few, searched again.
   if (!dry) { try { out.guides = await refreshGuides(db, 4); } catch (err) { console.error('[FTB] nudges guides failed:', err.message); } }
   return res.status(200).json(out);
