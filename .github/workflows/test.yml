@@ -178,6 +178,9 @@ jobs:
       - name: Featured restaurants on city guides
         working-directory: tests
         run: node featured.test.js
+      - name: Creator payouts (20%)
+        working-directory: tests
+        run: node creators.test.js
       - name: Several photos and videos at once
         working-directory: tests
         run: node multiphoto.test.js

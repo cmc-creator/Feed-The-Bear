@@ -9481,3 +9481,6 @@ a.account-action-row { text-decoration: none; color: inherit; }
 @media (prefers-reduced-motion: reduce) { .match-card > span, .fight-critter, .fight-splat, .bar-stack.oops { transition: none; animation: none; } }
 
 .bear-avatar-pic { object-fit: cover; aspect-ratio: 1; background: var(--surface3); }
+
+.my-page-earn { display: block; margin-top: 4px; font-size: .82rem; color: var(--text-muted); }
+.my-page-earn b { color: var(--primary); }

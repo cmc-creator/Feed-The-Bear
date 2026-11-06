@@ -1533,7 +1533,7 @@ async function myShareLink () {
       if (ok) {
         _myHandleFor = window._ftbUid;
         _myHandle = data.handle || '';
-        _myPage = { public: !!data.public, views: Number(data.views) || 0, joins: Number(data.joins) || 0 };
+        _myPage = { public: !!data.public, views: Number(data.views) || 0, joins: Number(data.joins) || 0, earnedCents: Number(data.earnedCents) || 0, owedCents: Number(data.owedCents) || 0 };
       }
     } catch { /* offline: the site */ }
   }
@@ -1557,7 +1557,7 @@ async function renderMyHandle () {
       const { ok, status, data } = await handleApi('GET', { query: '?mine=1' });
       if (!ok) throw new Error(data.error || `error ${status}`);
       _myHandle = data.handle || '';
-      _myPage = { public: !!data.public, views: Number(data.views) || 0, joins: Number(data.joins) || 0 };
+      _myPage = { public: !!data.public, views: Number(data.views) || 0, joins: Number(data.joins) || 0, earnedCents: Number(data.earnedCents) || 0, owedCents: Number(data.owedCents) || 0 };
     } catch (err) { failed = err.message || 'no connection'; }
   }
   boxes.forEach(box => {
@@ -1591,6 +1591,9 @@ function myPageHtml () {
       <strong>Your public page is on</strong>
       <a class="my-page-link" href="${escHtml(myPageUrl())}" target="_blank" rel="noopener">feed-the-bear.com/@${escHtml(_myHandle)}</a>
       <span class="my-page-stats">${n(_myPage.views, 'visit', 'visits')} · ${n(_myPage.joins, 'person joined', 'people joined')}</span>
+      <span class="my-page-earn">${_myPage.earnedCents
+        ? `💰 You've earned <b>$${(_myPage.earnedCents / 100).toFixed(2)}</b>${_myPage.owedCents ? ` ($${(_myPage.owedCents / 100).toFixed(2)} on its way)` : ''}`
+        : '💰 Earn 20% of what anyone who joins from your link pays for Grizzly, for as long as they stay.'}</span>
       <div class="my-page-actions">
         <button type="button" class="btn-sm btn-orange my-page-copy">Copy link</button>
         <button type="button" class="btn-sm btn-ghost my-page-share">Share</button>

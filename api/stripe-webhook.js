@@ -115,6 +115,20 @@ async function inviteFor (stripe, subId) {
   return uid && ref ? { uid, ref } : null;
 }
 
+// 20% of a referred member's payment (before tax) to whoever referred them,
+// once per invoice. The owner pays it out and marks it paid (owner.js).
+const CREATOR_SHARE = 0.2;
+async function creditCreator (db, invoice, invite) {
+  if (!invite?.ref || invite.ref === invite.uid) return;
+  const tax = Array.isArray(invoice.total_taxes) ? invoice.total_taxes.reduce((n, t) => n + (Number(t.amount) || 0), 0) : Number(invoice.tax) || 0;
+  const cents = Math.round(Math.max(0, invoice.amount_paid - tax) * CREATOR_SHARE);
+  if (!cents) return;
+  try { await db.doc(`creatorCredits/${invoice.id}`).create({ creator: invite.ref, friend: invite.uid, cents, at: new Date().toISOString() }); }
+  catch { return; } // already credited (Stripe sent it twice)
+  const inc = admin.firestore.FieldValue.increment;
+  await db.doc(`creatorEarnings/${invite.ref}`).set({ owedCents: inc(cents), earnedCents: inc(cents), payments: inc(1), lastAt: new Date().toISOString() }, { merge: true });
+}
+
 async function giftPaid (db, session) {
   const m = session.metadata || {};
   const ref = db.doc(`gifts/${session.id}`);
@@ -234,6 +248,8 @@ module.exports = async function handler (req, res) {
     // checkout let free trials, cancelled right away, farm free months.
     if (event.type === 'invoice.paid' && obj.amount_paid > 0) {
       const invite = await inviteFor(stripe, obj.subscription || obj.parent?.subscription_details?.subscription);
+      // Creators earn 20% of every payment from people who joined from their link.
+      if (invite) await creditCreator(db, obj, invite).catch(err => console.error('[FTB] creator credit:', err.message));
       if (invite) await rewardInviter({ db, stripe, inviterUid: invite.ref, friendUid: invite.uid });
     }
 

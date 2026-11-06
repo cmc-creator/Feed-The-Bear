@@ -175,7 +175,16 @@ module.exports = async function handler (req, res) {
       const codes = await listCodes(stripe).catch(err => ({ codes: [], error: err.message }));
       const fsnap = await db.collection('featured').orderBy('at', 'desc').limit(100).get();
       const featured = fsnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      return res.status(200).json({ vips, codes: codes.codes, codesError: codes.error || null, me, partners: await partnerCodes(db), featured });
+      const esnap = await db.collection('creatorEarnings').limit(200).get();
+      const creators = await Promise.all(esnap.docs.map(async d => {
+        const e = d.data();
+        let email = '';
+        try { email = (await fb.auth().getUser(d.id)).email || ''; } catch { /* deleted */ }
+        const handle = (await db.doc(`handleOf/${d.id}`).get()).data()?.handle || '';
+        return { uid: d.id, email, handle, owedCents: e.owedCents || 0, earnedCents: e.earnedCents || 0, paidCents: e.paidCents || 0, payments: e.payments || 0, lastAt: e.lastAt || '' };
+      }));
+      creators.sort((a, b) => b.owedCents - a.owedCents);
+      return res.status(200).json({ vips, codes: codes.codes, codesError: codes.error || null, me, partners: await partnerCodes(db), featured, creators });
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -216,6 +225,19 @@ module.exports = async function handler (req, res) {
         metadata: { by: me },
       });
       return res.status(200).json({ ok: true, code: promo.code, link: `${APP}/app.html?promo=${encodeURIComponent(promo.code)}`, message: `${promo.code} is ready.` });
+    }
+
+    // Paid a creator what they're owed (outside the app): their balance goes to zero.
+    if (body.action === 'creatorPaid') {
+      const uid = String(body.uid || '');
+      if (!/^[A-Za-z0-9]{10,64}$/.test(uid)) return res.status(400).json({ error: 'Bad request.' });
+      const ref = db.doc(`creatorEarnings/${uid}`);
+      const e = (await ref.get()).data();
+      if (!e?.owedCents) return res.status(400).json({ error: 'Nothing owed.' });
+      const paid = e.owedCents;
+      await ref.set({ owedCents: 0, paidCents: (e.paidCents || 0) + paid, lastPaidAt: new Date().toISOString() }, { merge: true });
+      await db.doc(`creatorPayouts/${uid}_${Date.now()}`).set({ uid, cents: paid, at: new Date().toISOString(), by: me });
+      return res.status(200).json({ ok: true, message: `Marked $${(paid / 100).toFixed(2)} as paid.` });
     }
 
     // Featured restaurants (advertise.js): show ('live') or hide one.

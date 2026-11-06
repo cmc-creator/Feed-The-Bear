@@ -85,7 +85,9 @@ module.exports = async function handler (req, res) {
       if (req.query?.mine) {
         const handle = (await db.doc(`handleOf/${uid}`).get()).data()?.handle || '';
         const h = handle ? (await db.doc(`handles/${handle}`).get()).data() || {} : {};
-        return res.status(200).json({ handle, public: !!h.public, views: Number(h.views) || 0, joins: Number(h.joins) || 0 });
+        const earn = (await db.doc(`creatorEarnings/${uid}`).get()).data() || {};
+        return res.status(200).json({ handle, public: !!h.public, views: Number(h.views) || 0, joins: Number(h.joins) || 0,
+          earnedCents: Number(earn.earnedCents) || 0, owedCents: Number(earn.owedCents) || 0 });
       }
       // The public Bear Cave pages of people you follow (?pagesOf=id1,id2):
       // { pages: { id: handle } }, public pages only (they're open to anyone anyway).
