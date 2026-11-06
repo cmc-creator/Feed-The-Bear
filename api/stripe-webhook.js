@@ -163,6 +163,27 @@ module.exports = async function handler (req, res) {
     const db = getAdmin().firestore();
     const obj = event.data.object;
 
+    // A restaurant paid to be featured on a city guide (advertise.js): waits for the owner's OK.
+    if (event.type === 'checkout.session.completed' && obj.metadata?.kind === 'featured') {
+      const m = obj.metadata;
+      const ref = db.doc(`featured/${obj.id}`);
+      if (!(await ref.get()).exists) {
+        await ref.set({ name: m.name, address: m.address || '', website: m.website || '', email: m.email, blurb: m.blurb || '', city: m.city, food: m.food,
+          key: `${m.city}_${m.food}`, status: 'pending', subscription: obj.subscription || '', customer: obj.customer || '', at: new Date().toISOString() });
+        await bump(db, 'featured_signup').catch(() => {});
+        // Tell the owner there's one to approve.
+        await sendEmail({ to: process.env.OWNER_EMAIL || 'cmc@conniemichelleconsulting.com', tag: 'featured-new', subject: `New featured restaurant: ${m.name}`,
+          html: emailHtml([`<p><strong>${esc(m.name)}</strong> paid to be featured on ${esc(m.food)} in ${esc(m.city)}.</p>`, '<p>Approve it in the owner portal: https://www.feed-the-bear.com/owner.html</p>']) }).catch(() => {});
+      }
+      return res.status(200).json({ received: true });
+    }
+    // Their subscription ended: off the guide.
+    if (event.type === 'customer.subscription.deleted' && obj.metadata?.kind === 'featured') {
+      const snap = await db.collection('featured').where('subscription', '==', obj.id).limit(5).get();
+      await Promise.all(snap.docs.map(d => d.ref.set({ status: 'ended', endedAt: new Date().toISOString() }, { merge: true })));
+      return res.status(200).json({ received: true });
+    }
+
     // A Grizzly gift (gift.js): the friend gets Grizzly for those months, and an email.
     if (event.type === 'checkout.session.completed' && obj.metadata?.kind === 'gift') {
       if (obj.payment_status === 'paid') await giftPaid(db, obj);

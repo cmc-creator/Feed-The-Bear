@@ -94,6 +94,13 @@
     </section>
 
     <section class="panel">
+      <h2>Featured restaurants</h2>
+      <p class="lead">Restaurants pay $29/month on <a href="/advertise.html">feed-the-bear.com/advertise.html</a> to be first on a city guide. Approve each one before it shows. You get an email when a new one signs up.</p>
+      <div class="rows" id="featured-list"><p class="empty">Loading…</p></div>
+      <p class="msg" id="featured-msg" role="status"></p>
+    </section>
+
+    <section class="panel">
       <h2>Affiliate codes (Book a table, Order delivery)</h2>
       <p class="lead">Join each company's affiliate program (search "DoorDash affiliate program" and so on). Paste what they give you: a tracking link with <b>{url}</b> where the restaurant's page goes, or a code like <b>ref=feedthebear</b>. Leave a box empty and that button links normally. You earn on every booking or order made through the app, free users included.</p>
       <form id="partner-form">
@@ -144,6 +151,18 @@ function renderVips (vips) {
     ${!v.live ? '<span class="pill off">Ended</span>' : v.pending ? '<span class="pill wait">Waiting for sign-in</span>' : '<span class="pill">Grizzly on</span>'}
     ${v.live ? `<button type="button" class="btn ghost" data-revoke="${esc(v.email)}">End</button>` : ''}</div>`).join('');
 }
+function renderFeatured (list) {
+  const el = $('featured-list');
+  if (!list.length) { el.innerHTML = '<p class="empty">No restaurants yet. Share the advertise page with local spots.</p>'; return; }
+  const pill = s => s === 'live' ? '<span class="pill">Live</span>' : s === 'pending' ? '<span class="pill wait">Needs your OK</span>' : `<span class="pill off">${esc(s)}</span>`;
+  el.innerHTML = list.map(f => `<div class="row"><div class="who"><b>${esc(f.name)}</b>
+    <small>${esc(f.food)} in ${esc(f.city)} · ${esc(f.email)}${f.website ? ` · ${esc(f.website)}` : ''}</small>
+    ${f.blurb ? `<small>"${esc(f.blurb)}"</small>` : ''}</div>
+    ${pill(f.status)}
+    ${f.status !== 'live' && f.status !== 'ended' ? `<button type="button" class="btn ghost" data-feat="${esc(f.id)}" data-to="live">Approve</button>` : ''}
+    ${f.status === 'live' ? `<button type="button" class="btn ghost" data-feat="${esc(f.id)}" data-to="hidden">Hide</button>` : ''}
+    <a class="btn ghost" href="/eat/${esc(f.city)}/${esc(f.food)}" target="_blank" rel="noopener">View guide</a></div>`).join('');
+}
 function renderCodes (codes, error) {
   const el = $('code-list');
   if (error) { el.innerHTML = `<p class="empty">Codes didn't load: ${esc(error)}</p>`; return; }
@@ -162,6 +181,7 @@ async function load () {
     $('gate').hidden = true; $('portal').hidden = false;
     $('who').textContent = `Signed in as ${data.me}`;
     renderVips(data.vips || []);
+    renderFeatured(data.featured || []);
     Object.entries(data.partners || {}).forEach(([k, v]) => { const el = $(`p-${k}`); if (el && document.activeElement !== el) el.value = v; });
     renderCodes(data.codes || [], data.codesError);
   } catch (err) { showGate(err.message); $('sign-in').hidden = false; }
@@ -195,6 +215,11 @@ document.addEventListener('click', async e => {
   const revoke = e.target.closest('[data-revoke]');
   const off = e.target.closest('[data-off]');
   const copy = e.target.closest('[data-copy]');
+  const feat = e.target.closest('[data-feat]');
+  if (feat) {
+    try { say('featured-msg', (await api('POST', { action: 'featured', id: feat.dataset.feat, status: feat.dataset.to })).message); load(); } catch (err) { say('featured-msg', err.message, false); }
+    return;
+  }
   if (revoke) {
     if (revoke.dataset.sure !== '1') { revoke.dataset.sure = '1'; revoke.textContent = 'Tap again to end'; return; }
     try { say('vip-msg', (await api('POST', { action: 'revoke', email: revoke.dataset.revoke })).message); load(); } catch (err) { say('vip-msg', err.message, false); }

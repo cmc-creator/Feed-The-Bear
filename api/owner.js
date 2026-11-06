@@ -173,7 +173,9 @@ module.exports = async function handler (req, res) {
         return { email: d.id, note: v.note || '', until: v.until || null, at: v.at || '', live: isLive(v), pending: !v.uid, endedAt: v.endedAt || null };
       });
       const codes = await listCodes(stripe).catch(err => ({ codes: [], error: err.message }));
-      return res.status(200).json({ vips, codes: codes.codes, codesError: codes.error || null, me, partners: await partnerCodes(db) });
+      const fsnap = await db.collection('featured').orderBy('at', 'desc').limit(100).get();
+      const featured = fsnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      return res.status(200).json({ vips, codes: codes.codes, codesError: codes.error || null, me, partners: await partnerCodes(db), featured });
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -214,6 +216,16 @@ module.exports = async function handler (req, res) {
         metadata: { by: me },
       });
       return res.status(200).json({ ok: true, code: promo.code, link: `${APP}/app.html?promo=${encodeURIComponent(promo.code)}`, message: `${promo.code} is ready.` });
+    }
+
+    // Featured restaurants (advertise.js): show ('live') or hide one.
+    if (body.action === 'featured') {
+      const id = String(body.id || '');
+      if (!/^[A-Za-z0-9_]{6,80}$/.test(id) || !['live', 'hidden'].includes(body.status)) return res.status(400).json({ error: 'Bad request.' });
+      const ref = db.doc(`featured/${id}`);
+      if (!(await ref.get()).exists) return res.status(404).json({ error: 'Not found.' });
+      await ref.set({ status: body.status, reviewedAt: new Date().toISOString() }, { merge: true });
+      return res.status(200).json({ ok: true, message: body.status === 'live' ? 'Live on its city guide now.' : 'Hidden from the guide.' });
     }
 
     if (body.action === 'partners') {

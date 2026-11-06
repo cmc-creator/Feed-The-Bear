@@ -151,6 +151,14 @@ async function refreshGuides (db, n = 6) {
   return done;
 }
 
+// Restaurants that pay to be featured here (advertise.js), approved by the owner.
+async function featuredFor (db, city, food) {
+  try {
+    const snap = await db.collection('featured').where('key', '==', `${city.slug}_${food.slug}`).limit(10).get();
+    return snap.docs.map(d => d.data()).filter(f => f.status === 'live').slice(0, 3);
+  } catch { return []; }
+}
+
 // Members' public picks (rated 4+) in this city for this food, best first.
 async function memberPicks (db, city, food) {
   const snap = await db.collection('profiles').limit(500).get().catch(() => null);
@@ -218,6 +226,8 @@ function page (res, status, { title, description, canonical, body, jsonld = null
     .meta a { color: var(--dim); }
     .stars { color: var(--gold); }
     .get b { color: var(--gold); }
+    .place.featured { border: 2px solid var(--gold); }
+    .badge { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: var(--gold); color: #1b130b; font-size: .68rem; font-weight: 800; vertical-align: middle; }
     .save { flex-shrink: 0; padding: 8px 12px; border-radius: 999px; background: rgba(255,138,61,.14); border: 1px solid rgba(255,138,61,.5); color: var(--accent); font-weight: 800; font-size: .85rem; text-decoration: none; }
     .chips { display: flex; flex-wrap: wrap; gap: 8px; }
     .chips a { padding: 8px 12px; border-radius: 999px; background: var(--card); color: var(--text); text-decoration: none; font-weight: 700; font-size: .9rem; }
@@ -265,14 +275,19 @@ function cityPage (res, city) {
   });
 }
 
-function guidePage (res, city, food, places, members) {
+function guidePage (res, city, food, places, members, featured = []) {
   const canonical = `${SITE}/eat/${city.slug}/${food.slug}`;
-  const title = `${food.label} in ${city.name}, ${city.st}: ${places.length + members.length} spots to try | Feed The Bear`;
+  const title = `${food.label} in ${city.name}, ${city.st}: ${places.length + members.length + featured.length} spots to try | Feed The Bear`;
   const memberHtml = members.length ? `<h2>Feed The Bear members' favorites</h2><ul class="list">${members.map(m => `
     <li class="place"><div class="body"><div class="name">${esc(m.name)}</div>
       <div class="meta"><span class="stars">${'★'.repeat(Math.round(m.avg))}</span> from ${m.stars.length} member${m.stars.length === 1 ? '' : 's'}${m.address ? ` · ${esc(m.address)}` : ''}</div>
       ${m.get.length ? `<div class="get">Get the <b>${m.get.map(esc).join(', ')}</b></div>` : ''}</div>
       <a class="save" href="${esc(saveLink(m.name, m.address))}">Save</a></li>`).join('')}</ul>` : '';
+  const featuredHtml = featured.length ? `<ul class="list" style="margin-top:14px">${featured.map(f => `
+    <li class="place featured"><div class="body"><div class="name">${esc(f.name)} <span class="badge">Featured</span></div>
+      ${f.blurb ? `<div class="get">${esc(f.blurb)}</div>` : ''}
+      <div class="meta">${f.address ? `${esc(f.address)} · ` : ''}${f.website ? `<a href="${esc(f.website)}" rel="sponsored noopener" target="_blank">Website</a>` : ''}</div></div>
+      <a class="save" href="${esc(saveLink(f.name, f.address))}">Save</a></li>`).join('')}</ul>` : '';
   const placeHtml = places.length ? `<h2>${members.length ? 'More' : 'Local'} ${esc(food.label.toLowerCase())} spots</h2><ul class="list">${places.map(p => `
     <li class="place"><div class="body"><div class="name">${esc(p.name)}</div>
       <div class="meta">${p.address ? `${esc(p.address)} · ` : ''}<a href="${esc(mapsLink(p, city))}" rel="nofollow noopener" target="_blank">Map</a>${p.chain ? ' · chain' : ''}</div></div>
@@ -280,7 +295,7 @@ function guidePage (res, city, food, places, members) {
     : '<p class="lead">We are still gathering spots here. Check back soon.</p>';
   const others = FOODS.filter(f => f.slug !== food.slug).map(f => `<a href="/eat/${city.slug}/${f.slug}">${f.emoji} ${esc(f.label)}</a>`).join('');
   const nearby = CITIES.filter(c => c.st === city.st && c.slug !== city.slug).map(c => `<a href="/eat/${c.slug}/${food.slug}">${esc(food.label)} in ${esc(c.name)}</a>`).join('');
-  const all = [...members.map(m => ({ name: m.name, address: m.address })), ...places];
+  const all = [...featured.map(f => ({ name: f.name, address: f.address })), ...members.map(m => ({ name: m.name, address: m.address })), ...places];
   return page(res, 200, {
     title,
     noindex: !all.length,
@@ -290,9 +305,10 @@ function guidePage (res, city, food, places, members) {
       itemListElement: all.slice(0, 30).map((p, i) => ({ '@type': 'ListItem', position: i + 1, item: { '@type': 'Restaurant', name: p.name, ...(p.address ? { address: p.address } : {}) } })) },
     body: `<h1>${food.emoji} ${esc(food.label)} in ${esc(city.name)}, ${esc(city.st)}</h1>
       <p class="lead">Local spots first. Tap Save to put one on your Want to Try list in Feed The Bear, then rate it and note what to order once you've been.</p>
-      ${memberHtml}${placeHtml}
+      ${featuredHtml}${memberHtml}${placeHtml}
       <h2>More in ${esc(city.name)}</h2><div class="chips">${others}</div>
       ${nearby ? `<h2>Nearby</h2><div class="chips">${nearby}</div>` : ''}
+      <p class="note">Own a restaurant here? <a href="/advertise.html">Get it featured on this guide</a>.</p>
       <p class="note">Places from <a href="https://www.openstreetmap.org/copyright" rel="nofollow noopener">© OpenStreetMap contributors</a>; favorites from Feed The Bear members' public pages. <a href="/eat">Other cities</a></p>`,
   });
 }
@@ -309,13 +325,14 @@ module.exports = async function handler (req, res) {
   if (!food) return notFound(res);
   const ip = String(req.headers?.['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
   if (await overLimit(`guide:${ip}`, 120, 600)) { res.setHeader('Retry-After', '600'); return res.status(429).send('Slow down a little and try again soon.'); }
-  let places = [], members = [];
+  let places = [], members = [], featured = [];
   try {
     const db = getAdmin().firestore();
-    [places, members] = await Promise.all([placesFor(db, city, food), memberPicks(db, city, food)]);
+    [places, members, featured] = await Promise.all([placesFor(db, city, food), memberPicks(db, city, food), featuredFor(db, city, food)]);
   } catch (err) { console.error('[FTB] guide failed:', err.message); }
   const memberNames = new Set(members.map(m => norm(m.name)));
-  return guidePage(res, city, food, places.filter(p => !memberNames.has(norm(p.name))), members);
+  featured.forEach(f => memberNames.add(norm(f.name)));
+  return guidePage(res, city, food, places.filter(p => !memberNames.has(norm(p.name))), members.filter(m => !featured.some(f => norm(f.name) === norm(m.name))), featured);
 };
 
 module.exports.CITIES = CITIES;
