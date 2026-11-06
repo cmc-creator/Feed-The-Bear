@@ -150,7 +150,8 @@ const PRICE = 'price_1UW2DmLzFIsRCvKRfFexC3P8';
   check(/com\.android\.billingclient:billing:\d/.test(gradle), 'Play Billing Library in the build');
   check(/registerPlugin\(PlayBillingPlugin\.class\)/.test(main) && /registerPlugin\(SpeechPlugin\.class\)/.test(main) && /registerPlugin\(ShareSheetPlugin\.class\)/.test(main), 'billing, speech and share plugins registered');
   check(/RECORD_AUDIO/.test(manifest) && /android\.speech\.RecognitionService/.test(manifest), 'microphone permission and speech service query');
-  check(!/ACCESS_BACKGROUND_LOCATION"/.test(manifest.replace(/<!--[\s\S]*?-->/g, '')), 'still no background location');
+  // 2.3.0: background location for closed-app nearby alerts, explained in the app first (bg-location-overlay).
+  check(/ACCESS_BACKGROUND_LOCATION"/.test(manifest.replace(/<!--[\s\S]*?-->/g, '')) && /id="bg-location-overlay"/.test(fs.readFileSync(path.join(__dirname, '..', 'app.html'), 'utf8')), 'background location for nearby alerts, with the explanation screen');
 
   finish('playbilling');
 })();

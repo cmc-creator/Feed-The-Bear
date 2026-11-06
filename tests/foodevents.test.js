@@ -5,8 +5,17 @@
 const fs = require('fs');
 const path = require('path');
 const { BASE, check, launch, newPage, finish } = require('./lib');
+// CI installs only the tests' packages, so the server's are stood in for.
+const Module = require('module');
+const load = Module._load;
+Module._load = function (req, ...a) {
+  if (req === 'firebase-admin') return { apps: [1], firestore: () => ({}) };
+  if (req === 'stripe') return () => ({});
+  return load.call(this, req, ...a);
+};
 const { cleanEvents, parseArray } = require('../api/food-events');
 const { pick } = require('../api/nudges');
+Module._load = load;
 
 const day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
 
