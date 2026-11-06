@@ -1223,3 +1223,89 @@ document.addEventListener('click', e => {
 /* ════════════════════════════════════════════════════════════
    PHASE 11 • TASTE DNA + WEEKLY GOAL + ENHANCEMENTS
    ════════════════════════════════════════════════════════════ */
+
+/* ── Food challenges nationwide (Play) ───────────────────────
+   Upcoming eating contests and food challenges across the US
+   (api/food-events.js searches the web once a day). Your state comes first.
+   Tap one for its page; Share asks a friend to go. Kept on the phone for a
+   few hours so opening Play is instant. */
+const FOOD_EVENTS_KEY = 'ftb_food_events_v1';
+const FOOD_EVENTS_TTL = 6 * 60 * 60 * 1000;
+const US_STATE_CODES = { alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA', colorado: 'CO', connecticut: 'CT', delaware: 'DE', 'district of columbia': 'DC', florida: 'FL', georgia: 'GA', hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA', kansas: 'KS', kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD', massachusetts: 'MA', michigan: 'MI', minnesota: 'MN', mississippi: 'MS', missouri: 'MO', montana: 'MT', nebraska: 'NE', nevada: 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', ohio: 'OH', oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA', 'rhode island': 'RI', 'south carolina': 'SC', 'south dakota': 'SD', tennessee: 'TN', texas: 'TX', utah: 'UT', vermont: 'VT', virginia: 'VA', washington: 'WA', 'west virginia': 'WV', wisconsin: 'WI', wyoming: 'WY' };
+const FOOD_EVENT_ICON = { contest: '🏆', challenge: '🔥', festival: '🎪' };
+let _foodEvents = null;
+
+async function loadFoodEvents () {
+  try {
+    const saved = JSON.parse(localStorage.getItem(FOOD_EVENTS_KEY) || 'null');
+    if (saved && Date.now() - saved.at < FOOD_EVENTS_TTL && Array.isArray(saved.events) && saved.events.length) return saved.events;
+  } catch { /* bad value */ }
+  try {
+    const resp = await fetch('/api/food-events');
+    const events = resp.ok ? (await resp.json())?.events : null;
+    if (Array.isArray(events)) {
+      try { localStorage.setItem(FOOD_EVENTS_KEY, JSON.stringify({ at: Date.now(), events })); } catch { /* storage full */ }
+      return events;
+    }
+  } catch { /* offline */ }
+  return [];
+}
+
+async function myStateCode () {
+  const area = typeof userAreaName === 'function' ? await userAreaName() : '';
+  const last = String(area).split(',').pop().trim().toLowerCase();
+  return US_STATE_CODES[last] || '';
+}
+
+function foodEventDate (e) {
+  const fmt = d => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return e.endDate && e.endDate !== e.date ? `${fmt(e.date)} – ${fmt(e.endDate)}` : fmt(e.date);
+}
+
+function openFoodEventLink (url) {
+  const safe = safeUrl(url);
+  if (!safe) return;
+  // The Android app hands other sites to the phone's browser when the page goes there.
+  if (window.Capacitor?.isNativePlatform?.() && !window.Capacitor.isPluginAvailable?.('ShareSheet')) location.href = safe;
+  else window.open(safe, '_blank', 'noopener');
+}
+
+async function renderFoodEventsHub (body) {
+  if (!body) return;
+  const box = document.createElement('div');
+  box.className = 'hub-section food-events';
+  box.innerHTML = '<div class="hub-section-title">Eating contests &amp; food challenges</div><div class="fe-list"><div class="fe-empty">Finding contests near and far…</div></div>';
+  body.appendChild(box);
+  const [events, mine] = await Promise.all([_foodEvents || loadFoodEvents(), myStateCode().catch(() => '')]);
+  _foodEvents = events.length ? events : null;
+  const list = box.querySelector('.fe-list');
+  if (!list) return;
+  if (!events.length) { list.innerHTML = '<div class="fe-empty">No contests to show right now. Check back soon.</div>'; return; }
+  const sorted = mine ? [...events.filter(e => e.state === mine), ...events.filter(e => e.state !== mine)] : events;
+  list.innerHTML = sorted.slice(0, 20).map((e, i) => `
+    <div class="fe-card" data-i="${i}">
+      <button type="button" class="fe-main"${e.url ? '' : ' disabled'}>
+        <span class="fe-icon" aria-hidden="true">${FOOD_EVENT_ICON[e.kind] || '🏆'}</span>
+        <span class="fe-text">
+          <span class="fe-name">${escHtml(e.name)}</span>
+          <span class="fe-meta">${escHtml(foodEventDate(e))} · ${escHtml([e.city, e.state].filter(Boolean).join(', '))}${e.state === mine ? ' <span class="fe-near">Your state</span>' : ''}</span>
+          ${e.blurb ? `<span class="fe-blurb">${escHtml(e.blurb)}</span>` : ''}
+          ${e.prize ? `<span class="fe-prize">Prize: ${escHtml(e.prize)}</span>` : ''}
+        </span>
+      </button>
+      <button type="button" class="fe-share" aria-label="Ask a friend to go">Share</button>
+    </div>`).join('');
+  list.addEventListener('click', ev => {
+    const card = ev.target.closest('.fe-card');
+    if (!card) return;
+    const e = sorted[Number(card.dataset.i)];
+    if (ev.target.closest('.fe-share')) {
+      trackProductEvent('food_event_shared', { kind: e.kind });
+      const text = `${e.name}, ${foodEventDate(e)} in ${[e.city, e.state].filter(Boolean).join(', ')}. Want to go? 🐻`;
+      navigator.share?.({ title: e.name, text, url: e.url || 'https://www.feed-the-bear.com' }).catch(() => {});
+      return;
+    }
+    if (ev.target.closest('.fe-main') && e.url) { trackProductEvent('food_event_opened', { kind: e.kind }); openFoodEventLink(e.url); }
+  });
+}
+window.renderFoodEventsHub = renderFoodEventsHub;

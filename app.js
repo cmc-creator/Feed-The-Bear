@@ -11177,6 +11177,7 @@ function renderMobileHub (filter = '') {
   }).join('');
   body.innerHTML = html || '<p class="hub-empty">No tools match “' + escHtml(filter) + '”.</p>';
   fillHubFoodPhotos(body);
+  if (!q) window.renderFoodEventsHub?.(body);
 }
 
 function openMobileHub () {

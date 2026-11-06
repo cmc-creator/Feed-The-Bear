@@ -9380,3 +9380,18 @@ button.map-group-row { cursor: pointer; }
   justify-content: center;
   text-align: center;
 }
+
+/* Play: eating contests & food challenges nationwide (play.js) */
+.fe-list { display: grid; gap: 8px; }
+.fe-empty { font-size: .8rem; color: var(--text-muted); padding: 6px 2px; }
+.fe-card { display: flex; align-items: stretch; gap: 6px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.fe-main { flex: 1; min-width: 0; display: flex; gap: 10px; align-items: flex-start; text-align: left; padding: 10px; background: none; border: 0; color: var(--text); font: inherit; cursor: pointer; }
+.fe-main:disabled { cursor: default; }
+.fe-icon { font-size: 1.4rem; line-height: 1; padding-top: 2px; }
+.fe-text { display: grid; gap: 2px; min-width: 0; }
+.fe-name { font-size: .86rem; font-weight: 800; }
+.fe-meta { font-size: .72rem; color: var(--text-muted); }
+.fe-near { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; font-size: .64rem; font-weight: 800; color: var(--primary); border: 1px solid rgba(var(--primary-rgb), .5); }
+.fe-blurb { font-size: .74rem; line-height: 1.35; }
+.fe-prize { font-size: .7rem; font-weight: 700; color: var(--primary); }
+.fe-share { flex: 0 0 auto; padding: 0 12px; background: none; border: 0; border-left: 1px solid var(--border); color: var(--primary); font: inherit; font-size: .74rem; font-weight: 800; cursor: pointer; }

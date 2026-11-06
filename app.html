@@ -2883,26 +2883,12 @@
         .then(reg => {
           // Force the browser to check for a new SW on every launch (bypasses
           // the default 24-hour check interval - critical for installed PWAs).
+          // No reload when it activates: app files are network-first, so this
+          // page is already fresh. Reloading here threw away whatever had just
+          // opened (a shared spot's Add form, an invite) and landed on Home.
           reg.update();
-
-          // When a new SW finishes installing, reload once it activates so the
-          // fresh assets are served immediately instead of on the next cold open.
-          reg.addEventListener('updatefound', () => {
-            const sw = reg.installing;
-            sw.addEventListener('statechange', () => {
-              if (sw.state === 'activated' && navigator.serviceWorker.controller) {
-                window.location.reload();
-              }
-            });
-          });
         })
         .catch(() => {});
-
-      // Guard against a double-reload if controllerchange fires more than once.
-      let _swRefreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!_swRefreshing) { _swRefreshing = true; window.location.reload(); }
-      });
     }
   </script>
 </body>

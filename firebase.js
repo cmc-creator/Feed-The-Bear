@@ -465,8 +465,25 @@ async function fbPublishFriendProfile () {
     _lastPublishedProfile = json;
     FriendPings.notify(doc.id);
   } catch (err) {
+    // The phone's share id belongs to another account (signed in with a
+    // different one on this phone). Friends could never see this account or
+    // its follows, so it gets its own id.
+    // Checked in the background so a follow never waits on it.
+    if (err.code === 'permission-denied' && !_profileIdReplaced) _replaceForeignProfileId(doc.id, uid);
     console.warn('[FTB] profile publish failed:', err.code || err);
   }
+}
+let _profileIdReplaced = false;
+async function _replaceForeignProfileId (id, uid) {
+  _profileIdReplaced = true;
+  const owner = await _db.doc(`profiles/${id}`).get().then(s => s.data()?.uid).catch(() => null);
+  if (!owner || owner === uid || window._ftbUid !== uid) return;
+  state.settings.profileShareId = '';
+  if (typeof getProfileShareId === 'function') getProfileShareId();
+  try { localStorage.removeItem('ftb_follow_noted_v1'); } catch { /* storage blocked */ }
+  _lastPublishedProfile = '';
+  await fbPublishFriendProfile();
+  window.noteExistingFollows?.();
 }
 
 async function fbUnpublishFriendProfile (id) {

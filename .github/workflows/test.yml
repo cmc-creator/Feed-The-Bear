@@ -148,6 +148,9 @@ jobs:
       - name: Best bet, Explorer, smarter Decision Mode
         working-directory: tests
         run: node foodie.test.js
+      - name: Eating contests in Play; updates never reload the page
+        working-directory: tests
+        run: node foodevents.test.js
       - name: Several photos and videos at once
         working-directory: tests
         run: node multiphoto.test.js
