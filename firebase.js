@@ -808,6 +808,12 @@ function initFirebaseAuth () {
         setTimeout(() => openAuthModal({ forUpgrade: true }), 400);
       } else if (_signInRequired()) {
         openAuthModal();
+      } else if (_tryingFirst() && _gateOn()) {
+        // A new phone (or a reinstall): sign in, or try it first.
+        let seen = false;
+        try { seen = !!sessionStorage.getItem('ftb_try_seen'); } catch { /* private mode */ }
+        if (!seen) openAuthModal({ tryFirst: true });
+        else if (typeof onboardingAfterSignIn === 'function') onboardingAfterSignIn(false);
       }
     }
   });
@@ -867,9 +873,35 @@ const AUTH_SUB_UPGRADE = 'Sign in or create your account, and you will go straig
 // The local test server (tests/) skips it unless a test sets ftb_test_auth_gate.
 function _signInRequired () {
   if (_auth?.currentUser) return false;
+  return _gateOn() && !_tryingFirst();
+}
+// Accounts are required on the site; the local test server skips it unless a test sets ftb_test_auth_gate.
+function _gateOn () {
   if (location.hostname !== '127.0.0.1') return true;
   try { return !!localStorage.getItem('ftb_test_auth_gate'); } catch { return false; }
 }
+
+// New visitors try it first: up to TRY_SPOTS saved spots before an account is
+// needed (the sheet then opens and stays). A phone that has signed in before,
+// or someone arriving from an invite, signs in from the start.
+const TRY_SPOTS = 3;
+function _tryingFirst () {
+  try {
+    if (_lastAccount()) return false;
+    if (localStorage.getItem('ftb_ref_v1') || (typeof window.pendingInviteName === 'function' && window.pendingInviteName())) return false;
+    const q = new URLSearchParams(location.search);
+    if (/profile=/.test(location.hash) || q.has('ref') || q.has('i') || q.has('accept') || /invite/.test(location.pathname)) return false;
+    return (JSON.parse(localStorage.getItem('ftb_restaurants_v2') || '[]') || []).length < TRY_SPOTS;
+  } catch { return false; }
+}
+// After each save (app.js saveData): the 3rd spot asks for the free account.
+window.ftbAfterSave = function () {
+  if (!window._ftbAuthReady || _auth?.currentUser) return;
+  const overlay = document.getElementById('auth-overlay');
+  if (!_signInRequired() || !overlay?.classList.contains('hidden')) return;
+  if (typeof trackProductEvent === 'function') trackProductEvent('try_limit_signup');
+  setTimeout(openAuthModal, 900);
+};
 
 function _requiredAuthSub () {
   let invited = false, hasSpots = false;
@@ -888,9 +920,10 @@ function _requiredAuthSub () {
   return 'Create your free account to start saving the places you want to eat.';
 }
 
-function openAuthModal ({ forUpgrade = false } = {}) {
+function openAuthModal ({ forUpgrade = false, tryFirst = false } = {}) {
   const overlay = document.getElementById('auth-overlay');
   if (!overlay) return;
+  overlay.classList.toggle('auth-try', tryFirst);
   const required = _signInRequired();
   overlay.dataset.purpose = forUpgrade ? 'upgrade' : '';
   overlay.classList.toggle('auth-required', required);
@@ -927,6 +960,8 @@ function closeAuthModal () {
   overlay?.classList.remove('auth-required');
   overlay?.classList.add('hidden');
   maybeHideOverlay();
+  // Closed without signing in (a new visitor trying it first): setup can start.
+  if (!_auth?.currentUser && typeof onboardingAfterSignIn === 'function') onboardingAfterSignIn(false);
 }
 
 function _setAuthMode (mode) {
@@ -1450,6 +1485,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // Auth modal
   document.getElementById('auth-overlay')?.addEventListener('click',   e => { if (e.target.id === 'auth-overlay') closeAuthModal(); });
   document.getElementById('auth-close-btn')?.addEventListener('click', closeAuthModal);
+  // New visitors: close the sheet and look around (the 3rd saved spot asks again).
+  document.getElementById('auth-try-first')?.addEventListener('click', () => {
+    try { sessionStorage.setItem('ftb_try_seen', '1'); } catch { /* private mode */ }
+    if (typeof trackProductEvent === 'function') trackProductEvent('try_first');
+    closeAuthModal();
+    if (typeof onboardingAfterSignIn === 'function') onboardingAfterSignIn(false);
+  });
   document.getElementById('auth-google-btn')?.addEventListener('click', _handleGoogleAuth);
   document.getElementById('auth-submit-btn')?.addEventListener('click', _handleAuthSubmit);
   document.getElementById('auth-forgot-btn')?.addEventListener('click', _handleForgotPassword);

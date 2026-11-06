@@ -1084,6 +1084,7 @@ function saveData () {
   }
   updateTagSuggestions();
   NativeAlerts?.schedule();
+  window.ftbAfterSave?.();
   setTimeout(checkAchievements, 0);
   setTimeout(renderWeeklyGoal, 0);
   setTimeout(maybeAskToSaveDiary, 1800);
@@ -5951,7 +5952,10 @@ function showOnboarding () {
   const q = new URLSearchParams(location.search);
   if (['text', 'title', 'url', 'spot', 'action', 'share-target'].some(k => q.has(k))) return;
   // Not before sign-in: an account signing in on a new phone already set up.
-  if (typeof _signInRequired === 'function' && _signInRequired()) { _onboardingAfterSignIn = true; return; }
+  // Not before we know who's here (sign-in restoring), and not under the sign-in sheet.
+  if (typeof _gateOn === 'function' && _gateOn() && !window._ftbUid && (!window._ftbAuthReady || _signInRequired())) { _onboardingAfterSignIn = true; return; }
+  // The sign-in sheet is up (a new phone): setup waits for "Try it first" or sign-in.
+  if (!document.getElementById('auth-overlay')?.classList.contains('hidden')) { _onboardingAfterSignIn = true; return; }
   // The cub's hands-on welcome; the old slides stay as a fallback.
   if (window.Cub?.welcome?.()) return;
   _onboardingStep = 0;

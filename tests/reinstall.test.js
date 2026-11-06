@@ -40,6 +40,25 @@ const shown = p => p.evaluate(() => !!document.querySelector('#cub-welcome:not(.
   await p.waitForTimeout(2000);
   check(await p.locator('#modal-overlay').isVisible() && !(await shown(p)), 'a shared spot opens its form with no setup on top');
   check(!p.errors.length, `no page errors ${p.errors.join(' | ')}`);
+
+  // A new visitor can try it first: the sheet offers it, setup follows, and
+  // the 3rd saved spot asks for the free account (and can't be skipped).
+  p = await fresh();
+  await p.goto(`${BASE}/app.html`);
+  await p.waitForTimeout(1500);
+  await p.evaluate(() => { window._ftbAuthReady = true; openAuthModal({ tryFirst: true }); });
+  check(await p.locator('#auth-try-first').isVisible(), 'a new visitor is offered "Try it first"');
+  await p.click('#auth-try-first');
+  await p.waitForTimeout(900);
+  check(await p.locator('#auth-overlay').isHidden() && await shown(p), 'trying first closes the sheet and starts setup');
+  await p.evaluate(() => { document.querySelectorAll('#cub-welcome, #onboarding-overlay').forEach(e => e.classList.add('hidden')); maybeHideOverlay(); });
+  for (let i = 1; i <= 3; i++) {
+    await p.evaluate(n => { state.restaurants.push({ id: `t${n}`, name: `Spot ${n}`, status: 'want-to-try', tags: [], visits: [], dishes: [] }); saveData(); }, i);
+    await p.waitForTimeout(1200);
+    if (i < 3) check(await p.locator('#auth-overlay').isHidden(), `spot ${i} saves without an account`);
+  }
+  check(await p.locator('#auth-overlay').isVisible() && await p.evaluate(() => document.getElementById('auth-overlay').classList.contains('auth-required')), 'the 3rd spot asks for the free account, and it stays until they sign up');
+  check(/come with you/.test(await p.textContent('#auth-overlay .auth-sub')), 'it says their spots come with them');
   await browser.close();
   finish('reinstall');
 })();

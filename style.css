@@ -9484,3 +9484,6 @@ a.account-action-row { text-decoration: none; color: inherit; }
 
 .my-page-earn { display: block; margin-top: 4px; font-size: .82rem; color: var(--text-muted); }
 .my-page-earn b { color: var(--primary); }
+
+.auth-try-first { display: none; text-align: center; margin: 6px 0 0; }
+#auth-overlay.auth-try .auth-try-first { display: block; }
