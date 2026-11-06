@@ -539,8 +539,16 @@ var FriendPings = (() => {
     listening = true;
     p.addListener('registration', ({ value }) => { call('register', { token: value }); syncFollows(true); });
     p.addListener('registrationError', err => console.warn('[FTB] push registration failed:', err?.error || err));
-    // Tapping a friend's notification opens Friends.
-    p.addListener('pushNotificationActionPerformed', () => { setTimeout(() => window.openFoodieFriends?.(), 400); });
+    // Tapping one opens what it's about: contests in Play, your Want to Try
+    // list (api/nudges.js), or Friends.
+    p.addListener('pushNotificationActionPerformed', a => {
+      const open = a?.notification?.data?.open;
+      setTimeout(() => {
+        if (open === 'contests') window.openFoodEvents?.();
+        else if (open === 'want') window.setView?.('want-to-try');
+        else window.openFoodieFriends?.();
+      }, 400);
+    });
     // While the app is open Android doesn't show it, so say it in the app.
     p.addListener('pushNotificationReceived', n => {
       if (typeof showToast === 'function') showToast(n.title || 'Feed The Bear', n.body || '', 'info');
@@ -597,7 +605,14 @@ var FriendPings = (() => {
     try { await p.unregister(); } catch { /* already off */ }
   }
 
-  return { start, offer, syncFollows, notify, stop };
+  // Roughly where you are and your Want to Try pins, for the daily nudges.
+  async function area (data) {
+    if (!plugin()) return false;
+    await start();
+    return !!(await call('area', data))?.ok;
+  }
+
+  return { start, offer, syncFollows, notify, stop, area };
 })();
 window.FriendPings = FriendPings;
 

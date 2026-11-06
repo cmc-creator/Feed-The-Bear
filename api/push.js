@@ -138,6 +138,23 @@ module.exports = async function handler (req, res) {
       return res.status(200).json({ ok: true, added: added.length, removed: removed.length });
     }
 
+    // Roughly where this phone is (2 decimals, ~1 km), its state, alert distance
+    // and Want to Try pins: api/nudges.js uses them for the weekly "near you"
+    // nudge and contests in your state. Sent at most once a day by the app.
+    if (body.action === 'area') {
+      const num = (v, lo, hi) => (Number.isFinite(Number(v)) && Number(v) >= lo && Number(v) <= hi ? Math.round(Number(v) * 100) / 100 : null);
+      const lat = num(body.lat, -90, 90);
+      const lng = num(body.lng, -180, 180);
+      if (lat === null || lng === null) return res.status(400).json({ error: 'Bad place' });
+      const st = /^[A-Z]{2}$/.test(String(body.state || '')) ? String(body.state) : '';
+      const miles = [1, 5, 10, 25, 50].includes(Number(body.miles)) ? Number(body.miles) : 10;
+      const want = (Array.isArray(body.want) ? body.want : []).slice(0, 100).map(w => ({
+        n: String(w?.n || '').slice(0, 60), lat: num(w?.lat, -90, 90), lng: num(w?.lng, -180, 180),
+      })).filter(w => w.n && w.lat !== null && w.lng !== null);
+      await db.doc(`pushArea/${uid}`).set({ lat, lng, state: st, miles, want, at: new Date().toISOString() }, { merge: true });
+      return res.status(200).json({ ok: true });
+    }
+
     if (body.action === 'notify') {
       const id = String(body.id || '');
       if (!ID_RE.test(id)) return res.status(400).json({ error: 'Bad id' });

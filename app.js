@@ -2495,6 +2495,22 @@ var NativeAlerts = (() => {
   };
 })();
 
+// Android app: roughly where you are and your Want to Try pins, once a day,
+// so the server can send the weekly "near you" nudge and contests in your
+// state (api/nudges.js) when the app is closed.
+async function shareNudgeArea () {
+  if (!window.FriendPings?.area || !Number.isFinite(state.userLat) || !window._ftbUid) return;
+  const today = new Date().toDateString();
+  try { if (localStorage.getItem('ftb_area_sent_v1') === today) return; } catch { return; }
+  const st = typeof myStateCode === 'function' ? await myStateCode().catch(() => '') : '';
+  const want = state.restaurants
+    .filter(r => r.status === 'want-to-try' && Number.isFinite(Number(r.lat)) && Number.isFinite(Number(r.lng)) && r.lat !== null)
+    .slice(0, 100).map(r => ({ n: String(r.name || '').slice(0, 60), lat: Number(r.lat), lng: Number(r.lng) }));
+  if (await window.FriendPings.area({ lat: state.userLat, lng: state.userLng, state: st, miles: nearAlertMiles(), want })) {
+    try { localStorage.setItem('ftb_area_sent_v1', today); } catch { /* storage full */ }
+  }
+}
+
 function closeBgLocation () {
   document.getElementById('bg-location-overlay')?.classList.add('hidden');
   maybeHideOverlay();
@@ -8923,6 +8939,8 @@ document.addEventListener('DOMContentLoaded', () => {
       startWatching();
       renderCards();
       loadHomeDiscovery();
+      // After sign-in has settled: contests coming up, and the daily nudges' area.
+      setTimeout(() => { window.checkFoodEventHeadsUp?.(); shareNudgeArea(); }, 6000);
     },
     err => {
       state.locationEnabled = false;

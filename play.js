@@ -1226,25 +1226,40 @@ document.addEventListener('click', e => {
 
 /* ── Food challenges nationwide (Play) ───────────────────────
    Upcoming eating contests and food challenges across the US
-   (api/food-events.js searches the web once a day). Your state comes first.
-   Tap one for its page; Share asks a friend to go. Kept on the phone for a
-   few hours so opening Play is instant. */
-const FOOD_EVENTS_KEY = 'ftb_food_events_v1';
+   (api/food-events.js: five regions plus your state, searched daily).
+   Saved ★ first, then your state. Tap one for its page; Share asks a friend
+   to go. A heads-up when a saved one, or one in your state, is days away
+   (closed app: api/nudges.js). Kept on the phone for a few hours. */
+const FOOD_EVENTS_KEY = 'ftb_food_events_v2';
+const FOOD_EVENTS_SAVED_KEY = 'ftb_food_events_saved_v1';
+const FOOD_EVENTS_NOTED_KEY = 'ftb_food_events_noted_v1';
 const FOOD_EVENTS_TTL = 6 * 60 * 60 * 1000;
 const US_STATE_CODES = { alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA', colorado: 'CO', connecticut: 'CT', delaware: 'DE', 'district of columbia': 'DC', florida: 'FL', georgia: 'GA', hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA', kansas: 'KS', kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD', massachusetts: 'MA', michigan: 'MI', minnesota: 'MN', mississippi: 'MS', missouri: 'MO', montana: 'MT', nebraska: 'NE', nevada: 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', ohio: 'OH', oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA', 'rhode island': 'RI', 'south carolina': 'SC', 'south dakota': 'SD', tennessee: 'TN', texas: 'TX', utah: 'UT', vermont: 'VT', virginia: 'VA', washington: 'WA', 'west virginia': 'WV', wisconsin: 'WI', wyoming: 'WY' };
 const FOOD_EVENT_ICON = { contest: '🏆', challenge: '🔥', festival: '🎪' };
 let _foodEvents = null;
 
-async function loadFoodEvents () {
+const foodEventKey = e => `${e.name}|${e.date}`;
+function savedFoodEvents () {
+  try { return new Set(JSON.parse(localStorage.getItem(FOOD_EVENTS_SAVED_KEY)) || []); } catch { return new Set(); }
+}
+function toggleSavedFoodEvent (e) {
+  const saved = savedFoodEvents();
+  const k = foodEventKey(e);
+  if (saved.has(k)) saved.delete(k); else saved.add(k);
+  try { localStorage.setItem(FOOD_EVENTS_SAVED_KEY, JSON.stringify([...saved].slice(-100))); } catch { /* storage full */ }
+  return saved.has(k);
+}
+
+async function loadFoodEvents (st = '') {
   try {
     const saved = JSON.parse(localStorage.getItem(FOOD_EVENTS_KEY) || 'null');
-    if (saved && Date.now() - saved.at < FOOD_EVENTS_TTL && Array.isArray(saved.events) && saved.events.length) return saved.events;
+    if (saved && saved.st === st && Date.now() - saved.at < FOOD_EVENTS_TTL && Array.isArray(saved.events) && saved.events.length) return saved.events;
   } catch { /* bad value */ }
   try {
-    const resp = await fetch('/api/food-events');
+    const resp = await fetch(`/api/food-events${st ? `?state=${st}` : ''}`);
     const events = resp.ok ? (await resp.json())?.events : null;
     if (Array.isArray(events)) {
-      try { localStorage.setItem(FOOD_EVENTS_KEY, JSON.stringify({ at: Date.now(), events })); } catch { /* storage full */ }
+      try { localStorage.setItem(FOOD_EVENTS_KEY, JSON.stringify({ at: Date.now(), st, events })); } catch { /* storage full */ }
       return events;
     }
   } catch { /* offline */ }
@@ -1270,20 +1285,30 @@ function openFoodEventLink (url) {
   else window.open(safe, '_blank', 'noopener');
 }
 
+// Saved first, then your state, then the rest; soonest first within each.
+function sortFoodEvents (events, mine, saved) {
+  const rank = e => (saved.has(foodEventKey(e)) ? 0 : e.state === mine ? 1 : 2);
+  return [...events].sort((a, b) => rank(a) - rank(b) || a.date.localeCompare(b.date));
+}
+
 async function renderFoodEventsHub (body) {
   if (!body) return;
   const box = document.createElement('div');
   box.className = 'hub-section food-events';
   box.innerHTML = '<div class="hub-section-title">Eating contests &amp; food challenges</div><div class="fe-list"><div class="fe-empty">Finding contests near and far…</div></div>';
   body.appendChild(box);
-  const [events, mine] = await Promise.all([_foodEvents || loadFoodEvents(), myStateCode().catch(() => '')]);
-  _foodEvents = events.length ? events : null;
+  const mine = await myStateCode().catch(() => '');
+  const events = _foodEvents?.st === mine ? _foodEvents.events : await loadFoodEvents(mine);
+  if (events.length) _foodEvents = { st: mine, events };
   const list = box.querySelector('.fe-list');
   if (!list) return;
   if (!events.length) { list.innerHTML = '<div class="fe-empty">No contests to show right now. Check back soon.</div>'; return; }
-  const sorted = mine ? [...events.filter(e => e.state === mine), ...events.filter(e => e.state !== mine)] : events;
-  list.innerHTML = sorted.slice(0, 20).map((e, i) => `
-    <div class="fe-card" data-i="${i}">
+  const saved = savedFoodEvents();
+  const sorted = sortFoodEvents(events, mine, saved).slice(0, 40);
+  const card = (e, i) => {
+    const on = saved.has(foodEventKey(e));
+    return `
+    <div class="fe-card${on ? ' fe-saved' : ''}" data-i="${i}">
       <button type="button" class="fe-main"${e.url ? '' : ' disabled'}>
         <span class="fe-icon" aria-hidden="true">${FOOD_EVENT_ICON[e.kind] || '🏆'}</span>
         <span class="fe-text">
@@ -1293,12 +1318,29 @@ async function renderFoodEventsHub (body) {
           ${e.prize ? `<span class="fe-prize">Prize: ${escHtml(e.prize)}</span>` : ''}
         </span>
       </button>
-      <button type="button" class="fe-share" aria-label="Ask a friend to go">Share</button>
-    </div>`).join('');
+      <div class="fe-actions">
+        <button type="button" class="fe-star" aria-pressed="${on}" aria-label="${on ? 'Saved' : 'Save'} ${escHtml(e.name)}">${on ? '★' : '☆'}</button>
+        <button type="button" class="fe-share" aria-label="Ask a friend to go">Share</button>
+      </div>
+    </div>`;
+  };
+  const near = mine ? sorted.filter(e => e.state === mine).length : 0;
+  list.innerHTML = (mine ? `<div class="fe-empty">${near ? `${near} in your state` : 'None found in your state yet'} · ${events.length} nationwide</div>` : '')
+    + sorted.map(card).join('');
   list.addEventListener('click', ev => {
-    const card = ev.target.closest('.fe-card');
-    if (!card) return;
-    const e = sorted[Number(card.dataset.i)];
+    const cardEl = ev.target.closest('.fe-card');
+    if (!cardEl) return;
+    const e = sorted[Number(cardEl.dataset.i)];
+    if (ev.target.closest('.fe-star')) {
+      const on = toggleSavedFoodEvent(e);
+      cardEl.classList.toggle('fe-saved', on);
+      const star = cardEl.querySelector('.fe-star');
+      star.textContent = on ? '★' : '☆';
+      star.setAttribute('aria-pressed', String(on));
+      trackProductEvent(on ? 'food_event_saved' : 'food_event_unsaved', { kind: e.kind });
+      if (on) showToast('Saved', `We'll give you a heads-up before ${e.name}.`, 'success');
+      return;
+    }
     if (ev.target.closest('.fe-share')) {
       trackProductEvent('food_event_shared', { kind: e.kind });
       const text = `${e.name}, ${foodEventDate(e)} in ${[e.city, e.state].filter(Boolean).join(', ')}. Want to go? 🐻`;
@@ -1309,3 +1351,37 @@ async function renderFoodEventsHub (body) {
   });
 }
 window.renderFoodEventsHub = renderFoodEventsHub;
+
+// Opens Play at the contests (a contest notification was tapped).
+function openFoodEvents () {
+  if (typeof openMobileHub !== 'function') return;
+  openMobileHub();
+  let tries = 0;
+  const go = () => {
+    const el = document.querySelector('#mobile-hub-body .food-events');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    else if (++tries < 20) setTimeout(go, 150);
+  };
+  setTimeout(go, 150);
+}
+window.openFoodEvents = openFoodEvents;
+
+// A saved contest, or one in your state, within 3 days: say so once.
+async function checkFoodEventHeadsUp () {
+  const mine = await myStateCode().catch(() => '');
+  const saved = savedFoodEvents();
+  if (!mine && !saved.size) return;
+  const events = await loadFoodEvents(mine);
+  let noted;
+  try { noted = new Set(JSON.parse(localStorage.getItem(FOOD_EVENTS_NOTED_KEY)) || []); } catch { noted = new Set(); }
+  const today = new Date().toISOString().slice(0, 10);
+  const soon = new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10);
+  const e = sortFoodEvents(events, mine, saved).find(x => (saved.has(foodEventKey(x)) || x.state === mine) && x.date >= today && x.date <= soon && !noted.has(foodEventKey(x)));
+  if (!e) return;
+  noted.add(foodEventKey(e));
+  try { localStorage.setItem(FOOD_EVENTS_NOTED_KEY, JSON.stringify([...noted].slice(-100))); } catch { /* storage full */ }
+  const when = e.date === today ? 'today' : new Date(`${e.date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' });
+  showToast(`🏆 ${e.name} is ${when}`, `In ${[e.city, e.state].filter(Boolean).join(', ')}. Open Play to see it.`, 'info');
+  trackProductEvent('food_event_headsup', { saved: saved.has(foodEventKey(e)) });
+}
+window.checkFoodEventHeadsUp = checkFoodEventHeadsUp;
