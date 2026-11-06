@@ -8974,6 +8974,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (e.target === document.getElementById('account-overlay')) closeAccountModal();
   });
   document.getElementById('account-edit-btn')?.addEventListener('click', openEditProfile);
+  // Username & public page live in Settings too (friends.js renders them).
+  document.getElementById('account-handle-row')?.addEventListener('click', () => { closeAccountModal(); setTimeout(openHandleSettings, 150); });
+  document.getElementById('handle-close-btn')?.addEventListener('click', closeHandleSettings);
+  document.getElementById('handle-overlay')?.addEventListener('click', e => { if (e.target.id === 'handle-overlay') closeHandleSettings(); });
   document.getElementById('edit-profile-close-btn')?.addEventListener('click', () => {
   document.getElementById('edit-profile-overlay').classList.add('hidden'); maybeHideOverlay();
   });

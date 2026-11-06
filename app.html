@@ -68,6 +68,18 @@
     </div>
   </div>
 
+  <!-- ── Username & public page (Settings) ───────────────────── -->
+  <div id="handle-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="handle-title">
+    <div class="modal-card handle-card">
+      <div class="modal-header">
+        <h2 id="handle-title">Username &amp; public page</h2>
+        <button id="handle-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="handle-intro">Your username is how friends find you, and your public page link (feed-the-bear.com/@username) is the one to put in your TikTok and Instagram bio.</p>
+      <div id="settings-handle" class="friends-handle"></div>
+    </div>
+  </div>
+
   <!-- ── Account Portal ─────────────────────────────────────── -->
   <div id="account-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="account-title">
     <div class="modal-card account-portal-card">
@@ -93,6 +105,9 @@
         </button>
         <button class="account-action-row" id="account-edit-btn">
           <span class="aar-icon" aria-hidden="true">✏️</span><span class="aar-label">Edit Profile</span><span class="aar-chevron">›</span>
+        </button>
+        <button class="account-action-row" id="account-handle-row">
+          <span class="aar-icon" aria-hidden="true">@</span><span class="aar-label">Username &amp; public page<small id="account-handle-state" class="aar-sub">Pick the name friends find you by, and your page link for TikTok</small></span><span class="aar-chevron">›</span>
         </button>
         <!-- Email, password, phone - signed in only -->
         <button class="account-action-row hidden" id="account-security-row">
@@ -2114,6 +2129,7 @@
         <button id="friends-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <p class="friends-subtitle">See what your friends order, what they skip, and what they're craving, right on the places you both save.</p>
+      <div id="friends-status" class="friends-status" aria-live="polite"></div>
       <button id="friends-invite-btn" type="button" class="btn-primary friends-invite-big">Invite a friend</button>
       <button id="friends-copy-btn" type="button" class="friends-copy-link">or copy your link</button>
       <button id="friends-qr-btn" type="button" class="friends-copy-link">or show my QR code</button>

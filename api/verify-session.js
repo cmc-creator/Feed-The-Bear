@@ -57,18 +57,52 @@ async function nativeFinish (req, res) {
   }
 }
 
+//   { action: 'restore' } → { plan, restored } Grizzly paid under this verified email, moved to this account
+async function restoreByEmail ({ db, stripe, uid, decoded }) {
+  const email = String(decoded?.email || '').toLowerCase();
+  const profileRef = db.doc(`users/${uid}/meta/profile`);
+  const current = (await profileRef.get()).data() || {};
+  if (current.plan === 'grizzly') return { plan: 'grizzly', restored: false };
+  if (!stripe || !email || !decoded.email_verified) return { plan: current.plan || 'free', restored: false };
+  const customers = await stripe.customers.list({ email, limit: 10 });
+  for (const c of customers.data) {
+    const subs = await stripe.subscriptions.list({ customer: c.id, status: 'all', limit: 10 });
+    const sub = subs.data.find(s => LIVE.includes(s.status));
+    if (!sub) continue;
+    // Point Stripe at this account, so renewals and cancellations land here.
+    await stripe.subscriptions.update(sub.id, { metadata: { ...(sub.metadata || {}), uid } }).catch(() => {});
+    await stripe.customers.update(c.id, { metadata: { ...(c.metadata || {}), uid } }).catch(() => {});
+    await db.doc(`stripeCustomers/${c.id}`).set({ uid }, { merge: true });
+    await profileRef.set({
+      plan: 'grizzly',
+      stripeCustomerId: c.id,
+      stripeSubscriptionId: sub.id,
+      trialEndsAt: sub.status === 'trialing' && sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
+      cancelAtPeriodEnd: !!sub.cancel_at_period_end,
+      restoredAt: new Date().toISOString(),
+    }, { merge: true });
+    console.log('[FTB] restored Grizzly by email to', uid);
+    return { plan: 'grizzly', restored: true, trialEnd: sub.status === 'trialing' && sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null };
+  }
+  return { plan: current.plan || 'free', restored: false };
+}
+
 async function accountAction (req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.body?.action === 'native-finish') return nativeFinish(req, res);
   const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   if (!token) return res.status(401).json({ error: 'Sign in first' });
-  let uid;
+  let uid, decoded;
   const a = getAdmin();
-  try { ({ uid } = await a.auth().verifyIdToken(token)); } catch { return res.status(401).json({ error: 'Sign in again' }); }
+  try { decoded = await a.auth().verifyIdToken(token); ({ uid } = decoded); } catch { return res.status(401).json({ error: 'Sign in again' }); }
   const key = process.env.STRIPE_SECRET_KEY;
   const stripe = key ? Stripe(key) : null;
   const db = a.firestore();
   try {
+    // A paid subscription linked to an account id that no longer exists
+    // (accounts were re-created when the app moved Firebase projects on
+    // 2026-10-29): find it by this account's verified email and move it here.
+    if (req.body?.action === 'restore') return res.status(200).json(await restoreByEmail({ db, stripe, uid, decoded }));
     // Android app, step 1 (in Chrome, signed in): remember who signed in for
     // this challenge. See nativeFinish for step 2.
     if (req.body?.action === 'native-start') {

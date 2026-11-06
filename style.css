@@ -2259,6 +2259,18 @@ body.celebrate-glow::before {
 }
 @media (max-width: 420px) { #header-invite-btn { display: none; } .moss-friends-btn { width: 38px; height: 38px; } .moss-core { width: 25px; height: 25px; } .moss-ring, .moss-glint { -webkit-mask: radial-gradient(circle, transparent 12.5px, #000 13px); mask: radial-gradient(circle, transparent 12.5px, #000 13px); } }
 
+/* Friends: which account, what loaded, and anything that failed. */
+.friends-status { display: grid; gap: 8px; margin: 0 0 12px; }
+.friends-status:empty { display: none; }
+.friends-who { font-size: .8rem; color: var(--text-muted); line-height: 1.4; overflow-wrap: anywhere; }
+.friends-who strong { color: var(--text); }
+.friends-load-error { padding: 10px 12px; border-radius: 12px; background: rgba(255, 214, 196, .95); color: #4a1d0c; border: 1px solid #f0a07a; font-size: .86rem; font-weight: 600; line-height: 1.45; display: grid; gap: 8px; }
+.friends-load-error .btn-sm, .friends-load-error .link-btn { justify-self: start; }
+.my-handle-loading, .my-handle-hint { font-size: .84rem; color: var(--text-muted); }
+.handle-card { max-width: 460px; width: min(460px, calc(100vw - 20px)); padding-bottom: 18px; }
+.handle-card .handle-intro { margin: 0 18px 12px; font-size: .9rem; color: var(--text-muted); line-height: 1.5; }
+.handle-card .friends-handle { margin: 0 18px; }
+
 /* Byte Cub's chat: above everything, with his action buttons under a message. */
 .chat-panel { z-index: 300; }
 .chat-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: -2px 0 10px 44px; }
@@ -9359,3 +9371,12 @@ button.map-group-row { cursor: pointer; }
 .share-menu-card h3 { margin: 0 0 4px; font-size: 1.05rem; }
 .share-menu-card button { width: 100%; min-height: 46px; font-size: .95rem; }
 .share-menu-cancel { background: none; border: 0; color: var(--text-dim); text-decoration: underline; cursor: pointer; }
+
+/* Button labels sit in the middle. The button styles are inline-flex, which
+   starts content on the left, so full-width buttons showed left-aligned text.
+   :where() keeps this at zero weight: rows that are meant to read left (list
+   items, cards) still set their own alignment and win. */
+:where(.btn-primary, .btn-secondary, .btn-ghost, .btn-danger, .btn-orange, .btn-sm, .auth-google-btn, .auth-tab, .grizzly-pill, .upgrade-cta, .header-add-btn, button.chip, .suggestion-chip) {
+  justify-content: center;
+  text-align: center;
+}

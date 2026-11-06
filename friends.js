@@ -364,14 +364,15 @@ let _serverInvites = [];
 async function loadInviteStatus () {
   if (!window._ftbUid) return;
   try {
-    const { ok, data } = await handleApi('GET', { query: '?invites=1' });
-    if (!ok || !Array.isArray(data.invites)) return;
+    const { ok, status, data } = await handleApi('GET', { query: '?invites=1' });
+    if (!ok || !Array.isArray(data.invites)) { noteFriendsError('your invites', status, data); return; }
+    clearFriendsError('your invites');
     _inviteStatus = Object.fromEntries(data.invites.map(r => [r.code, r]));
     _serverInvites = data.invites
       .filter(r => r && /^[a-z0-9]{16,32}$/.test(r.code || ''))
       .map(r => ({ at: String(r.at || ''), code: r.code, name: '' }));
     if (!document.getElementById('friends-overlay')?.classList.contains('hidden')) renderFriendsList();
-  } catch { /* keep what we had */ }
+  } catch { noteFriendsError('your invites', 0, {}); }
 }
 
 function sanitizeRecent (list) {
@@ -632,8 +633,9 @@ async function loadFollowing () {
   if (!window._ftbUid || _restoringFollows) return;
   _restoringFollows = true;
   try {
-    const { ok, data } = await handleApi('GET', { query: '?following=1' });
-    if (!ok || !Array.isArray(data.following)) return;
+    const { ok, status, data } = await handleApi('GET', { query: '?following=1' });
+    if (!ok || !Array.isArray(data.following)) { noteFriendsError('who you follow', status, data); return; }
+    clearFriendsError('who you follow');
     const have = new Set(getFriends().map(f => f.data?.id).filter(Boolean));
     const missing = data.following
       .map(f => ({ id: String(f?.id || '').slice(0, 40), u: String(f?.u || 'Friend').slice(0, 30) }))
@@ -649,7 +651,7 @@ async function loadFollowing () {
     await refreshFriendsLive(true);
     renderAll();
     if (!document.getElementById('friends-overlay')?.classList.contains('hidden')) renderFriendsList();
-  } catch { /* try again next time */ } finally { _restoringFollows = false; }
+  } catch { noteFriendsError('who you follow', 0, {}); } finally { _restoringFollows = false; }
 }
 window.loadFollowing = loadFollowing;
 
@@ -657,12 +659,40 @@ let _followers = null;
 async function loadFollowers () {
   if (!window._ftbUid) { _followers = []; return; }
   try {
-    const { ok, data } = await handleApi('GET', { query: '?followers=1' });
+    const { ok, status, data } = await handleApi('GET', { query: '?followers=1' });
+    if (!ok) noteFriendsError('who follows you', status, data);
+    else clearFriendsError('who follows you');
     _followers = ok && Array.isArray(data.followers) ? data.followers.slice(0, 200).map(f => ({
       id: String(f?.id || '').slice(0, 40), u: String(f?.u || 'Friend').slice(0, 30),
     })).filter(f => /^[a-z0-9]{8,40}$/.test(f.id)) : [];
-  } catch { _followers = []; }
+  } catch { _followers = []; noteFriendsError('who follows you', 0, {}); }
   if (!document.getElementById('friends-overlay')?.classList.contains('hidden')) renderFriendsList();
+}
+
+/* What the Friends screen knows, said at the top: which account, how much
+   loaded, and any part that failed (with Try again), so nothing fails quietly. */
+const _friendsErrors = {};
+function noteFriendsError (what, status, data) {
+  _friendsErrors[what] = status === 401 ? 'your sign-in expired, so sign out and back in'
+    : status ? `${data?.error || 'server error'} (${status})` : 'no connection';
+  renderFriendsStatus();
+}
+function clearFriendsError (what) { delete _friendsErrors[what]; renderFriendsStatus(); }
+function renderFriendsStatus () {
+  const el = document.getElementById('friends-status');
+  if (!el) return;
+  if (!window._ftbUid) {
+    el.innerHTML = `<div class="friends-load-error">You're not signed in here, so your friends and invites can't load. <button type="button" class="btn-sm btn-orange friends-status-signin">Sign in</button></div>`;
+    el.querySelector('.friends-status-signin').onclick = () => { closeFoodieFriends(); openAuthModal(); };
+    return;
+  }
+  const errs = Object.entries(_friendsErrors);
+  const following = getFriends().length;
+  const invites = _serverInvites.length;
+  el.innerHTML = `<div class="friends-who">Signed in as <strong>${escHtml(window._ftbUserEmail || 'you')}</strong>`
+    + (_followers === null ? ' · loading…' : ` · following ${following} · ${(_followers || []).length} follow you · ${invites} invite${invites === 1 ? '' : 's'} sent`) + '</div>'
+    + (errs.length ? `<div class="friends-load-error">Couldn't load ${escHtml(errs.map(([w, m]) => `${w}: ${m}`).join('; '))}. <button type="button" class="btn-sm btn-orange friends-status-retry">Try again</button></div>` : '');
+  el.querySelector('.friends-status-retry')?.addEventListener('click', () => { Object.keys(_friendsErrors).forEach(k => delete _friendsErrors[k]); openFoodieFriends(); });
 }
 
 // What your friends say about one spot: their rating, orders, and cravings.
@@ -1097,6 +1127,7 @@ window.openFriendSpots = openFriendSpots;
 function renderFriendsList () {
   const el = document.getElementById('friends-list');
   if (!el) return;
+  renderFriendsStatus();
   const friends = getFriends();
   const following = new Set(friends.map(f => f.data?.id).filter(Boolean));
   const followers = _followers || [];
@@ -1184,7 +1215,7 @@ function openFoodieFriends () {
   // Open to everyone: a free account can follow one friend (followFriend
   // checks), so it needs this screen to find them. Inviting stays Grizzly.
   // Each part draws on its own: one bad record must never blank the whole screen.
-  for (const step of [renderFriendsList, loadFollowers, loadInviteStatus, loadFollowing, noteExistingFollows, renderMyHandle, renderFriendsLiveNote, () => refreshFriendsLive(true)]) {
+  for (const step of [renderFriendsStatus, renderFriendsList, loadFollowers, loadInviteStatus, loadFollowing, noteExistingFollows, renderMyHandle, renderFriendsLiveNote, () => refreshFriendsLive(true)]) {
     try {
       const out = step();
       if (out && typeof out.catch === 'function') out.catch(err => console.warn('[FTB] friends:', err));
@@ -1198,6 +1229,18 @@ function openFoodieFriends () {
   document.getElementById('friends-overlay').classList.remove('hidden');
   document.body.classList.add('overlay-open');
 }
+function openHandleSettings () {
+  document.getElementById('handle-overlay')?.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  renderMyHandle();
+}
+function closeHandleSettings () {
+  document.getElementById('handle-overlay')?.classList.add('hidden');
+  maybeHideOverlay();
+}
+window.openHandleSettings = openHandleSettings;
+window.closeHandleSettings = closeHandleSettings;
+
 function closeFoodieFriends () {
   document.getElementById('friends-overlay').classList.add('hidden');
   maybeHideOverlay();
@@ -1313,24 +1356,38 @@ async function handleApi (method, { query = '', body = null } = {}) {
   return { ok: resp.ok, status: resp.status, data };
 }
 
+// Your username and public page show in Friends and in Settings (Account).
 async function renderMyHandle () {
-  const box = document.getElementById('friends-handle');
-  if (!box) return;
-  if (!window._ftbUid) { box.innerHTML = ''; return; }
+  const boxes = ['friends-handle', 'settings-handle'].map(id => document.getElementById(id)).filter(Boolean);
+  if (!boxes.length) return;
+  if (!window._ftbUid) {
+    boxes.forEach(box => { box.innerHTML = '<div class="my-page"><strong>Sign in to pick your username</strong><span>Your username and public page belong to your account.</span></div>'; });
+    return;
+  }
   if (_myHandleFor !== window._ftbUid) { _myHandle = null; _myHandleFor = window._ftbUid; }
+  let failed = '';
   if (_myHandle === null) {
+    boxes.forEach(box => { if (!box.innerHTML.trim()) box.innerHTML = '<span class="my-handle-loading">Loading your username…</span>'; });
     try {
-      const { data } = await handleApi('GET', { query: '?mine=1' });
+      const { ok, status, data } = await handleApi('GET', { query: '?mine=1' });
+      if (!ok) throw new Error(data.error || `error ${status}`);
       _myHandle = data.handle || '';
       _myPage = { public: !!data.public, views: Number(data.views) || 0, joins: Number(data.joins) || 0 };
-    } catch { _myHandle = ''; }
+    } catch (err) { failed = err.message || 'no connection'; }
   }
-  box.innerHTML = (_myHandle
-    ? `Friends can find you as <strong>@${escHtml(_myHandle)}</strong> · <button type="button" class="link-btn friends-handle-edit">Change</button>`
-    : `<button type="button" class="link-btn friends-handle-edit">Pick a username</button> so friends can find you.`)
-    + myPageHtml();
-  box.querySelector('.friends-handle-edit').onclick = editMyHandle;
-  wireMyPage(box);
+  boxes.forEach(box => {
+    if (failed) {
+      box.innerHTML = `<div class="friends-load-error">Your username didn't load (${escHtml(failed)}). <button type="button" class="link-btn my-handle-retry">Try again</button></div>`;
+      box.querySelector('.my-handle-retry').onclick = () => renderMyHandle();
+      return;
+    }
+    box.innerHTML = (_myHandle
+      ? `Friends can find you as <strong>@${escHtml(_myHandle)}</strong> · <button type="button" class="link-btn friends-handle-edit">Change</button>`
+      : `<button type="button" class="btn-sm btn-orange friends-handle-edit">Pick your username</button> <span class="my-handle-hint">so friends can find you and you get a page link for TikTok.</span>`)
+      + myPageHtml();
+    box.querySelector('.friends-handle-edit').onclick = () => editMyHandle(box);
+    wireMyPage(box);
+  });
 }
 
 /* ── Your public page (api/creator.js): feed-the-bear.com/@you ──
@@ -1339,7 +1396,7 @@ let _myPage = { public: false, views: 0, joins: 0 };
 function myPageUrl () { return `https://www.feed-the-bear.com/@${_myHandle}`; }
 function myPageHtml () {
   const intro = '<strong>Your public page</strong><span>Put a link in your TikTok or Instagram bio. Anyone can see your top spots and what to order, then join free and follow you. When someone who joined goes Grizzly, you get a free month.</span>';
-  if (!_myHandle) return `<div class="my-page">${intro}<span class="my-page-note">Pick a username above to get your page.</span></div>`;
+  if (!_myHandle) return `<div class="my-page">${intro}<span class="my-page-note">Pick your username first (button above), then you can turn your page on.</span></div>`;
   if (!_myPage.public) {
     return `<div class="my-page">${intro}
       <button type="button" class="btn-sm btn-orange my-page-on">Turn on my page</button></div>`;
@@ -1386,8 +1443,7 @@ function wireMyPage (box) {
   });
 }
 
-function editMyHandle () {
-  const box = document.getElementById('friends-handle');
+function editMyHandle (box = document.getElementById('friends-handle')) {
   box.innerHTML = `<form class="friends-find-row friends-handle-form">
       <input class="form-input" placeholder="your_name" value="${escHtml(_myHandle || '')}" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Your username" />
       <button type="submit" class="btn-sm btn-orange">Save</button>

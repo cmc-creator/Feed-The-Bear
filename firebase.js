@@ -657,6 +657,9 @@ function initFirebaseAuth () {
       }
       if (typeof renderGrizzlyUi === 'function') renderGrizzlyUi();
       FriendPings.start();
+      // Paid, but this account doesn't show it (e.g. the account was re-created):
+      // the server finds the subscription by your email and moves it here.
+      if (window._ftbPlan !== 'grizzly') _restoreGrizzly(user);
 
       // They tapped Upgrade before signing in: bring them straight back.
       let pendingUpgrade = null;
@@ -1201,6 +1204,24 @@ async function shareInvite () {
 }
 
 // Signed-in account actions on the server (api/verify-session.js POST).
+let _restoreTried = '';
+async function _restoreGrizzly (user, { quiet = false } = {}) {
+  if (!user || (_restoreTried === user.uid && quiet !== 'force')) return false;
+  _restoreTried = user.uid;
+  try {
+    const { ok, data } = await _accountAction('restore');
+    if (!ok || data.plan !== 'grizzly' || window._ftbUid !== user.uid) return false;
+    window._ftbPlan = 'grizzly';
+    window._ftbTrialEnd = data.trialEnd || null;
+    try { localStorage.setItem('ftb_plan_v1', 'grizzly'); } catch { /* private mode */ }
+    if (typeof renderGrizzlyUi === 'function') renderGrizzlyUi();
+    updateAuthUI(user);
+    if (typeof closeUpgradeModal === 'function') closeUpgradeModal();
+    if (data.restored) showToast('Your Grizzly is back', `Found your subscription for ${user.email}. Everything is unlocked.`, 'success');
+    return true;
+  } catch { return false; }
+}
+
 async function _accountAction (action) {
   const user = _auth?.currentUser;
   if (!user) throw new Error('Sign in first');
@@ -1282,7 +1303,9 @@ async function openBilling () {
   const btn = document.getElementById('account-billing-row');
   if (btn) btn.disabled = true;
   try {
-    const { ok, status, data } = await _accountAction('portal');
+    let { ok, status, data } = await _accountAction('portal');
+    // No subscription linked here yet: look for one under this email, then try again.
+    if (status === 404 && await _restoreGrizzly(_auth?.currentUser, { quiet: 'force' })) ({ ok, status, data } = await _accountAction('portal'));
     if (ok && data.url) { window.location.href = data.url; return; }
     if (status !== 404) { showToast('Could not open billing', data.error || 'Please try again.', 'error'); return; }
     // Say which account this is and why there's no bill, so a paid account

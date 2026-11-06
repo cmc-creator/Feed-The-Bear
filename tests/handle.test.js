@@ -202,9 +202,9 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
   await q.close();
 
   // Picking your own username.
-  await p.click('.friends-handle-edit');
-  await p.fill('.friends-handle-form input', 'Connie_Eats');
-  await p.click('.friends-handle-form button[type=submit]');
+  await p.click('#friends-handle .friends-handle-edit');
+  await p.fill('#friends-handle .friends-handle-form input', 'Connie_Eats');
+  await p.click('#friends-handle .friends-handle-form button[type=submit]');
   await p.waitForTimeout(400);
   const claim = claims.find(b => b.action === 'claim');
   check(claim?.handle === 'connie_eats' && claim.id, 'picking a username sends it with your profile');
