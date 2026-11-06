@@ -4593,7 +4593,8 @@ function renderAll () {
   updateLocationBanner();
   // Home sections are isolated: a failure in one must never cascade and
   // abort renderAll (which would leave later init wiring unattached).
-  [renderGrizzlyUi, maybeAskForRating, renderTodayStatusRow, renderWeeklyGoal, renderOpenNowHome, renderCraveHome, renderFriendsFeedHome, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
+  // grizzly.js can still be loading on a slow connection.
+  [function renderGrizzlyUi () { window.renderGrizzlyUi?.(); }, maybeAskForRating, renderTodayStatusRow, renderWeeklyGoal, renderOpenNowHome, renderCraveHome, renderFriendsFeedHome, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
   .forEach(fn => { try { fn(); } catch (err) { console.error(`${fn.name} failed:`, err); window.ftbReportError?.(err?.message || err, fn.name); } });
 }
 
