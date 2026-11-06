@@ -4248,7 +4248,22 @@ function openMapsSearch (r) {
 //   - a tracking link with {url} where the page goes (Impact, CJ, Partnerize):
 //       'https://ubereats.example-network.com/c/123/456?u={url}'
 //   - extra query text added to the page's own link: 'ref=feedthebear'
+// Set in the owner portal (owner.js 'partners'), fetched at most every few hours.
 const PARTNER_REFS = { opentable: '', resy: '', yelp: '', doordash: '', ubereats: '', grubhub: '' };
+(function loadPartnerRefs () {
+  const KEY = 'ftb_partner_refs_v1';
+  const apply = refs => Object.keys(PARTNER_REFS).forEach(k => { if (typeof refs?.[k] === 'string') PARTNER_REFS[k] = refs[k]; });
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (saved) apply(saved.refs);
+    if (saved && Date.now() - saved.at < 6 * 3600 * 1000) return;
+  } catch { /* bad value */ }
+  setTimeout(() => fetch('/api/owner?partners=1').then(r => (r.ok ? r.json() : null)).then(d => {
+    if (!d?.partners) return;
+    apply(d.partners);
+    try { localStorage.setItem(KEY, JSON.stringify({ at: Date.now(), refs: d.partners })); } catch { /* storage full */ }
+  }).catch(() => {}), 4000);
+})();
 function partnerUrl (key, url) {
   const code = String(PARTNER_REFS[key] || '').trim();
   if (!code) return url;

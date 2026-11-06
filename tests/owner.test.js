@@ -79,5 +79,12 @@ const call = (token, method, body) => new Promise(resolve => {
   r = await call('owner', 'POST', { action: 'codeOff', id: 'promo_1' });
   check(r.status === 200 && codes[0].active === false, 'a code can be switched off');
 
+  // Affiliate codes: saved by the owner, read by anyone (they end up in links).
+  r = await call('owner', 'POST', { action: 'partners', partners: { doordash: 'https://dd.example/c/1?u={url}', ubereats: 'ref=feedthebear' } });
+  check(r.status === 200 && docs['config/partners'].doordash.includes('{url}'), 'affiliate codes are saved');
+  check((await call('owner', 'POST', { action: 'partners', partners: { opentable: 'https://ot.example/track' } })).status === 400, 'a tracking link without {url} is refused');
+  const pub = await new Promise(resolve => owner({ method: 'GET', query: { partners: '1' }, headers: {} }, { setHeader () {}, status (c) { this.c = c; return this; }, json (b) { resolve(b); } }));
+  check(pub.partners?.ubereats === 'ref=feedthebear', 'the app can read them without signing in');
+
   finish('owner');
 })();

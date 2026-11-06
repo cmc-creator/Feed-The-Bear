@@ -92,6 +92,21 @@
       <p class="msg" id="code-msg" role="status"></p>
       <div class="rows" id="code-list"><p class="empty">Loading…</p></div>
     </section>
+
+    <section class="panel">
+      <h2>Affiliate codes (Book a table, Order delivery)</h2>
+      <p class="lead">Join each company's affiliate program (search "DoorDash affiliate program" and so on). Paste what they give you: a tracking link with <b>{url}</b> where the restaurant's page goes, or a code like <b>ref=feedthebear</b>. Leave a box empty and that button links normally. You earn on every booking or order made through the app, free users included.</p>
+      <form id="partner-form">
+        <label>OpenTable<input id="p-opentable" autocomplete="off" placeholder="https://…?u={url}" /></label>
+        <label>Resy<input id="p-resy" autocomplete="off" /></label>
+        <label>Yelp<input id="p-yelp" autocomplete="off" /></label>
+        <label>DoorDash<input id="p-doordash" autocomplete="off" /></label>
+        <label>Uber Eats<input id="p-ubereats" autocomplete="off" /></label>
+        <label>Grubhub<input id="p-grubhub" autocomplete="off" /></label>
+        <button class="btn" type="submit">Save codes</button>
+      </form>
+      <p class="msg" id="partner-msg" role="status"></p>
+    </section>
   </div>
 </main>
 
@@ -147,6 +162,7 @@ async function load () {
     $('gate').hidden = true; $('portal').hidden = false;
     $('who').textContent = `Signed in as ${data.me}`;
     renderVips(data.vips || []);
+    Object.entries(data.partners || {}).forEach(([k, v]) => { const el = $(`p-${k}`); if (el && document.activeElement !== el) el.value = v; });
     renderCodes(data.codes || [], data.codesError);
   } catch (err) { showGate(err.message); $('sign-in').hidden = false; }
 }
@@ -158,6 +174,12 @@ $('vip-form').addEventListener('submit', async e => {
     const r = await api('POST', { action: 'grant', email: $('vip-email').value, months: Number($('vip-months').value), note: $('vip-note').value });
     say('vip-msg', r.message); $('vip-email').value = ''; $('vip-note').value = ''; load();
   } catch (err) { say('vip-msg', err.message, false); }
+});
+$('partner-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  say('partner-msg', 'Saving…');
+  const partners = Object.fromEntries(['opentable', 'resy', 'yelp', 'doordash', 'ubereats', 'grubhub'].map(k => [k, $(`p-${k}`).value.trim()]));
+  try { say('partner-msg', (await api('POST', { action: 'partners', partners })).message); } catch (err) { say('partner-msg', err.message, false); }
 });
 $('code-duration').addEventListener('change', () => { $('code-months-wrap').hidden = $('code-duration').value !== 'repeating'; });
 $('code-form').addEventListener('submit', async e => {

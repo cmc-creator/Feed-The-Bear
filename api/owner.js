@@ -134,8 +134,22 @@ async function listCodes (stripe) {
   };
 }
 
+const PARTNER_KEYS = ['opentable', 'resy', 'yelp', 'doordash', 'ubereats', 'grubhub'];
+// Affiliate codes for Book a table / Order delivery (app.js partnerUrl): a
+// tracking link with {url}, or extra query text. Public: they end up in links.
+async function partnerCodes (db) {
+  const d = (await db.doc('config/partners').get()).data() || {};
+  return Object.fromEntries(PARTNER_KEYS.map(k => [k, String(d[k] || '').slice(0, 300)]));
+}
+
 module.exports = async function handler (req, res) {
   res.setHeader('Cache-Control', 'no-store');
+  if (req.method === 'GET' && req.query?.partners) {
+    try {
+      res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600');
+      return res.status(200).json({ partners: await partnerCodes(getAdmin().firestore()) });
+    } catch { return res.status(200).json({ partners: {} }); }
+  }
   let fb, me;
   try {
     fb = getAdmin();
@@ -159,7 +173,7 @@ module.exports = async function handler (req, res) {
         return { email: d.id, note: v.note || '', until: v.until || null, at: v.at || '', live: isLive(v), pending: !v.uid, endedAt: v.endedAt || null };
       });
       const codes = await listCodes(stripe).catch(err => ({ codes: [], error: err.message }));
-      return res.status(200).json({ vips, codes: codes.codes, codesError: codes.error || null, me });
+      return res.status(200).json({ vips, codes: codes.codes, codesError: codes.error || null, me, partners: await partnerCodes(db) });
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -200,6 +214,18 @@ module.exports = async function handler (req, res) {
         metadata: { by: me },
       });
       return res.status(200).json({ ok: true, code: promo.code, link: `${APP}/app.html?promo=${encodeURIComponent(promo.code)}`, message: `${promo.code} is ready.` });
+    }
+
+    if (body.action === 'partners') {
+      const next = {};
+      for (const k of PARTNER_KEYS) {
+        const v = String(body.partners?.[k] || '').trim().slice(0, 300);
+        if (v && /^https?:\/\//i.test(v) && !v.includes('{url}')) return res.status(400).json({ error: `The ${k} link needs {url} where the restaurant's page goes.` });
+        if (/[<>"\s]/.test(v)) return res.status(400).json({ error: `The ${k} code has spaces or symbols that can't go in a link.` });
+        next[k] = v;
+      }
+      await db.doc('config/partners').set(next);
+      return res.status(200).json({ ok: true, message: 'Affiliate codes saved. Book and Order links use them within the hour.' });
     }
 
     if (body.action === 'codeOff') {
