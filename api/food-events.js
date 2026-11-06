@@ -17,7 +17,7 @@ const { overLimit, clientIp } = require('./_limit');
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const FRESH_MS = 24 * 60 * 60 * 1000;
-const RETRY_MS = 30 * 60 * 1000; // after a failed search, wait before trying again
+const RETRY_MS = 10 * 60 * 1000; // after a failed search, wait before trying again
 const KINDS = new Set(['contest', 'challenge', 'festival']);
 const STATES = new Set('AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY'.split(' '));
 
@@ -85,14 +85,14 @@ Only include events with a confirmed date on or after ${today}. Do not invent an
 Answer with only a JSON array, no other text. Each item:
 {"name": "...", "kind": "contest" | "challenge" | "festival", "date": "YYYY-MM-DD", "endDate": "YYYY-MM-DD or empty",
  "city": "...", "state": "two-letter code", "venue": "...", "url": "official page", "prize": "short, or empty", "blurb": "one sentence: what you eat and how"}
-Give up to 30 events from as many different states as you can find.`;
+Give up to 20 events from as many different states as you can find.`;
   const resp = await fetch(GEMINI_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       tools: [{ google_search: {} }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 8192 },
+      generationConfig: { temperature: 0.2, maxOutputTokens: 6000, thinkingConfig: { thinkingBudget: 0 } },
     }),
   });
   if (!resp.ok) throw new Error(`Gemini ${resp.status}: ${(await resp.text().catch(() => '')).slice(0, 200)}`);
