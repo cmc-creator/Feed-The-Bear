@@ -13,7 +13,8 @@ const { BASE, check, launch, newPage, finish } = require('./lib');
   const first = await p.$$eval('#mobile-hub-body .hub-section:first-child .hub-card', els => els.map(e => e.dataset.tool));
   check(JSON.stringify(first) === JSON.stringify(['just-ate', 'swipe', 'tonight', 'open-now', 'friends', 'spin']), `six favorites up top (${first})`);
   const visibleCards = await p.$$eval('#mobile-hub-body .hub-card', els => els.length);
-  check(visibleCards <= 32, `fewer big cards than before (${visibleCards})`);
+  // 35: the Games section (Food Fight, Burger Bar, Food Match) added three.
+  check(visibleCards <= 35, `not too many big cards (${visibleCards})`);
   check(await p.locator('#mobile-hub-body .hub-row').count() >= 4, 'themed sections are sideways rows');
 
   // Utilities are folded until asked for.

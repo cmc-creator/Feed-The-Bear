@@ -9429,3 +9429,55 @@ button.map-group-row { cursor: pointer; }
 .fx-card .friend-remove { width: 30px; height: 30px; min-width: 0; flex-shrink: 0; background: none; box-shadow: none; color: var(--text-dim); font-size: .9rem; }
 
 a.account-action-row { text-decoration: none; color: inherit; }
+
+/* Play arcade games (games.js) */
+.game-card { max-width: 520px; }
+.game-body { display: grid; gap: 12px; position: relative; }
+.game-hud { display: flex; justify-content: space-between; gap: 8px; font-size: .82rem; color: var(--text-dim); }
+.game-hud b { color: var(--text); font-variant-numeric: tabular-nums; }
+.game-hint { margin: 0; font-size: .85rem; color: var(--text-muted); }
+.game-over { display: grid; gap: 8px; justify-items: center; text-align: center; padding: 14px; border-radius: var(--radius); background: var(--surface2); border: 1px solid rgba(var(--primary-rgb), .45); }
+.game-over-big { font-size: 1.35rem; font-weight: 800; }
+.game-over p { margin: 0; color: var(--text-muted); }
+.game-over-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+/* Food Match */
+.match-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.match-card { position: relative; aspect-ratio: 1; padding: 0; border: 0; border-radius: 14px; background: none; cursor: pointer; perspective: 600px; }
+.match-card > span { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 14px; backface-visibility: hidden; transition: transform .35s ease; }
+.match-back { background: var(--surface3); overflow: hidden; border: 2px solid rgba(var(--primary-rgb), .35); }
+.match-back img { width: 100%; height: 100%; object-fit: cover; opacity: .9; }
+.match-face { background: var(--surface2); font-size: clamp(1.8rem, 9vw, 2.6rem); transform: rotateY(180deg); border: 2px solid var(--border); }
+.match-card.up .match-back { transform: rotateY(180deg); }
+.match-card.up .match-face { transform: rotateY(0); }
+.match-card.found .match-face { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+/* Food Fight */
+.fight-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; touch-action: manipulation; user-select: none; }
+.fight-hole { position: relative; aspect-ratio: 1; border-radius: 16px; overflow: hidden; background: radial-gradient(circle at 50% 80%, rgba(0,0,0,.35), transparent 60%), var(--surface2); }
+.fight-table { position: absolute; left: 0; right: 0; bottom: 0; height: 30%; background: repeating-linear-gradient(90deg, #c84b3c 0 12px, #f4efe6 12px 24px); border-top: 3px solid #a33a2e; z-index: 2; }
+.fight-critter { position: absolute; left: 8%; right: 8%; bottom: 12%; top: 6%; padding: 0; border: 0; background: none; cursor: pointer; z-index: 1; animation: fight-up .18s ease-out; }
+.fight-critter img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,.35); }
+.fight-emoji { display: grid; place-items: center; width: 100%; height: 100%; font-size: clamp(2.4rem, 13vw, 3.6rem); }
+.fight-critter.raccoon { filter: drop-shadow(0 0 6px rgba(239,138,122,.7)); }
+.fight-splat { position: absolute; inset: 0; display: grid; place-items: center; z-index: 3; font-size: 1.3rem; font-weight: 800; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.6); animation: fight-splat .65s ease-out forwards; pointer-events: none; }
+.fight-splat.bad { color: #ffb4a8; }
+.fight-start { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.25); border-radius: var(--radius); }
+@keyframes fight-up { from { transform: translateY(60%); } to { transform: none; } }
+@keyframes fight-splat { from { transform: scale(.6); opacity: 1; } to { transform: scale(1.4) translateY(-30%); opacity: 0; } }
+/* Bear Burger Bar */
+.bar-customer { display: flex; align-items: center; gap: 12px; }
+.bar-customer img { width: 72px; height: 72px; flex-shrink: 0; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .4); }
+.bar-ticket { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; background: #fffaf0; color: #3a2a1c; font-size: .82rem; font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+.bar-order { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; font-size: 1.5rem; }
+.bar-need.done { opacity: .3; }
+.bar-plate { display: grid; justify-items: center; min-height: 120px; align-content: end; }
+.bar-stack { display: flex; flex-direction: column; align-items: center; font-size: 1.9rem; line-height: .8; }
+.bar-stack.oops { animation: bar-oops .35s; }
+.bar-dish { font-size: 2.2rem; line-height: 1; }
+.bar-buttons { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.bar-btn { display: grid; justify-items: center; gap: 2px; padding: 8px 2px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font: inherit; font-size: .66rem; font-weight: 700; cursor: pointer; touch-action: manipulation; }
+.bar-btn span { font-size: 1.5rem; line-height: 1; }
+.bar-btn:active { transform: scale(.92); }
+@keyframes bar-oops { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+@media (prefers-reduced-motion: reduce) { .match-card > span, .fight-critter, .fight-splat, .bar-stack.oops { transition: none; animation: none; } }
+
+.bear-avatar-pic { object-fit: cover; aspect-ratio: 1; background: var(--surface3); }

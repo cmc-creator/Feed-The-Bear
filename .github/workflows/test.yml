@@ -169,6 +169,9 @@ jobs:
       - name: Friends screen and Bear Cave invites
         working-directory: tests
         run: node friendscreen.test.js
+      - name: Arcade games and photo bear avatars
+        working-directory: tests
+        run: node games.test.js
       - name: Several photos and videos at once
         working-directory: tests
         run: node multiphoto.test.js

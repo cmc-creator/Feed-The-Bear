@@ -3,7 +3,7 @@
    Offline-first cache strategy
    ════════════════════════════════════════════════════════════ */
 
-const CACHE  = 'ftb-v145';
+const CACHE  = 'ftb-v146';
 const ASSETS = [
   './',
   './index.html',
@@ -14,6 +14,7 @@ const ASSETS = [
   './friends.js',
   './insights.js',
   './play.js',
+  './games.js',
   './bear-swipe.js',
   './bear-swipe.css',
   './cub.js',

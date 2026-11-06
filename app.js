@@ -1527,12 +1527,16 @@ const BEAR_AVATARS = {
   'panda':       { fur: '#f4f1ec', ear: '#2b2b2b', muzzle: '#ffffff', bg: '#6aa26b', acc: 'panda' },
   'polar':       { fur: '#f3eee6', ear: '#d9cfc1', muzzle: '#ffffff', bg: '#4a90b8', acc: 'scarf' },
 };
-const AVATAR_OPTIONS = Object.keys(BEAR_AVATARS);
+// Photo bears eating, in the logo's style (assets/avatars, made with Gemini).
+const PHOTO_AVATARS = ['tacos', 'pizza', 'burger', 'sushi', 'ramen', 'bbq', 'donut', 'icecream', 'pancakes', 'hotdog', 'wings', 'honey', 'popcorn', 'croissant', 'salmon', 'birthday'];
+const photoAvatarSrc = id => `assets/avatars/bear-${String(id).slice(4)}.jpg`;
+const AVATAR_OPTIONS = [...PHOTO_AVATARS.map(f => `pic-${f}`), ...Object.keys(BEAR_AVATARS)];
 const DEFAULT_AVATAR = 'bear-chef';
 const LEGACY_AVATARS = { FTB: 'bear-chef', VIP: 'bear-crown', DINE: 'bear-pizza', CHEF: 'bear-chef', TABLE: 'bear-taco', CITY: 'bear-shades', DATE: 'bear-bow', GOLD: 'bear-crown', CLUB: 'bear-party', FINE: 'bear-donut', PLUS: 'bear-beanie', NYX: 'bear-phones' };
 
 function normalizeAvatar (id) {
   if (BEAR_AVATARS[id]) return id;
+  if (typeof id === 'string' && id.startsWith('pic-') && PHOTO_AVATARS.includes(id.slice(4))) return id;
   return LEGACY_AVATARS[id] || DEFAULT_AVATAR;
 }
 
@@ -1555,7 +1559,9 @@ function bearAccessory (a) {
 }
 
 function avatarSvg (id) {
-  const a = BEAR_AVATARS[normalizeAvatar(id)];
+  const key = normalizeAvatar(id);
+  if (key.startsWith('pic-')) return `<img class="bear-avatar bear-avatar-pic" src="${photoAvatarSrc(key)}" alt="Bear avatar" loading="lazy" decoding="async" />`;
+  const a = BEAR_AVATARS[key];
   const dark = '#2a1d16';
   const panda = a.acc === 'panda';
   const earOuter = panda ? a.ear : a.fur;
@@ -11043,6 +11049,9 @@ const TOOL_ACTIONS = {
   'fortune':          () => openFortune(),
   'moodcal':          () => openMoodCal(),
   'feedbear':         () => openFeedBearGame(),
+  'foodfight':        () => openFoodFight(),
+  'burgerbar':        () => openBurgerBar(),
+  'foodmatch':        () => openFoodMatch(),
   'passport':         () => openPassport(),
   'worldmap':         () => openWorldMap(),
   'visitlog':         () => openVisitLog(),
@@ -11078,6 +11087,10 @@ const HUB_SECTIONS = [
   ['tonight','🌙',"Tonight's Pick"], ['open-now','🟢','Open Now'],
   ['friends','👯','Friends'], ['spin','🎡','Spin the Wheel'],
   ]},
+  { title: 'Games', items: [
+  ['foodfight','🍕','Food Fight'], ['burgerbar','🍔','Bear Burger Bar'],
+  ['foodmatch','🃏','Food Match'], ['feedbear','🐻','Feed the Bear'],
+  ]},
   { title: "Can't decide?", items: [
   ['decision','🏆','Decision Mode'], ['duel','⚔️','Restaurant Duel'],
   ['craving','😋','Craving Engine'], ['fortune','🥠','Fortune Cookie'],
@@ -11094,7 +11107,7 @@ const HUB_SECTIONS = [
   ]},
   { title: 'Games & rewards', items: [
   ['challenge','🎯','Challenges'], ['achievements','🏅','Achievements'],
-  ['bingo','🎱','Cuisine Bingo'], ['feedbear','🐻','Feed the Bear'],
+  ['bingo','🎱','Cuisine Bingo'],
   ]},
   { title: 'Plan a food day', items: [
   ['itinerary','🗺️','Smart Itinerary'], ['mealplanner','🥗','Meal Planner'], ['travel','✈️','Trip Guides'],
@@ -11147,6 +11160,9 @@ const HUB_INFO = {
   achievements:  ['Badges you have earned', 'trophy'],
   bingo:         ['Fill the cuisine card', 'grid'],
   feedbear:      ['Catch food, dodge pests', 'bear'],
+  foodfight:     ['Toss food to hungry bears', 'bear'],
+  burgerbar:     ['Build each bear an order', 'stack'],
+  foodmatch:     ['Find the food pairs', 'grid'],
 };
 
 function hubPreviewHtml (style) {
