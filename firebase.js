@@ -45,7 +45,8 @@ function isPremium () {
   return !!window._ftbUid && plan === 'grizzly';
 }
 
-const FREE_RESTAURANT_LIMIT = 25;
+// FREE_RESTAURANT_LIMIT is declared in app.js (loads first) so no script
+// can run before it exists.
 
 function requiresPremium (featureName, fn) {
   if (isPremium()) { fn(); return; }
@@ -718,6 +719,7 @@ function initFirebaseAuth () {
         saveData(); // persists locally + (Grizzly) debounced push of merged set
         renderAll();
         if (deletedIds.size) fbDeleteRestaurantsCloud(user.uid, [...deletedIds]);
+        if (typeof onboardingAfterSignIn === 'function') onboardingAfterSignIn(restaurants.length > 0 || !!cloudProfile);
         if (gained > 0) {
           showToast('☁️ Den synced!', `Loaded ${gained} spot${gained === 1 ? '' : 's'} from the cloud.`, 'success');
         }

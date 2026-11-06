@@ -4,6 +4,13 @@
 
 'use strict';
 
+/* ── Free (Cub) plan limits ──────────────────────────────────
+   Declared in the first app script so grizzly.js, friends.js and cub.js can
+   never run before they exist (timers can fire while the parser waits on the
+   external Firebase scripts, which used to make renderGrizzlyUi throw). */
+const FREE_RESTAURANT_LIMIT = 25;
+const FREE_FRIENDS = 1;
+
 /* ── Defensive AI stub - if ai.js failed to load (old SW cache,
    offline, etc.) replace window.AI with a no-op stub so the app
    still boots instead of throwing ReferenceError on first call. */
@@ -5873,8 +5880,14 @@ const ONBOARDING_STEPS = [
   { title: 'Let Byte Cub Curate', desc: 'Ask for smart recommendations, tie breakers, and refined shareable cards.' },
 ];
 let _onboardingStep = 0;
+let _onboardingAfterSignIn = false;
 function showOnboarding () {
   if (state.settings.onboardingDone) return;
+  // Not over a shared spot or a link that opened something (it asks next time).
+  const q = new URLSearchParams(location.search);
+  if (['text', 'title', 'url', 'spot', 'action', 'share-target'].some(k => q.has(k))) return;
+  // Not before sign-in: an account signing in on a new phone already set up.
+  if (typeof _signInRequired === 'function' && _signInRequired()) { _onboardingAfterSignIn = true; return; }
   // The cub's hands-on welcome; the old slides stay as a fallback.
   if (window.Cub?.welcome?.()) return;
   _onboardingStep = 0;
@@ -5895,6 +5908,18 @@ function dismissOnboarding () {
   document.getElementById('onboarding-overlay').classList.add('hidden');
   state.settings.onboardingDone = true;
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+}
+// Signed in (firebase.js): an account that already has spots or a profile
+// skips setup; a new one gets it now if it was waiting for sign-in.
+function onboardingAfterSignIn (existing) {
+  if (state.settings.onboardingDone) return;
+  if (existing) {
+    window.Cub?.endWelcome?.();
+    dismissOnboarding();
+    maybeHideOverlay();
+    return;
+  }
+  if (_onboardingAfterSignIn) { _onboardingAfterSignIn = false; setTimeout(showOnboarding, 400); }
 }
 
 /* ════════════════════════════════════════════════════════════

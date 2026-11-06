@@ -570,7 +570,7 @@ function isFollowing (data) { return getFriends().some(f => f.key === friendKey(
 
 // Free accounts can follow one friend (usually whoever invited them), so an
 // invite works without paying; following more people is Grizzly.
-const FREE_FRIENDS = 1;
+// FREE_FRIENDS itself is declared in app.js (loads first).
 
 // Following again with a newer link updates that friend's profile.
 function followFriend (data, { quiet = false } = {}) {

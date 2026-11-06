@@ -710,7 +710,13 @@ window.Cub = (() => {
     return true;
   }
 
-  return { init, openAdd, close, welcome, guessCuisine, parseMapsLink, tip: buddyTip, hide: hideBuddy, resumeShare };
+  // Signed in to an account that already set up: close it without a toast.
+  function endWelcome () {
+    welcomeActive = false;
+    welcomeEl?.classList.add('hidden');
+  }
+
+  return { init, openAdd, close, welcome, endWelcome, guessCuisine, parseMapsLink, tip: buddyTip, hide: hideBuddy, resumeShare };
 })();
 
 document.addEventListener('DOMContentLoaded', () => window.Cub.init());

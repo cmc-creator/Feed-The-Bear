@@ -154,6 +154,9 @@ jobs:
       - name: Accepting an invite makes you friends both ways; real names
         working-directory: tests
         run: node followback.test.js
+      - name: Reinstalling never repeats first-time setup
+        working-directory: tests
+        run: node reinstall.test.js
       - name: Several photos and videos at once
         working-directory: tests
         run: node multiphoto.test.js
