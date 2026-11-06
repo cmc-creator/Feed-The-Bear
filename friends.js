@@ -17,6 +17,7 @@
 function buildProfileData () {
   const dishNames = (r, verdict, n) => dishesOf(r).filter(d => d.verdict === verdict).slice(0, n).map(d => String(d.name).slice(0, 40));
   const picks = [...state.restaurants]
+    .filter(isAvailableSpot)
     .filter(r => r.myRating > 0 || dishesOf(r).some(d => d.verdict === 'again'))
     .sort((a, b) => (b.myRating || 0) - (a.myRating || 0))
     .slice(0, 15)
@@ -32,7 +33,7 @@ function buildProfileData () {
       return pick;
     });
   const craves = [];
-  state.restaurants.forEach(r => dishesOf(r).forEach(d => {
+  state.restaurants.filter(isAvailableSpot).forEach(r => dishesOf(r).forEach(d => {
     if (d.verdict === 'want' && craves.length < 10) craves.push({ d: String(d.name).slice(0, 40), at: String(r.name).slice(0, 60) });
   }));
   return { v: 2, id: getProfileShareId(), u: shownName().slice(0, 30), picks, w: craves, ts: Date.now() };

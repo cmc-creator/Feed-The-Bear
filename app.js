@@ -2164,7 +2164,7 @@ function findNearbyCraving () {
   const log = getCraveAlertLog();
   let best = null;
   state.restaurants.forEach(r => {
-    if (!r.lat || !r.lng || log[r.id] === today) return;
+    if (!isAvailableSpot(r) || !r.lat || !r.lng || log[r.id] === today) return;
     const crave = dishesOf(r).find(d => d.verdict === 'want');
     if (!crave) return;
     const d = haversine(state.userLat, state.userLng, r.lat, r.lng);
@@ -2222,7 +2222,7 @@ function checkProximity () {
   let near = null;
   const better = (a, b) => !b || (a.want !== b.want ? a.want : a.d < b.d);
   state.restaurants.forEach(r => {
-    if (!r.lat || !r.lng || (quietUntil[r.id] || 0) > now || (state.notifiedAt[r.id] || 0) > now - NOTIFY_COOLDOWN) return;
+    if (!isAvailableSpot(r) || !r.lat || !r.lng || (quietUntil[r.id] || 0) > now || (state.notifiedAt[r.id] || 0) > now - NOTIFY_COOLDOWN) return;
     const d = haversine(state.userLat, state.userLng, r.lat, r.lng);
     const cand = { r, d, want: r.status === 'want-to-try' };
     if (d <= (cand.want ? wantRadius : NOTIFY_RADIUS) && better(cand, near)) near = cand;
@@ -2443,6 +2443,7 @@ var NativeAlerts = (() => {
     const here = Number.isFinite(state.userLat) && Number.isFinite(state.userLng);
     // Android allows 100 geofences: keep the closest Want to Try spots.
     const spots = state.restaurants
+      .filter(isAvailableSpot)
       .filter(r => r.status === 'want-to-try' && r.lat != null && r.lng != null && Number.isFinite(Number(r.lat)) && Number.isFinite(Number(r.lng)))
       .map(r => ({ id: r.id, name: String(r.name || '').slice(0, 80), lat: Number(r.lat), lng: Number(r.lng), d: here ? haversine(state.userLat, state.userLng, Number(r.lat), Number(r.lng)) : 0 }))
       .sort((a, b) => a.d - b.d)
@@ -2518,6 +2519,7 @@ async function shareNudgeArea () {
   try { if (localStorage.getItem('ftb_area_sent_v1') === today) return; } catch { return; }
   const st = typeof myStateCode === 'function' ? await myStateCode().catch(() => '') : '';
   const want = state.restaurants
+    .filter(isAvailableSpot)
     .filter(r => r.status === 'want-to-try' && Number.isFinite(Number(r.lat)) && Number.isFinite(Number(r.lng)) && r.lat !== null)
     .slice(0, 100).map(r => ({ n: String(r.name || '').slice(0, 60), lat: Number(r.lat), lng: Number(r.lng) }));
   if (await window.FriendPings.area({ lat: state.userLat, lng: state.userLng, state: st, miles: nearAlertMiles(), want })) {
@@ -2626,7 +2628,12 @@ function distOf (r) {
 // Suggestions (For You, Open Now, picks) skip spots too far to go to today,
 // like a place you tried once on a trip. Lists and the diary still show them.
 const SUGGEST_MAX_METERS = 30 * 1609.344;
+function isAvailableSpot (r) {
+  return !!r && r.permanentlyClosed !== true;
+}
+
 function nearEnoughToSuggest (r) {
+  if (!isAvailableSpot(r)) return false;
   if (!state.locationEnabled || !r.lat || !r.lng) return true; // distance unknown
   return distOf(r) <= SUGGEST_MAX_METERS;
 }
@@ -3121,6 +3128,7 @@ function fmtClock ({ hour = 0, minute = 0 } = {}) {
 
 // Open or closed right now, from Google's weekly periods (day 0 = Sunday).
 function openStatus (r, now = new Date()) {
+  if (r?.permanentlyClosed === true) return { open: false, permanent: true, text: 'Permanently closed' };
   const periods = Array.isArray(r?.periods) ? r.periods.filter(p => p && p.open) : [];
   if (!periods.length) return null;
   if (periods.length === 1 && !periods[0].close) return { open: true, text: 'Open 24 hours' };
@@ -3186,7 +3194,7 @@ function fillDetailFacts (r) {
   box.innerHTML = `
     ${st ? `<details class="detail-hours-toggle">
       <summary><span class="detail-open-dot ${st.open ? (st.soon ? 'soon' : 'open') : 'closed'}" aria-hidden="true"></span>${escHtml(st.text)}</summary>
-      <ul>${(r.hours || []).map((h, i) => `<li class="${i === today ? 'today' : ''}">${escHtml(h)}</li>`).join('')}</ul>
+      ${st.permanent ? '<p>Your visits, ratings and photos are kept. This place is excluded from suggestions.</p>' : `<ul>${(r.hours || []).map((h, i) => `<li class="${i === today ? 'today' : ''}">${escHtml(h)}</li>`).join('')}</ul>`}
     </details>` : ''}
     ${links ? `<div class="detail-hours-links">${links}</div>` : ''}`;
 }
@@ -3685,6 +3693,23 @@ function openDetailModal (id) {
   document.getElementById('detail-book-btn').onclick = () => openPartnerSheet('book', r);
   document.getElementById('detail-order-btn').onclick = () => openPartnerSheet('order', r);
   document.getElementById('detail-edit-btn').onclick = () => { closeDetailModal(); openEditModal(r.id); };
+  const closedBtn = document.getElementById('detail-closed-btn');
+  closedBtn.textContent = isAvailableSpot(r) ? 'Mark permanently closed' : 'Mark reopened';
+  closedBtn.setAttribute('aria-pressed', String(!isAvailableSpot(r)));
+  closedBtn.onclick = () => {
+    const closed = isAvailableSpot(r);
+    if (closed && !confirm(`Mark "${r.name}" permanently closed? Your visits, ratings and photos stay saved, but it will no longer be suggested.`)) return;
+    r.permanentlyClosed = closed;
+    r.updatedAt = Date.now();
+    localStorage.removeItem('ftb_area_sent_v1');
+    saveData();
+    NativeAlerts.schedule();
+    shareNudgeArea();
+    renderAll();
+    openDetailModal(id);
+    showToast(closed ? 'Marked permanently closed' : 'Marked reopened',
+      closed ? 'Your history is kept. This place will not be suggested.' : 'This place can appear in suggestions again.', 'info');
+  };
   document.getElementById('detail-delete-btn').onclick = () => {
     if (confirm(`Delete "${r.name}"? This cannot be undone.`)) {
       state.restaurants = state.restaurants.filter(x => x.id !== id);
@@ -4836,6 +4861,7 @@ function nearbyResponse () {
   return `Enable location tracking first (click the location button in the header) and I will show what is nearby right now.`;
   }
   const nearby = state.restaurants
+  .filter(isAvailableSpot)
   .filter(r => r.lat && r.lng)
   .map(r => ({ ...r, dist: haversine(state.userLat, state.userLng, r.lat, r.lng) }))
   .filter(r => r.dist < 5000)
@@ -4855,9 +4881,9 @@ function nearbyResponse () {
 }
 
 function recommendResponse () {
-  const unvisited = state.restaurants.filter(r => r.status === 'want-to-try' && r.googleRating > 0);
+  const unvisited = state.restaurants.filter(r => isAvailableSpot(r) && r.status === 'want-to-try' && r.googleRating > 0);
   if (!unvisited.length) {
-  const top = [...state.restaurants].sort((a,b) => (b.googleRating||0) - (a.googleRating||0)).slice(0,3);
+  const top = state.restaurants.filter(isAvailableSpot).sort((a,b) => (b.googleRating||0) - (a.googleRating||0)).slice(0,3);
   if (!top.length) {
     const nearby = getNearbyDiscoveryRows(3);
     if (!nearby.length) return `Your saved list is empty, and I do not have live nearby data yet. Open Discover, run a scan, and I will recommend from nearby immediately.`;
@@ -4900,7 +4926,7 @@ function notesResponse () {
 }
 
 function budgetResponse () {
-  const cheap = state.restaurants.filter(r => r.priceRange === 1);
+  const cheap = state.restaurants.filter(r => isAvailableSpot(r) && r.priceRange === 1);
   if (!cheap.length) return `No budget spots on your list yet. Add some $ restaurants and I'll help you find a bargain! `;
   const items = cheap.slice(0,4).map(r =>
   `<span class="chip-link" data-id="${r.id}">${cuisineEmoji(r.cuisine)} ${r.name} ($)</span>`
@@ -4909,7 +4935,7 @@ function budgetResponse () {
 }
 
 function fancyResponse () {
-  const fancy = state.restaurants.filter(r => r.priceRange >= 3);
+  const fancy = state.restaurants.filter(r => isAvailableSpot(r) && r.priceRange >= 3);
   if (!fancy.length) return `No fine dining spots on your list yet. Time to live a little! `;
   const items = fancy.slice(0,4).map(r =>
   `<span class="chip-link" data-id="${r.id}">${cuisineEmoji(r.cuisine)} ${r.name} (${priceDollars(r.priceRange)})</span>`
@@ -4924,7 +4950,7 @@ function cuisineFromQuery (q) {
 
 function cuisineResponse (cuisine) {
   const list = state.restaurants.filter(r =>
-  (r.cuisine||'').toLowerCase() === cuisine.toLowerCase()
+  isAvailableSpot(r) && (r.cuisine||'').toLowerCase() === cuisine.toLowerCase()
   );
   if (!list.length) return `No ${cuisine} restaurants on your list yet! Add one `;
   const items = list.slice(0,5).map(r =>
@@ -4937,6 +4963,7 @@ function restaurantDetailResponse (r) {
   const dist = distOf(r);
   const distStr = dist < Infinity ? ` - ${fmtDist(dist)} away` : '';
   return `Here's what I know about **${r.name}**:\n\n` +
+  (!isAvailableSpot(r) ? 'Permanently closed. Your history is kept.\n' : '') +
   (r.googleRating ? `⭐ Google: ${r.googleRating}/5\n` : '') +
   (r.myRating ? `⭐ Your rating: ${r.myRating}/5\n` : '') +
   (r.address ? ` ${r.address}${distStr}\n` : '') +
@@ -4947,8 +4974,9 @@ function restaurantDetailResponse (r) {
 }
 
 function surpriseMeResponse () {
-  const unvisited = state.restaurants.filter(r => r.status === 'want-to-try');
-  const pool = unvisited.length ? unvisited : state.restaurants;
+  const available = state.restaurants.filter(isAvailableSpot);
+  const unvisited = available.filter(r => r.status === 'want-to-try');
+  const pool = unvisited.length ? unvisited : available;
   if (!pool.length) return `Your list is empty! Add some restaurants first.`;
   const r = randomFrom(pool);
   return ` How about… **${r.name}**? ${r.cuisine ? `${cuisineEmoji(r.cuisine)} ${r.cuisine} vibes.` : ''} ${r.googleRating ? `Rated ⭐${r.googleRating}.` : ''} ${r.address ? ` ${r.address}` : ''}\n\n<span class="chip-link" data-id="${r.id}">View details</span>`;
@@ -5137,20 +5165,29 @@ function dishFromText (t) {
 function parseCubCommand (text) {
   const t = text.trim();
   const low = t.toLowerCase();
+  if (/\b(?:eating|food)\s+(?:contests?|competitions?|challenges?)\b/.test(low)) return { kind: 'contests' };
   if (/\b(show|open|see|view|go to|pull up)\b.*\b(want[- ]to[- ]try|wish ?list|to[- ]try)\b/.test(low)) return { kind: 'list', view: 'want-to-try' };
   if (/\b(show|open|see|view|pull up)\b.*\b(been there|visited|places i('ve| have) (been|eaten)|where i('ve| have) (been|eaten))\b/.test(low)) return { kind: 'list', view: 'visited' };
   if (/\b(show|open|see)\b.*\bmy lists?\b/.test(low)) return { kind: 'list', view: 'lists' };
-  let m = t.match(/\b(?:went to|ate at|eaten at|been to|visited|tried|stopped at|stopped by|had (?:breakfast|brunch|lunch|dinner|drinks|dessert|coffee) at|grabbed (?:breakfast|brunch|lunch|dinner|food|a bite) at)\s+(.+)/i)
-  || t.match(/\blog\s+(?:(?:a\s+)?(?:visit|meal)\s+(?:to|at|for)\s+)?(.+)/i);
+  const noteMatch = t.match(/\b(?:and\s+)?(?:note|remember)(?:\s+that)?\s+(.+)$/i);
+  const note = noteMatch ? noteMatch[1].trim() : '';
+  const request = noteMatch ? t.slice(0, noteMatch.index).replace(/[,\s]+$/, '') : t;
+  let m = request.match(/\b(?:add|save|put|move|mark)\s+(.+?)\s+(?:to|on|in|as)\s+(?:my\s+)?(?:visited|visitied|been[- ]there)(?:\s+list)?[.!]?\s*$/i);
   if (m) {
-  const name = placeFromText(m[1]);
-  if (name.length >= 2) return { kind: 'log', name, dish: dishFromText(t), stars: starsFromText(t) };
+    const name = placeFromText(m[1]).replace(/^the\s+/i, '');
+    if (name.length >= 2) return { kind: 'log', name, dish: dishFromText(request), stars: starsFromText(request), note };
   }
-  m = t.match(/\b(?:add|save|put)\s+(.+?)\s+(?:to|on|in)\s+(?:my\s+)?(?:want[- ]to[- ]try|list|wish ?list|to[- ]try)/i)
-  || t.match(/\bi\s+want to try\s+(.+)/i) || t.match(/^(?:add|save)\s+(.+)/i);
+  m = request.match(/\b(?:went to|ate at|eaten at|been to|visited|tried|stopped at|stopped by|had (?:breakfast|brunch|lunch|dinner|drinks|dessert|coffee) at|grabbed (?:breakfast|brunch|lunch|dinner|food|a bite) at)\s+(.+)/i)
+  || request.match(/\blog\s+(?:(?:a\s+)?(?:visit|meal)\s+(?:to|at|for)\s+)?(.+)/i);
   if (m) {
   const name = placeFromText(m[1]);
-  if (name.length >= 2) return { kind: 'want', name };
+  if (name.length >= 2) return { kind: 'log', name, dish: dishFromText(request), stars: starsFromText(request), note };
+  }
+  m = request.match(/\b(?:add|save|put)\s+(.+?)\s+(?:to|on|in)\s+(?:my\s+)?(?:want[- ]to[- ]try|list|wish ?list|to[- ]try)/i)
+  || request.match(/\bi\s+want to try\s+(.+)/i) || request.match(/^(?:can you\s+)?(?:please\s+)?(?:add|save)\s+(.+)/i);
+  if (m) {
+  const name = placeFromText(m[1]);
+  if (name.length >= 2) return { kind: 'want', name, note };
   }
   const food = foodToFind(t);
   if (food) return { kind: 'find', food };
@@ -5214,16 +5251,22 @@ async function cubFindNearby (food) {
   });
   cubSay(`Closest spots for ${food} near you:\n${lines.join('\n')}\n\nTap one to save it to Want to Try.`,
     places.slice(0, 4).map((p, i) => ({ label: `🔖 ${p.name}`, primary: i === 0, run: () => {
-      const r = savedSpotNamed(p.name);
+      const r = savedSpotNamed(p.name, p);
       if (r) { cubSay(`**${r.name}** is already saved.`, [{ label: 'Open it', primary: true, run: () => { closeChat(); openDetailModal(r.id); } }]); return; }
       const spot = createSpotFrom({ found: p, status: 'want-to-try' });
       if (spot) { saveData(); renderAll(); cubAddWant(spot); }
     } })));
 }
 
-function savedSpotNamed (name) {
+function savedSpotNamed (name, place = null) {
   const key = normalizeName(name);
-  return state.restaurants.find(r => normalizeName(r.name) === key) || findDuplicates(name)[0] || null;
+  const matches = state.restaurants.filter(r => normalizeName(r.name) === key);
+  if (place?.placeId) {
+    const exact = matches.find(r => r.placeId === place.placeId);
+    if (exact) return exact;
+  }
+  if (place?.address) return matches.find(r => normalizeName(r.address) === normalizeName(place.address)) || null;
+  return matches.length === 1 ? matches[0] : null;
 }
 
 // Creates a spot from a real place (or just a name). Respects the Cub limit.
@@ -5234,7 +5277,7 @@ function createSpotFrom ({ found = null, name = '', status = 'want-to-try' }) {
   const r = {
   id: uid(), name: String(found?.name || name).slice(0, 80), cuisine: kind.slice(0, 40), priceRange: found?.priceLevel || 0,
   address: found?.address || '', lat: Number.isFinite(found?.lat) ? found.lat : null, lng: Number.isFinite(found?.lng) ? found.lng : null,
-  website: '', photo: '', googleRating: found?.rating || 0, googleReviews: found?.reviews || 0, myRating: 0, notes: '', tags: [],
+  placeId: found?.placeId || '', website: '', photo: '', googleRating: found?.rating || 0, googleReviews: found?.reviews || 0, myRating: 0, notes: '', tags: [],
   collectionId: null, priority: '', status, dateAdded: today, dateVisited: status === 'visited' ? today : null,
   updatedAt: Date.now(), visits: [], links: [],
   };
@@ -5244,19 +5287,25 @@ function createSpotFrom ({ found = null, name = '', status = 'want-to-try' }) {
   return r;
 }
 
-function cubLogVisit (r, { dish = '', stars = 0 } = {}) {
+function cubSaveNote (r, note = '') {
+  if (!note) return;
+  r.notes = [r.notes, note].filter(Boolean).join('\n');
+}
+
+function cubLogVisit (r, { dish = '', stars = 0, note = '' } = {}) {
   if (!Array.isArray(r.visits)) r.visits = [];
-  r.visits.push({ date: iso(), note: '', rating: stars, dish, photo: '' });
+  r.visits.push({ date: iso(), note, rating: stars, dish, photo: '' });
+  cubSaveNote(r, note);
   r.status = 'visited';
   r.dateVisited = r.dateVisited || iso();
   if (stars) r.myRating = stars;
   r.updatedAt = Date.now();
   if (dish) upsertDish(r, { name: dish, verdict: stars >= 4 ? 'again' : stars && stars <= 2 ? 'skip' : 'ok', rating: stars || undefined });
-  else saveData();
+  saveData();
   renderAll();
   trackProductEvent('cub_logged_visit', { hasDish: !!dish, stars });
   const bits = [stars ? '★'.repeat(stars) : '', dish ? `the ${dish}` : ''].filter(Boolean).join(' and ');
-  cubSay(`Done! **${r.name}** is on your Been There list${bits ? ` with ${bits}` : ''}. 🐻`, [
+  cubSay(`Done! **${r.name}**${r.address ? ` (${r.address})` : ''} is on your Been There list${bits ? ` with ${bits}` : ''}.${note ? `\nSaved note: ${note}` : ''} 🐻`, [
   { label: '📸 Add photos', primary: true, run: () => { closeChat(); openDetailModal(r.id); } },
   ...(stars ? [] : [{ label: '⭐ Rate it', run: () => cubAskStars(r) }]),
   { label: 'See Been There', run: () => { closeChat(); setView('visited'); } },
@@ -5287,21 +5336,36 @@ function cubAddWant (r) {
 
 // Finds the place you mean: one of yours, or real ones to choose from.
 async function cubResolve (name, onPick) {
-  const saved = savedSpotNamed(name);
-  if (saved) { onPick({ r: saved }); return; }
+  const query = name.replace(/^the\s+/i, '').trim();
+  const branch = query.match(/^(.+?)\s+(?:on|at|in|near)\s+(.+)$/i);
+  const key = normalizeName(branch ? branch[1] : query);
+  const locationKey = branch ? normalizeName(branch[2]) : '';
+  const matchesBranch = p => !locationKey || normalizeName(`${p.name} ${p.address || ''}`).includes(locationKey);
+  const saved = state.restaurants.filter(r => normalizeName(r.name) === key && matchesBranch(r));
+  if (saved.length === 1) { onPick({ r: saved[0] }); return; }
+  if (saved.length > 1) {
+    cubSay('You have more than one saved location. Which one?', saved.map(r => ({
+      label: `${r.name}${r.address ? ` · ${r.address}` : ' · address not saved'}`,
+      run: () => onPick({ r }),
+    })));
+    return;
+  }
   showTyping();
-  const found = await searchRealPlaces(name);
+  const found = (await searchRealPlaces(query)).filter(p => normalizeName(p.name).includes(key) && matchesBranch(p));
   hideTyping();
   if (!found.length) {
-  cubSay(`I couldn't find "${name}" on the map. Want me to save it with just the name?`, [
+  cubSay(`I couldn't verify "${name}" on the map. I won't substitute another location. Want me to save it with just the name?`, [
     { label: `Yes, use "${name}"`, primary: true, run: () => onPick({ name }) },
   ]);
   return;
   }
-  if (found.length === 1 || normalizeName(found[0].name) === normalizeName(name)) {
+  if (found.length === 1) {
   const f = found[0];
   cubSay(`Is it **${f.name}**${f.address ? `, ${f.address}` : ''}?`, [
-    { label: 'Yes', primary: true, run: () => onPick({ found: f }) },
+    { label: 'Yes', primary: true, run: () => {
+      const r = savedSpotNamed(f.name, f);
+      onPick(r ? { r } : { found: f });
+    } },
     ...(found.length > 1 ? [{ label: 'No, show others', run: () => cubChoose(found.slice(1), name, onPick) }] : [{ label: `No, just "${name}"`, run: () => onPick({ name }) }]),
   ]);
   return;
@@ -5311,12 +5375,21 @@ async function cubResolve (name, onPick) {
 
 function cubChoose (found, name, onPick) {
   cubSay('Which one?', [
-  ...found.slice(0, 4).map(f => ({ label: `${f.name}${f.address ? ` · ${f.address.split(',')[0]}` : ''}`, run: () => onPick({ found: f }) })),
+  ...found.slice(0, 4).map(f => ({ label: `${f.name}${f.address ? ` · ${f.address}` : ''}`, run: () => {
+    const r = savedSpotNamed(f.name, f);
+    onPick(r ? { r } : { found: f });
+  } })),
   { label: `Just "${name}"`, run: () => onPick({ name }) },
   ]);
 }
 
 async function handleCubCommand (cmd) {
+  if (cmd.kind === 'contests') {
+    cubSay('The list is in Play on your phone, or Discover on desktop, under Eating contests & food challenges.', [
+      { label: 'Open eating competitions', primary: true, run: () => { closeChat(); openFoodEvents(); } },
+    ]);
+    return;
+  }
   if (cmd.kind === 'list') {
   cubSay(cmd.view === 'visited' ? 'Here are the places you have been.' : cmd.view === 'want-to-try' ? 'Here is your Want to Try list.' : 'Here are your lists.');
   setTimeout(() => { closeChat(); setView(cmd.view); }, 500);
@@ -5332,13 +5405,14 @@ async function handleCubCommand (cmd) {
   if (cmd.kind === 'want') {
   await cubResolve(cmd.name, ({ r, found, name }) => {
     if (r) {
-      cubSay(r.status === 'visited' ? `You've already been to **${r.name}**! It's on your Been There list.` : `**${r.name}** is already on your Want to Try list.`, [
+      if (cmd.note) { cubSaveNote(r, cmd.note); r.updatedAt = Date.now(); saveData(); renderAll(); }
+      cubSay((r.status === 'visited' ? `You've already been to **${r.name}**! It's on your Been There list.` : `**${r.name}** is already on your Want to Try list.`) + (cmd.note ? `\nSaved note: ${cmd.note}` : ''), [
         { label: 'Open it', primary: true, run: () => { closeChat(); openDetailModal(r.id); } },
       ]);
       return;
     }
     const spot = createSpotFrom({ found, name, status: 'want-to-try' });
-    if (spot) { saveData(); renderAll(); cubAddWant(spot); }
+    if (spot) { cubSaveNote(spot, cmd.note); saveData(); renderAll(); cubAddWant(spot); }
   });
   return;
   }
@@ -5422,9 +5496,9 @@ function answerCubQuestion (text) {
   return true;
 }
 
-async function sendChat () {
+async function sendChat (message) {
   const input = document.getElementById('chat-input');
-  const text = input.value.trim();
+  const text = (typeof message === 'string' ? message : input.value).trim();
   if (!text) return;
   input.value = '';
   addChatMsg(text, 'user');
@@ -5441,8 +5515,8 @@ async function sendChat () {
   if (cmd) { trackProductEvent('cub_command', { kind: cmd.kind }); await handleCubCommand(cmd); return; }
 
   // A place you saved, by name: open it.
-  const named = state.restaurants.find(r => r.name && text.toLowerCase().includes(r.name.toLowerCase()));
-  if (named && !/\?$/.test(text)) {
+  const named = savedSpotNamed(text);
+  if (named) {
   cubSay(restaurantDetailResponse(named), [{ label: `Open ${named.name}`, primary: true, run: () => { closeChat(); openDetailModal(named.id); } }]);
   return;
   }
@@ -5455,9 +5529,15 @@ async function sendChat () {
       // He asks the app to search real places near you rather than asking where you are.
       const find = String(reply).match(/\[\[\s*FIND:\s*([^\]]{2,60})\]\]/i);
       if (find) { await cubFindNearby(find[1].trim().toLowerCase()); return; }
+      if (!String(reply).trim()) throw new Error('Byte Cub returned an empty answer.');
       cubSay(reply);
       return;
-    } catch { /* fall through to the built-in answers */ }
+    } catch (err) {
+      console.warn('[FTB] Byte Cub chat failed:', err);
+      hideTyping();
+      cubSay("I couldn't reach the AI just now. Here's what I can tell from your saved list:\n\n" + chatResponse(text));
+      return;
+    }
   }
   setTimeout(() => { hideTyping(); cubSay(chatResponse(text)); }, 350);
 }
@@ -7129,7 +7209,7 @@ function buildDecisionModeShortlist () {
 
   const swipe = swipeCraving();
 
-  const scored = state.restaurants.map(r => {
+  const scored = state.restaurants.filter(isAvailableSpot).map(r => {
   const distance = distOf(r);
   let score = scoreMoodPick(r, mood);
   const cuisineLc = String(r.cuisine || '').toLowerCase();
@@ -7356,7 +7436,8 @@ function runSmartPlanner () {
   if (!out) return;
 
   const nearbyFallback = getNearbyDiscoveryRows(16);
-  const plannerPool = state.restaurants.length ? [...state.restaurants] : nearbyFallback;
+  const available = state.restaurants.filter(isAvailableSpot);
+  const plannerPool = available.length ? available : nearbyFallback;
 
   const picks = plannerPool.map(r => {
   if (budget && (r.priceRange || 0) > budget) return { r, s: -999 };
@@ -7441,7 +7522,7 @@ function buildSmartItinerary () {
   };
   const w = styleWeights[style] || styleWeights.balanced;
 
-  const pool = [...state.restaurants]
+  const pool = state.restaurants.filter(isAvailableSpot)
   .map(r => {
     const d = distOf(r);
     const moodScore = scoreMoodPick(r, style === 'balanced' ? 'quick' : style);
@@ -7515,7 +7596,7 @@ function _dvCandidates () {
 function openDinnerRooms (presetIds = null) {
   if (grizzlyLocked('vote')) return;
   _dvSelected.clear();
-  const preset = Array.isArray(presetIds) ? presetIds.filter(id => state.restaurants.some(r => r.id === id)).slice(0, DV_MAX) : [];
+  const preset = Array.isArray(presetIds) ? presetIds.filter(id => state.restaurants.some(r => r.id === id && isAvailableSpot(r))).slice(0, DV_MAX) : [];
   if (preset.length) preset.forEach(id => _dvSelected.add(id));
   else _dvCandidates().slice(0, 3).forEach(r => _dvSelected.add(r.id));
   renderDinnerVote();
@@ -7688,7 +7769,7 @@ async function exportHighlightCard (kind = 'weekly') {
   ];
   } else if (kind === 'mood') {
   const mood = document.querySelector('.home-mood-chip.active')?.dataset.mood || 'quick';
-  const picks = [...state.restaurants]
+  const picks = state.restaurants.filter(isAvailableSpot)
     .map(r => ({ ...r, s: scoreMoodPick(r, mood) }))
     .sort((a, b) => b.s - a.s)
     .slice(0, 3);
@@ -9362,7 +9443,7 @@ async function runTonightsPick () {
   return;
   }
 
-  const all = state.restaurants;
+  const all = state.restaurants.filter(isAvailableSpot);
   if (!all.length) {
   document.getElementById('tonight-result').innerHTML = state.userLat && state.userLng
     ? '<p style="text-align:center;color:var(--text-dim)">No nearby foodie finds right now. Try Discover Nearby for a wider scan.</p>'
@@ -11268,6 +11349,7 @@ function renderMobileHub (filter = '') {
   const body = document.getElementById('mobile-hub-body');
   if (!body) return;
   const q = filter.trim().toLowerCase();
+  const showContests = /\b(?:contests?|competitions?|food challenges?)\b/.test(q);
   const lock = action => (GRIZZLY_TOOLS.has(action) && !hasGrizzly() ? '<span class="hub-lock">GRIZZLY</span>' : '');
   const card = ([action, , label]) => {
   const [sub, style] = HUB_INFO[action] || ['', 'photo'];
@@ -11299,9 +11381,9 @@ function renderMobileHub (filter = '') {
     <div class="${rowClass}">${items.map(card).join('')}</div>
   </div>`;
   }).join('');
-  body.innerHTML = html || '<p class="hub-empty">No tools match “' + escHtml(filter) + '”.</p>';
+  body.innerHTML = html || (showContests ? '' : '<p class="hub-empty">No tools match “' + escHtml(filter) + '”.</p>');
   fillHubFoodPhotos(body);
-  if (!q) window.renderFoodEventsHub?.(body);
+  if (!q || showContests) window.renderFoodEventsHub?.(body);
 }
 
 function openMobileHub () {
@@ -11322,6 +11404,11 @@ function closeMobileHub () {
 
 function initMobileHub () {
   document.getElementById('mobile-hub-close')?.addEventListener('click', closeMobileHub);
+  document.getElementById('hub-contests-btn')?.addEventListener('click', () => {
+    const search = document.getElementById('mobile-hub-search');
+    if (search) search.value = 'competitions';
+    renderMobileHub('competitions');
+  });
   document.getElementById('mobile-hub-search')?.addEventListener('input', e => renderMobileHub(e.target.value));
   document.getElementById('mobile-hub-body')?.addEventListener('click', e => {
   const tile = e.target.closest('.hub-tile, .hub-card');
@@ -11418,7 +11505,7 @@ function closeCravingEngine () {
 function runCravingEngine () {
   const moods   = [..._cravingMoods];
   const freetext = document.getElementById('craving-freetext').value.toLowerCase();
-  const savedCandidates = state.restaurants.filter(r => r.status === 'want-to-try' || r.status === 'visited');
+  const savedCandidates = state.restaurants.filter(r => isAvailableSpot(r) && (r.status === 'want-to-try' || r.status === 'visited'));
   const nearbyCandidates = getNearbyDiscoveryRows(20);
   const candidates = savedCandidates.length ? savedCandidates : nearbyCandidates;
   if (!candidates.length) {
@@ -13042,7 +13129,7 @@ function renderCraveHome () {
   const section = document.getElementById('crave-home');
   const list = document.getElementById('crave-home-list');
   if (!section || !list) return;
-  const all = state.restaurants || [];
+  const all = (state.restaurants || []).filter(isAvailableSpot);
   if (!all.length) { section.classList.add('hidden'); return; }
   section.classList.remove('hidden');
 
@@ -15301,6 +15388,14 @@ async function sendAiMessage (userText) {
   _appendAiMsg('user', userText);
   document.getElementById('ai-chat-input').value = '';
 
+  if (parseCubCommand(userText)) {
+    _appendAiMsg('assistant', 'Opening the save and action controls in our chat.');
+    closeAiPanel();
+    openChat();
+    await sendChat(userText);
+    return;
+  }
+
   if (!AI.hasAccess()) {
   const ruleResp = typeof chatResponse === 'function' ? chatResponse(userText) : "I need a Gemini API key to give smart answers!";
   _appendAiMsg('assistant', ruleResp);
@@ -15315,13 +15410,16 @@ async function sendAiMessage (userText) {
   const find = String(reply).match(/\[\[\s*FIND:\s*([^\]]{2,60})\]\]/i);
   if (find) {
     _appendAiMsg('assistant', `Looking for ${find[1].trim()} near you…`);
+    closeAiPanel();
     openChat();
     await cubFindNearby(find[1].trim().toLowerCase());
     return;
   }
+  if (!String(reply).trim()) throw new Error('Byte Cub returned an empty answer.');
   _appendAiMsg('assistant', reply);
   } catch (err) {
   thinking.remove();
+  console.warn('[FTB] Byte Cub AI panel failed:', err);
   if (err.message === 'NO_KEY') {
     _appendAiMsg('assistant', 'Byte Cub is included by default. If AI is unavailable right now, please try again in a moment.');
   } else {
@@ -16216,6 +16314,7 @@ function _renderBeenaWhile () {
   const now = Date.now();
   const MS_90 = 90 * 24 * 60 * 60 * 1000;
   const candidates = state.restaurants
+  .filter(isAvailableSpot)
   .filter(r => r.myRating >= 4 && (r.status === 'visited' || (r.visits && r.visits.length)))
   .map(r => {
     const lastLogDate = r.visits && r.visits.length
@@ -16285,8 +16384,8 @@ async function generateMealPlan () {
   result.classList.remove('hidden');
   result.innerHTML = '<span class="ai-thinking-inline"><span></span><span></span><span></span></span> Planning your foodie week…';
   btn.disabled = true;
-  const wantToTry = state.restaurants.filter(r => r.status === 'want-to-try').slice(0, 10).map(r => r.name + (r.cuisine ? ' (' + r.cuisine + ')' : '')).join(', ');
-  const faves = state.restaurants.filter(r => r.myRating >= 4).slice(0, 8).map(r => r.name + (r.cuisine ? ' (' + r.cuisine + ')' : '')).join(', ');
+  const wantToTry = state.restaurants.filter(r => isAvailableSpot(r) && r.status === 'want-to-try').slice(0, 10).map(r => r.name + (r.cuisine ? ' (' + r.cuisine + ')' : '')).join(', ');
+  const faves = state.restaurants.filter(r => isAvailableSpot(r) && r.myRating >= 4).slice(0, 8).map(r => r.name + (r.cuisine ? ' (' + r.cuisine + ')' : '')).join(', ');
   const prompt = `You are a personal dining concierge. Create a ${days}-day dining plan for this week.
 
 User profile:
@@ -16338,7 +16437,7 @@ function closeGroupVote () {
   maybeHideOverlay();
 }
 function _renderGroupVotePicker () {
-  const sorted = state.restaurants.slice().sort((a, b) => (b.myRating || 0) - (a.myRating || 0)).slice(0, 30);
+  const sorted = state.restaurants.filter(isAvailableSpot).sort((a, b) => (b.myRating || 0) - (a.myRating || 0)).slice(0, 30);
   document.getElementById('groupvote-picker').innerHTML = sorted.map(r =>
   `<div class="groupvote-pick-item${_gvSelected.has(r.id) ? ' selected' : ''}" data-id="${r.id}">
     <div class="groupvote-pick-check">${_gvSelected.has(r.id) ? '✓' : ''}</div>
@@ -16699,7 +16798,7 @@ function openCheckinWithPhoto (id) {
 
 /* ── Priority Badge Helper ──────────────────────────────── */
 function priorityBadgeHtml (r) {
-  if (!r.priority || r.status !== 'want-to-try') return '';
+  if (!isAvailableSpot(r) || !r.priority || r.status !== 'want-to-try') return '';
   if (r.priority === 'hot')    return '<span class="priority-badge hot"> Must Go!</span>';
   if (r.priority === 'next')   return '<span class="priority-badge next">⭐ Up Next</span>';
   if (r.priority === 'someday') return '<span class="priority-badge someday"> Someday</span>';
@@ -16732,7 +16831,7 @@ function neverTriedCuisineResponse () {
 
 function timeBasedResponse (q) {
   const hour = new Date().getHours();
-  const want = state.restaurants.filter(r => r.status === 'want-to-try');
+  const want = state.restaurants.filter(r => isAvailableSpot(r) && r.status === 'want-to-try');
   const isMorning = hour < 11;
   const isLunch   = hour >= 11 && hour < 15;
   const isDinner  = hour >= 17;
@@ -16781,7 +16880,7 @@ function funnyNoteResponse () {
 }
 
 function goingTonightResponse () {
-  const want = state.restaurants.filter(r => r.status === 'want-to-try');
+  const want = state.restaurants.filter(r => isAvailableSpot(r) && r.status === 'want-to-try');
   const hot  = want.filter(r => r.priority === 'hot');
   const pool = hot.length ? hot : want;
   if (!pool.length) return `Your want-to-try list is empty - add some spots and come back! `;

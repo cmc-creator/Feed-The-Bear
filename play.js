@@ -149,7 +149,7 @@ let _swipeCurrentCard = null;
 function openSwipeDeck () {
   if (grizzlyLocked('swipe')) return;
   _swipeDeck = [...state.restaurants]
-    .filter(r => r.status === 'want-to-try')
+    .filter(r => isAvailableSpot(r) && r.status === 'want-to-try')
     .sort(() => Math.random() - .5);
   _swipeIdx = 0;
   _renderSwipeDeck();
@@ -286,7 +286,7 @@ let _spinning     = false;
 const WHEEL_COLORS = ['#E8B15A','#FF8C42','#FFA62B','#FFD166','#06D6A0','#118AB2','#7C83FD','#EF476F','#F78C6B','#C77DFF'];
 
 function openSpinWheel () {
-  _spinItems = state.restaurants.filter(r => r.status === 'want-to-try' || r.status === 'visited');
+  _spinItems = state.restaurants.filter(r => isAvailableSpot(r) && (r.status === 'want-to-try' || r.status === 'visited'));
   if (_spinItems.length < 2) {
     showToast('Need more restaurants', 'Add at least 2 to your list first.', 'error');
     return;
@@ -412,7 +412,7 @@ function closeDuel () {
 }
 function _populateDuelPickers () {
   const opts = state.restaurants
-    .slice()
+    .filter(isAvailableSpot)
     .sort((a,b) => a.name.localeCompare(b.name))
     .map(r => `<option value="${r.id}">${escHtml(r.name)}${r.cuisine ? ' (' + escHtml(r.cuisine) + ')' : ''}</option>`)
     .join('');
