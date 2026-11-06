@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gift Grizzly | Feed The Bear</title>
+  <meta name="description" content="Give a food lover Feed The Bear Grizzly: unlimited spots, Byte Cub AI picks and their own Bear Cave page. 3 months or a year." />
+  <link rel="canonical" href="https://www.feed-the-bear.com/gift.html" />
+  <meta property="og:title" content="Gift Grizzly | Feed The Bear" />
+  <meta property="og:description" content="The gift for the friend who always knows where to eat." />
+  <meta property="og:image" content="https://www.feed-the-bear.com/og-image.jpg" />
+  <meta name="theme-color" content="#1b241c" />
+  <link rel="icon" href="/feedbear-sm.jpg" />
+  <style>
+    :root { --bg: #1b241c; --card: #26322a; --card2: #2f3d33; --text: #f6ecdc; --dim: #c9bfae; --accent: #ff8a3d; --gold: #ffd98a; --bad: #ffb4a8; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 500 1rem/1.5 system-ui, -apple-system, sans-serif; }
+    main { max-width: 560px; margin: 0 auto; padding: 24px 16px 48px; }
+    a { color: var(--gold); }
+    .top { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); font-weight: 800; }
+    .top img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+    .hero { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 20px 0 14px; }
+    .hero img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 50%; border: 2px solid rgba(255,217,138,.4); }
+    h1 { font-size: 1.8rem; line-height: 1.15; margin: 0 0 6px; text-wrap: balance; }
+    .lead { color: var(--dim); margin: 0 0 18px; }
+    form { display: grid; gap: 12px; background: var(--card); border-radius: 18px; padding: 16px; }
+    .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .plan { position: relative; display: grid; gap: 2px; padding: 12px; border-radius: 14px; background: var(--card2); border: 2px solid transparent; cursor: pointer; }
+    .plan input { position: absolute; opacity: 0; }
+    .plan:has(input:checked) { border-color: var(--accent); }
+    .plan:has(input:focus-visible) { outline: 2px solid var(--gold); outline-offset: 2px; }
+    .plan b { font-size: 1.05rem; }
+    .plan .price { font-size: 1.4rem; font-weight: 800; color: var(--gold); }
+    .plan small { color: var(--dim); }
+    label { display: grid; gap: 4px; font-size: .82rem; font-weight: 700; color: var(--dim); }
+    input[type=text], input[type=email], textarea { font: inherit; color: var(--text); background: var(--card2); border: 1px solid rgba(255,255,255,.12); border-radius: 10px; padding: 11px; }
+    textarea { min-height: 70px; resize: vertical; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 420px) { .row { grid-template-columns: 1fr; } }
+    button { font: inherit; font-weight: 800; font-size: 1.05rem; padding: 15px; border: 0; border-radius: 14px; background: var(--accent); color: #1b130b; cursor: pointer; }
+    button:disabled { opacity: .6; }
+    .err { color: var(--bad); font-weight: 700; min-height: 1.2em; margin: 0; }
+    .what { margin-top: 22px; color: var(--dim); font-size: .92rem; }
+    .what li { margin-bottom: 4px; }
+    .done { text-align: center; background: var(--card); border-radius: 18px; padding: 24px 16px; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<main>
+  <a class="top" href="/"><img src="/feedbear-sm.jpg" alt="" />Feed The Bear</a>
+  <div class="hero" aria-hidden="true">
+    <img src="/assets/avatars/bear-birthday.jpg" alt="" /><img src="/assets/avatars/bear-tacos.jpg" alt="" /><img src="/assets/avatars/bear-donut.jpg" alt="" /><img src="/assets/avatars/bear-burger.jpg" alt="" />
+  </div>
+
+  <section id="done" class="done" hidden>
+    <h1>Gift sent 🎁</h1>
+    <p class="lead" id="done-line">We emailed them. Grizzly turns on the moment they sign in.</p>
+    <a href="/gift.html">Send another</a> · <a href="/app.html">Open Feed The Bear</a>
+  </section>
+
+  <section id="buy">
+    <h1>Give Grizzly to a food lover</h1>
+    <p class="lead">For the friend who always knows where to eat. They get every Grizzly perk, and you never need an account.</p>
+    <form id="gift-form" novalidate>
+      <div class="plans" role="radiogroup" aria-label="How long">
+        <label class="plan"><input type="radio" name="months" value="3" checked /><b>3 months</b><span class="price">$14.99</span><small>A great stocking stuffer</small></label>
+        <label class="plan"><input type="radio" name="months" value="12" /><b>1 year</b><span class="price">$49.99</span><small>Best value</small></label>
+      </div>
+      <div class="row">
+        <label>Their email<input id="to" type="email" required autocomplete="off" placeholder="friend@example.com" /></label>
+        <label>Their first name<input id="toName" type="text" maxlength="40" placeholder="Sam" /></label>
+      </div>
+      <div class="row">
+        <label>Your name<input id="from" type="text" maxlength="40" placeholder="Connie" /></label>
+        <label>Your email (for the receipt)<input id="buyerEmail" type="email" autocomplete="email" placeholder="you@example.com" /></label>
+      </div>
+      <label>A note for them (optional)<textarea id="message" maxlength="300" placeholder="Happy holidays! Let's try all of these together."></textarea></label>
+      <p class="err" id="err" role="alert"></p>
+      <button type="submit" id="go">Continue to payment</button>
+    </form>
+    <ul class="what">
+      <li>Unlimited saved spots and photos</li>
+      <li>Byte Cub AI picks: "tacos near me", what to order, and more</li>
+      <li>Their own Bear Cave page to share their favorites</li>
+      <li>We email them the gift, and it's on the moment they sign in with that email</li>
+    </ul>
+  </section>
+</main>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+if (params.get('sent')) {
+  $('buy').hidden = true; $('done').hidden = false;
+  const who = params.get('to');
+  if (who) $('done-line').textContent = `We emailed ${who}. Grizzly turns on the moment they sign in.`;
+}
+$('gift-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('err').textContent = '';
+  const to = $('to').value.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(to)) { $('err').textContent = "Check your friend's email."; $('to').focus(); return; }
+  $('go').disabled = true; $('go').textContent = 'Opening checkout…';
+  try {
+    const res = await fetch('/api/gift', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      to, toName: $('toName').value, from: $('from').value, buyerEmail: $('buyerEmail').value.trim(),
+      months: Number(document.querySelector('input[name=months]:checked').value), message: $('message').value,
+    }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.url) throw new Error(data.error || 'Checkout did not open. Please try again.');
+    location.href = data.url;
+  } catch (err) {
+    $('err').textContent = err.message;
+    $('go').disabled = false; $('go').textContent = 'Continue to payment';
+  }
+});
+</script>
+</body>
+</html>

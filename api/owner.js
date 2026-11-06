@@ -73,6 +73,23 @@ async function endVip (db, stripe, email) {
   return true;
 }
 
+// Grizzly for this email: now if they have an account, else at first sign-in.
+// Months add on to time they already have (a second gift extends the first).
+async function grantVip (db, fb, { email, months = 0, note = '', by = '' }) {
+  email = String(email).trim().toLowerCase();
+  months = Math.max(0, Math.min(60, Math.floor(Number(months) || 0)));
+  const cur = (await vipRef(db, email).get()).data();
+  const from = isLive(cur) && cur.until ? Math.max(Date.now(), Date.parse(cur.until)) : Date.now();
+  const forGood = isLive(cur) && !cur.until;
+  const until = forGood || !months ? null : new Date(from + months * 30.44 * 86400000).toISOString();
+  let uid = null;
+  try { uid = (await fb.auth().getUserByEmail(email)).uid; } catch { /* no account yet */ }
+  const vip = { email, until, note: String(note || '').slice(0, 120), at: new Date().toISOString(), by, active: true, uid, pending: !uid };
+  await vipRef(db, email).set(vip);
+  if (uid) await applyVip(db, uid, vip);
+  return { pending: !uid, until };
+}
+
 // Signed in for the first time with an email the owner made a VIP: Grizzly now.
 async function applyPendingVip (db, uid, email) {
   if (!email) return false;
@@ -149,15 +166,9 @@ module.exports = async function handler (req, res) {
     if (body.action === 'grant') {
       const email = String(body.email || '').trim().toLowerCase();
       if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'That email does not look right.' });
-      const months = Math.max(0, Math.min(60, Math.floor(Number(body.months) || 0)));
-      const until = months ? new Date(Date.now() + months * 30.44 * 86400000).toISOString() : null;
-      let uid = null;
-      try { uid = (await fb.auth().getUserByEmail(email)).uid; } catch { /* no account yet */ }
-      const vip = { email, until, note: String(body.note || '').slice(0, 120), at: new Date().toISOString(), by: me, active: true, uid, pending: !uid };
-      await vipRef(db, email).set(vip);
-      if (uid) await applyVip(db, uid, vip);
-      return res.status(200).json({ ok: true, pending: !uid, until,
-        message: uid ? `${email} has Grizzly now${until ? ` until ${until.slice(0, 10)}` : ''}.` : `${email} gets Grizzly the first time they sign in with that email.` });
+      const r = await grantVip(db, fb, { email, months: body.months, note: body.note, by: me });
+      return res.status(200).json({ ok: true, pending: r.pending, until: r.until,
+        message: !r.pending ? `${email} has Grizzly now${r.until ? ` until ${r.until.slice(0, 10)}` : ''}.` : `${email} gets Grizzly the first time they sign in with that email.` });
     }
 
     if (body.action === 'revoke') {
@@ -207,6 +218,7 @@ module.exports = async function handler (req, res) {
 };
 
 module.exports.applyPendingVip = applyPendingVip;
+module.exports.grantVip = grantVip;
 module.exports.expireVips = expireVips;
 module.exports.vipFor = vipFor;
 module.exports.isLive = isLive;

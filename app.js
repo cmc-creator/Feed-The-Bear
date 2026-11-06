@@ -1787,6 +1787,8 @@ function openAccountModal () {
   const overlay = document.getElementById('account-overlay');
   if (!overlay) return;
   document.getElementById('account-owner-row')?.classList.toggle('hidden', String(window._ftbUserEmail || '').toLowerCase() !== OWNER_EMAIL);
+  // Gifts are sold on the website only (the Android app follows Google Play's billing rules).
+  document.getElementById('account-gift-row')?.classList.toggle('hidden', !!window.Capacitor?.isNativePlatform?.());
   const profile = loadUserProfile() || { name: 'Foodie', avatar: DEFAULT_AVATAR, joinDate: new Date().toISOString() };
   const normalizedAvatar = profile.avatar === '' ? DEFAULT_AVATAR : (profile.avatar || DEFAULT_AVATAR);
 

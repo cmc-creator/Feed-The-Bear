@@ -24,7 +24,7 @@ const Stripe = require('stripe');
 const admin  = require('firebase-admin');
 const { rewardInviter } = require('./_referral');
 const play = require('./_play');
-const { vipFor } = require('./owner');
+const { vipFor, grantVip } = require('./owner');
 const { sendEmail, emailHtml, esc } = require('./_email');
 
 function getAdmin () {
@@ -115,6 +115,37 @@ async function inviteFor (stripe, subId) {
   return uid && ref ? { uid, ref } : null;
 }
 
+async function giftPaid (db, session) {
+  const m = session.metadata || {};
+  const ref = db.doc(`gifts/${session.id}`);
+  if ((await ref.get()).exists) return; // Stripe can send an event twice
+  const months = Number(m.months) === 12 ? 12 : 3;
+  const from = m.from || 'A friend';
+  const r = await grantVip(db, getAdmin(), { email: m.to, months, note: `Gift from ${from}`, by: 'gift' });
+  await ref.set({ to: m.to, from, months, buyer: session.customer_details?.email || session.customer_email || '', paid: session.amount_total || 0, at: new Date().toISOString(), pending: r.pending });
+  await bump(db, 'gift_bought').catch(() => {});
+  const app = process.env.APP_URL || 'https://www.feed-the-bear.com';
+  const hi = m.toName ? `Hi ${esc(m.toName)},` : 'Hi,';
+  await sendEmail({
+    to: m.to, name: m.toName || '', tag: 'gift',
+    subject: `🎁 ${from} gave you Feed The Bear Grizzly`,
+    html: emailHtml([
+      `<h1 style="margin:0 0 8px;font-size:22px">You got Grizzly! 🐻</h1>`,
+      `<p>${hi} <strong>${esc(from)}</strong> gave you ${months === 12 ? 'a year' : '3 months'} of Feed The Bear Grizzly: unlimited spots, Byte Cub AI picks, your Bear Cave page and more.</p>`,
+      m.message ? `<p style="padding:12px 14px;border-radius:12px;background:#f3ead9;font-style:italic">"${esc(m.message)}"</p>` : '',
+      `<p>Sign in with <strong>${esc(m.to)}</strong> and it's already on.</p>`,
+      `<p><a href="${app}/app.html" style="display:inline-block;padding:12px 18px;border-radius:12px;background:#ff8a3d;color:#1b130b;font-weight:800;text-decoration:none">Open Feed The Bear</a></p>`,
+    ]),
+  }).catch(err => console.error('[FTB] gift email:', err.message));
+  const buyer = session.customer_details?.email || session.customer_email;
+  if (buyer) {
+    await sendEmail({
+      to: buyer, tag: 'gift-receipt', subject: `Your Grizzly gift for ${m.toName || m.to} is on its way`,
+      html: emailHtml([`<h1 style="margin:0 0 8px;font-size:22px">Gift sent 🎁</h1>`, `<p>${esc(m.toName || m.to)} has ${months === 12 ? 'a year' : '3 months'} of Grizzly${r.pending ? ' waiting for them the first time they sign in' : ' on their account now'}. We emailed them too. Thank you!</p>`]),
+    }).catch(() => {});
+  }
+}
+
 module.exports = async function handler (req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -131,6 +162,12 @@ module.exports = async function handler (req, res) {
   try {
     const db = getAdmin().firestore();
     const obj = event.data.object;
+
+    // A Grizzly gift (gift.js): the friend gets Grizzly for those months, and an email.
+    if (event.type === 'checkout.session.completed' && obj.metadata?.kind === 'gift') {
+      if (obj.payment_status === 'paid') await giftPaid(db, obj);
+      return res.status(200).json({ received: true });
+    }
 
     if (event.type === 'checkout.session.completed') {
       const uid = obj.metadata?.uid || obj.client_reference_id;

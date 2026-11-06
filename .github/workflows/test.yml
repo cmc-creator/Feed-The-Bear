@@ -172,6 +172,9 @@ jobs:
       - name: Arcade games and photo bear avatars
         working-directory: tests
         run: node games.test.js
+      - name: Gift Grizzly
+        working-directory: tests
+        run: node gift.test.js
       - name: Several photos and videos at once
         working-directory: tests
         run: node multiphoto.test.js
