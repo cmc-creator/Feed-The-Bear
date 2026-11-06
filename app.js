@@ -1939,6 +1939,7 @@ function openEditProfile () {
 function openPersonalizeSettings () {
   const overlay = document.getElementById('personalize-overlay');
   if (!overlay) return;
+  document.getElementById('settings-owner-row')?.classList.toggle('hidden', String(window._ftbUserEmail || '').toLowerCase() !== OWNER_EMAIL);
 
   const themeSel = document.getElementById('personalize-theme-select');
   const densitySel = document.getElementById('personalize-density-select');
