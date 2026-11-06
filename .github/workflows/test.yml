@@ -151,6 +151,9 @@ jobs:
       - name: Eating contests in Play; updates never reload the page
         working-directory: tests
         run: node foodevents.test.js
+      - name: Accepting an invite makes you friends both ways; real names
+        working-directory: tests
+        run: node followback.test.js
       - name: Several photos and videos at once
         working-directory: tests
         run: node multiphoto.test.js

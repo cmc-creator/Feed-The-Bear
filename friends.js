@@ -35,8 +35,18 @@ function buildProfileData () {
   state.restaurants.forEach(r => dishesOf(r).forEach(d => {
     if (d.verdict === 'want' && craves.length < 10) craves.push({ d: String(d.name).slice(0, 40), at: String(r.name).slice(0, 60) });
   }));
+  return { v: 2, id: getProfileShareId(), u: shownName().slice(0, 30), picks, w: craves, ts: Date.now() };
+}
+
+// The name friends see: the one you typed, else your Google first name.
+// "Foodie" is only the placeholder, and showed every friend as "Foodie".
+function shownName () {
   const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
-  return { v: 2, id: getProfileShareId(), u: String(profile.name || '').slice(0, 30), picks, w: craves, ts: Date.now() };
+  const typed = String(profile.name || '').trim();
+  if (typed && typed.toLowerCase() !== 'foodie') return typed;
+  let google = '';
+  try { google = String(firebase.auth().currentUser?.displayName || '').trim().split(/\s+/)[0]; } catch { /* signed out */ }
+  return google || typed;
 }
 
 function getProfileShareId () {
@@ -122,6 +132,8 @@ function ensureInviteName () {
   // "Foodie" is the placeholder every new profile starts with, not a real name.
   const current = String(profile.name || '').trim();
   if (current && current.toLowerCase() !== 'foodie') return true;
+  const known = shownName();
+  if (known && known.toLowerCase() !== 'foodie') { saveUserProfile({ ...profile, name: known }); return true; }
   const name = String(window.prompt('What name should your friends see on your invite?') || '').trim().slice(0, 30);
   if (!name) return false;
   saveUserProfile({ ...profile, name });
@@ -666,7 +678,34 @@ async function loadFollowers () {
       id: String(f?.id || '').slice(0, 40), u: String(f?.u || 'Friend').slice(0, 30),
     })).filter(f => /^[a-z0-9]{8,40}$/.test(f.id)) : [];
   } catch { _followers = []; noteFriendsError('who follows you', 0, {}); }
+  followBackNew();
   if (!document.getElementById('friends-overlay')?.classList.contains('hidden')) renderFriendsList();
+}
+
+// Accepting your invite (following you) makes you friends both ways: on
+// Grizzly each new follower is followed back once. Unfollowing them sticks.
+const FOLLOWED_BACK_KEY = 'ftb_followed_back_v1';
+function followBackNew () {
+  let done;
+  try { done = new Set(JSON.parse(localStorage.getItem(FOLLOWED_BACK_KEY)) || []); } catch { done = new Set(); }
+  const following = new Set(getFriends().map(f => f.data?.id).filter(Boolean));
+  let changed = false;
+  for (const f of _followers || []) {
+    if (done.has(f.id)) continue;
+    if (!following.has(f.id)) {
+      // Free accounts follow one friend, so they choose who with Follow back.
+      if (!hasGrizzly()) continue;
+      if (!followFriend({ id: f.id, u: f.u, picks: [], w: [], ts: 0 }, { quiet: true })) continue;
+      following.add(f.id);
+      showToast(`You and ${f.u} are friends`, `${f.u} accepted your invite, so you follow each other now.`, 'success');
+    }
+    done.add(f.id);
+    changed = true;
+  }
+  if (changed) {
+    try { localStorage.setItem(FOLLOWED_BACK_KEY, JSON.stringify([...done].slice(-200))); } catch { /* storage full */ }
+    refreshFriendsLive(true);
+  }
 }
 
 /* What the Friends screen knows, said at the top: which account, how much
