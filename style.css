@@ -9427,3 +9427,5 @@ button.map-group-row { cursor: pointer; }
 .fx-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .fx-page { text-decoration: none; }
 .fx-card .friend-remove { width: 30px; height: 30px; min-width: 0; flex-shrink: 0; background: none; box-shadow: none; color: var(--text-dim); font-size: .9rem; }
+
+a.account-action-row { text-decoration: none; color: inherit; }

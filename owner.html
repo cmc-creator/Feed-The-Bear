@@ -49,12 +49,13 @@
 <main>
   <header>
     <h1>Feed The Bear owner <small id="who">VIP access and discounts</small></h1>
-    <a href="/usage.html">Usage dashboard</a>
+    <span style="display:flex;gap:14px;flex-wrap:wrap"><a href="/app.html">← Back to the app</a><a href="/usage.html">Usage dashboard</a></span>
   </header>
 
   <section id="gate" class="panel gate">
     <p id="gate-msg">Sign in with your owner account.</p>
     <button type="button" class="btn" id="sign-in">Sign in with Google</button>
+    <p class="lead" style="margin-top:14px">Or <a href="/app.html">sign in on the app</a> as cmc@conniemichelleconsulting.com, then come back here.</p>
   </section>
 
   <div id="portal" hidden>
@@ -189,7 +190,17 @@ try {
   const auth = firebase.auth();
   const google = new firebase.auth.GoogleAuthProvider();
   google.setCustomParameters({ prompt: 'select_account' });
-  $('sign-in').addEventListener('click', () => auth.signInWithPopup(google).catch(e => showGate(e.message)));
+  // Signed in to the app in this browser already: no sign-in needed here.
+  // A pop-up that fails (Google's "Something went wrong", a blocked window)
+  // falls back to signing in on a full page.
+  auth.getRedirectResult().catch(e => showGate(e.message));
+  $('sign-in').addEventListener('click', () => {
+    auth.signInWithPopup(google).catch(e => {
+      if (e && e.code === 'auth/popup-closed-by-user') { showGate('Sign in with your owner account.'); return; }
+      showGate('Opening Google sign-in…');
+      auth.signInWithRedirect(google).catch(err => showGate(err.message));
+    });
+  });
   auth.onAuthStateChanged(u => {
     user = u;
     $('sign-in').hidden = !!u;

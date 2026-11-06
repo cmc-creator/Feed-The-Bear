@@ -1774,9 +1774,13 @@ function openProfileSetup () {
   if (skipBtn) skipBtn.onclick = doSkip;
 }
 
+// The owner's own account sees a way into the owner portal (owner.html; the server checks too).
+const OWNER_EMAIL = 'cmc@conniemichelleconsulting.com';
+
 function openAccountModal () {
   const overlay = document.getElementById('account-overlay');
   if (!overlay) return;
+  document.getElementById('account-owner-row')?.classList.toggle('hidden', String(window._ftbUserEmail || '').toLowerCase() !== OWNER_EMAIL);
   const profile = loadUserProfile() || { name: 'Foodie', avatar: DEFAULT_AVATAR, joinDate: new Date().toISOString() };
   const normalizedAvatar = profile.avatar === '' ? DEFAULT_AVATAR : (profile.avatar || DEFAULT_AVATAR);
 
