@@ -1395,6 +1395,24 @@ async function handleApi (method, { query = '', body = null } = {}) {
   return { ok: resp.ok, status: resp.status, data };
 }
 
+// The link printed on share images: your public page when it's on, else the site.
+async function myShareLink () {
+  const site = 'feed-the-bear.com';
+  if (!window._ftbUid) return site;
+  if (_myHandleFor !== window._ftbUid || _myHandle === null) {
+    try {
+      const { ok, data } = await handleApi('GET', { query: '?mine=1' });
+      if (ok) {
+        _myHandleFor = window._ftbUid;
+        _myHandle = data.handle || '';
+        _myPage = { public: !!data.public, views: Number(data.views) || 0, joins: Number(data.joins) || 0 };
+      }
+    } catch { /* offline: the site */ }
+  }
+  return _myHandle && _myPage?.public ? `${site}/@${_myHandle}` : site;
+}
+window.myShareLink = myShareLink;
+
 // Your username and public page show in Friends and in Settings (Account).
 async function renderMyHandle () {
   const boxes = ['friends-handle', 'settings-handle'].map(id => document.getElementById(id)).filter(Boolean);

@@ -742,7 +742,7 @@ function initFirebaseAuth () {
 
       _mergeFriendsFromCloud(cloudProfile);
       // Let the people you follow see you under "Following you" (once each).
-      setTimeout(() => { window.loadFollowing?.(); window.loadFollowers?.(); window.noteExistingFollows?.(); window.noteInviteJoined?.(); }, 5000);
+      setTimeout(() => { window.loadFollowing?.(); window.loadFollowers?.(); window.noteExistingFollows?.(); window.noteInviteJoined?.(); window.myShareLink?.(); }, 5000);
       // Opened an invite before signing in: follow them and show their spots now.
       setTimeout(() => window.resumePendingInvite?.(), 600);
 

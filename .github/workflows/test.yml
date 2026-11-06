@@ -157,6 +157,9 @@ jobs:
       - name: Reinstalling never repeats first-time setup
         working-directory: tests
         run: node reinstall.test.js
+      - name: Share images carry your link and a Google Play badge
+        working-directory: tests
+        run: node brand.test.js
       - name: Several photos and videos at once
         working-directory: tests
         run: node multiphoto.test.js

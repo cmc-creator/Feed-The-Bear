@@ -91,6 +91,46 @@ window.StoryCard = (() => {
 
   function stars (n) { return n ? '★'.repeat(n) + '☆'.repeat(5 - n) : ''; }
 
+  // Your link (feed-the-bear.com/@you when your page is public), never more than 2s to find.
+  function shareLink () {
+    const site = 'feed-the-bear.com';
+    const ask = window.myShareLink ? window.myShareLink().catch(() => site) : Promise.resolve(site);
+    return Promise.race([ask, new Promise(r => setTimeout(() => r(site), 2000))]);
+  }
+
+  // Bottom of every share image: your link on the left, a "Get it on Google
+  // Play" badge on the right, so each share works as a small ad for the app.
+  // `s` scales it (1 on the 1080-wide cards).
+  function brand (ctx, { x, y, w, link, s = 1, font = FONT, gold = GOLD }) {
+    const bw = 292 * s, bh = 86 * s, bx = x + w - bw, by = y - bh / 2;
+    ctx.save();
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = gold;
+    let size = 38 * s;
+    ctx.font = `800 ${size}px ${font}`;
+    while (ctx.measureText(link).width > w - bw - 30 * s && size > 20 * s) { size -= 2 * s; ctx.font = `800 ${size}px ${font}`; }
+    ctx.fillText(link, x, y);
+    // The badge
+    const r = 16 * s;
+    ctx.beginPath();
+    ctx.moveTo(bx + r, by); ctx.arcTo(bx + bw, by, bx + bw, by + bh, r); ctx.arcTo(bx + bw, by + bh, bx, by + bh, r);
+    ctx.arcTo(bx, by + bh, bx, by, r); ctx.arcTo(bx, by, bx + bw, by, r); ctx.closePath();
+    ctx.fillStyle = '#000'; ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, .45)'; ctx.lineWidth = 2 * s; ctx.stroke();
+    const tx = bx + 26 * s, ty = y;
+    ctx.beginPath(); ctx.moveTo(tx, ty - 22 * s); ctx.lineTo(tx + 34 * s, ty); ctx.lineTo(tx, ty + 22 * s); ctx.closePath();
+    const g = ctx.createLinearGradient(tx, ty - 22 * s, tx + 34 * s, ty + 22 * s);
+    g.addColorStop(0, '#00d7fe'); g.addColorStop(0.4, '#00f076'); g.addColorStop(0.7, '#ffd400'); g.addColorStop(1, '#ff3a44');
+    ctx.fillStyle = g; ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = `600 ${17 * s}px ${font}`;
+    ctx.fillText('GET IT ON', tx + 52 * s, ty - 15 * s);
+    ctx.font = `700 ${32 * s}px ${font}`;
+    ctx.fillText('Google Play', tx + 52 * s, ty + 14 * s);
+    ctx.restore();
+  }
+
   async function draw (r) {
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
@@ -177,9 +217,8 @@ window.StoryCard = (() => {
     // Footer
     ctx.fillStyle = 'rgba(255, 246, 230, .14)'; ctx.fillRect(PAD, H - 196, W - PAD * 2, 2);
     ctx.fillStyle = DIM; ctx.font = `700 34px ${FONT}`;
-    ctx.fillText('Remember every great bite', PAD, H - 128);
-    ctx.fillStyle = GOLD; ctx.font = `800 38px ${FONT}`;
-    ctx.fillText(location.host || 'feed-the-bear.vercel.app', PAD, H - 76);
+    ctx.fillText('Remember every great bite', PAD, H - 140);
+    brand(ctx, { x: PAD, y: H - 82, w: W - PAD * 2, link: await shareLink() });
 
     return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
   }
@@ -332,9 +371,8 @@ window.StoryCard = (() => {
 
     ctx.fillStyle = 'rgba(255, 246, 230, .14)'; ctx.fillRect(PAD, H - 196, W - PAD * 2, 2);
     ctx.fillStyle = DIM; ctx.font = `700 34px ${FONT}`;
-    ctx.fillText(spec.footer || 'Remember every great bite', PAD, H - 128);
-    ctx.fillStyle = GOLD; ctx.font = `800 38px ${FONT}`;
-    ctx.fillText(location.host || 'www.feed-the-bear.com', PAD, H - 76);
+    ctx.fillText(spec.footer || 'Remember every great bite', PAD, H - 140);
+    brand(ctx, { x: PAD, y: H - 82, w: W - PAD * 2, link: await shareLink() });
     return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
   }
 
@@ -365,5 +403,5 @@ window.StoryCard = (() => {
     track('story_card_opened', { kind: spec.kind || 'story' });
   }
 
-  return { open, openStory, draw, drawStory, close, pickDishes };
+  return { open, openStory, draw, drawStory, close, pickDishes, brand, shareLink };
 })();

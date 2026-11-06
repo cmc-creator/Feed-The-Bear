@@ -7583,7 +7583,7 @@ function closeShareHighlights () {
   maybeHideOverlay();
 }
 
-function exportHighlightCard (kind = 'weekly') {
+async function exportHighlightCard (kind = 'weekly') {
   const canvas = document.getElementById('share-canvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -7674,12 +7674,17 @@ function exportHighlightCard (kind = 'weekly') {
   ctx.fillText(line, 126, y + 8);
   });
 
-  ctx.fillStyle = '#FFD166';
-  ctx.font = '600 30px Poppins, system-ui';
-  ctx.fillText('feed the bear', 92, H - 128);
   ctx.fillStyle = 'rgba(255,255,255,.72)';
   ctx.font = '500 24px Poppins, system-ui';
-  ctx.fillText(new Date().toLocaleDateString(), 92, H - 88);
+  ctx.fillText(`Feed The Bear · ${new Date().toLocaleDateString()}`, 92, H - 178);
+  // Your link and a Google Play badge (story-card.js), so the card brings people in.
+  if (window.StoryCard?.brand) {
+    window.StoryCard.brand(ctx, { x: 92, y: H - 112, w: W - 184, link: await window.StoryCard.shareLink(), s: 0.85, font: 'Poppins, system-ui', gold: '#FFD166' });
+  } else {
+    ctx.fillStyle = '#FFD166';
+    ctx.font = '600 30px Poppins, system-ui';
+    ctx.fillText('feed-the-bear.com', 92, H - 112);
+  }
 
   canvas.toBlob(blob => {
   if (!blob) {
