@@ -310,7 +310,7 @@
           <img id="edit-photo-preview" class="profile-photo-preview hidden" alt="Profile photo preview" />
         </div>
         <label class="form-label">Your name</label>
-        <input id="edit-name" class="form-input" type="text" placeholder="Your name" maxlength="30" />
+        <input id="edit-name" class="form-input" type="text" aria-label="Your name" placeholder="Your name" maxlength="30" />
         <label class="form-label" style="margin-top:16px;margin-bottom:8px;display:block">Avatar</label>
         <div class="avatar-emoji-grid" id="edit-avatar-grid"></div>
         <label class="form-label" style="margin-top:16px;margin-bottom:8px;display:block">Profile photo</label>
@@ -1149,7 +1149,7 @@
       <p class="challenge-subtitle">Share your top picks and see whose taste reigns supreme.</p>
       <div id="challenge-preview" class="challenge-preview"></div>
       <div class="challenge-share-row">
-        <input id="challenge-link" class="challenge-link-input" readonly placeholder="Generating link…" />
+        <input id="challenge-link" class="challenge-link-input" readonly aria-label="Challenge invite link" placeholder="Generating link…" />
         <button id="challenge-copy-btn" class="btn-sm btn-orange">Copy</button>
       </div>
       <button id="challenge-share-btn" class="btn-primary" style="width:100%;margin-top:12px">Share Challenge</button>
@@ -1347,7 +1347,7 @@
         <button id="command-palette-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="command-palette-input-row">
-        <input id="command-palette-input" class="form-input" type="text" placeholder="Search actions, views, tools" autocomplete="off" />
+        <input id="command-palette-input" class="form-input" type="text" aria-label="Search actions, views and tools" placeholder="Search actions, views, tools" autocomplete="off" />
       </div>
       <div id="command-palette-results" class="command-palette-results"></div>
     </div>
@@ -1623,7 +1623,7 @@
             <h4>My Notes</h4>
             <span class="detail-notes-saved" id="detail-notes-saved" aria-live="polite"></span>
           </div>
-          <textarea id="detail-notes-edit" class="detail-notes-edit" rows="3"
+          <textarea id="detail-notes-edit" class="detail-notes-edit" rows="3" aria-label="My notes about this place"
             placeholder="Jot the vibe, what to order, and who joined you" maxlength="2000"></textarea>
         </div>
 
@@ -1631,7 +1631,7 @@
           <h4>Links</h4>
           <div id="detail-links-list" class="detail-links-list"></div>
           <div class="detail-links-add">
-            <input id="detail-link-input" class="form-input" type="url" inputmode="url" placeholder="Paste a TikTok, Instagram, review or menu link" />
+            <input id="detail-link-input" class="form-input" type="url" inputmode="url" aria-label="Add a link to this place" placeholder="Paste a TikTok, Instagram, review or menu link" />
             <button type="button" id="detail-link-add-btn" class="btn-sm btn-primary">Add</button>
           </div>
         </div>
@@ -1731,7 +1731,7 @@
   </div>
 
   <!-- ── Chat Panel ─────────────────────────────────────────── -->
-  <aside id="chat-panel" class="chat-panel hidden" aria-label="Byte Cub Chat">
+  <aside id="chat-panel" class="chat-panel hidden" role="dialog" aria-modal="true" aria-label="Byte Cub Chat">
     <div class="chat-header">
       <div class="chat-avatar"><img class="bear-mark" src="feedbear-sm.jpg" alt="" aria-hidden="true" /></div>
       <div>
@@ -1765,7 +1765,7 @@
     </div>
 
     <div class="chat-input-row">
-      <input type="text" id="chat-input" placeholder="e.g. I went to Tacos Chiwas, had the birria, 5 stars" autocomplete="off" enterkeyhint="send" />
+      <input type="text" id="chat-input" aria-label="Message Byte Cub" placeholder="e.g. I went to Tacos Chiwas, had the birria, 5 stars" autocomplete="off" enterkeyhint="send" />
       <button id="chat-mic-btn" class="btn-secondary" type="button" title="Talk to Byte Cub" aria-label="Talk to Byte Cub">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/></svg>
       </button>
@@ -2017,7 +2017,7 @@
         <canvas id="profile-qr" width="180" height="180"></canvas>
       </div>
       <div class="profile-link-row">
-        <input id="profile-link" class="challenge-link-input" readonly placeholder="Generating…" />
+        <input id="profile-link" class="challenge-link-input" readonly aria-label="Your shareable profile link" placeholder="Generating…" />
         <button id="profile-copy-btn" class="btn-sm btn-orange">Copy</button>
       </div>
       <button id="profile-share-btn" class="btn-primary" style="width:100%;margin-top:10px">Share Profile</button>
@@ -2127,7 +2127,7 @@
         <button class="craving-chip" data-mood="cheap">Cheap Eats</button>
         <button class="craving-chip" data-mood="new">Try Something New</button>
       </div>
-      <input id="craving-freetext" class="form-input" placeholder="Or type anything: spicy noodles under $20" style="margin-top:12px" />
+      <input id="craving-freetext" class="form-input" aria-label="What are you craving?" placeholder="Or type anything: spicy noodles under $20" style="margin-top:12px" />
       <button id="craving-go-btn" class="btn-primary" style="width:100%;margin-top:12px">Find My Match</button>
       <div id="craving-result" class="craving-result hidden"></div>
     </div>
@@ -2205,8 +2205,8 @@
       <details class="friends-paste">
         <summary>Got a friend's link? Paste it here</summary>
         <div style="display:flex;gap:8px;margin-top:8px">
-          <input id="friends-link-input" class="form-input" placeholder="Paste their link" style="flex:1" />
-          <button id="friends-load-btn" class="btn-sm btn-orange">Follow</button>
+          <input id="friends-link-input" class="form-input" aria-label="Friend's invite or profile link" placeholder="Paste their link" style="flex:1" />
+          <button id="friends-load-btn" class="btn-sm btn-orange" aria-label="Follow friend from link">Follow</button>
         </div>
       </details>
       <div id="friends-result" class="friends-result hidden"></div>
@@ -2351,7 +2351,7 @@
             <h3>Developer Override</h3>
             <p>Byte Cub is already included for users. This field is only for local developer fallback testing.</p>
             <div class="ai-key-input-row">
-              <input type="password" id="ai-gemini-key-input" class="form-input" placeholder="Paste Gemini API key (AIza…)" autocomplete="off" />
+              <input type="password" id="ai-gemini-key-input" class="form-input" aria-label="Developer Gemini API key" placeholder="Paste Gemini API key (AIza…)" autocomplete="off" />
               <button id="ai-save-key-btn" class="btn-primary btn-sm">Save</button>
             </div>
             <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="ai-key-link">Get a free key at Google AI Studio →</a>
@@ -2374,7 +2374,7 @@
         </div>
         <div class="ai-chat-history" id="ai-chat-history"></div>
         <div class="ai-input-row">
-          <input id="ai-chat-input" class="form-input" placeholder="Ask Byte Cub anything…" type="text" />
+          <input id="ai-chat-input" class="form-input" aria-label="Message Byte Cub" placeholder="Ask Byte Cub anything…" type="text" />
           <button id="ai-chat-send-btn" class="btn-primary" aria-label="Send">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
@@ -2538,7 +2538,7 @@
         </div>
         <div class="travel-section-label" style="margin-top:12px">Custom city</div>
         <div style="display:flex;gap:8px">
-          <input id="travel-city-input" class="form-input" placeholder="e.g. Melbourne, Australia" style="flex:1" />
+          <input id="travel-city-input" class="form-input" aria-label="City to explore" placeholder="e.g. Melbourne, Australia" style="flex:1" />
           <button id="travel-set-btn" class="btn-primary">Set</button>
         </div>
       </div>
@@ -2755,7 +2755,7 @@
       <p class="mealplanner-sub">Tell Byte Cub your week and budget - get a personalised dining plan.</p>
       <div class="mealplanner-controls">
         <div class="mealplanner-row">
-          <label class="mealplanner-label">Dining out days</label>
+          <label class="mealplanner-label" for="mp-days">Dining out days</label>
           <select id="mp-days" aria-label="Number of days" class="form-input" style="width:auto">
             <option value="2">2 days</option>
             <option value="3" selected>3 days</option>
@@ -2765,11 +2765,11 @@
           </select>
         </div>
         <div class="mealplanner-row">
-          <label class="mealplanner-label">Weekly budget</label>
+          <label class="mealplanner-label" for="mp-budget">Weekly budget</label>
           <input type="number" id="mp-budget" class="form-input" style="width:120px" placeholder="e.g. 150" min="0" step="5" />
         </div>
         <div class="mealplanner-row">
-          <label class="mealplanner-label">Vibe this week</label>
+          <label class="mealplanner-label" for="mp-vibe">Vibe this week</label>
           <input type="text" id="mp-vibe" class="form-input" style="flex:1" placeholder="e.g. comfort food, exploring, healthy…" />
         </div>
       </div>

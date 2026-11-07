@@ -9090,7 +9090,7 @@ body.overlay-open .save-diary-nudge { visibility: hidden; }
 .open-now-home { margin-bottom: 14px; }
 .open-now-home-list { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 4px; scrollbar-width: none; }
 .open-now-home-list::-webkit-scrollbar { display: none; }
-.open-now-list .open-now-card { flex: 0 0 auto; min-width: 170px; max-width: 230px; scroll-snap-align: start; display: grid; gap: 3px; text-align: left; padding: 10px 12px; border-radius: var(--radius); background: var(--surface2); border: 1px solid rgba(46, 204, 113, .35); color: var(--text); font: inherit; cursor: pointer; }
+.open-now-home-list .open-now-card { flex: 0 0 auto; min-width: 170px; max-width: 230px; scroll-snap-align: start; display: grid; gap: 3px; text-align: left; padding: 10px 12px; border-radius: var(--radius); background: var(--surface2); border: 1px solid rgba(46, 204, 113, .35); color: var(--text); font: inherit; cursor: pointer; }
 .onc-name { font-weight: 800; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .onc-status { font-size: .76rem; font-weight: 700; color: var(--green); }
 .onc-status.soon { color: #e67e22; }

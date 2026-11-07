@@ -146,6 +146,13 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const day = iso => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
 let user = null;
+// Opened from the app (app.js): its sign-in, good for about an hour.
+let handoff = null;
+try {
+  handoff = JSON.parse(sessionStorage.getItem('ftb_owner_handoff') || 'null');
+  if (!handoff?.token || Date.now() - handoff.at > 50 * 60 * 1000) handoff = null;
+} catch { handoff = null; }
+const handoffUser = handoff && { email: handoff.email, getIdToken: async () => handoff.token, fromApp: true };
 
 async function api (method, body) {
   const token = await user.getIdToken();
@@ -168,7 +175,7 @@ function renderVips (vips) {
 function renderCreators (list) {
   const el = $('creator-list');
   const money = c => `$${(c / 100).toFixed(2)}`;
-  if (!list.length) { el.innerHTML = '<p class="empty">No creator earnings yet. They start when someone who joined from a creator's link pays.</p>'; return; }
+  if (!list.length) { el.innerHTML = '<p class="empty">No creator earnings yet. They start when someone who joined from a creator link pays.</p>'; return; }
   el.innerHTML = list.map(c => `<div class="row"><div class="who"><b>${esc(c.handle ? '@' + c.handle : c.email || c.uid)}</b>
     <small>${esc(c.email)} · ${c.payments} payment${c.payments === 1 ? '' : 's'} · earned ${money(c.earnedCents)} · paid ${money(c.paidCents)}</small></div>
     ${c.owedCents ? `<span class="pill wait">Owed ${money(c.owedCents)}</span><button type="button" class="btn ghost" data-paid="${esc(c.uid)}">Mark paid</button>` : '<span class="pill off">All paid</span>'}</div>`).join('');
@@ -282,7 +289,9 @@ try {
     });
   });
   $('sign-out').addEventListener('click', () => auth.signOut());
+  if (handoffUser) { user = handoffUser; $('sign-in').hidden = true; load(); }
   auth.onAuthStateChanged(u => {
+    if (!u && handoffUser) return; // signed in through the app
     user = u;
     $('sign-in').hidden = !!u;
     $('sign-out').hidden = true;

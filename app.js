@@ -1809,6 +1809,17 @@ function openProfileSetup () {
 
 // The owner's own account sees a way into the owner portal (owner.html; the server checks too).
 const OWNER_EMAIL = 'cmc@conniemichelleconsulting.com';
+// Opening it from the app hands over this sign-in, so the portal never asks again.
+document.addEventListener('click', async e => {
+  const link = e.target.closest('#account-owner-row, #settings-owner-row');
+  if (!link) return;
+  e.preventDefault();
+  try {
+    const user = typeof _auth !== 'undefined' ? _auth?.currentUser : null;
+    if (user) sessionStorage.setItem('ftb_owner_handoff', JSON.stringify({ token: await user.getIdToken(true), email: user.email, at: Date.now() }));
+  } catch { /* the portal can still sign in itself */ }
+  location.href = '/owner.html';
+});
 
 function openAccountModal () {
   const overlay = document.getElementById('account-overlay');
@@ -5905,6 +5916,43 @@ function openDiscoverSearch (term) {
   return discoverNearby({ query: term });
 }
 
+function initDialogFocus () {
+  const origins = new Map();
+  let top = null;
+  const visible = el => el.isConnected && el.getClientRects().length && !el.closest('.hidden') && getComputedStyle(el).visibility !== 'hidden';
+  const controls = dialog => [...dialog.querySelectorAll('button, a[href], input, select, textarea, [tabindex]')]
+    .filter(el => !el.disabled && el.tabIndex >= 0 && visible(el));
+  const refresh = () => {
+    const dialogs = [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].filter(visible)
+      .sort((a, b) => (parseInt(getComputedStyle(a).zIndex) || 0) - (parseInt(getComputedStyle(b).zIndex) || 0));
+    dialogs.forEach(dialog => { if (!origins.has(dialog)) origins.set(dialog, document.activeElement); });
+    const next = dialogs.at(-1) || null;
+    if (next !== top) {
+      const previous = top;
+      top = next;
+      const trigger = previous && !dialogs.includes(previous) ? origins.get(previous) : null;
+      if (trigger && visible(trigger) && (!top || top.contains(trigger))) trigger.focus({ preventScroll: true });
+      else if (top && !top.contains(document.activeElement)) {
+        top.tabIndex = -1;
+        (controls(top)[0] || top).focus({ preventScroll: true });
+      }
+    }
+    for (const dialog of origins.keys()) if (!dialogs.includes(dialog)) origins.delete(dialog);
+  };
+  new MutationObserver(refresh).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Tab' || e.defaultPrevented || !top || !visible(top)) return;
+    const items = controls(top);
+    if (!items.length) { e.preventDefault(); top.focus(); return; }
+    if (!top.contains(document.activeElement) || (e.shiftKey && document.activeElement === items[0])) {
+      e.preventDefault(); items[e.shiftKey ? items.length - 1 : 0].focus();
+    } else if (!e.shiftKey && document.activeElement === items.at(-1)) {
+      e.preventDefault(); items[0].focus();
+    }
+  });
+  refresh();
+}
+
 /* ── Phone Back button ────────────────────────────────────────
    While any panel, non-Home tab or search is open, the app keeps exactly
    one extra history step. Back uses it up: the top thing closes, and the
@@ -9067,6 +9115,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initReminders();
   initInstallPrompt();
   BackNav.init();
+  initDialogFocus();
   if (NativeAlerts.available()) {
   NativeAlerts.refresh();
   NativeAlerts.schedule();

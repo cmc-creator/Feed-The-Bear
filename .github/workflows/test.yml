@@ -181,6 +181,9 @@ jobs:
       - name: Creator payouts (20%)
         working-directory: tests
         run: node creators.test.js
+      - name: Owner portal page opens signed in from the app
+        working-directory: tests
+        run: node ownerpage.test.js
       - name: Several photos and videos at once
         working-directory: tests
         run: node multiphoto.test.js

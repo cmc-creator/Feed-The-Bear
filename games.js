@@ -35,6 +35,7 @@ function gameOverlay (title) {
     ov.className = 'modal-overlay hidden';
     ov.setAttribute('role', 'dialog');
     ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('aria-labelledby', 'game-title');
     ov.innerHTML = '<div class="modal-card game-card"><div class="modal-header"><h2 id="game-title"></h2><button type="button" class="icon-btn" id="game-close-btn" aria-label="Close">✕</button></div><div id="game-body" class="game-body"></div></div>';
     document.body.appendChild(ov);
     ov.querySelector('#game-close-btn').addEventListener('click', closeGame);
