@@ -44,6 +44,15 @@ Then open http://127.0.0.1:8765/app.html.
   the dish. When a branch cannot be verified, he asks instead of substituting
   another place.
 
+- Main search and its mic show matching saved places and restaurants already
+  loaded nearby. Nearby matches are labelled **not saved** and offer **Save**;
+  **Search nearby** searches further using your current location. Voice also
+  understands "find" / "search for" before a restaurant name.
+- Friend invites open sharing directly from **Send invite** or **Skip**, so
+  iPhone browsers can open the share sheet. If sharing is blocked, choose
+  Text message, WhatsApp, Email or Copy. A blocked clipboard leaves the full
+  invite selectable on screen instead of relying on a browser prompt.
+
 ## Tests
 
 Browser tests drive the app with Playwright against the local server above.

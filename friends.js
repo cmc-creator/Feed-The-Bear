@@ -64,7 +64,7 @@ function profileHasContent (data) {
 
 function encodeProfileLink (data) {
   const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
-  return window.location.href.split('?')[0].split('#')[0] + '#profile=' + encoded;
+  return window.location.href.split('?')[0].split('#')[0] + '#profile=' + encodeURIComponent(encoded);
 }
 
 /* ── Friends' feed: what the people you follow ate lately ──
@@ -239,8 +239,8 @@ function contactPicker () {
 }
 
 // "Who's this invite for?" Resolves to the name ('' to skip it), or null if closed.
-function askInviteRecipient () {
-  return new Promise(resolve => {
+function askInviteRecipient (onSend) {
+  return new Promise((resolve, reject) => {
     document.getElementById('invite-who')?.remove();
     const pick = contactPicker();
     const el = document.createElement('div');
@@ -260,12 +260,20 @@ function askInviteRecipient () {
     </form>`;
     document.body.appendChild(el);
     const input = el.querySelector('.invite-who-name');
-    const done = val => { el.remove(); resolve(val); };
+    let finished = false;
+    const done = val => {
+      if (finished) return;
+      finished = true;
+      el.remove();
+      // Safari needs Web Share inside this tap, not an awaited continuation.
+      try { resolve(val !== null && onSend ? onSend(val) : val); }
+      catch (err) { reject(err); }
+    };
     el.querySelector('form').addEventListener('submit', e => { e.preventDefault(); done(input.value.trim().slice(0, 40)); });
     el.querySelector('.invite-who-skip').addEventListener('click', () => done(''));
     el.querySelector('.invite-who-close').addEventListener('click', () => done(null));
     el.addEventListener('click', e => { if (e.target === el) done(null); });
-    el.addEventListener('keydown', e => { if (e.key === 'Escape') done(null); });
+    el.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); done(null); } });
     el.querySelector('.invite-who-contacts')?.addEventListener('click', async () => {
       try {
         const name = (await pick()).trim();
@@ -278,16 +286,26 @@ function askInviteRecipient () {
 
 // `ref` is your account id for the free-month reward (firebase.js passes it).
 // Anyone can invite, free or Grizzly (following more than one friend is Grizzly).
+let _friendInvitePending = false;
 async function inviteFriend ({ ref = window._ftbUid || '' } = {}) {
+  if (_friendInvitePending) return;
   if (!ensureInviteName()) return;
-  const who = await askInviteRecipient();
-  if (who === null) return;
+  _friendInvitePending = true;
+  try {
+    await askInviteRecipient(who => sendFriendInvite(who, ref));
+  } catch (err) {
+    console.warn('Friend invite failed:', err);
+    showToast('Invite not sent', 'Please try again or copy your link from Friends.', 'error');
+  } finally { _friendInvitePending = false; }
+}
+
+async function sendFriendInvite (who, ref) {
   const data = buildProfileData();
   // Signed in: a code of its own, so this invite can be followed up.
   const code = window._ftbUid ? newInviteCode() : '';
   let url = buildInviteLink(ref);
   if (code) {
-    handleApi('POST', { body: { action: 'invite', code } }).catch(() => {});
+    handleApi('POST', { body: { action: 'invite', code } }).catch(err => console.warn('Invite tracking unavailable:', err));
     const [base, hash] = url.split('#');
     url = `${base}${base.includes('?') ? '&' : '?'}i=${code}${hash ? `#${hash}` : ''}`;
   }
@@ -302,17 +320,20 @@ async function inviteFriend ({ ref = window._ftbUid || '' } = {}) {
   startSharingLive();
   trackProductEvent('friend_invite', { withProfile: hasPicks, withRef: !!ref, named: !!who, tracked: !!code });
   try {
-    if (navigator.share) { await navigator.share({ title: 'Feed the Bear', text, url }); noteInviteSent({ code, name: who }); return; }
+    if (navigator.share) {
+      await navigator.share({ title: 'Feed the Bear', text, url });
+      noteInviteSent({ code, name: who });
+      return;
+    }
   } catch (err) {
     if (err && err.name === 'AbortError') return;
+    showToast('Share sheet unavailable', 'Choose Text message, Email, WhatsApp or Copy below.', 'info');
   }
-  noteInviteSent({ code, name: who });
   try {
-    await navigator.clipboard.writeText(`${text} ${url}`);
-    showToast('Invite copied', 'Paste it in a text to a friend.', 'success');
-  } catch {
-    // No share sheet and no clipboard (older Android app): show it to copy by hand.
-    window.prompt('Copy your invite and send it to a friend:', `${text} ${url}`);
+    await shareWithMenu({ title: 'Feed the Bear', text, url });
+    noteInviteSent({ code, name: who });
+  } catch (err) {
+    if (err?.name !== 'AbortError') throw err;
   }
 }
 
@@ -542,6 +563,7 @@ function decodeProfileLink (input = '') {
   let encoded = String(input).trim();
   const m = encoded.match(/#profile=(.+)$/);
   if (m) encoded = m[1];
+  encoded = decodeURIComponent(encoded).replace(/ /g, '+').replace(/-/g, '+').replace(/_/g, '/');
   const data = sanitizeFriendData(JSON.parse(decodeURIComponent(escape(atob(encoded)))));
   // An invite from someone who hasn't rated anything yet still names them,
   // so they can be followed and their picks arrive later.
@@ -1012,7 +1034,12 @@ function checkGuestProfile () {
   const hash = window.location.hash;
   if (!hash.startsWith('#profile=')) { resumePendingInvite(); return; }
   let data;
-  try { data = decodeProfileLink(hash); } catch { return; /* invalid link: ignore */ }
+  try { data = decodeProfileLink(hash); }
+  catch (err) {
+    console.warn('Invalid friend invite:', err);
+    showToast('Invite link could not be opened', 'Ask your friend to send a fresh link, or find them by username in Friends.', 'error');
+    return;
+  }
   const params = new URLSearchParams(window.location.search);
   const accept = params.has('accept') || params.has('i');
   try {

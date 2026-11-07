@@ -62,7 +62,7 @@
       var name = '';
       try {
         var m = location.hash.match(/#profile=(.+)$/);
-        if (m) name = String(JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(m[1]))))).u || '').trim().slice(0, 30);
+        if (m) name = String(JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(m[1]).replace(/ /g, '+').replace(/-/g, '+').replace(/_/g, '/'))))).u || '').trim().slice(0, 30);
       } catch (e) { /* older or broken link: generic wording */ }
       if (name) {
         document.getElementById('title').textContent = name + ' invited you to Feed The Bear';

@@ -95,56 +95,64 @@ const _blobToBase64 = blob => new Promise((resolve, reject) => {
   } catch { /* leave the browser's own behaviour */ }
 })();
 
-/* ── Share menu when there's no share sheet ───────────────────
-   The Android app before 2.2.0 (and some desktop browsers) have no
-   navigator.share, so Share buttons did nothing. This menu sends the text
-   by Messages, WhatsApp or Email, or copies it. Those open as links, which
-   the app hands to the phone. */
-(function shareMenuFallback () {
-  if (navigator.share) return;
+/* Also used when a browser exposes Web Share but refuses to open it. */
+function shareWithMenu ({ title = '', text = '', url = '', files } = {}) {
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const go = url => { location.href = url; };
-  try {
-    Object.defineProperty(navigator, 'share', {
-      configurable: true, writable: true,
-      value: ({ title = '', text = '', url = '', files } = {}) => new Promise((resolve, reject) => {
-        const body = [text, url].filter(Boolean).join(' ').trim();
-        if (!body) { reject(new DOMException(files?.length ? 'Files not supported' : 'Nothing to share', 'NotAllowedError')); return; }
-        document.getElementById('share-menu')?.remove();
-        const el = document.createElement('div');
-        el.id = 'share-menu';
-        el.className = 'modal-overlay share-menu';
-        el.setAttribute('role', 'dialog');
-        el.setAttribute('aria-modal', 'true');
-        el.setAttribute('aria-label', 'Share');
-        el.innerHTML = `<div class="share-menu-card">
-          <h3>${esc(title || 'Share')}</h3>
-          <button type="button" class="btn-primary" data-via="sms">💬 Text message</button>
-          <button type="button" class="btn-secondary" data-via="whatsapp">🟢 WhatsApp</button>
-          <button type="button" class="btn-secondary" data-via="email">✉️ Email</button>
-          <button type="button" class="btn-secondary" data-via="copy">📋 Copy</button>
-          <button type="button" class="share-menu-cancel">Cancel</button>
-        </div>`;
-        document.body.appendChild(el);
-        const close = ok => { el.remove(); ok ? resolve() : reject(new DOMException('Share canceled', 'AbortError')); };
-        el.addEventListener('click', async e => {
-          if (e.target === el || e.target.closest('.share-menu-cancel')) { close(false); return; }
-          const via = e.target.closest('[data-via]')?.dataset.via;
-          if (!via) return;
-          if (via === 'sms') go(`sms:?&body=${encodeURIComponent(body)}`);
-          if (via === 'whatsapp') go(`https://wa.me/?text=${encodeURIComponent(body)}`);
-          if (via === 'email') go(`mailto:?subject=${encodeURIComponent(title || 'Feed The Bear')}&body=${encodeURIComponent(body)}`);
-          if (via === 'copy') {
-            try { await navigator.clipboard.writeText(body); showToast('Copied', 'Paste it to a friend.', 'success'); }
-            catch { window.prompt('Copy this and send it to a friend:', body); }
-          }
-          close(true);
-        });
-        el.addEventListener('keydown', e => { if (e.key === 'Escape') close(false); });
-        el.querySelector('[data-via="sms"]').focus();
-      }),
+  return new Promise((resolve, reject) => {
+    const body = [text, url].filter(Boolean).join(' ').trim();
+    if (!body) { reject(new DOMException(files?.length ? 'Files not supported' : 'Nothing to share', 'NotAllowedError')); return; }
+    document.getElementById('share-menu')?.remove();
+    const el = document.createElement('div');
+    el.id = 'share-menu';
+    el.className = 'modal-overlay share-menu';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-label', 'Share');
+    el.innerHTML = `<div class="share-menu-card">
+      <h3>${esc(title || 'Share')}</h3>
+      <button type="button" class="btn-primary" data-via="sms">💬 Text message</button>
+      <button type="button" class="btn-secondary" data-via="whatsapp">🟢 WhatsApp</button>
+      <button type="button" class="btn-secondary" data-via="email">✉️ Email</button>
+      <button type="button" class="btn-secondary" data-via="copy">📋 Copy</button>
+      <div class="share-menu-manual hidden">
+        <p>Copying was blocked. Touch and hold the text below, then choose Copy and paste it to your friend.</p>
+        <textarea class="form-input share-menu-text" readonly aria-label="Text and link to share">${esc(body)}</textarea>
+        <button type="button" class="btn-secondary" data-via="done">I've copied it</button>
+      </div>
+      <button type="button" class="share-menu-cancel">Cancel</button>
+    </div>`;
+    document.body.appendChild(el);
+    const close = ok => { el.remove(); ok ? resolve() : reject(new DOMException('Share canceled', 'AbortError')); };
+    el.addEventListener('click', async e => {
+      if (e.target === el || e.target.closest('.share-menu-cancel')) { close(false); return; }
+      const via = e.target.closest('[data-via]')?.dataset.via;
+      if (!via) return;
+      if (via === 'sms') {
+        const apple = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        go(`sms:${apple ? '&' : '?'}body=${encodeURIComponent(body)}`);
+      }
+      if (via === 'whatsapp') go(`https://wa.me/?text=${encodeURIComponent(body)}`);
+      if (via === 'email') go(`mailto:?subject=${encodeURIComponent(title || 'Feed The Bear')}&body=${encodeURIComponent(body)}`);
+      if (via === 'copy') {
+        try { await navigator.clipboard.writeText(body); showToast('Copied', 'Paste it to a friend.', 'success'); }
+        catch (err) {
+          el.querySelector('.share-menu-manual').classList.remove('hidden');
+          const field = el.querySelector('.share-menu-text');
+          field.focus();
+          field.select();
+          return;
+        }
+      }
+      close(true);
     });
-  } catch { /* leave Share buttons as they were */ }
+    el.addEventListener('keydown', e => { if (e.key === 'Escape') close(false); });
+    el.querySelector('[data-via="sms"]').focus();
+  });
+}
+(function shareMenuFallback () {
+  if (navigator.share) return;
+  Object.defineProperty(navigator, 'share', { configurable: true, writable: true, value: shareWithMenu });
 })();
 
 /* ── Constants ───────────────────────────────────────────── */
@@ -2558,6 +2566,15 @@ function openSpotFromLink (id) {
 /* ════════════════════════════════════════════════════════════
    RENDERING
    ════════════════════════════════════════════════════════════ */
+function matchesRestaurantSearch (restaurant, query) {
+  const normalize = value => String(value || '').normalize('NFKD').replace(/\p{M}/gu, '')
+    .toLowerCase().replace(/['’]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const terms = normalize(query).split(/\s+/).filter(Boolean);
+  const fields = [restaurant.name, restaurant.cuisine, restaurant.notes, restaurant.address,
+    ...(restaurant.tags || []), ...dishesOf(restaurant).map(d => d.name)].map(normalize);
+  return terms.length > 0 && terms.every(term => fields.some(field => field.includes(term)));
+}
+
 function getFiltered () {
   let list = [...state.restaurants];
 
@@ -2568,15 +2585,7 @@ function getFiltered () {
   }
   // Search
   if (state.filter.search) {
-    const q = state.filter.search.toLowerCase();
-    list = list.filter(r =>
-      (r.name||'').toLowerCase().includes(q) ||
-      (r.cuisine||'').toLowerCase().includes(q) ||
-      (r.notes||'').toLowerCase().includes(q) ||
-      (r.address||'').toLowerCase().includes(q) ||
-      (r.tags||[]).some(t => String(t).toLowerCase().includes(q)) ||
-      dishesOf(r).some(d => dishKey(d.name).includes(q))
-    );
+    list = list.filter(r => matchesRestaurantSearch(r, state.filter.search));
   }
   // Cuisine
   if (state.filter.cuisine) {
@@ -5856,7 +5865,7 @@ function renderSearchMode () {
   const on = !!q && !['map', 'stats'].includes(state.currentView);
   main.classList.toggle('is-searching', on);
   let bar = document.getElementById('search-summary');
-  if (!on) { bar?.remove(); BackNav.layer('search', false); return; }
+  if (!on) { bar?.remove(); document.getElementById('search-nearby-results')?.remove(); BackNav.layer('search', false); return; }
   if (!bar) {
   bar = document.createElement('div');
   bar.id = 'search-summary';
@@ -5864,7 +5873,15 @@ function renderSearchMode () {
   main.prepend(bar);
   }
   const n = getFiltered().length;
-  bar.innerHTML = `<span>${n ? `${n} spot${n === 1 ? '' : 's'} match` : 'Nothing matches'} “${escHtml(q)}”</span>
+  const nearby = _nearbyCards.filter(card => !card.isSaved && matchesRestaurantSearch(card, q)
+    && (!state.filter.cuisine || cuisineFilterKey(card.cuisine) === cuisineFilterKey(state.filter.cuisine)));
+  let results = document.getElementById('search-nearby-results');
+  if (nearby.length) {
+    if (!results) { results = document.createElement('section'); results.id = 'search-nearby-results'; bar.after(results); }
+    results.innerHTML = `<h2>Nearby matches · not saved</h2><div class="search-nearby-grid">${nearby.map(renderNearbyVisualCard).join('')}</div>`;
+    wireNearbyCardLinks(results);
+  } else { results?.remove(); }
+  bar.innerHTML = `<span>${n ? `${n} spot${n === 1 ? '' : 's'} match` : nearby.length ? `${nearby.length} nearby spot${nearby.length === 1 ? '' : 's'} match` : 'Nothing matches'} “${escHtml(q)}”</span>
   ${n ? '' : `<button type="button" class="btn-ghost btn-sm" data-act="nearby">Search nearby</button>`}
   <button type="button" class="btn-ghost btn-sm" data-act="clear">Clear</button>`;
   bar.querySelector('[data-act=clear]').onclick = () => { clearSearch(); };
@@ -5885,13 +5902,7 @@ function clearSearch () {
 
 // Discover with the search box filled in (for spots you haven't saved).
 function openDiscoverSearch (term) {
-  discoverNearby();
-  setTimeout(() => {
-  const box = document.getElementById('disc-search');
-  if (!box) return;
-  box.value = term;
-  box.dispatchEvent(new Event('input', { bubbles: true }));
-  }, 300);
+  return discoverNearby({ query: term });
 }
 
 /* ── Phone Back button ────────────────────────────────────────
@@ -6137,12 +6148,13 @@ let _discSort = 'distance';
 let _discRenderLimit = 24;   // how many of the filtered results are currently shown ("Load More" bumps this)
 const DISC_PAGE_SIZE = 24;
 
-async function discoverNearby () {
+async function discoverNearby ({ query = '' } = {}) {
   if (!(await ensureLocationForDiscovery())) return;
 
   const overlay = document.getElementById('nearby-overlay');
   overlay.classList.remove('hidden');
   document.body.classList.add('overlay-open');
+  document.getElementById('disc-search').value = query;
 
   // Update location label
   const locLabel = document.getElementById('disc-location-label');
@@ -6346,7 +6358,7 @@ function _discApplyFilters () {
   let results = _discAllResults.filter(r => {
   if (cuisine !== 'all' && r.cuisine !== cuisine && r.amenity !== cuisine) return false;
   if (craving && craving.test(`${r.cuisine} ${r.name}`.toLowerCase())) return true;
-  if (query && !r.name.toLowerCase().includes(query) && !r.cuisine.toLowerCase().includes(query)) return false;
+  if (query && !matchesRestaurantSearch({ ...r, address: `${r.street || ''} ${r.city || ''}` }, query)) return false;
   return true;
   });
 
@@ -10510,7 +10522,7 @@ function parseVoiceInput (text) {
   if (!addMatch) {
   // Anything else is a search, same as typing it.
   const search = document.getElementById('search-input');
-  search.value = text;
+  search.value = text.replace(/^(?:please\s+)?(?:find|search(?:\s+for)?|look\s+for|show\s+me)\s+/i, '').replace(/\s+near\s+me$/i, '').trim() || text;
   search.dispatchEvent(new Event('input', { bubbles: true }));
   return;
   }
@@ -12566,8 +12578,11 @@ function renderNearbyCardsFromState () {
   list.innerHTML = `${_nearbyBannerMsg ? `<div class="nearby-home-loading">${escHtml(_nearbyBannerMsg)}</div>` : ''}` +
   filtered.map(card => renderNearbyVisualCard(card)).join('');
 
-  // Whole-card click opens Google Maps for the venue.
-  list.querySelectorAll('.nearby-home-card[data-card-link]').forEach(cardEl => {
+  wireNearbyCardLinks(list);
+}
+
+function wireNearbyCardLinks (root) {
+  root.querySelectorAll('.nearby-home-card[data-card-link]').forEach(cardEl => {
   const link = cardEl.dataset.cardLink || '';
   if (!link) return;
   cardEl.style.cursor = 'pointer';
@@ -12636,6 +12651,7 @@ function setNearbyCards (cards = [], opts = {}) {
   );
   _nearbyBannerMsg = String(opts.banner || '');
   renderNearbyCardsFromState();
+  if (state.filter.search) renderSearchMode();
   enrichNearbyCardsRealPhotos();
 }
 
