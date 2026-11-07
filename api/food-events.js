@@ -1,7 +1,9 @@
 /* ════════════════════════════════════════════════════════════
    Feed The Bear - Vercel Serverless: Food challenges nationwide
    ════════════════════════════════════════════════════════════
-   GET /api/food-events[?state=AZ] -> { events: [{ name, kind, date, endDate, city, state, venue, url, prize, blurb }], at }
+   GET /api/food-events[?state=AZ] -> { events, at, stale }
+   Events include a branch-aware id, dates, venue/location, source links,
+   organizer facts when available, and discoveredAt (not verification).
 
    Upcoming eating contests and food challenges across the US, found with
    Gemini + Google Search, five regions at once, kept in foodEvents/current;
@@ -13,6 +15,7 @@
    ════════════════════════════════════════════════════════════ */
 
 const admin = require('firebase-admin');
+const { createHash } = require('crypto');
 const { overLimit, clientIp } = require('./_limit');
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
@@ -32,7 +35,7 @@ function getAdmin () {
 }
 
 const str = (v, max) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max);
-const isDay = v => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
+const isDay = v => /^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v;
 function cleanUrl (v) {
   try {
     const u = new URL(String(v || ''));
@@ -60,15 +63,24 @@ function cleanEvents (list, today = new Date().toISOString().slice(0, 10), max =
       url: cleanUrl(e?.url),
       prize: str(e?.prize, 60),
       blurb: str(e?.blurb, 160),
+      address: str(e?.address, 160),
+      entryCost: str(e?.entryCost, 100),
+      rules: str(e?.rules, 600),
+      eligibility: str(e?.eligibility, 200),
+      registrationUrl: cleanUrl(e?.registrationUrl),
+      discoveredAt: Number.isFinite(e?.discoveredAt) && e.discoveredAt > 0 && e.discoveredAt <= Date.now() ? e.discoveredAt : 0,
     };
   }).map(e => (e.kind === 'challenge' && !isDay(e.date) ? { ...e, date: '', endDate: '' } : e)).filter(e => {
     if (!e.name || !e.state) return false;
     if (e.date === '' ? e.kind !== 'challenge' : (!isDay(e.date) || (e.endDate || e.date) < today)) return false;
-    const key = `${e.name.toLowerCase()}|${e.date}`;
+    const key = [e.name, e.date, e.state, e.city, e.venue].map(v => v.trim().toLowerCase()).join('|');
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  }).sort((a, b) => (a.date === '') - (b.date === '') || a.date.localeCompare(b.date)).slice(0, max);
+  }).map(e => ({
+    ...e,
+    id: createHash('sha256').update([e.name, e.date, e.state, e.city, e.venue].map(v => v.trim().toLowerCase()).join('|')).digest('hex').slice(0, 24),
+  })).sort((a, b) => (a.date === '') - (b.date === '') || a.date.localeCompare(b.date)).slice(0, max);
 }
 
 // The first JSON array in the model's answer.
@@ -91,12 +103,15 @@ const REGIONS = {
 };
 const STATE_NAMES = { AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California', CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', DC: 'Washington, DC', FL: 'Florida', GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa', KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland', MA: 'Massachusetts', MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana', NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire', NJ: 'New Jersey', NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio', OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island', SC: 'South Carolina', SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont', VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming' };
 
-const CHALLENGES_PROMPT = (where, today, max) => `Today is ${today}. Search the web for famous restaurant food challenges in ${where} that people can take any day
-(giant burgers, burritos, pizzas, steaks, spicy wings, huge breakfasts and the like: finish it in a time limit to win a prize or a spot on the wall of fame).
+const DETAIL_FIELDS = `"address": "street address or empty", "entryCost": "confirmed cost or empty",
+ "rules": "brief organizer rules or empty", "eligibility": "age, reservation or eligibility requirements or empty",
+ "registrationUrl": "official registration link or empty"`;
+const CHALLENGES_PROMPT = (where, today, max) => `Today is ${today}. Search the web for restaurant food challenges in ${where} that are ongoing, not one-time competitions.
 Only include challenges a current source says are still offered. Do not invent anything; leave a field empty if you cannot confirm it.
+Prefer the restaurant's own page. Do not invent images, prices, rules, dates or claims of verification. Summarize neutrally, without encouraging unsafe eating.
 Answer with only a JSON array, no other text. Each item:
 {"name": "challenge name at restaurant name", "kind": "challenge", "date": "", "endDate": "",
- "city": "...", "state": "two-letter code", "venue": "restaurant name", "url": "a page about it", "prize": "short, or empty", "blurb": "one sentence: what you eat and the time limit"}
+ "city": "...", "state": "two-letter code", "venue": "restaurant name", "url": "source page", "prize": "short, or empty", "blurb": "neutral one-sentence description", ${DETAIL_FIELDS}}
 Give up to ${max} challenges.`;
 
 async function searchEvents (key, where = 'the United States', max = 15, { challenges = false } = {}) {
@@ -105,9 +120,10 @@ async function searchEvents (key, where = 'the United States', max = 15, { chall
 competitive eating contests (Major League Eating events, hot dog, wing, pie, taco, burrito, pizza, chili, oyster, rib, cannoli, pickle, ramen contests and the like),
 food festivals and fairs that hold eating contests, and well-known restaurant food challenges people can sign up for.
 Only include events with a confirmed date on or after ${today}. Do not invent anything; leave a field empty if you cannot confirm it.
+Prefer official organizer pages. Do not invent images, prices, rules or claims of verification. Include spectator information in the rules if confirmed.
 Answer with only a JSON array, no other text. Each item:
 {"name": "...", "kind": "contest" | "challenge" | "festival", "date": "YYYY-MM-DD", "endDate": "YYYY-MM-DD or empty",
- "city": "...", "state": "two-letter code", "venue": "...", "url": "official page", "prize": "short, or empty", "blurb": "one sentence: what you eat and how"}
+ "city": "...", "state": "two-letter code", "venue": "...", "url": "official page", "prize": "short, or empty", "blurb": "neutral one-sentence description", ${DETAIL_FIELDS}}
 Give up to ${max} events.`;
   const resp = await fetch(GEMINI_URL, {
     method: 'POST',
@@ -133,23 +149,23 @@ async function cachedList (db, docId, search, { force = false } = {}) {
     cur = (await ref.get()).data() || null;
   } catch (err) { console.error('[FTB] food-events read failed:', err.message); }
   const now = Date.now();
-  const cached = cur ? cleanEvents(cur.events, undefined, 150) : [];
+  const cached = cur ? cleanEvents(cur.events, undefined, 150).map(e => ({ ...e, discoveredAt: e.discoveredAt || cur.at || 0 })) : [];
   const fresh = cur && now - (cur.at || 0) < FRESH_MS && cached.length;
   const tooSoon = cur && now - (cur.triedAt || 0) < RETRY_MS;
   if ((force || (!fresh && !tooSoon)) && process.env.GEMINI_API_KEY && ref) {
     try {
       await ref.set({ triedAt: now }, { merge: true });
-      const events = await search(process.env.GEMINI_API_KEY);
+      const events = (await search(process.env.GEMINI_API_KEY)).map(e => ({ ...e, discoveredAt: now }));
       if (events.length) {
         await ref.set({ events, at: now, triedAt: now });
-        return { events, at: now };
+        return { events, at: now, stale: false };
       }
       console.warn(`[FTB] food-events ${docId}: nothing usable found`);
     } catch (err) {
       console.error(`[FTB] food-events ${docId} search failed:`, err.message);
     }
   }
-  return { events: cached, at: cur?.at || 0 };
+  return { events: cached, at: cur?.at || 0, stale: !fresh };
 }
 
 // Every region at once, dated contests and any-day restaurant challenges
@@ -170,8 +186,8 @@ async function searchNational (key) {
 function nationalList (db, opts) { return cachedList(db, 'current', searchNational, opts); }
 function stateList (db, st, opts) {
   return cachedList(db, `st_${st}`, key => Promise.all([
-    searchEvents(key, STATE_NAMES[st], 15).catch(() => []),
-    searchEvents(key, STATE_NAMES[st], 8, { challenges: true }).catch(() => []),
+    searchEvents(key, STATE_NAMES[st], 15).catch(err => { console.error('[FTB] food-events state search failed:', err.message); return []; }),
+    searchEvents(key, STATE_NAMES[st], 8, { challenges: true }).catch(err => { console.error('[FTB] food-events state challenges failed:', err.message); return []; }),
   ]).then(([a, b]) => cleanEvents([...a, ...b].filter(e => e.state === st), undefined, 40)), opts);
 }
 
@@ -181,11 +197,12 @@ module.exports = async function handler (req, res) {
   const st = String(req.query?.state || '').toUpperCase();
   let db = null;
   try { db = getAdmin().firestore(); } catch (err) { console.error('[FTB] food-events admin failed:', err.message); }
-  if (!db) return res.status(200).json({ events: [], at: 0 });
+  if (!db) return res.status(503).json({ error: 'Challenge discovery is unavailable. Please try again later.' });
   const [nat, mine] = await Promise.all([nationalList(db), STATES.has(st) ? stateList(db, st) : null]);
   const events = cleanEvents([...(mine?.events || []), ...nat.events], undefined, 150);
+  if (!events.length && !nat.at && !mine?.at) return res.status(503).json({ error: 'Could not refresh challenges. Please try again later.' });
   res.setHeader('Cache-Control', 'public, max-age=1800, s-maxage=1800');
-  return res.status(200).json({ events, at: nat.at });
+  return res.status(200).json({ events, at: mine ? Math.min(nat.at || mine.at, mine.at || nat.at) : nat.at, stale: nat.stale || !!mine?.stale });
 };
 
 module.exports.nationalList = nationalList;

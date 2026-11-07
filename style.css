@@ -29,7 +29,8 @@
 
   --text:        #eaf0f7;
   --text-muted:  #b1bdce;
-  --text-dim:    #7f8ea6;
+  --text-dim:    #a8b6c9;
+  --on-primary:  #1a1310;
 
   /* Aliases for legacy/alternate names used across the sheet — without
      these, 60+ declarations silently resolved to nothing. */
@@ -395,7 +396,7 @@ img { display: block; }
 .btn-danger:hover { background: var(--red); color: #fff; }
 
 .btn-sm { padding: 5px 12px; font-size: .78rem; }
-.btn-orange { background: var(--primary); color: #fff; border-radius: var(--radius-xl); font-size: .8rem; font-weight: 600; padding: 5px 12px; }
+.btn-orange { background: var(--primary); color: var(--on-primary); border-radius: var(--radius-xl); font-size: .8rem; font-weight: 600; padding: 5px 12px; }
 .btn-orange:hover { background: var(--primary-dk); }
 
 button:focus-visible,
@@ -1053,7 +1054,7 @@ button:focus-visible,
   flex-wrap: wrap;
 }
 .card-action-btn {
-  flex: 1;
+  flex: 1 1 90px;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   font-size: .79rem;
@@ -1063,8 +1064,15 @@ button:focus-visible,
   justify-content: center;
   gap: 4px;
   transition: all var(--transition);
-  min-width: 70px;
+  min-width: 0;
+  min-height: 44px;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
+.card-action-btn svg { flex-shrink: 0; }
+.card-action-btn.delete-card { color: var(--red); border: 1px solid var(--red); background: rgba(231,76,60,.08); }
+.card-action-btn.delete-card:hover { color: var(--on-primary); background: var(--red); }
 .card-action-btn.directions {
   background: linear-gradient(145deg, rgba(var(--primary-rgb),.2), rgba(var(--primary-rgb),.09));
   color: #ffc4ad;
@@ -2480,9 +2488,11 @@ body.light-mode {
   --bg:        #edf4ee; --surface:   #ffffff; --surface2:  #f4f8f4;
   --surface3:  #e3ece4; --border:    rgba(31,45,39,.16); --text:      #203028;
   --text-dim:  #5a6f65; --text-muted:#466055;
-  --primary:   #5f9362; --primary-rgb: 95,147,98; --primary-dk: #4b7650; --primary-lt: #7aaf7e;
+  --primary:   #356b42; --primary-rgb: 53,107,66; --primary-dk: #285734; --primary-lt: #356b42;
+  --on-primary: #fff;
   --rose:      #c17761; --rose-rgb: 193,119,97;
-  --blue:      #5c8ea2; --blue-rgb: 92,142,162;
+  --blue:      #24637a; --blue-rgb: 36,99,122;
+  --red:       #a63027; --gold: #865816; --gold-dk: #704712;
   --shadow:    0 8px 28px rgba(30,45,36,.14); --shadow-lg: 0 16px 44px rgba(30,45,36,.2);
 }
 body.light-mode .app-header { background: rgba(255,255,255,.98); box-shadow: 0 1px 0 rgba(17,24,39,.14); }
@@ -2508,13 +2518,6 @@ body.light-mode .modal-header {
   border-bottom: 1px solid var(--border);
   padding-bottom: 14px;
 }
-/* The upgrade and auth cards stay dark in light mode, so their headers do too. */
-body.light-mode :is(.upgrade-card, .auth-card) .modal-header {
-  background: linear-gradient(180deg, rgba(71,48,31,.95), rgba(51,34,24,.95));
-  border-bottom: 0;
-  padding-bottom: 0;
-}
-body.light-mode .upgrade-card .modal-header h2 { color: #ffe9cd; }
 body.light-mode .today-status-pill {
   background: rgba(20,13,9,.82);
   border-color: rgba(255,226,188,.3);
@@ -2525,10 +2528,10 @@ body.light-mode .today-vibe-pill {
   border-color: rgba(31,41,51,.16);
   color: #1f2933;
 }
-#theme-toggle-btn .icon-sun  { display: none; }
-#theme-toggle-btn .icon-moon { display: block; }
-body.light-mode #theme-toggle-btn .icon-sun  { display: block; }
-body.light-mode #theme-toggle-btn .icon-moon { display: none; }
+#theme-toggle-btn .icon-sun  { display: block; }
+#theme-toggle-btn .icon-moon { display: none; }
+body.light-mode #theme-toggle-btn .icon-sun  { display: none; }
+body.light-mode #theme-toggle-btn .icon-moon { display: block; }
 
 /* ── Light mode: fix hardcoded dark-theme accent colors that became
       invisible (white-on-white / cream-on-white) on light surfaces ── */
@@ -4244,7 +4247,6 @@ body.guest-open #upgrade-overlay { z-index:7100; }
 }
 @media (max-width: 480px) {
   .header-actions { gap: 4px; }
-  .btn-primary span { display: none; }
   .app-header { padding: 0 10px; }
 }
 
@@ -7336,9 +7338,6 @@ body[data-ui-motion='playful'] .restaurant-grid.card-enter-run .restaurant-card:
   .card-name {
     font-size: 1.02rem;
   }
-  .card-action-btn {
-    min-height: 34px;
-  }
   .mood-picks-list,
   .for-you-home-list { grid-template-columns: 1fr; }
   .smart-planner-grid { grid-template-columns: 1fr; }
@@ -7923,10 +7922,10 @@ body[data-theme-accent='midnight'] {
   --surface: #191e29;
   --surface2: #1f2734;
   --surface3: #2a3342;
-  --primary: #b79a56;
-  --primary-rgb: 183,154,86;
-  --primary-dk: #977d45;
-  --primary-lt: #ccaf72;
+  --primary: #e8b15a;
+  --primary-rgb: 232,177,90;
+  --primary-dk: #c8964b;
+  --primary-lt: #f2ca85;
 }
 body[data-theme-accent='berry'] {
   --bg: #1b141a;
@@ -7949,10 +7948,10 @@ body[data-theme-accent='honey'] {
   --text-dim: #6b5a4c;
   --text-muted: #5a4a3d;
   --border: rgba(70,45,20,.16);
-  --primary: #b0702c;
-  --primary-rgb: 176,112,44;
-  --primary-dk: #8f5a22;
-  --primary-lt: #cf914c;
+  --primary: #8a5019;
+  --primary-rgb: 138,80,25;
+  --primary-dk: #704012;
+  --primary-lt: #8a5019;
 }
 body[data-theme-accent='mint'] {
   --bg: #edf3ef;
@@ -7963,10 +7962,10 @@ body[data-theme-accent='mint'] {
   --text-dim: #55706a;
   --text-muted: #3f5953;
   --border: rgba(31,45,42,.18);
-  --primary: #4a8b79;
-  --primary-rgb: 74,139,121;
-  --primary-dk: #3a7061;
-  --primary-lt: #68a793;
+  --primary: #286c57;
+  --primary-rgb: 40,108,87;
+  --primary-dk: #205542;
+  --primary-lt: #286c57;
 }
 body[data-theme-accent='neon'] {
   --bg: #0d1720;
@@ -8328,14 +8327,6 @@ body.light-mode .aar-icon {
     linear-gradient(165deg, rgba(69,45,30,.96), rgba(34,22,16,.97));
   box-shadow: 0 18px 40px rgba(0,0,0,.5);
 }
-/* Cream text needs the wood card, so keep it in Light Mode too. */
-body.light-mode .auth-card {
-  background:
-    linear-gradient(rgba(50,34,24,.78), rgba(40,27,20,.84)),
-    url('assets/textures/wood.jpg') center/cover no-repeat,
-    linear-gradient(165deg, rgba(69,45,30,.96), rgba(34,22,16,.97));
-}
-body.light-mode .auth-card .form-label { color: #e3d1b6; }
 .auth-body { padding: 8px 24px 28px; }
 .auth-title {
   font-size: 1.28rem;
@@ -8455,13 +8446,6 @@ body.light-mode .auth-card .form-label { color: #e3d1b6; }
   max-width: 560px;
   padding: 0;
   border: 1px solid rgba(198,161,118,.36);
-  background:
-    radial-gradient(120% 90% at 100% 0%, rgba(117,155,87,.2), transparent 52%),
-    linear-gradient(160deg, rgba(65,42,27,.97), rgba(31,20,14,.98));
-}
-/* Its cream/gold text is only readable on this dark gradient, so keep the
-   gradient even in Light Mode instead of letting .modal-card force it white. */
-body.light-mode .upgrade-card {
   background:
     radial-gradient(120% 90% at 100% 0%, rgba(117,155,87,.2), transparent 52%),
     linear-gradient(160deg, rgba(65,42,27,.97), rgba(31,20,14,.98));
@@ -9115,25 +9099,38 @@ body.overlay-open .save-diary-nudge { visibility: hidden; }
 .swipe-card-open.closed { color: #e74c3c; }
 .swipe-card-item .swipe-label { z-index: 2; }
 
-/* Light theme: these cards keep their dark wood/navy backgrounds, so they
-   need light text (they were getting the light theme's dark ink). */
-body.light-mode .for-you-home, body.light-mode .mood-picks-home, body.light-mode .week-recap-home,
-body.light-mode .for-you-card, body.light-mode .restaurant-card {
-  --text: #f6ecdc; --text-dim: #d8c4a7; --text-muted: #d8c4a7; --green: #7fdc9a;
-  color: #f6ecdc;
+/* Light surfaces and their text use the same theme tokens, not dark wood
+   mixed with dark ink. Photo overlays retain their explicit white labels. */
+body.light-mode :is(.home-module, .restaurant-card, .for-you-card, .mood-pick-card, .bear-swipe-home, .auth-card, .upgrade-card) {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+  box-shadow: var(--shadow);
 }
-body.light-mode .for-you-home-title, body.light-mode .mood-picks-home-title, body.light-mode .week-recap-title,
-body.light-mode .week-recap-text, body.light-mode .week-recap-home strong { color: #f6ecdc; }
-body.light-mode .for-you-home .btn-ghost, body.light-mode .for-you-card-meta, body.light-mode .home-mood-chip:not(.active),
-body.light-mode .restaurant-card .my-rating-row, body.light-mode .restaurant-card .card-action-btn { color: #e8d8bf; }
-body.light-mode .for-you-chip, body.light-mode .mood-pick-fit, body.light-mode .restaurant-card .card-highlight.good { color: #8ee6a8; background: rgba(46, 204, 113, .16); }
-body.light-mode .restaurant-card .card-highlight.mood, body.light-mode .restaurant-card .card-highlight { color: #f3c9a5; }
-body.light-mode .restaurant-card .card-highlight.open-now { color: #8ee6a8; }
-body.light-mode .restaurant-card .card-highlight.open-soon { color: #f5b36b; }
-body.light-mode .restaurant-card .card-highlight.closed-now { color: #ff9a8a; }
-body.light-mode .restaurant-card .card-action-btn { border-color: rgba(246, 236, 220, .25); }
-body.light-mode .for-you-home .for-you-chip.alt { color: #8ee6a8; background: rgba(46, 204, 113, .16); border-color: rgba(142, 230, 168, .35); }
-body.light-mode .mood-picks-home .home-mood-chip:not(.active) { background: rgba(246, 236, 220, .12); border-color: rgba(246, 236, 220, .3); color: #f6ecdc; }
+body.light-mode :is(.home-module, .for-you-card)::after { display: none; }
+body.light-mode :is(.app-header, .filter-bar) { background: var(--surface); }
+body.light-mode .app-header::before { background: none; }
+body.light-mode :is(.list-title, .crave-home-title, .for-you-home-title, .mood-picks-home-title, .week-recap-title, .week-recap-text, .for-you-card-name, .mood-pick-name, .card-note, .card-order, .card-order-title, .card-order.skip, .auth-title, .upgrade-plan-name, .upgrade-plan-price, .gz-title, .gz-perks) { color: var(--text); }
+body.light-mode :is(.crave-home-count, .crave-where, .crave-empty, .for-you-card-meta, .mood-pick-meta, .auth-sub, .auth-divider, .auth-toggle-text, .auth-tab:not(.active), .upgrade-price-sub, .upgrade-plan-features, .upgrade-plan-features li.dim, .upgrade-footer, .gz-snooze, .gz-meter-label) { color: var(--text-muted); opacity: 1; }
+body.light-mode :is(.crave-card, .link-chip, .for-you-chip, .home-mood-chip:not(.active), .home-quick-btn, .upgrade-plan, .upgrade-period-btn) {
+  background: var(--surface2); color: var(--text); border-color: var(--border);
+}
+body.light-mode :is(.upgrade-plan-paid, .upgrade-period-btn.active) { background: var(--surface3); border-color: var(--primary); color: var(--text); }
+body.light-mode :is(.for-you-chip.alt, .mood-pick-fit, .card-highlight.good, .card-highlight.open-now, .onc-status) { color: #24663e; background: rgba(38,132,74,.1); }
+body.light-mode :is(.card-highlight.mood, .card-highlight.open-soon, .onc-status.soon) { color: #854515; }
+body.light-mode .card-highlight.closed-now { color: var(--red); }
+body.light-mode .card-action-btn { border-color: var(--border); }
+body.light-mode .card-action-btn.primary-action { color: var(--text); }
+body.light-mode .card-action-btn.delete-card { color: var(--red); border-color: var(--red); }
+body.light-mode :is(.card-address, .card-notes) { color: var(--text-muted); }
+body.light-mode :is(.card-name, .card-cuisine, .card-order-label) { color: var(--text); }
+body.light-mode :is(.card-order.want, .card-order.friends, .card-order.skip) .card-order-label { color: var(--primary); }
+body.light-mode :is(.star-pick:not(.active):not(.hover), .dq-star:not(.on), .ja-star:not(.on)) { color: var(--text-dim); }
+body.light-mode .ja-star.on { color: var(--gold); }
+body.light-mode .card-action-btn.primary-action:hover, body.light-mode .card-action-btn.delete-card:hover { color: #fff; }
+body.light-mode .icon-btn { background: var(--surface2); color: var(--text); border-color: var(--border); box-shadow: none; }
+body.light-mode .icon-btn:hover { background: var(--surface3); color: var(--text); }
+body.light-mode .gz-perks li::before { color: #24663e; }
 
 /* Stand-in dish photo on cards with no photo of their own, clearly labeled. */
 .card-stock-tag { position: absolute; left: 10px; bottom: 10px; z-index: 2; padding: 3px 9px; border-radius: 999px; font-size: .7rem; font-weight: 700; color: #fff6e6; background: rgba(20, 12, 6, .72); backdrop-filter: blur(4px); max-width: calc(100% - 20px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -9236,13 +9233,9 @@ body.overlay-open .app-update-banner { display: none; }
 .rate-close { position: absolute; top: 8px; right: 8px; background: none; border: 0; color: var(--text-dim); font-size: 1rem; padding: 6px; cursor: pointer; }
 .rate-text { width: 100%; resize: vertical; }
 
-/* Small phones: the header was 383px wide and pushed the page sideways on
-   anything narrower. The light/dark switch is also in Settings. */
+/* Keep the theme switch available; secondary shortcuts are in Play/Home. */
 @media (max-width: 400px) {
-  #theme-toggle-btn { display: none; }
   .app-header .header-actions { gap: 5px; }
-  .app-header .brand-icon { width: 3.6rem; height: 3.6rem; }
-  .app-header .icon-btn { width: 34px; height: 34px; }
 }
 @media (max-width: 340px) {
   #header-invite-btn { display: none; }
@@ -9379,6 +9372,60 @@ button.map-group-row { cursor: pointer; }
 :where(.btn-primary, .btn-secondary, .btn-ghost, .btn-danger, .btn-orange, .btn-sm, .auth-google-btn, .auth-tab, .grizzly-pill, .upgrade-cta, .header-add-btn, button.chip, .suggestion-chip) {
   justify-content: center;
   text-align: center;
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+/* Quiet textures preserve the store's dark look without competing with text. */
+body:not(.light-mode)[data-theme-accent='midnight'] {
+  background:
+    linear-gradient(rgba(18,20,27,.94), rgba(18,20,27,.96)),
+    url('assets/textures/forest.jpg') center/cover fixed no-repeat, var(--bg);
+}
+body:not(.light-mode)[data-theme-accent='midnight'] :is(.home-module, .restaurant-card) {
+  background:
+    linear-gradient(rgba(25,30,41,.93), rgba(25,30,41,.96)),
+    url('assets/textures/wood.jpg') center/cover no-repeat, var(--surface);
+}
+body:not(.light-mode)[data-theme-accent='midnight'] .app-header { background: var(--bg); }
+body:not(.light-mode)[data-theme-accent='midnight'] .app-header::before { opacity: .2; }
+body :is(.mood-chip.selected, .craving-chip.selected, .chal-tab.active, .auth-tab.active, .home-mood-chip.active, .home-mood-chip:hover, .nearalerts-choices button.active, .ai-msg.user .ai-msg-bubble, .upgrade-plan-badge, .bingo-cell.filled, .bingo-cell.bingo-line, .dv-pick.on .dv-check, .groupvote-pick-item.selected .groupvote-pick-check, .route-pick-item.selected .route-pick-check) { color: var(--on-primary); }
+.suggestion-chip:hover, .quick-chip:hover, .disc-refresh-btn:hover, .card-action-btn.directions:hover { color: var(--on-primary); }
+.card-action-btn.primary-action:hover { color: var(--on-primary); }
+.modal-header h2, .mobile-hub-header > div, .bc-header > div { min-width: 0; overflow-wrap: anywhere; }
+.modal-header .icon-btn, .mobile-hub-header .icon-btn { flex-shrink: 0; }
+.home-quick-copy { min-width: 0; overflow-wrap: anywhere; }
+.bc-card-name, .bc-card-date, .bc-muted { overflow-wrap: anywhere; }
+
+@media (max-width: 768px) {
+  .app-header { min-height: 58px; height: auto; padding: 6px 10px; gap: 6px; }
+  .app-header .brand-icon { width: 44px; height: 44px; }
+  .app-header .header-actions { min-width: 0; gap: 5px; }
+  .app-header .icon-btn, .app-header .moss-friends-btn { width: 44px; height: 44px; min-width: 44px; flex-shrink: 0; padding: 8px; }
+  #theme-toggle-btn { display: flex; }
+  .grizzly-pill { line-height: 1.4; min-height: 36px; white-space: normal; letter-spacing: 0; }
+  :is(.btn-primary, .btn-secondary, .btn-ghost, .btn-danger, .btn-orange, .btn-sm, .auth-google-btn, .auth-tab, .suggestion-chip) { min-height: 44px; line-height: 1.4; white-space: normal; overflow-wrap: anywhere; }
+  .bc-card-actions { flex-wrap: wrap; }
+  .bc-card-actions button { flex: 1 1 105px; }
+  .bc-detail-actions > a, .bc-detail-actions > button { max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
+  .bc-home-heading > div { flex: 1; min-width: 0; }
+  .bc-home-heading > button { flex-shrink: 0; padding: 8px 12px; }
+  .profile-photo-row, .personalize-quick-actions, .challenge-share-row { flex-wrap: wrap; }
+  .profile-photo-row > button, .personalize-quick-actions > button { flex: 1 1 130px; min-width: 0; }
+  .challenge-link-input { min-width: 0; flex-basis: 100%; }
+  .list-tab { padding: 10px 8px; min-width: 0; }
+  .list-tab-name { min-width: 0; overflow-wrap: anywhere; }
+  .list-tab-count { flex-shrink: 0; }
+  .mobile-nav-btn span { line-height: 1.3; }
+}
+@media (max-width: 600px) {
+  #header-invite-btn, .header-actions #craving-btn { display: none; }
+}
+@media (max-width: 360px) {
+  .header-actions .grizzly-pill { display: none; }
 }
 
 /* Play: eating contests & food challenges nationwide (play.js) */
@@ -9398,6 +9445,71 @@ button.map-group-row { cursor: pointer; }
 .fe-star, .fe-share { flex: 1; padding: 0 12px; min-width: 56px; background: none; border: 0; color: var(--primary); font: inherit; font-size: .74rem; font-weight: 800; cursor: pointer; }
 .fe-star { font-size: 1.15rem; border-bottom: 1px solid var(--border); }
 .fe-card.fe-saved { border-color: rgba(var(--primary-rgb), .55); }
+
+/* Bear Challenges */
+.bc-home { padding: 18px; margin: 18px 0; }
+.bc-home-heading, .bc-header, .bc-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.bc-home-heading h2 { font-size: 1.25rem; margin: 4px 0; }
+.bc-eyebrow { font-size: .65rem; font-weight: 800; letter-spacing: .12em; color: var(--primary); }
+.bc-muted { color: var(--text-muted); font-size: .8rem; line-height: 1.5; }
+.bc-home-list { display: flex; gap: 14px; overflow-x: auto; padding: 12px 0 4px; scroll-snap-type: x proximity; }
+.bc-home-list .bc-card { flex: 0 0 255px; scroll-snap-align: start; }
+.bc-card { min-width: 0; border: 1px solid var(--border); border-radius: 18px; background: var(--surface2); overflow: hidden; }
+.bc-is-saved { border-color: var(--primary); }
+.bc-card-main { display: block; width: 100%; background: transparent; color: var(--text); font: inherit; border: 0; padding: 0; text-align: left; cursor: pointer; }
+.bc-art { position: relative; height: 130px; overflow: hidden; background: linear-gradient(135deg, rgba(var(--primary-rgb), .2), var(--surface3)); }
+.bc-art img { width: 100%; height: 100%; object-fit: cover; }
+.bc-art > span { position: absolute; bottom: 7px; right: 9px; color: #fff; background: rgba(0, 0, 0, .7); border-radius: 6px; font-size: .58rem; padding: 3px 6px; }
+.bc-art-icon { display: grid; place-items: center; font-size: 3.2rem; }
+.bc-card-text { display: grid; gap: 6px; padding: 14px; }
+.bc-card-name { font-size: 1rem; line-height: 1.35; overflow-wrap: anywhere; }
+.bc-tag { color: var(--primary); font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+.bc-card-date, .bc-card-prize { font-size: .8rem; font-weight: 700; }
+.bc-card-prize { color: var(--primary); }
+.bc-card-actions { display: flex; border-top: 1px solid var(--border); padding: 4px; gap: 4px; }
+.bc-card-actions button { flex: 1; font-size: .76rem; min-height: 44px; }
+.bc-screen.modal-overlay { display: flex; flex-direction: column; inset: 0; z-index: 230; padding: 0; background: var(--bg); backdrop-filter: none; }
+.bc-screen.hidden { display: none; }
+.bc-detail-screen.modal-overlay { z-index: 240; }
+.bc-header { width: 100%; flex-shrink: 0; align-items: flex-start; padding: calc(env(safe-area-inset-top, 0px) + 20px) 20px 14px; border-bottom: 1px solid var(--border); }
+.bc-header h2 { font-size: 1.5rem; line-height: 1.3; margin: 4px 0; overflow-wrap: anywhere; }
+.bc-header .icon-btn { flex-shrink: 0; width: 44px; height: 44px; background: var(--surface2); border-radius: 50%; }
+.bc-scroll { flex: 1; width: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 18px 20px calc(env(safe-area-inset-bottom, 0px) + 26px); }
+.bc-filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.bc-filters label { display: grid; gap: 6px; min-width: 0; font-size: .76rem; font-weight: 700; }
+.bc-filters input, .bc-filters select { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; color: var(--text); background: var(--surface2); font: inherit; }
+.bc-toolbar { justify-content: flex-start; flex-wrap: wrap; margin: 14px 0; }
+.bc-toolbar button { min-height: 44px; font-size: .8rem; }
+.bc-toolbar [aria-pressed="true"] { background: rgba(var(--primary-rgb), .2); border-color: var(--primary); }
+.bc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; padding-top: 12px; }
+.bc-empty { grid-column: 1 / -1; padding: 28px 16px; border: 1px dashed var(--border); border-radius: 16px; text-align: center; color: var(--text-muted); }
+.bc-empty h3 { color: var(--text); margin-bottom: 8px; }
+.bc-disclaimer { font-size: .75rem; color: var(--text-muted); line-height: 1.6; margin: 20px 0 0; }
+.bc-detail-content { max-width: 760px; margin: 0 auto; }
+.bc-detail-content .bc-art { height: 210px; border-radius: 18px; margin-bottom: 18px; }
+.bc-detail-blurb { font-size: 1.05rem; line-height: 1.6; margin: 12px 0; }
+.bc-facts { margin: 20px 0; display: grid; gap: 12px; }
+.bc-facts > div { padding: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; }
+.bc-facts dt { color: var(--text-muted); font-size: .72rem; margin-bottom: 4px; }
+.bc-facts dd { margin: 0; font-size: .9rem; line-height: 1.6; overflow-wrap: anywhere; }
+.bc-detail-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.bc-detail-actions > a, .bc-detail-actions > button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; font-size: .85rem; }
+.bc-notice { padding: 12px; border: 1px solid var(--primary); border-radius: 12px; color: var(--text); font-size: .85rem; line-height: 1.6; }
+.bc-hub-open { margin-bottom: 12px; min-height: 44px; }
+.bc-screen :focus-visible, .bc-home :focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+@media (min-width: 900px) {
+  .bc-header, .bc-screen > .bc-scroll { padding-left: max(24px, calc((100vw - 1120px) / 2)); padding-right: max(24px, calc((100vw - 1120px) / 2)); }
+}
+@media (max-width: 600px) {
+  .bc-home { padding: 14px; }
+  .bc-home-list .bc-card { flex-basis: min(260px, 80vw); }
+  .bc-header { padding-left: 16px; padding-right: 16px; }
+  .bc-header h2 { font-size: 1.2rem; }
+  .bc-scroll { padding-left: 16px; padding-right: 16px; }
+  .bc-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bc-filters label:has(#bc-kind), .bc-filters label:has(#bc-search) { grid-column: 1 / -1; }
+  .bc-grid { grid-template-columns: minmax(0, 1fr); }
+}
 
 /* Friends screen: latest bites, 30-day board, friend cards (friends.js) */
 .fx-feed { display: grid; gap: 10px; padding: 12px; border-radius: var(--radius); background: var(--surface2); border: 1px solid var(--border); }

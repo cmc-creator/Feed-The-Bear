@@ -763,7 +763,7 @@ function initFirebaseAuth () {
 
           const settingsKey = (typeof SETTINGS_KEY !== 'undefined') ? SETTINGS_KEY : 'ftb_settings_v1';
           localStorage.setItem(settingsKey, JSON.stringify(state.settings));
-          applyThemeChoice(state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark'));
+          applyThemeChoice(appearance.themeManual === false && appearance.themeChoice !== 'auto' ? 'dark' : state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark'));
           if (typeof applyPersonalizationSettings === 'function') applyPersonalizationSettings();
         }
       } else {

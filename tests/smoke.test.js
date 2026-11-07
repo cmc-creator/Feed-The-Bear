@@ -3,10 +3,10 @@
 // stopped app.js from running in production.
 const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib');
 
-// Need arguments or leave the page, so they are covered by flows.test.js.
+// Need arguments or leave the page, so they are covered by focused flow tests.
 const SKIP = new Set(['openDirections', 'openDirectionsForSwipeItem', 'openWebsite', 'openMapsSearch', 'openLightbox',
   'openEditModal', 'openDetailModal', 'openAddModalPreFilled', 'openSwipeChoiceDetails', 'openCheckinWithPhoto',
-  'openDishTracker', 'openVisitDebrief', 'openDecisionDirections', 'openPhotoGallery']);
+  'openDishTracker', 'openVisitDebrief', 'openDecisionDirections', 'openPhotoGallery', 'openFoodEventDetail']);
 
 const SEED = [
   { id: 'r1', name: 'The Mission', cuisine: 'Mexican', status: 'visited', myRating: 5, lat: 33.4918, lng: -111.9242, priceRange: 2, tags: [], dateAdded: '2026-09-01',

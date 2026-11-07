@@ -1,6 +1,5 @@
 /* ════════════════════════════════════════════════════════════
-   Bear Swipe. The module sits on dark wood in both themes, so text uses
-   fixed cream tones rather than theme colors.
+   Bear Swipe. Module labels follow the theme; photo captions stay white.
    ════════════════════════════════════════════════════════════ */
 #bear-swipe-home { color: #f6ecdc; }
 .bs-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
@@ -151,3 +150,14 @@
   .bs-claw path { animation-duration: .01s; }
   .bs-nom, .bs-crumb { animation-duration: .01s; }
 }
+
+body.light-mode #bear-swipe-home { color: var(--text); }
+body.light-mode :is(.bs-title, .bs-sub b, .bs-result-title, .bs-result-sub strong, .bs-bar, .bs-saved-spot) { color: var(--text); }
+body.light-mode :is(.bs-sub, .bs-count, .bs-loading, .bs-result-sub, .bs-saved-label, .bs-saved-spot span, .bs-result-actions .btn-ghost) { color: var(--text-muted); }
+body.light-mode .bs-result-kicker { color: var(--primary); }
+body.light-mode :is(.bs-icon-btn, .bs-saved-spot) { background: var(--surface2); border-color: var(--border); color: var(--text); }
+body.light-mode .bs-progress { background: var(--surface3); }
+body.light-mode .bs-btn-no { background: rgba(207,109,99,.1); color: var(--red); border-color: var(--red); }
+.bs-header > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+.bs-btn { min-width: 0; padding: 10px; overflow-wrap: anywhere; white-space: normal; line-height: 1.4; }
+@media (max-width: 768px) { .bs-icon-btn { width: 44px; height: 44px; flex-shrink: 0; } }

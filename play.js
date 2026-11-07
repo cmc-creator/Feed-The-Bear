@@ -1224,56 +1224,142 @@ document.addEventListener('click', e => {
    PHASE 11 • TASTE DNA + WEEKLY GOAL + ENHANCEMENTS
    ════════════════════════════════════════════════════════════ */
 
-/* ── Food challenges nationwide (Play) ───────────────────────
+/* ── Bear Challenges (Home, Play and Discover) ───────────────
    Upcoming eating contests and food challenges across the US
    (api/food-events.js: five regions plus your state, searched daily).
-   Saved ★ first, then your state. Tap one for its page; Share asks a friend
-   to go. A heads-up when a saved one, or one in your state, is days away
+   Saved ★ first, then your state. Details keep source links and unknown
+   facts explicit. Invites share the listing and its source. A heads-up
+   when a saved one, or one in your state, is days away
    (closed app: api/nudges.js). Kept on the phone for a few hours. */
 const FOOD_EVENTS_KEY = 'ftb_food_events_v2';
 const FOOD_EVENTS_SAVED_KEY = 'ftb_food_events_saved_v1';
+const FOOD_EVENT_BOOKMARKS_KEY = 'ftb_food_event_bookmarks_v2';
 const FOOD_EVENTS_NOTED_KEY = 'ftb_food_events_noted_v1';
 const FOOD_EVENTS_TTL = 6 * 60 * 60 * 1000;
 const US_STATE_CODES = { alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA', colorado: 'CO', connecticut: 'CT', delaware: 'DE', 'district of columbia': 'DC', florida: 'FL', georgia: 'GA', hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA', kansas: 'KS', kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD', massachusetts: 'MA', michigan: 'MI', minnesota: 'MN', mississippi: 'MS', missouri: 'MO', montana: 'MT', nebraska: 'NE', nevada: 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', ohio: 'OH', oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA', 'rhode island': 'RI', 'south carolina': 'SC', 'south dakota': 'SD', tennessee: 'TN', texas: 'TX', utah: 'UT', vermont: 'VT', virginia: 'VA', washington: 'WA', 'west virginia': 'WV', wisconsin: 'WI', wyoming: 'WY' };
 const FOOD_EVENT_ICON = { contest: '🏆', challenge: '🔥', festival: '🎪' };
 let _foodEvents = null;
+const _foodEventLoads = new Map();
+const _foodEventLists = new Map();
 
-const foodEventKey = e => `${e.name}|${e.date}`;
+const legacyFoodEventKey = e => `${e.name}|${e.date}`;
+const foodEventKey = e => e.id || [e.name, e.date, e.state, e.city, e.venue].map(v => String(v || '').trim().toLowerCase()).join('|');
+function foodEventBookmarks () {
+  try {
+    const value = JSON.parse(localStorage.getItem(FOOD_EVENT_BOOKMARKS_KEY) || '[]');
+    return Array.isArray(value) ? value.filter(e => e && typeof e.name === 'string') : [];
+  } catch (err) { console.warn('[FTB] challenge bookmarks could not be read:', err); return []; }
+}
 function savedFoodEvents () {
-  try { return new Set(JSON.parse(localStorage.getItem(FOOD_EVENTS_SAVED_KEY)) || []); } catch { return new Set(); }
+  const keys = new Set(foodEventBookmarks().map(foodEventKey));
+  try {
+    const old = JSON.parse(localStorage.getItem(FOOD_EVENTS_SAVED_KEY) || '[]');
+    if (Array.isArray(old)) old.forEach(k => keys.add(k));
+  } catch (err) { console.warn('[FTB] legacy challenge saves could not be read:', err); }
+  return keys;
+}
+function isFoodEventSaved (e, saved = savedFoodEvents()) {
+  return saved.has(foodEventKey(e)) || saved.has(legacyFoodEventKey(e));
+}
+function writeFoodEventBookmarks (bookmarks, saved) {
+  const before = localStorage.getItem(FOOD_EVENTS_SAVED_KEY);
+  localStorage.setItem(FOOD_EVENTS_SAVED_KEY, JSON.stringify([...saved]));
+  try { localStorage.setItem(FOOD_EVENT_BOOKMARKS_KEY, JSON.stringify(bookmarks)); }
+  catch (err) {
+    if (before === null) localStorage.removeItem(FOOD_EVENTS_SAVED_KEY);
+    else localStorage.setItem(FOOD_EVENTS_SAVED_KEY, before);
+    throw err;
+  }
+}
+function retainLegacyFoodEventSaves (events) {
+  const saved = savedFoodEvents();
+  const bookmarks = foodEventBookmarks();
+  const keys = new Set(bookmarks.map(foodEventKey));
+  const additions = events.filter(e => isFoodEventSaved(e, saved) && !keys.has(foodEventKey(e))).slice(0, Math.max(0, 100 - bookmarks.length));
+  if (!additions.length) return;
+  try { writeFoodEventBookmarks([...bookmarks, ...additions], saved); }
+  catch (err) { console.warn('[FTB] older challenge saves could not be retained:', err); }
 }
 function toggleSavedFoodEvent (e) {
   const saved = savedFoodEvents();
+  const wasSaved = isFoodEventSaved(e, saved);
   const k = foodEventKey(e);
-  if (saved.has(k)) saved.delete(k); else saved.add(k);
-  try { localStorage.setItem(FOOD_EVENTS_SAVED_KEY, JSON.stringify([...saved].slice(-100))); } catch { /* storage full */ }
-  return saved.has(k);
+  const bookmarks = foodEventBookmarks().filter(x => foodEventKey(x) !== k);
+  if (!wasSaved) {
+    if (bookmarks.length >= 100) {
+      showToast('Saved list full', 'Remove a saved challenge before adding another.', 'info');
+      return null;
+    }
+    bookmarks.push(e);
+  }
+  saved.delete(k);
+  saved.delete(legacyFoodEventKey(e));
+  try {
+    writeFoodEventBookmarks(bookmarks, saved);
+  } catch (err) {
+    console.warn('[FTB] challenge save failed:', err);
+    showToast('Could not save', 'Device storage is unavailable or full. Please try again.', 'error');
+    return null;
+  }
+  return !wasSaved;
 }
 
-async function loadFoodEvents (st = '') {
-  try {
-    const saved = JSON.parse(localStorage.getItem(FOOD_EVENTS_KEY) || 'null');
-    if (saved && saved.st === st && Date.now() - saved.at < FOOD_EVENTS_TTL && Array.isArray(saved.events) && saved.events.length) return saved.events;
-  } catch { /* bad value */ }
-  try {
-    const resp = await fetch(`/api/food-events${st ? `?state=${st}` : ''}`);
-    const events = resp.ok ? (await resp.json())?.events : null;
-    if (Array.isArray(events)) {
-      try { localStorage.setItem(FOOD_EVENTS_KEY, JSON.stringify({ at: Date.now(), st, events })); } catch { /* storage full */ }
-      return events;
+async function loadFoodEvents (st = '', { refresh = false } = {}) {
+  if (_foodEventLoads.has(st)) return _foodEventLoads.get(st);
+  const task = (async () => {
+    let cached = _foodEventLists.get(st);
+    if (!cached) {
+      try {
+        const value = JSON.parse(localStorage.getItem(`${FOOD_EVENTS_KEY}:${st}`) || localStorage.getItem(FOOD_EVENTS_KEY) || 'null');
+        if (value?.st === st && Array.isArray(value.events)) cached = value;
+      } catch (err) { console.warn('[FTB] challenge cache could not be read:', err); }
     }
-  } catch { /* offline */ }
-  return [];
+    if (!refresh && cached && ((!cached.error && Date.now() - cached.at < FOOD_EVENTS_TTL) || (cached.error && Date.now() - cached.triedAt < 60000))) {
+      _foodEventLists.set(st, cached);
+      _foodEvents = cached;
+      if (cached.unavailable) throw new Error(cached.error);
+      retainLegacyFoodEventSaves(cached.events);
+      return cached.events;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      const resp = await fetch(`/api/food-events${st ? `?state=${encodeURIComponent(st)}` : ''}`, { signal: controller.signal, cache: refresh ? 'no-cache' : 'default' });
+      if (!resp.ok) throw new Error(`Challenge discovery returned ${resp.status}`);
+      const data = await resp.json();
+      if (!Array.isArray(data?.events)) throw new Error('Challenge discovery returned an invalid list');
+      const value = { st, events: data.events, at: Date.now(), sourceAt: Number(data.at) || 0, stale: data.stale === true, error: '' };
+      _foodEventLists.set(st, value);
+      _foodEvents = value;
+      try { localStorage.setItem(`${FOOD_EVENTS_KEY}:${st}`, JSON.stringify(value)); }
+      catch (err) { console.warn('[FTB] challenge cache could not be stored:', err); }
+      retainLegacyFoodEventSaves(value.events);
+      return value.events;
+    } catch (err) {
+      console.warn('[FTB] challenge discovery failed:', err.message);
+      if (cached) {
+        const value = { ...cached, triedAt: Date.now(), stale: true, error: cached.unavailable ? 'Could not load challenges. Please try Refresh.' : 'Could not refresh. Showing an older list; confirm with the organizer.' };
+        _foodEventLists.set(st, value);
+        _foodEvents = value;
+        if (cached.unavailable) throw err;
+        return value.events;
+      }
+      _foodEventLists.set(st, { st, events: [], triedAt: Date.now(), stale: true, unavailable: true, error: 'Could not load challenges. Please try Refresh.' });
+      throw err;
+    } finally { clearTimeout(timer); }
+  })();
+  _foodEventLoads.set(st, task);
+  try { return await task; } finally { _foodEventLoads.delete(st); }
 }
 
 async function myStateCode () {
   const area = typeof userAreaName === 'function' ? await userAreaName() : '';
   const last = String(area).split(',').pop().trim().toLowerCase();
-  return US_STATE_CODES[last] || '';
+  return US_STATE_CODES[last] || (Object.values(US_STATE_CODES).includes(last.toUpperCase()) ? last.toUpperCase() : '');
 }
 
 function foodEventDate (e) {
-  if (!e.date) return 'Any day';
+  if (!e.date) return 'Ongoing · check availability';
   const fmt = d => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   return e.endDate && e.endDate !== e.date ? `${fmt(e.date)} – ${fmt(e.endDate)}` : fmt(e.date);
 }
@@ -1288,7 +1374,7 @@ function openFoodEventLink (url) {
 
 // Saved first, then your state, then the rest; soonest first within each.
 function sortFoodEvents (events, mine, saved) {
-  const rank = e => (saved.has(foodEventKey(e)) ? 0 : e.state === mine ? 1 : 2);
+  const rank = e => (isFoodEventSaved(e, saved) ? 0 : e.state === mine ? 1 : 2);
   return [...events].sort((a, b) => rank(a) - rank(b) || (a.date === '') - (b.date === '') || a.date.localeCompare(b.date));
 }
 
@@ -1296,21 +1382,23 @@ async function renderFoodEventsHub (body) {
   if (!body) return;
   const box = document.createElement('div');
   box.className = 'hub-section food-events';
-  box.innerHTML = '<div class="hub-section-title">Eating contests &amp; food challenges</div><div class="fe-list"><div class="fe-empty">Finding contests near and far…</div></div>';
+  box.innerHTML = '<div class="hub-section-title">Bear Challenges · Eating contests &amp; food challenges</div><button type="button" class="btn-secondary bc-hub-open">Explore Bear Challenges →</button><div class="fe-list"><div class="fe-empty">Finding contests near and far…</div></div>';
   body.appendChild(box);
+  box.querySelector('.bc-hub-open').addEventListener('click', openFoodEvents);
   const mine = await myStateCode().catch(() => '');
-  const events = _foodEvents?.st === mine ? _foodEvents.events : await loadFoodEvents(mine);
-  if (events.length) _foodEvents = { st: mine, events };
+  let events;
+  try { events = activeFoodEvents(await loadFoodEvents(mine)); }
+  catch { box.querySelector('.fe-list').innerHTML = '<div class="fe-empty">Could not load challenges. Open Bear Challenges to retry or see your saved list.</div>'; return; }
   const list = box.querySelector('.fe-list');
   if (!list) return;
   if (!events.length) { list.innerHTML = '<div class="fe-empty">No contests to show right now. Check back soon.</div>'; return; }
   const saved = savedFoodEvents();
   const sorted = sortFoodEvents(events, mine, saved).slice(0, 60);
   const card = (e, i) => {
-    const on = saved.has(foodEventKey(e));
+    const on = isFoodEventSaved(e, saved);
     return `
     <div class="fe-card${on ? ' fe-saved' : ''}" data-i="${i}">
-      <button type="button" class="fe-main"${e.url ? '' : ' disabled'}>
+      <button type="button" class="fe-main">
         <span class="fe-icon" aria-hidden="true">${FOOD_EVENT_ICON[e.kind] || '🏆'}</span>
         <span class="fe-text">
           <span class="fe-name">${escHtml(e.name)}</span>
@@ -1326,7 +1414,9 @@ async function renderFoodEventsHub (body) {
     </div>`;
   };
   const near = mine ? sorted.filter(e => e.state === mine).length : 0;
-  list.innerHTML = (mine ? `<div class="fe-empty">${near ? `${near} in your state` : 'None found in your state yet'} · ${events.length} nationwide</div>` : '')
+  const info = _foodEventLists.get(mine);
+  list.innerHTML = (info?.stale ? '<p class="fe-empty">Older discovery results. Confirm availability with the organizer.</p>' : '')
+    + (mine ? `<div class="fe-empty">${near ? `${near} in your state` : 'None found in your state yet'} · ${events.length} nationwide</div>` : '')
     + sorted.map(card).join('');
   list.addEventListener('click', ev => {
     const cardEl = ev.target.closest('.fe-card');
@@ -1334,38 +1424,368 @@ async function renderFoodEventsHub (body) {
     const e = sorted[Number(cardEl.dataset.i)];
     if (ev.target.closest('.fe-star')) {
       const on = toggleSavedFoodEvent(e);
+      if (on === null) return;
       cardEl.classList.toggle('fe-saved', on);
       const star = cardEl.querySelector('.fe-star');
       star.textContent = on ? '★' : '☆';
       star.setAttribute('aria-pressed', String(on));
       trackProductEvent(on ? 'food_event_saved' : 'food_event_unsaved', { kind: e.kind });
-      if (on) showToast('Saved', `We'll give you a heads-up before ${e.name}.`, 'success');
+      if (on) showToast('Saved on this device', 'Find it in Bear Challenges → Saved.', 'success');
+      refreshFoodChallengeViews();
       return;
     }
     if (ev.target.closest('.fe-share')) {
-      trackProductEvent('food_event_shared', { kind: e.kind });
-      const where = [e.city, e.state].filter(Boolean).join(', ');
-      const text = e.date ? `${e.name}, ${foodEventDate(e)} in ${where}. Want to go? 🐻` : `${e.name} in ${where}. Think we could take it? 🐻`;
-      navigator.share?.({ title: e.name, text, url: e.url || 'https://www.feed-the-bear.com' }).catch(() => {});
+      shareFoodEvent(e);
       return;
     }
-    if (ev.target.closest('.fe-main') && e.url) { trackProductEvent('food_event_opened', { kind: e.kind }); openFoodEventLink(e.url); }
+    if (ev.target.closest('.fe-main')) openFoodEventDetail(e);
   });
 }
 window.renderFoodEventsHub = renderFoodEventsHub;
 
-// Opens Play at the contests (a contest notification was tapped).
-function openFoodEvents () {
-  if (typeof openMobileHub !== 'function') return;
-  openMobileHub();
-  let tries = 0;
-  const go = () => {
-    const el = document.querySelector('#mobile-hub-body .food-events');
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    else if (++tries < 20) setTimeout(go, 150);
-  };
-  setTimeout(go, 150);
+const _bc = { mine: '', st: '', kind: 'all', query: '', when: 'all', saved: false, events: [], request: 0, loading: false, error: '', detail: null };
+let _bcReturnFocus = null;
+let _bcDetailReturnFocus = null;
+let _bcHomeRequest = 0;
+
+function foodEventToday () {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+function activeFoodEvents (events) {
+  return events.filter(e => e && typeof e.name === 'string' && (!e.date || (e.endDate || e.date) >= foodEventToday()));
+}
+function foodEventSourceUrl (url) {
+  try {
+    const u = new URL(url);
+    return ['https:', 'http:'].includes(u.protocol) && !u.username && !u.password ? u.href : '';
+  } catch { return ''; }
+}
+function foodEventFreshness (e, fallback = 0) {
+  const at = Number(e.discoveredAt) || fallback;
+  return at ? `Found ${new Date(at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · not organizer-verified` : 'Discovery date unknown · not organizer-verified';
+}
+function foodEventArtwork (e) {
+  const text = `${e.name} ${e.blurb}`.toLowerCase();
+  const food = /pizza/.test(text) ? 'pizza' : /burger/.test(text) ? 'burger' : /wing|chicken/.test(text) ? 'fried_chicken' : /taco/.test(text) ? 'tacos' : /burrito/.test(text) ? 'burrito' : /steak/.test(text) ? 'steak' : /ramen/.test(text) ? 'ramen' : null;
+  return food ? `<div class="bc-art"><img src="assets/food/${food}.jpg" alt="" loading="lazy" /><span>Food illustration</span></div>`
+    : `<div class="bc-art bc-art-icon" aria-hidden="true">${FOOD_EVENT_ICON[e.kind] || '🏆'}</div>`;
+}
+function foodChallengeCard (e, i) {
+  const on = isFoodEventSaved(e);
+  return `<article class="bc-card${on ? ' bc-is-saved' : ''}" data-event-index="${i}" data-event-key="${escHtml(foodEventKey(e))}">
+    <button type="button" class="bc-card-main" data-bc-action="detail">
+      ${foodEventArtwork(e)}
+      <span class="bc-card-text">
+        <span class="bc-tag">${e.kind === 'challenge' ? 'Restaurant challenge' : e.kind === 'festival' ? 'Food festival' : 'Eating competition'}</span>
+        <strong class="bc-card-name">${escHtml(e.name)}</strong>
+        <span class="bc-muted">${escHtml([e.venue, e.city, e.state].filter(Boolean).join(' · '))}</span>
+        <span class="bc-card-date">${escHtml(foodEventDate(e))}</span>
+        ${e.prize ? `<span class="bc-card-prize">Prize: ${escHtml(e.prize)}</span>` : ''}
+        <span class="bc-muted">${e.entryCost ? `Entry: ${escHtml(e.entryCost)}` : 'Entry cost: check organizer'}</span>
+      </span>
+    </button>
+    <div class="bc-card-actions"><button type="button" class="btn-ghost" data-bc-action="save" aria-pressed="${on}" aria-label="${on ? 'Unsave' : 'Save'} ${escHtml(e.name)}">${on ? '★ Saved' : '☆ Want to go'}</button>
+      <button type="button" class="btn-ghost" data-bc-action="share">Invite friends</button></div>
+  </article>`;
+}
+
+async function shareFoodEvent (e) {
+  const url = new URL('https://www.feed-the-bear.com/app.html');
+  url.searchParams.set('foodEvent', foodEventKey(e));
+  if (e.state) url.searchParams.set('eventState', e.state);
+  const where = [e.city, e.state].filter(Boolean).join(', ');
+  const source = foodEventSourceUrl(e.url);
+  const text = `${e.name} · ${foodEventDate(e)}${where ? ` in ${where}` : ''}. Want to go together? 🐻${source ? ` Organizer/source: ${source}` : ''} Confirm availability and rules before going.`;
+  try {
+    if (navigator.share) await navigator.share({ title: e.name, text, url: url.href });
+    else {
+      await navigator.clipboard.writeText(`${text} ${url.href}`);
+      showToast('Invite copied', 'Paste it in a message to your friends.', 'success');
+    }
+    trackProductEvent('food_event_shared', { kind: e.kind });
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    console.warn('[FTB] challenge invite failed:', err);
+    showToast('Could not share', 'Please try again, or copy the source link from the details.', 'error');
+  }
+}
+
+function handleFoodChallengeAction (ev, events) {
+  const button = ev.target.closest('[data-bc-action]');
+  const card = ev.target.closest('[data-event-index]');
+  const e = card && events[Number(card.dataset.eventIndex)];
+  if (!button || !e) return;
+  if (button.dataset.bcAction === 'detail') openFoodEventDetail(e);
+  if (button.dataset.bcAction === 'share') shareFoodEvent(e);
+  if (button.dataset.bcAction === 'save') {
+    const on = toggleSavedFoodEvent(e);
+    if (on === null) return;
+    trackProductEvent(on ? 'food_event_saved' : 'food_event_unsaved', { kind: e.kind });
+    if (on) showToast('Saved on this device', 'Find it under Saved in Bear Challenges.', 'success');
+    refreshFoodChallengeViews();
+  }
+}
+
+function foodEventPeriod () {
+  const start = new Date(`${foodEventToday()}T12:00:00`);
+  const end = new Date(start);
+  if (_bc.when === 'weekend') {
+    start.setDate(start.getDate() + (start.getDay() >= 5 || start.getDay() === 0 ? 0 : 5 - start.getDay()));
+    end.setTime(start.getTime());
+    end.setDate(end.getDate() + (7 - end.getDay()) % 7);
+  } else end.setDate(end.getDate() + 30);
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return [iso(start), iso(end)];
+}
+function filteredFoodChallenges () {
+  const liveKeys = new Set(_bc.events.map(foodEventKey));
+  const legacy = _bc.events.filter(e => isFoodEventSaved(e));
+  const bookmarks = foodEventBookmarks();
+  const bookmarkKeys = new Set(bookmarks.map(foodEventKey));
+  const events = _bc.saved ? [...bookmarks, ...legacy.filter(e => !bookmarkKeys.has(foodEventKey(e)))] : activeFoodEvents(_bc.events);
+  const query = _bc.query.trim().toLowerCase();
+  const [start, end] = foodEventPeriod();
+  const filtered = events.filter(e =>
+    (!_bc.st || e.state === _bc.st) &&
+    (_bc.kind === 'all' || (_bc.kind === 'challenge' ? e.kind === 'challenge' : e.kind !== 'challenge' && !!e.date)) &&
+    (!query || [e.name, e.venue, e.city, e.state, e.blurb].join(' ').toLowerCase().includes(query)) &&
+    (_bc.when === 'all' || (e.date && e.date <= end && (e.endDate || e.date) >= start)));
+  return sortFoodEvents(filtered, _bc.mine, savedFoodEvents()).map(e => ({ ...e, unavailable: !liveKeys.has(foodEventKey(e)) }));
+}
+let _bcVisible = [];
+function renderFoodChallenges () {
+  const list = document.getElementById('bc-list');
+  const status = document.getElementById('bc-status');
+  if (!list || !status) return;
+  const focused = document.activeElement;
+  const focusedCard = focused.closest('[data-event-index]');
+  const focusedEventKey = list.contains(focused) ? focusedCard?.dataset.eventKey : '';
+  const focusedAction = focused.dataset.bcAction;
+  document.getElementById('bc-saved').setAttribute('aria-pressed', String(_bc.saved));
+  document.getElementById('bc-refresh').disabled = _bc.loading;
+  _bcVisible = filteredFoodChallenges();
+  const info = _foodEventLists.get(_bc.st);
+  status.textContent = `${_bcVisible.length} ${_bc.saved ? 'saved ' : ''}listing${_bcVisible.length === 1 ? '' : 's'}${_bc.st ? ` in ${_bc.st}` : ' nationwide'}. ${_bc.loading ? 'Refreshing…' : _bc.error || info?.error || (info?.stale ? 'Older discovery results; confirm availability.' : 'Web-discovered, not organizer-verified.')}`;
+  list.setAttribute('aria-busy', String(_bc.loading));
+  list.innerHTML = _bcVisible.length ? _bcVisible.map(foodChallengeCard).join('') : `<div class="bc-empty">
+    <h3>${_bc.loading ? 'Finding your next food adventure…' : _bc.error && !_bc.saved ? 'Challenges could not be loaded' : _bc.saved ? 'No saved challenges match these filters' : 'No listings match yet'}</h3>
+    <p>${_bc.error ? 'Try Refresh, or open Saved to see the details kept on this device.' : _bc.saved ? 'Try Nationwide and clear other filters. Use Want to go on a listing to save it here.' : 'Try another state, clear your search, or choose Any time. Ongoing offers need organizer confirmation.'}</p></div>`;
+  if (focusedEventKey) {
+    const index = _bcVisible.findIndex(e => foodEventKey(e) === focusedEventKey);
+    const button = list.querySelector(`[data-event-index="${index}"] [data-bc-action="${focusedAction}"]`);
+    (button || document.getElementById('bc-saved')).focus();
+  }
+}
+async function loadFoodChallengesScreen ({ refresh = false, eventKey = '' } = {}) {
+  const request = ++_bc.request;
+  const st = _bc.st;
+  _bc.loading = true;
+  _bc.error = '';
+  renderFoodChallenges();
+  try {
+    const events = await loadFoodEvents(st, { refresh });
+    if (request !== _bc.request) return;
+    _bc.events = events;
+    if (eventKey) {
+      const e = events.find(x => foodEventKey(x) === eventKey);
+      if (e) openFoodEventDetail(e);
+      else showToast('Listing no longer available', 'This shared listing was not found. Browse current challenges or check the source in your invite.', 'info');
+    }
+  } catch {
+    if (request !== _bc.request) return;
+    _bc.events = [];
+    _bc.error = 'Could not load challenges. Please try Refresh.';
+  } finally {
+    if (request === _bc.request) { _bc.loading = false; renderFoodChallenges(); }
+  }
+}
+async function openFoodEvents (options = {}) {
+  const overlay = document.getElementById('bear-challenges-overlay');
+  if (!overlay) return;
+  if (overlay.classList.contains('hidden')) _bcReturnFocus = document.activeElement;
+  overlay.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  document.getElementById('bc-title').focus();
+  trackProductEvent('bear_challenges_opened');
+  const request = ++_bc.request;
+  const requestedState = typeof options.state === 'string' ? options.state : null;
+  const first = !_bc.mine && !_bc.st;
+  _bc.loading = true;
+  renderFoodChallenges();
+  const mine = await myStateCode().catch(() => '');
+  if (request !== _bc.request || overlay.classList.contains('hidden')) return;
+  _bc.mine = mine;
+  if (requestedState !== null) _bc.st = Object.values(US_STATE_CODES).includes(requestedState) ? requestedState : '';
+  else if (first && !_bc.saved) _bc.st = mine;
+  document.getElementById('bc-state').value = _bc.st;
+  loadFoodChallengesScreen({ eventKey: options.eventKey || '' });
+}
+function closeFoodEvents () {
+  ++_bc.request;
+  _bc.loading = false;
+  document.getElementById('bear-challenges-overlay').classList.add('hidden');
+  maybeHideOverlay();
+  if (_bcReturnFocus?.isConnected && _bcReturnFocus.closest('.hidden') === null) _bcReturnFocus.focus();
+}
+function closeFoodEventDetail () {
+  document.getElementById('bear-challenge-detail-overlay').classList.add('hidden');
+  _bc.detail = null;
+  maybeHideOverlay();
+  if (_bcDetailReturnFocus?.isConnected && _bcDetailReturnFocus.closest('.hidden') === null) _bcDetailReturnFocus.focus();
+  else if (!document.getElementById('bear-challenges-overlay').classList.contains('hidden')) document.getElementById('bc-title').focus();
+}
+function renderFoodEventDetail (e) {
+  const body = document.getElementById('bc-detail');
+  const focusedAction = body.contains(document.activeElement) ? document.activeElement.dataset.detailAction : '';
+  document.getElementById('bc-detail-title').textContent = e.name;
+  const source = foodEventSourceUrl(e.url);
+  const registration = foodEventSourceUrl(e.registrationUrl);
+  const where = [e.venue, e.address, e.city, e.state].filter(Boolean).join(', ');
+  const fallbackAt = _foodEventLists.get(_bc.st)?.sourceAt || _foodEvents?.sourceAt || 0;
+  const on = isFoodEventSaved(e);
+  const ended = e.date && (e.endDate || e.date) < foodEventToday();
+  body.innerHTML = `<div class="bc-detail-content">
+    ${foodEventArtwork(e)}
+    <span class="bc-tag">${e.kind === 'challenge' ? 'Restaurant challenge' : 'Upcoming event'}</span>
+    ${e.blurb ? `<p class="bc-detail-blurb">${escHtml(e.blurb)}</p>` : ''}
+    <p class="bc-muted">${escHtml(foodEventFreshness(e, fallbackAt))}</p>
+    ${ended || e.unavailable ? '<p class="bc-notice">This saved listing has ended or is not in the current discovery results. Details are kept for reference; availability is not confirmed.</p>' : ''}
+    <dl class="bc-facts">
+      <div><dt>When</dt><dd>${escHtml(foodEventDate(e))}${!e.date ? ' · days and reservations may vary' : ' · confirm start time with organizer'}</dd></div>
+      <div><dt>Where</dt><dd>${escHtml(where || 'Check organizer')}</dd></div>
+      <div><dt>Prize</dt><dd>${escHtml(e.prize || 'Not confirmed')}</dd></div>
+      <div><dt>Entry cost</dt><dd>${escHtml(e.entryCost || 'Not confirmed · check organizer')}</dd></div>
+      <div><dt>Eligibility / reservations</dt><dd>${escHtml(e.eligibility || 'Check with the organizer before registering')}</dd></div>
+      <div><dt>Organizer rules</dt><dd>${escHtml(e.rules || 'No rules captured. Read the source and confirm with the organizer.')}</dd></div>
+    </dl>
+    <div class="bc-detail-actions">
+      <button type="button" class="btn-primary" data-detail-action="save" aria-pressed="${on}">${on ? '★ Saved · remove' : '☆ Want to go'}</button>
+      <button type="button" class="btn-secondary" data-detail-action="share">Invite friends</button>
+      ${source ? `<a class="btn-secondary" href="${escHtml(source)}" target="_blank" rel="noopener noreferrer">Read source · ${escHtml(new URL(source).hostname)}</a>` : '<span class="bc-muted">No source link supplied. Availability cannot be confirmed.</span>'}
+      ${registration ? `<a class="btn-secondary" href="${escHtml(registration)}" target="_blank" rel="noopener noreferrer">Organizer registration</a>` : ''}
+      ${where ? `<a class="btn-ghost" href="https://www.google.com/maps/search/?api=1&amp;query=${escHtml(encodeURIComponent(where))}" target="_blank" rel="noopener noreferrer">Directions · confirm venue</a>` : ''}
+    </div>
+    <p class="bc-disclaimer">Saved on this device, not synced to your account. Follow organizer eligibility and safety rules; no pressure to participate. Check spectator options with the organizer.</p>
+  </div>`;
+  if (focusedAction) body.querySelector(`[data-detail-action="${focusedAction}"]`)?.focus();
+}
+function openFoodEventDetail (e) {
+  _bcDetailReturnFocus = document.activeElement;
+  _bc.detail = e;
+  renderFoodEventDetail(e);
+  document.getElementById('bear-challenge-detail-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  document.getElementById('bc-detail-title').focus();
+  trackProductEvent('food_event_opened', { kind: e.kind });
+}
+window.closeTopFoodChallenge = event => {
+  const detailOpen = !document.getElementById('bear-challenge-detail-overlay').classList.contains('hidden');
+  const browseOpen = !document.getElementById('bear-challenges-overlay').classList.contains('hidden');
+  if (!detailOpen && !browseOpen) return false;
+  if (event?.target?.closest('#share-menu')) return true;
+  if (detailOpen) { closeFoodEventDetail(); return true; }
+  if (browseOpen) { closeFoodEvents(); return true; }
+  return false;
+};
+
+async function renderFoodChallengesHome () {
+  const host = document.getElementById('bear-challenges-home-list');
+  if (!host) return;
+  const focused = document.activeElement;
+  const focusedCard = host.contains(focused) ? focused.closest('[data-event-index]') : null;
+  const focusedKey = focusedCard?.dataset.eventKey;
+  const focusedAction = focused.dataset.bcAction;
+  const request = ++_bcHomeRequest;
+  const mine = await myStateCode().catch(() => '');
+  try {
+    const events = activeFoodEvents(await loadFoodEvents(mine));
+    if (request !== _bcHomeRequest) return;
+    const local = mine ? events.filter(e => e.state === mine) : [];
+    const source = local.length ? local : events;
+    const sorted = sortFoodEvents(source, mine, savedFoodEvents());
+    const challenge = sorted.find(e => e.kind === 'challenge');
+    const competition = sorted.find(e => e.kind !== 'challenge');
+    const featured = [...new Map([challenge, competition, ...sorted].filter(Boolean).map(e => [foodEventKey(e), e])).values()].slice(0, 3);
+    const info = _foodEventLists.get(mine);
+    document.getElementById('bear-challenges-home-sub').textContent = `${local.length ? `Discover in ${mine}` : 'Discover nationwide'} · Restaurant challenges & upcoming events.${info?.stale ? ' Older results; confirm availability.' : ' Go with friends, or watch the fun.'}`;
+    host.innerHTML = featured.length ? featured.map(foodChallengeCard).join('') : '<p class="bc-muted">No current listings yet. See all to choose a state or browse your saved challenges.</p>';
+    host.onclick = ev => handleFoodChallengeAction(ev, featured);
+    if (focusedKey && document.activeElement === document.body) [...host.querySelectorAll('[data-event-key]')].find(card => card.dataset.eventKey === focusedKey)?.querySelector(`[data-bc-action="${focusedAction}"]`)?.focus();
+  } catch {
+    if (request !== _bcHomeRequest) return;
+    host.innerHTML = '<p class="bc-muted">Could not load challenges. See all to retry, choose a state, or view Saved.</p>';
+  }
+}
+window.renderFoodChallengesHome = renderFoodChallengesHome;
+function refreshFoodChallengeViews () {
+  renderFoodChallenges();
+  if (_bc.detail) renderFoodEventDetail(_bc.detail);
+  renderFoodChallengesHome();
+}
+
+function initFoodChallenges () {
+  const states = document.getElementById('bc-state');
+  Object.entries(US_STATE_CODES).forEach(([name, code]) => {
+    const option = document.createElement('option');
+    option.value = code;
+    option.textContent = name.replace(/\b\w/g, c => c.toUpperCase());
+    states.appendChild(option);
+  });
+  document.getElementById('bear-challenges-all').addEventListener('click', () => openFoodEvents());
+  document.getElementById('bear-challenges-close').addEventListener('click', closeFoodEvents);
+  document.getElementById('bear-challenge-detail-close').addEventListener('click', closeFoodEventDetail);
+  document.getElementById('bc-kind').addEventListener('change', ev => { _bc.kind = ev.target.value; renderFoodChallenges(); });
+  document.getElementById('bc-search').addEventListener('input', ev => { _bc.query = ev.target.value; renderFoodChallenges(); });
+  document.getElementById('bc-when').addEventListener('change', ev => { _bc.when = ev.target.value; renderFoodChallenges(); });
+  states.addEventListener('change', ev => { _bc.st = ev.target.value; _bc.events = []; loadFoodChallengesScreen(); });
+  document.getElementById('bc-saved').addEventListener('click', () => { _bc.saved = !_bc.saved; renderFoodChallenges(); });
+  document.getElementById('bc-refresh').addEventListener('click', () => loadFoodChallengesScreen({ refresh: true }));
+  document.getElementById('bc-your-state').addEventListener('click', async () => {
+    const mine = await myStateCode().catch(() => '');
+    if (!mine) { showToast('Choose a state', 'Location is unavailable. Select a state above; no location permission is required.', 'info'); return; }
+    _bc.mine = mine;
+    _bc.st = mine;
+    states.value = mine;
+    _bc.events = [];
+    loadFoodChallengesScreen();
+  });
+  document.getElementById('bc-list').addEventListener('click', ev => handleFoodChallengeAction(ev, _bcVisible));
+  document.getElementById('bc-detail').addEventListener('click', ev => {
+    const link = ev.target.closest('a[href]');
+    if (link && window.Capacitor?.isNativePlatform?.()) { ev.preventDefault(); openFoodEventLink(link.href); return; }
+    const action = ev.target.closest('[data-detail-action]')?.dataset.detailAction;
+    if (!_bc.detail) return;
+    if (action === 'share') shareFoodEvent(_bc.detail);
+    if (action === 'save') {
+      const on = toggleSavedFoodEvent(_bc.detail);
+      if (on === null) return;
+      trackProductEvent(on ? 'food_event_saved' : 'food_event_unsaved', { kind: _bc.detail.kind });
+      if (on) showToast('Saved on this device', 'Your challenge details are kept even if discovery changes.', 'success');
+      refreshFoodChallengeViews();
+    }
+  });
+  // These full-screen dialogs use the same BackNav overlay tracking as other panels.
+  ['bear-challenges-overlay', 'bear-challenge-detail-overlay'].forEach(id => {
+    const overlay = document.getElementById(id);
+    overlay.addEventListener('keydown', ev => {
+      if (ev.key !== 'Tab') return;
+      const focusable = [...overlay.querySelectorAll('button:not(:disabled), input, select, a[href]')].filter(el => el.offsetParent !== null);
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (!first) return;
+      if (ev.shiftKey && (document.activeElement === first || !focusable.includes(document.activeElement))) { ev.preventDefault(); last.focus(); }
+      else if (!ev.shiftKey && (document.activeElement === last || !focusable.includes(document.activeElement))) { ev.preventDefault(); first.focus(); }
+    });
+  });
+  renderFoodChallengesHome();
+  window.addEventListener('storage', ev => {
+    if ([FOOD_EVENT_BOOKMARKS_KEY, FOOD_EVENTS_SAVED_KEY].includes(ev.key)) refreshFoodChallengeViews();
+  });
+  const query = new URLSearchParams(location.search);
+  const eventKey = query.get('foodEvent');
+  if (eventKey) openFoodEvents({ state: query.get('eventState') || '', eventKey });
+}
+document.addEventListener('DOMContentLoaded', initFoodChallenges);
 window.openFoodEvents = openFoodEvents;
 
 // A saved contest, or one in your state, within 3 days: say so once.
@@ -1373,17 +1793,18 @@ async function checkFoodEventHeadsUp () {
   const mine = await myStateCode().catch(() => '');
   const saved = savedFoodEvents();
   if (!mine && !saved.size) return;
-  const events = await loadFoodEvents(mine);
+  let events;
+  try { events = await loadFoodEvents(mine); } catch { return; }
   let noted;
   try { noted = new Set(JSON.parse(localStorage.getItem(FOOD_EVENTS_NOTED_KEY)) || []); } catch { noted = new Set(); }
   const today = new Date().toISOString().slice(0, 10);
   const soon = new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10);
-  const e = sortFoodEvents(events, mine, saved).find(x => x.date && (saved.has(foodEventKey(x)) || x.state === mine) && x.date >= today && x.date <= soon && !noted.has(foodEventKey(x)));
+  const e = sortFoodEvents(events, mine, saved).find(x => x.date && (isFoodEventSaved(x, saved) || x.state === mine) && x.date >= today && x.date <= soon && !noted.has(foodEventKey(x)) && !noted.has(legacyFoodEventKey(x)));
   if (!e) return;
   noted.add(foodEventKey(e));
   try { localStorage.setItem(FOOD_EVENTS_NOTED_KEY, JSON.stringify([...noted].slice(-100))); } catch { /* storage full */ }
   const when = e.date === today ? 'today' : new Date(`${e.date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' });
-  showToast(`🏆 ${e.name} is ${when}`, `In ${[e.city, e.state].filter(Boolean).join(', ')}. Open Play to see it.`, 'info');
-  trackProductEvent('food_event_headsup', { saved: saved.has(foodEventKey(e)) });
+  showToast(`🏆 ${e.name} is ${when}`, `In ${[e.city, e.state].filter(Boolean).join(', ')}. Open Bear Challenges on Home and confirm with the organizer.`, 'info');
+  trackProductEvent('food_event_headsup', { saved: isFoodEventSaved(e, saved) });
 }
 window.checkFoodEventHeadsUp = checkFoodEventHeadsUp;

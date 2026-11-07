@@ -16,11 +16,28 @@ Then open http://127.0.0.1:8765/app.html.
 
 ## Managing places and finding competitions
 
-- Open a saved place and use **Delete** to remove it, or **Mark permanently
+- The default appearance is the readable **Dark** theme, on phones and web,
+  regardless of the phone's system theme. Use the sun/moon button in the
+  header to switch instantly, or choose **Settings → Theme → Light**.
+  Your choice is saved. **Auto (match my phone)** is opt-in.
+
+- Use **Delete** next to **Edit** on a saved-place card to remove it after
+  confirmation (also available inside the place). Use **Mark permanently
   closed** to keep its visits, ratings, notes and photos without suggesting it
   again. **Mark reopened** reverses the closure; the flag syncs with the place.
-- On a phone, open **Play**; on desktop, open **Discover**. Choose **Eating
-  competitions & food challenges**, or search for `competitions` in that hub.
+- Open **Bear Challenges → See all** on Home, or **Bear Challenges** in
+  **Play** (phone) / **Discover** (desktop). Filter restaurant challenges
+  separately from dated competitions and festivals, choose a state without
+  location permission, search a city or restaurant, or browse this weekend.
+- **Want to go** keeps challenge details in **Saved on this device**, even
+  when an event ends or disappears from discovery. Saves are local, not
+  account-synced; clearing browser data removes them. **Invite friends**
+  shares a link back to the listing plus its source when available.
+- Details show available prize, entry cost, rules, eligibility, source and
+  registration links. Unknown facts stay unconfirmed. The discovery date
+  means a web search found the listing, **not organizer verification**.
+  Confirm availability and rules with the organizer before going. Older
+  cached results are labelled; failed discovery offers Refresh and Saved.
 - Byte Cub understands requests such as "add the Subway on Waddell to visited
   and note they have the broccoli cheddar soup". He preserves the branch,
   confirms map matches, and saves availability notes without claiming you ate

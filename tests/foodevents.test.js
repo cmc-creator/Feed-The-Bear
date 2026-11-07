@@ -76,7 +76,9 @@ const day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
   await p.locator('.fe-card').first().locator('.fe-share').click();
   check(/Wing Off/.test((await p.evaluate(() => window.__shared))?.text || ''), 'Share asks a friend to go');
   await p.locator('.fe-card').first().locator('.fe-main').click();
-  check((await p.evaluate(() => window.__opened)) === 'https://example.com/wings', 'tapping one opens its page');
+  check(await p.locator('#bear-challenge-detail-overlay').isVisible() && /Wing Off/.test(await p.locator('#bc-detail-title').innerText()), 'tapping one opens challenge details');
+  check(await p.locator('#bc-detail a').first().getAttribute('href') === 'https://example.com/wings', 'details link to the original source');
+  await p.click('#bear-challenge-detail-close');
 
   // ★ saves it, and saved ones come first next time.
   await p.locator('.fe-card').nth(1).locator('.fe-star').click();
@@ -91,12 +93,12 @@ const day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
   check(!(await p.locator('.food-events').count()), 'searching tools hides the contests');
   await p.fill('#mobile-hub-search', '');
   await p.waitForTimeout(400);
-  check(await p.locator('.fe-card').count() === 2 && asked.length === 1, `the list is kept on the phone (server asked ${asked.length}x)`);
+  check(await p.locator('.fe-card').count() === 2 && asked.filter(q => q === '?state=AZ').length === 1, `the state list is cached and shared with Home (server asked ${asked.length}x)`);
 
   // A contest notification tapped: Play opens at the contests.
   await p.evaluate(() => { closeMobileHub(); openFoodEvents(); });
   await p.waitForTimeout(1200);
-  check(await p.locator('#mobile-hub-overlay').isVisible() && await p.locator('.food-events').isVisible(), 'a contest notification opens Play at the contests');
+  check(await p.locator('#bear-challenges-overlay').isVisible() && await p.locator('.bc-card').count() >= 2, 'a contest notification opens Bear Challenges');
   check(!p.errors.length, `no page errors ${p.errors.join(' | ')}`);
 
   await browser.close();

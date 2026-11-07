@@ -130,11 +130,17 @@ async function say (page, text) {
     await p.evaluate(() => { AI.chat = window.__chat; AI.hasAccess = window.__hasAccess; });
     await say(p, 'where do I find eating competitions?');
     await p.locator('.chat-actions button').filter({ hasText: 'Open eating competitions' }).click();
-    await p.waitForSelector('.fe-card');
-    check(await p.locator('#mobile-hub-overlay').isVisible(), 'Byte Cub opens the competition list directly');
+    await p.waitForSelector('#bc-list .bc-card');
+    check(await p.locator('#bear-challenges-overlay').isVisible(), 'Byte Cub opens Bear Challenges directly');
+    await p.click('#bear-challenges-close');
+    await p.evaluate(() => openMobileHub());
     await p.click('#hub-contests-btn');
+    await p.waitForSelector('#bc-list .bc-card');
+    check(/Wing Competition/.test(await p.locator('#bc-list').innerText()), 'the visible competitions shortcut opens Bear Challenges');
+    await p.click('#bear-challenges-close');
+    await p.fill('#mobile-hub-search', 'competitions');
     await p.waitForSelector('.fe-card');
-    check(await p.inputValue('#mobile-hub-search') === 'competitions' && /Wing Competition/.test(await p.locator('.food-events').innerText()), 'the visible competitions shortcut and hub search both show the list');
+    check(/Wing Competition/.test(await p.locator('.food-events').innerText()), 'hub search still finds competitions');
 
     await closeAllDialogs(p);
     await p.evaluate(() => openDetailModal('old'));

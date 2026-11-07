@@ -1622,6 +1622,7 @@ function persistAppearanceProfile () {
   const appearance = {
     themeChoice: state.settings.themeChoice || 'dark',
     themeMode: state.settings.theme || 'dark',
+    themeManual: state.settings.themeManual === true,
     uiDensity: UI_DENSITY.has(state.settings.uiDensity) ? state.settings.uiDensity : 'cozy',
     uiCorners: UI_CORNERS.has(state.settings.uiCorners) ? state.settings.uiCorners : 'rounded',
     uiMotion: UI_MOTION.has(state.settings.uiMotion) ? state.settings.uiMotion : 'playful',
@@ -1686,13 +1687,21 @@ function updateProfileVisuals (profile = null) {
 }
 
 function applyThemeChoice (choice = 'dark', opts = {}) {
+  if (choice === 'auto') {
+    state.settings.themeManual = false;
+    state.settings.themeChoice = 'auto';
+    applyAutoThemeByClock({ persist: opts.persist !== false });
+    scheduleNextAutoThemeTick();
+    if (opts.persist !== false) persistAppearanceProfile();
+    return;
+  }
   const markManual = opts.manual !== false;
   const shouldPersist = opts.persist !== false;
   const preset = THEME_PRESETS[choice] || THEME_PRESETS.dark;
   document.body.classList.toggle('light-mode', preset.mode === 'light');
   document.body.dataset.themeAccent = preset.accent;
   state.settings.theme = preset.mode;
-  state.settings.themeChoice = choice;
+  state.settings.themeChoice = THEME_PRESETS[choice] ? choice : 'dark';
   if (markManual) state.settings.themeManual = true;
   if (shouldPersist) {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
@@ -1702,10 +1711,19 @@ function applyThemeChoice (choice = 'dark', opts = {}) {
 }
 
 function syncThemeMetaColor () {
+  const light = document.body.classList.contains('light-mode');
+  document.documentElement.style.colorScheme = light ? 'light' : 'dark';
+  const toggle = document.getElementById('theme-toggle-btn');
+  if (toggle) {
+    const label = light ? 'Switch to dark theme' : 'Switch to light theme';
+    toggle.setAttribute('aria-label', label);
+    toggle.title = label;
+    toggle.setAttribute('aria-pressed', String(!light));
+  }
   const meta = document.querySelector('meta[name="theme-color"]');
   if (!meta) return;
-  const primary = getComputedStyle(document.body).getPropertyValue('--primary').trim();
-  if (primary) meta.setAttribute('content', primary);
+  const background = getComputedStyle(document.body).getPropertyValue('--bg').trim();
+  if (background) meta.setAttribute('content', background);
 }
 
 function applyPersonalizationSettings () {
@@ -1957,7 +1975,7 @@ function openPersonalizeSettings () {
   const resetTasteBtn = document.getElementById('taste-learning-reset-btn');
 
   if (themeSel) {
-    if (!state.settings.themeManual) {
+    if (state.settings.themeChoice === 'auto') {
       themeSel.value = 'auto';
     } else {
       themeSel.value = state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark');
@@ -2897,6 +2915,10 @@ function buildCard (r) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
           Edit
         </button>
+        <button class="card-action-btn delete-card" data-action="delete" type="button" aria-label="Delete ${escHtml(r.name)}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" aria-hidden="true"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6"/></svg>
+          Delete
+        </button>
       </div>
     </div>`;
 
@@ -2940,13 +2962,14 @@ function buildCard (r) {
     if (action === 'directions')   { e.stopPropagation(); openDirections(r);      return; }
     if (action === 'website')       { e.stopPropagation(); openWebsite(r);         return; }
     if (action === 'edit')          { e.stopPropagation(); openEditModal(r.id);    return; }
+    if (action === 'delete')        { e.stopPropagation(); deleteSavedRestaurant(r.id); return; }
     if (action === 'open')          { e.stopPropagation(); openDetailModal(r.id);  return; }
     if (action === 'mark-visited')  { e.stopPropagation(); markVisited(r.id);      return; }
     hapticTap('light');
     openDetailModal(r.id);
   });
   card.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetailModal(r.id); }
+    if (e.target === card && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openDetailModal(r.id); }
   });
   return card;
 }
@@ -3545,6 +3568,22 @@ async function fillMissingPlaceInfo () {
 window.addEventListener('load', () => setTimeout(fillMissingPlaceInfo, 5000));
 
 /* ── Detail Modal ─────────────────────────────────────────── */
+function deleteSavedRestaurant (id) {
+  const r = state.restaurants.find(x => x.id === id);
+  if (!r) {
+    showToast('Place no longer saved', 'Refresh your list before trying again.', 'info');
+    return;
+  }
+  if (!confirm(`Delete "${r.name}"? This cannot be undone.`)) return;
+  state.restaurants = state.restaurants.filter(x => x.id !== id);
+  state.selectedIds.delete(id);
+  recordRestaurantDeletion([id]);
+  saveData();
+  renderAll();
+  if (state.detailId === id) closeDetailModal();
+  showToast('Deleted', `"${r.name}" removed from your list.`, 'info');
+}
+
 function openDetailModal (id) {
   const r = state.restaurants.find(x => x.id === id);
   if (!r) return;
@@ -3710,16 +3749,7 @@ function openDetailModal (id) {
     showToast(closed ? 'Marked permanently closed' : 'Marked reopened',
       closed ? 'Your history is kept. This place will not be suggested.' : 'This place can appear in suggestions again.', 'info');
   };
-  document.getElementById('detail-delete-btn').onclick = () => {
-    if (confirm(`Delete "${r.name}"? This cannot be undone.`)) {
-      state.restaurants = state.restaurants.filter(x => x.id !== id);
-      recordRestaurantDeletion([id]);
-      saveData();
-      renderAll();
-      closeDetailModal();
-      showToast('Deleted', `"${r.name}" removed from your list.`, 'info');
-    }
-  };
+  document.getElementById('detail-delete-btn').onclick = () => deleteSavedRestaurant(id);
 
   const yoInput = document.getElementById('your-order-input');
   if (yoInput) yoInput.value = '';
@@ -4683,7 +4713,7 @@ function renderAll () {
   // Home sections are isolated: a failure in one must never cascade and
   // abort renderAll (which would leave later init wiring unattached).
   // grizzly.js can still be loading on a slow connection.
-  [function renderGrizzlyUi () { window.renderGrizzlyUi?.(); }, maybeAskForRating, renderTodayStatusRow, renderWeeklyGoal, renderOpenNowHome, renderCraveHome, renderFriendsFeedHome, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
+  [function renderGrizzlyUi () { window.renderGrizzlyUi?.(); }, function renderBearChallenges () { window.renderFoodChallengesHome?.(); }, maybeAskForRating, renderTodayStatusRow, renderWeeklyGoal, renderOpenNowHome, renderCraveHome, renderFriendsFeedHome, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
   .forEach(fn => { try { fn(); } catch (err) { console.error(`${fn.name} failed:`, err); window.ftbReportError?.(err?.message || err, fn.name); } });
 }
 
@@ -5165,7 +5195,7 @@ function dishFromText (t) {
 function parseCubCommand (text) {
   const t = text.trim();
   const low = t.toLowerCase();
-  if (/\b(?:eating|food)\s+(?:contests?|competitions?|challenges?)\b/.test(low)) return { kind: 'contests' };
+  if (/\b(?:eating|food|bear)\s+(?:contests?|competitions?|challenges?)\b/.test(low)) return { kind: 'contests' };
   if (/\b(show|open|see|view|go to|pull up)\b.*\b(want[- ]to[- ]try|wish ?list|to[- ]try)\b/.test(low)) return { kind: 'list', view: 'want-to-try' };
   if (/\b(show|open|see|view|pull up)\b.*\b(been there|visited|places i('ve| have) (been|eaten)|where i('ve| have) (been|eaten))\b/.test(low)) return { kind: 'list', view: 'visited' };
   if (/\b(show|open|see)\b.*\bmy lists?\b/.test(low)) return { kind: 'list', view: 'lists' };
@@ -5385,7 +5415,7 @@ function cubChoose (found, name, onPick) {
 
 async function handleCubCommand (cmd) {
   if (cmd.kind === 'contests') {
-    cubSay('The list is in Play on your phone, or Discover on desktop, under Eating contests & food challenges.', [
+    cubSay('Open Bear Challenges on Home, or its shortcut in Play / Discover. You can browse restaurant challenges, upcoming competitions, source links and your saved events, or filter by state and city.', [
       { label: 'Open eating competitions', primary: true, run: () => { closeChat(); openFoodEvents(); } },
     ]);
     return;
@@ -5983,17 +6013,18 @@ window.addEventListener('beforeinstallprompt', e => {
    ════════════════════════════════════════════════════════════ */
 function initTheme () {
   const appearance = loadUserProfile()?.appearance || {};
+  const hasLocalChoice = !!state.settings.themeChoice;
   if (!state.settings.themeChoice && appearance.themeChoice) state.settings.themeChoice = appearance.themeChoice;
   if (!state.settings.theme && appearance.themeMode) state.settings.theme = appearance.themeMode;
   if (!state.settings.uiDensity && appearance.uiDensity) state.settings.uiDensity = appearance.uiDensity;
   if (!state.settings.uiCorners && appearance.uiCorners) state.settings.uiCorners = appearance.uiCorners;
   if (!state.settings.uiMotion && appearance.uiMotion) state.settings.uiMotion = appearance.uiMotion;
 
-  if (state.settings.themeChoice === 'auto') state.settings.themeManual = false;
-  const initialChoice = state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark');
-  if (initialChoice !== 'auto') {
-  applyThemeChoice(initialChoice, { manual: !!state.settings.themeManual, persist: true });
-  }
+  // Older automatic themes saved "light" without a manual choice. Only an
+  // explicit Auto or chosen theme may override the dark first-run default.
+  const manualChoice = state.settings.themeManual === true || (!hasLocalChoice && !!appearance.themeChoice && appearance.themeManual !== false);
+  const initialChoice = state.settings.themeChoice === 'auto' ? 'auto' : manualChoice ? (state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark')) : 'dark';
+  applyThemeChoice(initialChoice, { manual: true, persist: true });
   applyPersonalizationSettings();
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
   document.getElementById('theme-toggle-btn').addEventListener('click', () => {
@@ -8162,6 +8193,7 @@ function setupEvents () {
   // Keyboard: Escape
   document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
+    if (window.closeTopFoodChallenge?.(e)) return;
     closeMobileHub();
     closeJustAte();
     closeModal();
@@ -9757,19 +9789,10 @@ function checkConfettiMilestones (prev, next) {
 
 let _autoThemeTimer = null;
 
-// The default look follows the clock: warm Honey by day, gold-on-dark at night
-// (the greens, Mint and Neon, are still in settings for anyone who wants them).
+// Dark is the default at every hour. Following the phone is opt-in.
 function getAutoThemePresetByHour (hour = new Date().getHours()) {
-  if (hour >= 6 && hour < 11) {
-  return { mode: 'light', accent: 'honey', part: 'morning' };
-  }
-  if (hour >= 11 && hour < 17) {
-  return { mode: 'light', accent: 'honey', part: 'day' };
-  }
-  if (hour >= 17 && hour < 22) {
-  return { mode: 'dark', accent: 'midnight', part: 'evening' };
-  }
-  return { mode: 'dark', accent: 'midnight', part: 'late-night' };
+  const part = hour >= 6 && hour < 11 ? 'morning' : hour >= 11 && hour < 17 ? 'day' : hour >= 17 && hour < 22 ? 'evening' : 'late-night';
+  return { mode: 'dark', accent: 'midnight', part };
 }
 
 // Auto follows the phone's light/dark setting: warm Honey in light mode,
@@ -9783,7 +9806,7 @@ function getAutoThemePreset () {
 }
 
 function applyAutoThemeByClock (opts = {}) {
-  if (state.settings.themeManual) return;
+  if (state.settings.themeManual || state.settings.themeChoice !== 'auto') return;
   const preset = getAutoThemePreset();
   const partChanged = state.settings.theme !== preset.mode;
 
@@ -9792,7 +9815,7 @@ function applyAutoThemeByClock (opts = {}) {
   syncThemeMetaColor();
 
   state.settings.theme = preset.mode;
-  state.settings.themeChoice = preset.mode === 'light' ? 'light' : 'dark';
+  state.settings.themeChoice = 'auto';
   state.settings.autoThemePart = preset.part;
 
   if (opts.persist) {
@@ -9805,7 +9828,7 @@ function applyAutoThemeByClock (opts = {}) {
 
 // Switch the moment the phone flips between light and dark.
 _darkSchemeQuery?.addEventListener?.('change', () => {
-  if (!state.settings.themeManual) applyAutoThemeByClock({ persist: true, announce: false });
+  if (state.settings.themeChoice === 'auto') applyAutoThemeByClock({ persist: true, announce: false });
 });
 
 function scheduleNextAutoThemeTick () {
@@ -9822,8 +9845,7 @@ function scheduleNextAutoThemeTick () {
 }
 
 function initAutoTheme () {
-  // Only apply auto if no manual preference saved yet
-  if (!state.settings.themeManual) {
+  if (state.settings.themeChoice === 'auto') {
   applyAutoThemeByClock({ persist: true, announce: false });
   scheduleNextAutoThemeTick();
   }
@@ -11349,7 +11371,7 @@ function renderMobileHub (filter = '') {
   const body = document.getElementById('mobile-hub-body');
   if (!body) return;
   const q = filter.trim().toLowerCase();
-  const showContests = /\b(?:contests?|competitions?|food challenges?)\b/.test(q);
+  const showContests = /\b(?:contests?|competitions?|(?:food|bear) challenges?)\b/.test(q);
   const lock = action => (GRIZZLY_TOOLS.has(action) && !hasGrizzly() ? '<span class="hub-lock">GRIZZLY</span>' : '');
   const card = ([action, , label]) => {
   const [sub, style] = HUB_INFO[action] || ['', 'photo'];
@@ -11405,9 +11427,7 @@ function closeMobileHub () {
 function initMobileHub () {
   document.getElementById('mobile-hub-close')?.addEventListener('click', closeMobileHub);
   document.getElementById('hub-contests-btn')?.addEventListener('click', () => {
-    const search = document.getElementById('mobile-hub-search');
-    if (search) search.value = 'competitions';
-    renderMobileHub('competitions');
+    window.openFoodEvents?.();
   });
   document.getElementById('mobile-hub-search')?.addEventListener('input', e => renderMobileHub(e.target.value));
   document.getElementById('mobile-hub-body')?.addEventListener('click', e => {
