@@ -55,6 +55,7 @@
   <section id="gate" class="panel gate">
     <p id="gate-msg">Sign in with your owner account.</p>
     <button type="button" class="btn" id="sign-in">Sign in with Google</button>
+    <button type="button" class="btn ghost" id="sign-out" hidden>Sign out and use another account</button>
     <p class="lead" style="margin-top:14px">Or <a href="/app.html">sign in on the app</a> as cmc@conniemichelleconsulting.com, then come back here.</p>
   </section>
 
@@ -129,6 +130,11 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script>
 'use strict';
+// Sign-in only works on the real address (and shares the app's sign-in there),
+// so a Vercel deployment link or the bare domain moves to www.
+if (/\.vercel\.app$/.test(location.hostname) || location.hostname === 'feed-the-bear.com') {
+  location.replace('https://www.feed-the-bear.com/owner.html' + location.search);
+}
 // Same public web config as firebase.js.
 const FB_CONFIG = {
   apiKey: 'AIzaSyCqWTvEFYCEVjooO_eCVGNFsIeya17q3WQ',
@@ -201,7 +207,11 @@ async function load () {
     renderCreators(data.creators || []);
     Object.entries(data.partners || {}).forEach(([k, v]) => { const el = $(`p-${k}`); if (el && document.activeElement !== el) el.value = v; });
     renderCodes(data.codes || [], data.codesError);
-  } catch (err) { showGate(err.message); $('sign-in').hidden = false; }
+  } catch (err) {
+    showGate(user?.email ? `${err.message} You're signed in as ${user.email}.` : err.message);
+    $('sign-in').hidden = false;
+    $('sign-out').hidden = !user;
+  }
 }
 
 $('vip-form').addEventListener('submit', async e => {
@@ -271,9 +281,11 @@ try {
       auth.signInWithRedirect(google).catch(err => showGate(err.message));
     });
   });
+  $('sign-out').addEventListener('click', () => auth.signOut());
   auth.onAuthStateChanged(u => {
     user = u;
     $('sign-in').hidden = !!u;
+    $('sign-out').hidden = true;
     if (u) load(); else showGate('Sign in with your owner account.');
   });
 } catch (err) {

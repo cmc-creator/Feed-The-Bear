@@ -8,7 +8,7 @@
 .bs-sub b { color: #fff3e0; }
 .bs-header-btns { display: flex; gap: 6px; flex: 0 0 auto; }
 .bs-icon-btn {
-  width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font: inherit; font-weight: 800;
+  width: 44px; height: 44px; border-radius: 50%; cursor: pointer; font: inherit; font-size: 20px; line-height: 1.2; padding: 0; font-weight: 800;
   color: #fff3e0; background: rgba(255, 236, 205, .12); border: 1px solid rgba(255, 226, 188, .3);
 }
 .bs-progress-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
