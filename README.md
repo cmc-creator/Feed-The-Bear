@@ -53,7 +53,8 @@ Then open http://127.0.0.1:8765/app.html.
   Text message, WhatsApp, Email or Copy. A blocked clipboard leaves the full
   invite selectable on screen instead of relying on a browser prompt.
 - Dialogs keep keyboard focus inside and return it to the triggering control
-  when closed. Forms and secondary tools reflow at enlarged text sizes,
+  when closed, including nested sharing dialogs. Sticky filters follow the
+  actual header height. Forms and secondary tools reflow at enlarged text sizes,
   including landscape, tablet and short keyboard-sized viewports. Automated
   checks cover up to 200% text; physical Safari, VoiceOver and TalkBack testing
   is still required before declaring every device fully validated.

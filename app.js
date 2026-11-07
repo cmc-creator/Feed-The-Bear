@@ -5919,27 +5919,34 @@ function openDiscoverSearch (term) {
 function initDialogFocus () {
   const origins = new Map();
   let top = null;
+  let lastFocused = document.activeElement;
   const visible = el => el.isConnected && el.getClientRects().length && !el.closest('.hidden') && getComputedStyle(el).visibility !== 'hidden';
   const controls = dialog => [...dialog.querySelectorAll('button, a[href], input, select, textarea, [tabindex]')]
-    .filter(el => !el.disabled && el.tabIndex >= 0 && visible(el));
-  const refresh = () => {
+    .filter(el => !el.matches(':disabled') && el.tabIndex >= 0 && visible(el));
+  const refresh = (origin = document.activeElement) => {
     const dialogs = [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].filter(visible)
       .sort((a, b) => (parseInt(getComputedStyle(a).zIndex) || 0) - (parseInt(getComputedStyle(b).zIndex) || 0));
-    dialogs.forEach(dialog => { if (!origins.has(dialog)) origins.set(dialog, document.activeElement); });
+    dialogs.forEach(dialog => { if (!origins.has(dialog)) origins.set(dialog, origin); });
     const next = dialogs.at(-1) || null;
     if (next !== top) {
       const previous = top;
       top = next;
+      if (top) top.tabIndex = -1;
       const trigger = previous && !dialogs.includes(previous) ? origins.get(previous) : null;
       if (trigger && visible(trigger) && (!top || top.contains(trigger))) trigger.focus({ preventScroll: true });
       else if (top && !top.contains(document.activeElement)) {
-        top.tabIndex = -1;
         (controls(top)[0] || top).focus({ preventScroll: true });
       }
     }
     for (const dialog of origins.keys()) if (!dialogs.includes(dialog)) origins.delete(dialog);
   };
-  new MutationObserver(refresh).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+  new MutationObserver(() => refresh()).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+  document.addEventListener('focusin', e => {
+    const previous = lastFocused;
+    lastFocused = e.target;
+    refresh(previous);
+    if (top && visible(top) && !top.contains(document.activeElement)) (controls(top)[0] || top).focus({ preventScroll: true });
+  });
   document.addEventListener('keydown', e => {
     if (e.key !== 'Tab' || e.defaultPrevented || !top || !visible(top)) return;
     const items = controls(top);
@@ -9116,6 +9123,15 @@ document.addEventListener('DOMContentLoaded', () => {
   initInstallPrompt();
   BackNav.init();
   initDialogFocus();
+  const layoutOffsets = new Map([
+    ['.app-header', '--header-offset'],
+    ['#stats-bar', '--stats-offset'],
+    ['.filter-bar', '--filter-offset'],
+  ].map(([selector, name]) => [document.querySelector(selector), name]));
+  const layoutObserver = new ResizeObserver(entries => {
+    entries.forEach(({ target }) => document.documentElement.style.setProperty(layoutOffsets.get(target), `${target.getBoundingClientRect().height}px`));
+  });
+  layoutOffsets.forEach((name, element) => layoutObserver.observe(element));
   if (NativeAlerts.available()) {
   NativeAlerts.refresh();
   NativeAlerts.schedule();
