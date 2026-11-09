@@ -105,7 +105,11 @@ async function upgradeTitle (p) {
   check(!/free/i.test(authText) && /Grizzly/.test(authText), `upgrade sign-in talks Grizzly, never "free" (${authText.slice(0, 90)})`);
   await closeAllDialogs(p);
   await p.evaluate(() => openAuthModal());
-  check(/backed up/.test(await p.locator('#auth-overlay .auth-sub').innerText()) && await p.locator('#auth-title').innerText() === 'Welcome back', 'regular sign-in keeps its own wording');
+  const backupText = await p.locator('#auth-overlay .auth-sub').innerText();
+  check(/Back up your spots, ratings and notes/.test(backupText)
+    && /backup limits/.test(backupText) && /only on this device/.test(backupText)
+    && await p.locator('#auth-title').innerText() === 'Welcome back',
+    'regular sign-in explains diary backup and device-local media limits');
   await closeAllDialogs(p);
 
   // Grizzly members don't see upsells
