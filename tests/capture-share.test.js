@@ -73,6 +73,29 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
   await p.click('.sn-media');
   check(await p.evaluate(() => window.__shared.type === 'video/mp4' && window.__shared.size === 16),
     'video sharing passes the stored clip instead of its poster frame');
+  await p.click('.sn-social-help summary');
+  check(await p.locator('.sn-social-help').innerText().then(text => ['TikTok', 'Instagram', 'Facebook', 'Nothing posts automatically'].every(s => text.includes(s))),
+    'social instructions name the supported workflow without promising automatic publishing');
+  await p.evaluate(() => {
+    navigator.clipboard.writeText = async text => { window.__copiedCaption = text; };
+  });
+  await p.click('.sn-caption summary');
+  await p.fill('.sn-caption-text', 'These tacos deserve a Reel!');
+  await p.click('.sn-copy');
+  check(await p.evaluate(() => window.__copiedCaption === 'These tacos deserve a Reel!'),
+    'copy caption uses the foodie edited caption for social apps that drop shared text');
+  const [download] = await Promise.all([p.waitForEvent('download'), p.click('.sn-download')]);
+  check(download.suggestedFilename().endsWith('.mp4'), 'manual social upload downloads the actual video file');
+  await p.evaluate(() => { navigator.canShare = () => false; });
+  const [fallbackDownload] = await Promise.all([p.waitForEvent('download'), p.click('.sn-media')]);
+  check(fallbackDownload.suggestedFilename().endsWith('.mp4')
+    && (await p.locator('.sn-error').innerText()).includes('upload'),
+    'unsupported native video sharing offers a real download with upload instructions');
+  await p.evaluate(() => { navigator.clipboard.writeText = async () => { throw new Error('Clipboard denied'); }; });
+  await p.click('.sn-copy');
+  check(await p.locator('.sn-caption-text').isVisible()
+    && (await p.locator('.sn-error').innerText()).includes('manually'),
+    'blocked clipboard exposes the editable caption for manual copying');
   await p.evaluate(() => Cub.openAdd());
   check(await p.locator('.share-nudge').count() === 0, 'a previous share prompt cannot cover the next Add flow');
 
@@ -112,7 +135,7 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
     await p.click('.qa-status[data-status="visited"]');
     check(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `capture UI fits a ${width}px phone without sideways scrolling`);
   }
-  const realErrors = p.errors.filter(e => !/Media share failed/.test(e));
+  const realErrors = p.errors.filter(e => !/Media share failed|Caption copy failed/.test(e));
   check(!realErrors.length, `no unexpected page errors (${realErrors.join(' | ')})`);
   await browser.close();
   finish('capture-share');

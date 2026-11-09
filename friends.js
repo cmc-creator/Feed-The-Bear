@@ -1063,7 +1063,7 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
   el.className = 'share-nudge';
   el.setAttribute('role', 'status');
   el.innerHTML = `${safeUrl(photo) ? `<img src="${escHtml(safeUrl(photo))}" alt="" />` : '<span class="sn-emoji" aria-hidden="true">📸</span>'}
-    <span class="sn-text"><strong>${r.status === 'visited' ? 'Share this meal?' : 'Share this spot?'}</strong><span>Send to socials or a friend using your share sheet</span></span>
+    <span class="sn-text"><strong>${r.status === 'visited' ? 'Share this meal?' : 'Share this spot?'}</strong><span>Choose TikTok, Instagram, Facebook or a friend in your share sheet, when available.</span></span>
     <div class="sn-actions">
       <button type="button" class="btn-sm btn-primary sn-media" ${photo || video ? 'disabled' : ''}>${video ? 'Preparing video...' : photo ? 'Preparing photo...' : 'Share spot'}</button>
       <button type="button" class="btn-sm sn-go">Make Story card</button>
@@ -1073,6 +1073,11 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
       <label>What your friends will see<textarea class="form-input sn-caption-text" maxlength="600" rows="3"></textarea></label>
       ${note ? '<label class="sn-note-label"><input type="checkbox" class="sn-include-note" /> Include my meal note in the Story card</label>' : ''}
       <small>Nothing posts automatically. You choose who sees it.</small>
+    </details><details class="sn-social-help"><summary>Posting to TikTok, Instagram or Facebook?</summary>
+      <p>Tap Share and choose an installed app. Each app decides which files and captions it accepts. If it is missing, save your media, open that app and upload it as a new post, Reel or Story. Copy your caption to paste there.</p>
+      <button type="button" class="btn-sm sn-copy">Copy caption</button>
+      ${photo || video ? '<button type="button" class="btn-sm sn-download" disabled>Save media</button>' : ''}
+      <small>Nothing posts automatically. You review and publish in your social app.</small>
     </details><span class="sn-error" role="status"></span>`;
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add('in'));
@@ -1083,6 +1088,33 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
   const error = message => { el.querySelector('.sn-error').textContent = message; };
   let file = null;
   const mediaButton = el.querySelector('.sn-media');
+  const downloadButton = el.querySelector('.sn-download');
+  const canShareFile = () => !!navigator.share && !!navigator.canShare?.({ files: [file] });
+  const download = () => {
+    if (generation !== _dataGeneration || !file) return;
+    const url = URL.createObjectURL(file);
+    const link = document.createElement('a');
+    link.href = url; link.download = file.name;
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    el.querySelector('.sn-social-help').open = true;
+    error('Download requested. Open TikTok, Instagram or Facebook to upload it, then paste your caption.');
+  };
+  downloadButton?.addEventListener('click', download);
+  el.querySelector('.sn-copy').addEventListener('click', async () => {
+    if (generation !== _dataGeneration) return;
+    try {
+      await navigator.clipboard.writeText(caption.value.trim());
+      if (generation !== _dataGeneration || !el.isConnected) return;
+      error('Caption copied. Paste it into your social post.');
+    } catch (err) {
+      if (generation !== _dataGeneration || !el.isConnected) return;
+      console.warn('[FTB] Caption copy failed:', err);
+      el.querySelector('.sn-caption').open = true;
+      caption.focus(); caption.select();
+      error('Copying was blocked. Select the caption above and copy it manually.');
+    }
+  });
   const prepare = async () => {
     try {
       let blob;
@@ -1097,8 +1129,10 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
       if (generation !== _dataGeneration || !el.isConnected) return;
       const extension = video ? (/mp4/.test(blob.type) ? 'mp4' : /quicktime/.test(blob.type) ? 'mov' : 'webm') : 'jpg';
       file = new File([blob], `${r.name.replace(/[^a-z0-9-]/gi, '-')}.${extension}`, { type: blob.type });
-      mediaButton.textContent = navigator.canShare?.({ files: [file] }) ? `Share ${video ? 'video' : 'photo'}` : `Download ${video ? 'video' : 'photo'}`;
+      mediaButton.textContent = canShareFile() ? `Share ${video ? 'video' : 'photo'}` : `Download ${video ? 'video' : 'photo'}`;
       mediaButton.disabled = false;
+      downloadButton.disabled = false;
+      downloadButton.textContent = `Save ${video ? 'video' : 'photo'}`;
     } catch (err) {
       console.warn('[FTB] Share media preparation failed:', err);
       error(err.message);
@@ -1108,20 +1142,17 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
   mediaButton.addEventListener('click', () => {
     if (generation !== _dataGeneration) return;
     error('');
-    if (file && !navigator.canShare?.({ files: [file] })) {
-      const url = URL.createObjectURL(file);
-      const link = document.createElement('a');
-      link.href = url; link.download = file.name;
-      document.body.appendChild(link); link.click(); link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-      error('Download requested. Open your social app to upload it.');
+    if (file && !canShareFile()) {
+      download();
       return;
     }
     // The file is prepared before this click, preserving iOS user activation.
     navigator.share({ title: r.name, text: caption.value.trim(), ...(file ? { files: [file] } : {}) }).catch(err => {
       if (err?.name === 'AbortError') return;
+      if (generation !== _dataGeneration || !el.isConnected) return;
       console.warn('[FTB] Media share failed:', err);
-      error('Sharing was blocked. Try the Story card or save it from there.');
+      el.querySelector('.sn-social-help').open = true;
+      error('Sharing was blocked. Save your media below and upload it in your social app, or try the Story card.');
     });
   });
   el.querySelector('.sn-x').addEventListener('click', hide);

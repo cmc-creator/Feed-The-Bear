@@ -259,7 +259,7 @@ window.Cub = (() => {
     sheet.classList.toggle('want', status === 'want-to-try');
     sheet.classList.toggle('went-before', s === 'visited-before');
     sheet.querySelector('.qa-dish').placeholder = status === 'visited' ? 'What did you have? (optional)' : 'Heard about a must-order dish? (optional)';
-    say('Add a photo if you like, then save. Everything else is optional.');
+    say('Photo or video? Both optional. Save, then share.');
     syncSave();
   }
 
@@ -456,6 +456,9 @@ window.Cub = (() => {
     const cameraButton = capture.querySelector('[data-source="photo"]');
     cameraButton.classList.add('qa-photo');
     cameraButton.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Take photo</span>';
+    const videoButton = capture.querySelector('[data-source="video"]');
+    videoButton.classList.add('qa-video');
+    videoButton.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="12" height="12" rx="2"/><path d="m15 10 6-4v12l-6-4z"/></svg><span>Record video</span>';
     el.querySelector('.qa-save').addEventListener('click', save);
     el.querySelector('.qa-more').addEventListener('click', moreDetails);
     el.querySelector('.qa-close').addEventListener('click', close);

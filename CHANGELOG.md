@@ -1,5 +1,15 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-08 (video and social handoff)
+
+- Give Record video the same full-width icon, 60px touch target and finite,
+  reduced-motion-aware glow as Take photo. Keep Save visible on small phones.
+- Explain TikTok, Instagram and Facebook sharing through the device share sheet.
+  Add actual-media downloads and editable-caption copying for manual uploads
+  when a social app is missing or sharing is blocked; never post automatically.
+- Test actual video downloads, unsupported sharing, clipboard failures,
+  video label fit and both reduced-motion preferences.
+
 ## [Unreleased] - 2026-11-08 (simpler Add)
 
 - Reduce Quick Add to the place, Here now / Went before / Want to try,

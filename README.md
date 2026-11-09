@@ -28,6 +28,12 @@ Then open http://127.0.0.1:8765/app.html.
   video**, and **Gallery**. Recording uses the rear-camera capture intent on
   supported phones; desktop browsers may offer a file picker instead. If
   camera access is denied, allow it in device settings or choose Gallery.
+- Quick Add highlights both camera actions with full-width buttons and a
+  gentle, finite glow that respects reduced motion. Post-save sharing names
+  TikTok, Instagram and Facebook: choose an available installed app in the
+  share sheet, or expand the social posting help to save your media and copy
+  your edited caption for manual upload. Apps control which files and captions
+  they accept; Feed The Bear does not connect social accounts or auto-publish.
 - Saving is disabled while media is being picked or processed. Closing or
   replacing a form discards late picker results rather than attaching them
   to another place. Grizzly videos remain limited to 15 seconds and stay on

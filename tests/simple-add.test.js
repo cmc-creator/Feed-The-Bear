@@ -31,21 +31,21 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
       return save.bottom <= innerHeight && save.top >= 0 && card.scrollHeight <= card.clientHeight + 1
         && document.documentElement.scrollWidth <= innerWidth;
     }), `the collapsed Add flow and Save fit a ${width}px phone without scrolling`);
-    check(await p.locator('.qa-photo').evaluate(button => {
+    for (const selector of ['.qa-photo', '.qa-video']) check(await p.locator(selector).evaluate(button => {
       const label = button.querySelector('span');
       const rect = label.getBoundingClientRect();
       const bounds = button.getBoundingClientRect();
       return button.scrollWidth <= button.clientWidth && rect.left >= bounds.left && rect.right <= bounds.right
         && bounds.height >= 60 && button.querySelector('svg') !== null;
-    }), `the full-width camera icon and complete Take photo label fit at ${width}px`);
+    }), `the full-width ${selector} icon and complete label fit at ${width}px`);
   }
   await p.emulateMedia({ reducedMotion: 'reduce' });
-  check(await p.locator('.qa-photo').evaluate(button => getComputedStyle(button).animationName === 'none'),
-    'the camera glow respects the device reduced-motion setting');
+  for (const selector of ['.qa-photo', '.qa-video']) check(await p.locator(selector).evaluate(button => getComputedStyle(button).animationName === 'none'),
+    `${selector} glow respects the device reduced-motion setting`);
   await p.emulateMedia({ reducedMotion: 'no-preference' });
   await p.evaluate(() => { document.body.dataset.uiMotion = 'reduced'; });
-  check(await p.locator('.qa-photo').evaluate(button => getComputedStyle(button).animationName === 'none'),
-    'the camera glow respects the app reduced-motion preference');
+  for (const selector of ['.qa-photo', '.qa-video']) check(await p.locator(selector).evaluate(button => getComputedStyle(button).animationName === 'none'),
+    `${selector} glow respects the app reduced-motion preference`);
   await p.evaluate(() => { document.body.dataset.uiMotion = 'playful'; });
   await p.evaluate(() => {
     navigator.share = async data => { window.__post = data; };
