@@ -1055,7 +1055,7 @@ function openFoodiePlan (restaurantId = '', friendKey = '') {
 }
 
 /* ── Share moments: right after you log a meal ── */
-function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', note = '' }) {
+function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', note = '', rememberedVisit = false }) {
   if (!r || !window.StoryCard) return;
   const generation = _dataGeneration;
   document.querySelector('.share-nudge')?.remove();
@@ -1077,7 +1077,7 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add('in'));
   const hide = () => { el.classList.remove('in'); setTimeout(() => el.remove(), 300); };
-  const text = `${dish ? `${dish} at ${r.name}` : `${r.status === 'visited' ? 'Just ate at' : 'Want to try'} ${r.name}`}${verdict === 'again' ? ' — 10/10 would order again' : ''}. Saved with Feed The Bear https://www.feed-the-bear.com`;
+  const text = `${dish ? `${dish} at ${r.name}` : `${r.status === 'visited' ? rememberedVisit ? 'Been to' : 'Just ate at' : 'Want to try'} ${r.name}`}${verdict === 'again' ? ' — 10/10 would order again' : ''}. Saved with Feed The Bear https://www.feed-the-bear.com`;
   const caption = el.querySelector('.sn-caption-text');
   caption.value = text;
   const error = message => { el.querySelector('.sn-error').textContent = message; };
@@ -1134,7 +1134,7 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
     if (generation !== _dataGeneration) return;
     hide();
     trackProductEvent('share_meal_clicked', { hasPhoto: !!photo });
-    const kicker = r.status === 'want-to-try' ? 'On my food bucket list' : verdict === 'again' ? 'Order this again' : verdict === 'skip' ? 'Skip this one' : 'Just ate';
+    const kicker = r.status === 'want-to-try' ? 'On my food bucket list' : verdict === 'again' ? 'Order this again' : verdict === 'skip' ? 'Skip this one' : rememberedVisit ? 'A bite worth remembering' : 'Just ate';
     try {
       await StoryCard.openStory({
         kind: 'meal', kicker, title: dish || r.name, sub: dish ? `at ${r.name}` : (r.cuisine || ''), photo,

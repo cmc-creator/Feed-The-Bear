@@ -1,5 +1,18 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-08 (simpler Add)
+
+- Reduce Quick Add to the place, Here now / Went before / Want to try,
+  optional photo/video and Save. Collapse rating, dish, cuisine, AI fill
+  and the full form under Add details; collapse bulk import separately.
+- Replace the duplicate camera icon with one labelled Take photo action.
+  Keep social posting optional after saving.
+- Make Take photo full-width with a high-contrast camera icon and a gentle,
+  limited glow; preserve the full label on small phones and respect reduced motion.
+- Preserve optional past-visit dates consistently across visits and dishes;
+  unknown past dates stay unknown. Past-visit captions do not claim "Just ate".
+- Add measurable small-phone, optional-detail and save-to-share regressions.
+
 ## [Unreleased] - 2026-11-08 (social foodie pass)
 
 - Add food-date invitations from Friends, shared interests, the Home feed and

@@ -67,6 +67,7 @@ window.Cub = (() => {
   let sheet = null;
   let pick = null;          // the chosen place
   let status = null;        // 'visited' | 'want-to-try'
+  let visitChoice = null;
   let stars = 0;
   let verdict = null;
   let photo = '';
@@ -248,17 +249,23 @@ window.Cub = (() => {
   }
 
   function setStatus (s) {
-    status = s;
-    sheet.querySelectorAll('.qa-status').forEach(b => b.classList.toggle('active', b.dataset.status === s));
-    sheet.classList.toggle('been', s === 'visited');
-    sheet.classList.toggle('want', s === 'want-to-try');
-    sheet.querySelector('.qa-dish').placeholder = s === 'visited' ? 'What did you have? (optional)' : 'Heard about a must-order dish? (optional)';
-    say(s === 'visited' ? 'Nice! How was it? Tap the stars.' : 'Good call. Any dish you have to try there?');
+    visitChoice = s;
+    status = s === 'visited-before' ? 'visited' : s;
+    sheet.querySelectorAll('.qa-status').forEach(b => {
+      b.classList.toggle('active', b.dataset.status === s);
+      b.setAttribute('aria-pressed', String(b.dataset.status === s));
+    });
+    sheet.classList.toggle('been', status === 'visited');
+    sheet.classList.toggle('want', status === 'want-to-try');
+    sheet.classList.toggle('went-before', s === 'visited-before');
+    sheet.querySelector('.qa-dish').placeholder = status === 'visited' ? 'What did you have? (optional)' : 'Heard about a must-order dish? (optional)';
+    say('Add a photo if you like, then save. Everything else is optional.');
     syncSave();
   }
 
   function syncSave () {
     if (sheet) sheet.querySelector('.qa-save').disabled = !pick || !status || app().foodMediaBusy() || !!window._ftbAccountSwitching;
+    if (sheet) sheet.querySelector('.qa-save').textContent = status === 'visited' ? 'Save my visit' : 'Save place';
   }
 
   function setStars (n) {
@@ -290,6 +297,12 @@ window.Cub = (() => {
     if (a.foodMediaBusy() || window._ftbAccountSwitching) { a.showToast('Please wait', 'Finish adding media before saving.', 'info'); return; }
     const atLimit = typeof a.isPremium === 'function' && !a.isPremium() && state.restaurants.length >= FREE_RESTAURANT_LIMIT;
     const today = a.iso();
+    const visitDate = visitChoice === 'visited-before' ? sheet.querySelector('.qa-visit-date').value : today;
+    if (visitChoice === 'visited-before' && !sheet.querySelector('.qa-visit-date').checkValidity()) {
+      sheet.querySelector('.qa-details').open = true;
+      sheet.querySelector('.qa-visit-date').reportValidity();
+      return;
+    }
     const cuisine = sheet.querySelector('.qa-cuisine').value.trim().slice(0, 40);
     const dish = sheet.querySelector('.qa-dish').value.trim().slice(0, 80);
     const r = {
@@ -299,9 +312,9 @@ window.Cub = (() => {
       myRating: status === 'visited' ? stars : 0, notes: pick.notes || '', tags: pick.tags || [],
       collectionId: null, priority: '', status, dateAdded: today,
       links: pick.sourceUrl ? [{ url: pick.sourceUrl.slice(0, 500), added: today }] : [],
-      dateVisited: status === 'visited' ? today : null, updatedAt: Date.now(), visits: [],
+      dateVisited: status === 'visited' ? visitDate || null : null, updatedAt: Date.now(), visits: [],
     };
-    if (status === 'visited') r.visits.push({ date: today, note: '', rating: stars, dish, photo, ...(video ? { video } : {}) });
+    if (status === 'visited') r.visits.push({ date: visitDate, note: '', rating: stars, dish, photo, ...(video ? { video } : {}) });
     if (photo) r.photo = photo;
     if (video) r.video = video;
     if (atLimit) {
@@ -314,7 +327,7 @@ window.Cub = (() => {
       return;
     }
     state.restaurants.unshift(r);
-    if (dish) a.upsertDish(r, { name: dish, verdict: status === 'visited' ? (verdict || (stars >= 4 ? 'again' : stars && stars <= 2 ? 'skip' : 'ok')) : 'want', photo, video });
+    if (dish) a.upsertDish(r, { name: dish, verdict: status === 'visited' ? (verdict || (stars >= 4 ? 'again' : stars && stars <= 2 ? 'skip' : 'ok')) : 'want', photo, video, date: status === 'visited' ? visitDate : today });
     else a.saveData();
     if (!Number.isFinite(r.lat) && r.address && typeof a.geocodeAddress === 'function') a.geocodeAddress(r.id, r.address);
     a.renderAll();
@@ -323,9 +336,9 @@ window.Cub = (() => {
     close();
     saving = false;
     if (photo) a.photoReveal(photo, dish || r.name);
-    a.showToast(status === 'visited' ? `${r.name} logged` : `${r.name} saved`, status === 'visited' ? 'In your den, with your rating.' : 'On your Want to Try list.', 'success');
+    a.showToast(status === 'visited' ? `${r.name} logged` : `${r.name} saved`, status === 'visited' ? 'Your visit is saved. Sharing is up to you.' : 'On your Want to Try list.', 'success');
     if (typeof a.celebrateMilestones === 'function') a.celebrateMilestones();
-    a.offerShareMeal({ r, dish, verdict: status === 'visited' ? verdict || 'ok' : '', photo, video });
+    a.offerShareMeal({ r, dish, verdict: status === 'visited' ? verdict || 'ok' : '', photo, video, rememberedVisit: visitChoice === 'visited-before' });
     if (welcomeActive) { resumeWelcome(true); return; }
     buddyTip(status === 'want-to-try' && !dish ? `Tip: open ${r.name} and add a must-try dish to your Crave List.` : '', true);
   }
@@ -358,34 +371,42 @@ window.Cub = (() => {
           <input class="form-input qa-input" type="text" maxlength="120" autocomplete="off" enterkeyhint="search"
             placeholder="Name, or paste a TikTok, Instagram or Maps link" aria-label="Restaurant name, or a TikTok, Instagram or Google Maps link" />
           <div class="qa-suggs"></div>
-          <button type="button" class="qa-import">Have a list in your notes? <strong>Import it all at once</strong></button>
+          <details class="qa-import-options"><summary>Import a list instead</summary><button type="button" class="qa-import">Have a list in your notes? <strong>Import it all at once</strong></button></details>
         </div>
         <div class="qa-step-2">
           <div class="qa-place">
             <div class="qa-place-name"></div>
             <div class="qa-place-meta"></div>
-            <div class="qa-row">
-              <input class="form-input qa-cuisine" type="text" maxlength="40" placeholder="Cuisine" aria-label="Cuisine" />
-              <button type="button" class="qa-ai">Let Cub fill the rest${'<span class="gz-badge qa-ai-badge">GRIZZLY</span>'}</button>
-            </div>
             <button type="button" class="qa-change">Not it? Search again</button>
           </div>
           <div class="qa-statuses">
-            <button type="button" class="qa-status" data-status="visited">Been there</button>
-            <button type="button" class="qa-status" data-status="want-to-try">Want to try</button>
+            <button type="button" class="qa-status" data-status="visited" aria-pressed="false">Here now</button>
+            <button type="button" class="qa-status" data-status="visited-before" aria-pressed="false">Went before</button>
+            <button type="button" class="qa-status" data-status="want-to-try" aria-pressed="false">Want to try</button>
           </div>
+          <div class="qa-media"><span class="qa-media-label">Photo or video (optional)</span>
+            <img class="qa-photo-preview hidden" alt="Your photo" />
+          </div>
+          <details class="qa-details"><summary>Add details <span>Optional</span></summary>
+          <div class="qa-details-body">
+          <label class="qa-visit-date-wrap">Visit date (optional)<input class="form-input qa-visit-date" type="date" /></label>
           <div class="qa-been">
+            <span class="qa-field-label">Your rating (optional)</span>
             <div class="qa-stars" role="radiogroup" aria-label="Your rating">${[1, 2, 3, 4, 5].map(n => `<button type="button" class="qa-star" data-n="${n}" aria-label="${n} star${n > 1 ? 's' : ''}">★</button>`).join('')}</div>
           </div>
           <div class="qa-extra">
             <div class="qa-row">
-              <input class="form-input qa-dish" type="text" maxlength="80" autocomplete="off" />
-              <button type="button" class="qa-photo" aria-label="Add a photo or video"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+              <input class="form-input qa-dish" type="text" maxlength="80" autocomplete="off" aria-label="Dish (optional)" />
             </div>
-            <img class="qa-photo-preview hidden" alt="Your photo" />
           </div>
-          <button type="button" class="btn-primary qa-save" disabled>Add to my den</button>
+          <div class="qa-row">
+            <input class="form-input qa-cuisine" type="text" maxlength="40" placeholder="Cuisine" aria-label="Cuisine" />
+            <button type="button" class="qa-ai">Let Cub fill the rest${'<span class="gz-badge qa-ai-badge">GRIZZLY</span>'}</button>
+          </div>
           <button type="button" class="qa-more">More details</button>
+          </div></details>
+          <button type="button" class="btn-primary qa-save" disabled>Save place</button>
+          <p class="qa-save-hint">Save first. Share a photo, video or Story card next.</p>
         </div>
       </div>`;
     document.body.appendChild(el);
@@ -431,8 +452,10 @@ window.Cub = (() => {
       prev.classList.remove('hidden');
       say(video ? 'Ooh, a video! That looks amazing.' : 'Looks delicious.');
     };
-    el.querySelector('.qa-photo').addEventListener('click', () => attachMedia());
-    app().addFoodCaptureActions(el.querySelector('.qa-extra'), attachMedia);
+    const capture = app().addFoodCaptureActions(el.querySelector('.qa-media'), attachMedia);
+    const cameraButton = capture.querySelector('[data-source="photo"]');
+    cameraButton.classList.add('qa-photo');
+    cameraButton.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Take photo</span>';
     el.querySelector('.qa-save').addEventListener('click', save);
     el.querySelector('.qa-more').addEventListener('click', moreDetails);
     el.querySelector('.qa-close').addEventListener('click', close);
@@ -445,14 +468,18 @@ window.Cub = (() => {
   function openAdd (prefill = '') {
     app().invalidateFoodMedia();
     sheet = sheet || build();
-    pick = null; status = null; stars = 0; verdict = null; photo = ''; video = '';
-    sheet.classList.remove('step-2', 'been', 'want');
+    pick = null; status = null; visitChoice = null; stars = 0; verdict = null; photo = ''; video = '';
+    sheet.classList.remove('step-2', 'been', 'want', 'went-before');
+    sheet.querySelector('.qa-details').open = false;
+    sheet.querySelector('.qa-import-options').open = false;
+    sheet.querySelector('.qa-visit-date').value = '';
+    sheet.querySelector('.qa-visit-date').max = app().iso();
     sheet.querySelector('.qa-input').value = '';
     sheet.querySelector('.qa-dish').value = '';
     sheet.querySelector('.qa-save').disabled = true;
     sheet.querySelector('.qa-photo-preview').classList.add('hidden');
     sheet.querySelectorAll('.qa-star').forEach(b => b.classList.remove('on'));
-    sheet.querySelectorAll('.qa-status').forEach(b => b.classList.remove('active'));
+    sheet.querySelectorAll('.qa-status').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false'); });
     sheet.querySelector('.qa-ai-badge').classList.toggle('hidden', app().hasGrizzly());
     renderSuggestions('');
     say(nearbyPlaces().length ? "Where'd you find a good bite? Here's what's near you." : "Where'd you find a good bite? Type a name or paste a Maps link.");

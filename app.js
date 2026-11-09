@@ -12067,13 +12067,13 @@ function verdictFromRating (rating = 0) {
 // Adds a dish or updates the one with the same name, so re-logging a dish
 // changes its verdict instead of creating duplicates.
 // `media` (list of { photo, video? }) adds photos ahead of the dish's existing ones.
-function upsertDish (r, { name, verdict, rating, note, photo, video, media } = {}) {
+function upsertDish (r, { name, verdict, rating, note, photo, video, media, date } = {}) {
   const clean = String(name || '').trim().slice(0, 80);
   if (!r || !clean) return null;
   if (!Array.isArray(r.dishes)) r.dishes = [];
   let dish = r.dishes.find(d => dishKey(d.name) === dishKey(clean));
   if (!dish) {
-  dish = { id: uid(), name: clean, verdict: 'ok', rating: 0, note: '', date: iso() };
+  dish = { id: uid(), name: clean, verdict: 'ok', rating: 0, note: '', date: date === undefined ? iso() : date };
   r.dishes.push(dish);
   }
   if (Number.isFinite(rating) && rating > 0) dish.rating = Math.min(5, Math.round(rating));
@@ -12082,7 +12082,8 @@ function upsertDish (r, { name, verdict, rating, note, photo, video, media } = {
   if (note != null) dish.note = String(note).slice(0, 200);
   if (photo) { dish.photo = photo; if (video) dish.video = video; else delete dish.video; }
   if (Array.isArray(media) && media.length) setMediaOn(dish, [...media, ...mediaOf(dish)]);
-  if (dish.verdict !== 'want') dish.date = iso();
+  if (date !== undefined) dish.date = date;
+  else if (dish.verdict !== 'want') dish.date = iso();
   r.updatedAt = Date.now();
   saveData();
   return dish;

@@ -16,6 +16,14 @@ Then open http://127.0.0.1:8765/app.html.
 
 ## Photos, videos, sharing and account privacy
 
+- **Add** starts with the place name or link, then **Here now**, **Went
+  before**, or **Want to try**. Add a photo if you like and save; ratings,
+  dishes, cuisine and AI fill are tucked under **Add details**. Bulk import
+  is a separate expandable option, not another required step.
+- **Went before** allows an optional visit date under Add details.
+  Unknown dates stay unknown rather than being recorded as today.
+  Sharing stays optional and appears only after the place is saved.
+
 - Quick Add, Just Ate, and the full Add form offer **Take photo**, **Record
   video**, and **Gallery**. Recording uses the rear-camera capture intent on
   supported phones; desktop browsers may offer a file picker instead. If

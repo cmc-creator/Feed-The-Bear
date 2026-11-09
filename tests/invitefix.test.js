@@ -117,6 +117,7 @@ asGrizzly(); // uses Grizzly-only features
   await p.click('#home-add-bar');
   await p.waitForTimeout(300);
   check(await p.locator('.qa-sheet:not(.hidden), #quick-add:not(.hidden), .qa-input').first().isVisible(), 'it opens Add a spot');
+  await p.click('.qa-import-options summary');
   await p.click('.qa-import');
   await p.waitForTimeout(400);
   check(await p.locator('#import-overlay').isVisible(), 'which links to importing a whole list');

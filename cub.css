@@ -51,14 +51,15 @@
   font: inherit; font-size: .82rem; color: var(--text); background: var(--surface2); border: 1px dashed var(--border);
 }
 .qa-import strong { color: var(--primary); }
+.qa-import-options summary { min-height: 44px; padding: 12px 0; box-sizing: border-box; color: var(--text-dim); font-size: .8rem; cursor: pointer; }
 .qa-change {justify-self: start; background: none; border: 0; padding: 0; font: inherit; font-size: .74rem; color: var(--text-dim); text-decoration: underline; cursor: pointer; }
-.qa-statuses { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.qa-statuses { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .qa-status {
-  font: inherit; font-size: .95rem; font-weight: 800; cursor: pointer; min-height: 52px; border-radius: var(--radius);
+  font: inherit; font-size: .85rem; font-weight: 800; cursor: pointer; min-height: 52px; padding: 8px 6px; white-space: normal; overflow-wrap: anywhere; border-radius: var(--radius);
   border: 2px solid var(--border); background: var(--surface2); color: var(--text); transition: transform .12s ease;
 }
 .qa-status:active { transform: scale(.96); }
-.qa-status.active[data-status="visited"] { border-color: var(--primary); background: rgba(var(--primary-rgb), .18); }
+.qa-status.active[data-status="visited"], .qa-status.active[data-status="visited-before"] { border-color: var(--primary); background: rgba(var(--primary-rgb), .18); }
 .qa-status.active[data-status="want-to-try"] { border-color: #e0a85a; background: rgba(224, 168, 90, .18); }
 .qa-stars { display: flex; justify-content: center; gap: 8px; }
 .qa-star { font-size: 2rem; line-height: 1; background: none; border: 0; cursor: pointer; color: var(--border); transition: transform .15s ease, color .15s ease; }
@@ -72,6 +73,39 @@
 .qa-save { width: 100%; min-height: 50px; font-size: 1rem; }
 .qa-save:disabled { opacity: .5; cursor: not-allowed; }
 .qa-more { margin: 2px auto 0; background: none; border: 0; font: inherit; font-size: .8rem; color: var(--text-dim); text-decoration: underline; cursor: pointer; }
+.qa-details { border-top: 1px solid var(--border); min-width: 0; }
+.qa-details summary { padding: 12px 0; min-height: 44px; box-sizing: border-box; cursor: pointer; font-size: .9rem; font-weight: 700; }
+.qa-details summary span { color: var(--text-dim); font-size: .75rem; font-weight: 400; margin-left: 6px; }
+.qa-details-body { display: grid; gap: 14px; padding: 4px 0 12px; }
+.qa-details-body .qa-row { flex-wrap: wrap; }
+.qa-details-body .qa-cuisine { flex: 1 1 150px; }
+.qa-visit-date-wrap { display: none; }
+#quick-add-overlay.went-before .qa-visit-date-wrap { display: grid; gap: 6px; font-size: .85rem; }
+.qa-media-label, .qa-field-label { display: block; color: var(--text-dim); font-size: .82rem; margin-bottom: 6px; }
+.qa-save-hint { text-align: center; font-size: .78rem; color: var(--text-dim); margin: 0; line-height: 1.5; }
+.qa-card .food-capture-actions { margin: 0; }
+.qa-card .food-capture-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.qa-card .food-capture-buttons .qa-photo {
+  grid-column: 1 / -1; width: 100%; height: auto; min-height: 60px; padding: 12px 16px;
+  display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 1rem; font-weight: 800;
+  color: var(--on-primary); background: var(--primary); border: 2px solid var(--primary); border-radius: var(--radius-sm);
+  animation: qa-camera-glow 2.4s ease-in-out 3;
+}
+.qa-photo svg { flex-shrink: 0; }
+.qa-photo span { min-width: 0; }
+.qa-card .qa-photo:disabled { animation: none; opacity: .65; }
+@keyframes qa-camera-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--primary-rgb), 0); }
+  50% { box-shadow: 0 0 0 5px rgba(var(--primary-rgb), .25), 0 0 20px rgba(var(--primary-rgb), .3); }
+}
+@media (prefers-reduced-motion: reduce) { .qa-card .food-capture-buttons .qa-photo { animation: none; } }
+body[data-ui-motion='reduced'] .qa-card .food-capture-buttons .qa-photo { animation: none; }
+.qa-card .qa-change, .qa-card .qa-more { min-height: 44px; }
+@media (max-width: 360px) {
+  #quick-add-overlay.step-2 .qa-step-2 { gap: 6px; }
+  .qa-card { padding: 14px 16px; }
+  .qa-place { padding: 8px 12px; gap: 2px; }
+}
 
 /* ── Buddy ── */
 .cub-buddy { position: fixed; right: 14px; bottom: 24px; z-index: 250; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }

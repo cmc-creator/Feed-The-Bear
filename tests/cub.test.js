@@ -38,6 +38,7 @@ const NEARBY = [
   check(/12 Main St, Scottsdale/.test(await p.locator('.qa-place-meta').innerText()), 'address comes from the place data');
   check(await p.locator('.qa-save').isDisabled(), 'save waits for Been there / Want to try');
   await p.click('.qa-status[data-status="want-to-try"]');
+  await p.click('.qa-details summary');
   await p.fill('.qa-dish', 'Birria tacos');
   await p.locator('#quick-add-overlay .modal-card').screenshot({ path: path.join(SHOTS, 'qa-2.png') }).catch(() => {});
   await p.click('.qa-save');
@@ -53,6 +54,7 @@ const NEARBY = [
   await p.locator('.qa-sugg-new').click();
   check(await p.inputValue('.qa-cuisine') === 'Vietnamese', 'a typed name gets a cuisine guess ("Pho" → Vietnamese)');
   await p.click('.qa-status[data-status="visited"]');
+  await p.click('.qa-details summary');
   await p.click('.qa-star[data-n="5"]');
   check(/Five stars/.test(await p.locator('.qa-say').innerText()), 'the cub reacts to the rating');
   await p.fill('.qa-dish', 'Rare beef pho');
@@ -78,6 +80,7 @@ const NEARBY = [
   await p.fill('.qa-input', 'https://www.google.com/maps/place/Pizzeria+Bianco/@33.449174,-112.0656515,17z');
   await p.waitForTimeout(200);
   check(await p.locator('.qa-place-name').innerText() === 'Pizzeria Bianco' && await p.inputValue('.qa-cuisine') === 'Italian', 'a Google Maps link fills the name and a cuisine guess');
+  await p.click('.qa-details summary');
   await p.click('.qa-more');
   await p.waitForTimeout(300);
   check(await p.inputValue('#form-name') === 'Pizzeria Bianco', '"More details" opens the full form, pre-filled');
@@ -87,6 +90,7 @@ const NEARBY = [
   await p.evaluate(() => Cub.openAdd());
   await p.fill('.qa-input', 'Some Place');
   await p.keyboard.press('Enter');
+  await p.click('.qa-details summary');
   await p.click('.qa-ai');
   await p.waitForSelector('#upgrade-overlay:not(.hidden)', { timeout: 3000 }).catch(() => {});
   check((await p.locator('#upgrade-title').innerText().catch(() => '')) === 'Let the cub do the typing', 'AI fill pitches Grizzly to free users');
