@@ -50,6 +50,22 @@ Then open http://127.0.0.1:8765/app.html.
   social share targets on physical Android and iPhone devices. Browser tests
   verify capture input attributes and native-share payloads, not camera hardware.
 
+## Food dates and friends
+
+- Use **Plan a food date** from Friends or the Friends feed on Home.
+  **Pick a time** on a shared food interest preselects that friend and spot.
+  Choose a saved place, friend or group, optional date/time and a short message.
+  The invitation preview is exactly what is sent or copied.
+- Send the invitation through your device share sheet, copy it to a group chat,
+  or make a 1080x1920 invite card. These are invitations, not reservations,
+  calendar bookings or automatic messages to followers.
+- Post-save sharing includes editable captions and **Go together**.
+  Meal notes enter Story cards only if you explicitly opt in.
+  Want-to-Try cards are labelled as food bucket-list picks, not meals eaten.
+- Friends' activity can help you save your first place, even with an empty
+  diary. Account changes hide pending invitations and invalidate slow card
+  generation without breaking the feed controls.
+
 ## Managing places and finding competitions
 
 - The default appearance is the readable **Dark** theme, on phones and web,

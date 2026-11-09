@@ -91,6 +91,7 @@ asGrizzly(); // uses Grizzly-only features
     const writes = [];
     _db = { doc: () => ({ set: (data) => { writes.push(data); return Promise.resolve(); }, get: () => Promise.resolve({ exists: false, data: () => ({}) }) }), collection: () => ({ get: () => Promise.resolve({ docs: [] }) }) };
     window._ftbUid = 'friendUid12345678';
+    window._ftbSyncBlocked = false;
     const cloud = { friendsAt: Date.now() + 60000, friends: [{ key: 'id:zzz', name: 'Sam', data: { id: 'zzz', u: 'Sam', picks: [{ n: 'Bacanora', r: 5 }], w: [] } }] };
     _mergeFriendsFromCloud(cloud);
     const afterCloud = getFriends().map(x => x.name);

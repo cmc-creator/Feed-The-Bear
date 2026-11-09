@@ -91,6 +91,9 @@ jobs:
       - name: Capture and immediate sharing
         working-directory: tests
         run: node capture-share.test.js
+      - name: Social food dates and sharing privacy
+        working-directory: tests
+        run: node social-planning.test.js
       - name: Place info
         working-directory: tests
         run: node placeinfo.test.js

@@ -400,12 +400,18 @@ window.StoryCard = (() => {
 
   // Draws the card for restaurant `r` and opens the preview.
   async function open (r, text) {
-    showCard(await draw(r), text, `What to order at ${r.name}`, `${r.name}-what-to-order`);
+    const generation = _dataGeneration;
+    const blob = await draw(r);
+    if (generation !== _dataGeneration) return;
+    showCard(blob, text, `What to order at ${r.name}`, `${r.name}-what-to-order`);
     track('story_card_opened', { kind: 'order' });
   }
 
   async function openStory (spec, text, fileBase) {
-    showCard(await drawStory(spec), text, spec.title || 'Feed The Bear', fileBase || spec.title);
+    const generation = _dataGeneration;
+    const blob = await drawStory(spec);
+    if (generation !== _dataGeneration) return;
+    showCard(blob, text, spec.title || 'Feed The Bear', fileBase || spec.title);
     track('story_card_opened', { kind: spec.kind || 'story' });
   }
 

@@ -6086,6 +6086,30 @@ body.light-mode .today-vibe-pill {
 .backup-status span { flex: 1 1 200px; overflow-wrap: anywhere; }
 .backup-status button { min-height: 44px; }
 .sn-x { background: none; border: 0; color: var(--text-dim); font-size: .9rem; padding: 6px; cursor: pointer; }
+.sn-caption { flex-basis: 100%; min-width: 0; font-size: .82rem; }
+.sn-caption summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--primary); }
+.sn-caption label { display: grid; gap: 6px; margin-bottom: 8px; }
+.sn-caption .sn-note-label { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.sn-caption small { color: var(--text-dim); }
+.foodie-social-start { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; margin: 10px 0; border-radius: var(--radius-sm); background: rgba(var(--primary-rgb), .09); border: 1px solid rgba(var(--primary-rgb), .25); }
+.foodie-social-start > div, .foodie-social-start > span { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; }
+.foodie-social-start p { color: var(--text-dim); font-size: .85rem; margin: 6px 0 0; }
+.foodie-social-start button, .fx-date { min-height: 44px; white-space: normal; }
+.foodie-plan-card { width: min(100%, 560px); }
+.fp-intro, .fp-privacy { color: var(--text-dim); line-height: 1.5; }
+.fp-intro { margin: 0; padding: 16px 20px; font-size: .9rem; }
+.fp-form { display: grid; gap: 14px; min-width: 0; padding: 0 20px 24px; }
+.fp-form label { display: grid; gap: 7px; font-size: .88rem; min-width: 0; }
+.fp-form .form-input { width: 100%; min-width: 0; min-height: 44px; box-sizing: border-box; }
+.fp-when { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.fp-preview { padding: 16px; border-radius: var(--radius-sm); border: 1px solid rgba(var(--primary-rgb), .35); background: rgba(var(--primary-rgb), .08); }
+.fp-preview-label { color: var(--primary); font-size: .75rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.fp-text { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; margin: 10px 0 0; font-size: .88rem; line-height: 1.6; }
+.fp-privacy { font-size: .78rem; margin: 0; }
+.fp-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.fp-actions button { flex: 1 1 120px; min-height: 44px; white-space: normal; overflow-wrap: anywhere; }
+.fp-status { color: var(--text-dim); font-size: .85rem; overflow-wrap: anywhere; margin: 0; }
+@media (max-width: 360px) { .fp-when { grid-template-columns: 1fr; } }
 @media (min-width: 769px) { .share-nudge { left: auto; right: 24px; bottom: 24px; width: 380px; } }
 
 .yo-best-bet {

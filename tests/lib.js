@@ -63,13 +63,20 @@ async function newPage (browser, { seed = null, settings = {}, viewport = { widt
   page.errors = [];
   page.on('pageerror', e => page.errors.push(e.message));
   if (grizzly) {
+    let navigation = 0;
+    page.on('request', request => {
+      if (request.isNavigationRequest() && request.frame() === page.mainFrame()) navigation++;
+    });
+    page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigation++; });
     page.on('load', async () => {
       if (!new URL(page.url()).pathname.endsWith('/app.html')) return;
+      const started = navigation;
       try {
         await page.waitForFunction(() => window._ftbAuthReady === true);
+        if (started !== navigation || page.isClosed()) return;
         await page.evaluate(() => { window._ftbPlan = 'grizzly'; });
       } catch (err) {
-        if (!page.isClosed()) page.errors.push('Grizzly fixture could not restore its test session: ' + err.message);
+        if (!page.isClosed() && started === navigation) page.errors.push('Grizzly fixture could not restore its test session: ' + err.message);
       }
     });
   }

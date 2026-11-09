@@ -1,5 +1,19 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-08 (social foodie pass)
+
+- Add food-date invitations from Friends, shared interests, the Home feed and
+  post-save sharing: select a place and friend, optional date/time, preview,
+  send, copy, or make a Story-sized invitation card.
+- Allow edited sharing captions; require opt-in before including meal notes.
+  Label saved Want-to-Try places as bucket-list picks instead of "Just ate".
+- Preserve Friends feed controls when accounts switch and show friends'
+  recommendations before the user's first save. Cancel stale Story generation.
+- Update the Google Play deletion test to simulate a real completed sign-out.
+  Add social-planning regressions to CI and refresh the offline asset cache.
+- Prevent Enter in Byte Cub from activating a newly focused dialog's Close
+  button when handing off to Dinner Vote.
+
 ## [Unreleased] - 2026-11-08
 
 ### Account isolation and reliable backup

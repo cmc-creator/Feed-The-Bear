@@ -1235,6 +1235,7 @@ function clearAccountUI (appearance) {
   state.selectedIds.clear();
   state.bulkMode = false;
   state.filter = { search: '', cuisine: '', price: '', sort: 'date-desc', tag: '', collection: '' };
+  window.resetFriendsSession?.();
   setYourOrderPending([]);
   CubChats.resetSession();
   closeChat();
@@ -8440,7 +8441,7 @@ function setupEvents () {
   document.getElementById('chat-close-btn').addEventListener('click', closeChat);
   document.getElementById('chat-send-btn').addEventListener('click', sendChat);
   document.getElementById('chat-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') sendChat();
+  if (e.key === 'Enter') { e.preventDefault(); sendChat(); }
   });
   initChatMic();
 
@@ -8983,6 +8984,7 @@ function setupEvents () {
   });
   document.getElementById('friends-invite-btn')?.addEventListener('click', inviteFriend);
   document.getElementById('ff-open-friends')?.addEventListener('click', openFoodieFriends);
+  document.getElementById('ff-plan-date')?.addEventListener('click', () => openFoodiePlan());
 
   // Phase 8 - Smart Discovery
   document.getElementById('discover-close-btn').addEventListener('click', closeDiscover);

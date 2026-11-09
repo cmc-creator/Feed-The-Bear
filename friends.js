@@ -480,8 +480,13 @@ function renderFriendsFeedHome () {
   const section = document.getElementById('friends-feed-home');
   const list = document.getElementById('ff-list');
   if (!section || !list) return;
+  if (window._ftbAccountSwitching) {
+    list.replaceChildren();
+    section.classList.add('hidden');
+    return;
+  }
   // Only when friends have something to show; inviting is the small header button.
-  const items = (state.restaurants || []).length ? friendsFeedItems() : [];
+  const items = friendsFeedItems();
   // The friend with the most spots you don't have yet: one tap to see and add them.
   const best = getFriends().map(f => ({ f, n: friendNewSpots(f).length })).sort((a, b) => b.n - a.n)[0];
   // The moss Friends button in the header gets a dot when there's something new.
@@ -754,7 +759,16 @@ function resetFriendsSession () {
   _notingFollows = false;
   Object.keys(_friendsErrors).forEach(k => delete _friendsErrors[k]);
   document.getElementById('friends-list')?.replaceChildren();
-  document.getElementById('friends-feed-home')?.replaceChildren();
+  document.getElementById('ff-list')?.replaceChildren();
+  document.getElementById('friends-feed-home')?.classList.add('hidden');
+  document.getElementById('header-friends-dot')?.classList.add('hidden');
+  document.getElementById('header-friends-btn')?.setAttribute('aria-label', 'Friends');
+  _friendPages = {};
+  _friendPagesFor = '';
+  _myHandle = null;
+  _myHandleFor = '';
+  _myPage = { public: false, views: 0, joins: 0 };
+  ['friends-handle', 'settings-handle'].forEach(id => document.getElementById(id)?.replaceChildren());
 }
 function noteFriendsError (what, status, data) {
   _friendsErrors[what] = status === 401 ? 'your sign-in expired, so sign out and back in'
@@ -914,6 +928,132 @@ async function askFriendToGo (r, friendName = '') {
   catch { window.prompt('Send this to a friend:', text); }
 }
 
+function openFoodiePlan (restaurantId = '', friendKey = '') {
+  if (window._ftbAccountSwitching) {
+    showToast('Your diary is opening', 'Wait for your account to finish restoring, then plan your next bite.', 'info');
+    return;
+  }
+  const previous = document.getElementById('foodie-plan-overlay');
+  previous?.classList.add('hidden');
+  previous?.remove();
+  const generation = _dataGeneration;
+  const spots = [...(state.restaurants || [])].filter(isAvailableSpot)
+    .sort((a, b) => (a.status === 'want-to-try' ? 0 : 1) - (b.status === 'want-to-try' ? 0 : 1));
+  const friends = getFriends();
+  const el = document.createElement('div');
+  el.id = 'foodie-plan-overlay';
+  el.className = 'modal-overlay hidden';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-modal', 'true');
+  el.setAttribute('aria-labelledby', 'foodie-plan-title');
+  el.innerHTML = `<div class="modal-card foodie-plan-card">
+    <div class="modal-header"><h2 id="foodie-plan-title">Make it a food date</h2><button id="foodie-plan-close" type="button" class="icon-btn fp-close" aria-label="Close food date planner">✕</button></div>
+    <p class="fp-intro">One spot. Your favorite people. Something delicious to look forward to.</p>
+    <form class="fp-form">
+      <label>Where are we eating?<select class="form-input fp-spot" required>${spots.length
+        ? spots.map(r => `<option value="${escHtml(r.id)}">${escHtml(r.name)}${r.status === 'want-to-try' ? ' · Want to try' : ''}</option>`).join('')
+        : '<option value="">Save a spot to start your plan</option>'}</select></label>
+      <button type="button" class="btn-sm fp-add">Add a different spot</button>
+      <label>Who is it for?<select class="form-input fp-friend"><option value="">My food crew</option>${friends.map(f => `<option value="${escHtml(f.key)}">${escHtml(f.name)}</option>`).join('')}</select></label>
+      <div class="fp-when"><label>Date (optional)<input type="date" class="form-input fp-day" min="${iso()}" /></label><label>Time (optional)<input type="time" class="form-input fp-time" /></label></div>
+      <label>Add a little flavor (optional)<textarea class="form-input fp-note" rows="2" maxlength="280" placeholder="Tacos, a catch-up, and absolutely ordering dessert."></textarea></label>
+      <div class="fp-preview"><span class="fp-preview-label">Your invitation</span><p class="fp-text"></p></div>
+      <p class="fp-privacy">Only this invitation is shared. No private notes, automatic invites, reservations, or calendar bookings.</p>
+      <div class="fp-actions"><button type="submit" class="btn-primary fp-send" ${spots.length ? '' : 'disabled'}>Send the plan</button><button type="button" class="btn-sm fp-copy" ${spots.length ? '' : 'disabled'}>Copy invite</button><button type="button" class="btn-sm fp-story" ${spots.length ? '' : 'disabled'}>Make invite card</button></div>
+      <p class="fp-status" role="status"></p>
+    </form></div>`;
+  document.body.appendChild(el);
+  el.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+  const form = el.querySelector('form');
+  const spotField = el.querySelector('.fp-spot');
+  const friendField = el.querySelector('.fp-friend');
+  const dayField = el.querySelector('.fp-day');
+  const timeField = el.querySelector('.fp-time');
+  const noteField = el.querySelector('.fp-note');
+  if (spots.some(r => r.id === restaurantId)) spotField.value = restaurantId;
+  if (friends.some(f => f.key === friendKey)) friendField.value = friendKey;
+  const current = () => generation === _dataGeneration && el.isConnected && !el.classList.contains('hidden');
+  const selected = () => spots.find(r => r.id === spotField.value);
+  const when = () => {
+    const parts = [];
+    if (dayField.value) {
+      const [year, month, day] = dayField.value.split('-').map(Number);
+      parts.push(new Date(year, month - 1, day).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }));
+    }
+    if (timeField.value) {
+      const [hours, minutes] = timeField.value.split(':').map(Number);
+      parts.push(new Date(2000, 0, 1, hours, minutes).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }));
+    }
+    return parts.join(' at ');
+  };
+  const invite = () => {
+    const r = selected();
+    if (!r) return '';
+    const friend = friends.find(f => f.key === friendField.value);
+    const tip = orderPicksFor(r).get[0];
+    return [
+      `${friend ? `${String(friend.name).split(/\s+/)[0]}, want` : 'Want'} to go to ${r.name} together?`,
+      when() ? `Let's meet ${when()}.` : 'Let\'s pick a time!',
+      tip ? `I hear the ${tip.name} is the move.` : '',
+      noteField.value.trim(),
+      buildGoogleDirectionsUrl({ name: r.name, address: r.address || '', lat: r.lat, lon: r.lon ?? r.lng }),
+    ].filter(Boolean).join('\n');
+  };
+  const preview = () => { el.querySelector('.fp-text').textContent = invite() || 'Save a place you love or want to try, then invite your crew.'; };
+  form.addEventListener('input', preview);
+  form.addEventListener('change', preview);
+  preview();
+  const close = () => { el.classList.add('hidden'); el.remove(); maybeHideOverlay(); };
+  el.querySelector('.fp-close').addEventListener('click', close);
+  el.addEventListener('click', e => { if (e.target === el) close(); });
+  el.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
+  el.querySelector('.fp-add').addEventListener('click', () => { close(); closeFoodieFriends(); Cub.openAdd(); });
+  let busy = false;
+  const run = async (action, button) => {
+    if (!current() || busy || !form.reportValidity()) return;
+    busy = true;
+    const label = button.textContent;
+    button.textContent = 'Preparing...';
+    el.querySelectorAll('.fp-actions button').forEach(b => { b.disabled = true; });
+    const status = el.querySelector('.fp-status');
+    status.textContent = '';
+    try {
+      const r = selected();
+      const text = invite();
+      if (action === 'story') {
+        await StoryCard.openStory({
+          kind: 'invite', kicker: 'You + me + good food', title: r.name, sub: r.cuisine || 'Our next delicious adventure',
+          photo: r.photo || r.placePhoto || '',
+          sections: [{ label: 'The plan', items: [when() || 'Let\'s pick a time', noteField.value.trim()].filter(Boolean), tone: 'soft' }],
+          footer: 'Good food is better together',
+        }, text, `${r.name}-food-date`);
+      } else if (action === 'copy') {
+        await navigator.clipboard.writeText(text);
+        if (current()) status.textContent = 'Invite copied. Paste it into your group chat.';
+      } else {
+        if (navigator.share) await navigator.share({ title: `Food date at ${r.name}`, text });
+        else await shareWithMenu({ title: `Food date at ${r.name}`, text });
+        if (current()) status.textContent = 'Share action completed. Your crew can reply in the app you chose.';
+      }
+      if (current()) trackProductEvent('food_date_shared', { via: action });
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      console.warn('[FTB] Food date sharing failed:', err);
+      if (current()) status.textContent = action === 'copy' ? 'Copying was blocked. Select the invitation text above to copy it, or use Send the plan.' : 'Could not share this plan. Try Copy invite or Make invite card.';
+    } finally {
+      busy = false;
+      button.textContent = label;
+      if (current()) el.querySelectorAll('.fp-actions button').forEach(b => { b.disabled = false; });
+    }
+  };
+  form.addEventListener('submit', e => { e.preventDefault(); run('share', el.querySelector('.fp-send')); });
+  el.querySelector('.fp-copy').addEventListener('click', () => run('copy', el.querySelector('.fp-copy')));
+  el.querySelector('.fp-story').addEventListener('click', () => run('story', el.querySelector('.fp-story')));
+  spotField.focus();
+  trackProductEvent('food_date_opened');
+}
+
 /* ── Share moments: right after you log a meal ── */
 function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', note = '' }) {
   if (!r || !window.StoryCard) return;
@@ -927,12 +1067,19 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
     <div class="sn-actions">
       <button type="button" class="btn-sm btn-primary sn-media" ${photo || video ? 'disabled' : ''}>${video ? 'Preparing video...' : photo ? 'Preparing photo...' : 'Share spot'}</button>
       <button type="button" class="btn-sm sn-go">Make Story card</button>
+      <button type="button" class="btn-sm sn-plan">Go together</button>
       <button type="button" class="btn-sm sn-x">Done</button>
-    </div><span class="sn-error" role="status"></span>`;
+    </div><details class="sn-caption"><summary>Edit caption</summary>
+      <label>What your friends will see<textarea class="form-input sn-caption-text" maxlength="600" rows="3"></textarea></label>
+      ${note ? '<label class="sn-note-label"><input type="checkbox" class="sn-include-note" /> Include my meal note in the Story card</label>' : ''}
+      <small>Nothing posts automatically. You choose who sees it.</small>
+    </details><span class="sn-error" role="status"></span>`;
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add('in'));
   const hide = () => { el.classList.remove('in'); setTimeout(() => el.remove(), 300); };
   const text = `${dish ? `${dish} at ${r.name}` : `${r.status === 'visited' ? 'Just ate at' : 'Want to try'} ${r.name}`}${verdict === 'again' ? ' — 10/10 would order again' : ''}. Saved with Feed The Bear https://www.feed-the-bear.com`;
+  const caption = el.querySelector('.sn-caption-text');
+  caption.value = text;
   const error = message => { el.querySelector('.sn-error').textContent = message; };
   let file = null;
   const mediaButton = el.querySelector('.sn-media');
@@ -971,24 +1118,29 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
       return;
     }
     // The file is prepared before this click, preserving iOS user activation.
-    navigator.share({ title: r.name, text, ...(file ? { files: [file] } : {}) }).catch(err => {
+    navigator.share({ title: r.name, text: caption.value.trim(), ...(file ? { files: [file] } : {}) }).catch(err => {
       if (err?.name === 'AbortError') return;
       console.warn('[FTB] Media share failed:', err);
       error('Sharing was blocked. Try the Story card or save it from there.');
     });
   });
   el.querySelector('.sn-x').addEventListener('click', hide);
+  el.querySelector('.sn-plan').addEventListener('click', () => {
+    if (generation !== _dataGeneration) return;
+    hide();
+    openFoodiePlan(r.id);
+  });
   el.querySelector('.sn-go').addEventListener('click', async () => {
     if (generation !== _dataGeneration) return;
     hide();
     trackProductEvent('share_meal_clicked', { hasPhoto: !!photo });
-    const kicker = verdict === 'again' ? 'Order this again' : verdict === 'skip' ? 'Skip this one' : 'Just ate';
+    const kicker = r.status === 'want-to-try' ? 'On my food bucket list' : verdict === 'again' ? 'Order this again' : verdict === 'skip' ? 'Skip this one' : 'Just ate';
     try {
       await StoryCard.openStory({
         kind: 'meal', kicker, title: dish || r.name, sub: dish ? `at ${r.name}` : (r.cuisine || ''), photo,
         stars: r.myRating || 0,
-        sections: note ? [{ label: 'Note to self', items: [note], tone: 'soft' }] : [],
-      }, text, `${r.name}-${dish || 'meal'}`);
+        sections: note && el.querySelector('.sn-include-note')?.checked ? [{ label: 'My take', items: [note], tone: 'soft' }] : [],
+      }, caption.value.trim(), `${r.name}-${dish || 'meal'}`);
     } catch (err) {
       console.warn('[FTB] meal card failed:', err);
       showToast('Could not make Story card', 'Your place is saved. Try sharing again from its details.', 'error');
@@ -1441,13 +1593,23 @@ function renderFriendsList () {
       }).join('')
       + (invites.length > shown.length ? `<div class="friends-empty">and ${invites.length - shown.length} more</div>` : '')
     : '';
-  el.innerHTML = pulseHtml + followingHtml + followersHtml + invitesHtml || (_followers === null && window._ftbUid
+  el.innerHTML = '<div class="foodie-social-start"><div><strong>Good food is better together</strong><p>Pick a spot, add a time, send your crew a plan.</p></div><button type="button" class="btn-primary fx-start-plan">Plan a food date</button></div>' + (pulseHtml + followingHtml + followersHtml + invitesHtml || (_followers === null && window._ftbUid
     ? '<div class="friends-empty">Loading your friends…</div>'
     : '<div class="friends-empty">No friends yet. Send an invite: when a friend joins from it, they show up here and you can follow each other.</div>'
       // Friends belong to an account: an empty list usually means a different (or new) one.
       + (window._ftbUserEmail
         ? `<div class="friends-empty friends-account">Signed in as <strong>${escHtml(window._ftbUserEmail)}</strong>. Had friends before? They're on the account you used then. Sign out (Account) and sign in with that one.</div>`
-        : ''));
+        : '')));
+  el.querySelector('.fx-start-plan').addEventListener('click', () => openFoodiePlan());
+  el.querySelectorAll('.fx-overlap').forEach(overlap => {
+    const quick = overlap.querySelector('.fx-plan');
+    const plan = document.createElement('button');
+    plan.type = 'button';
+    plan.className = 'btn-sm fx-date';
+    plan.textContent = 'Pick a time';
+    plan.addEventListener('click', () => openFoodiePlan(quick.dataset.id, quick.dataset.key));
+    overlap.appendChild(plan);
+  });
   el.querySelectorAll('.friend-spots').forEach(b => b.addEventListener('click', () => {
     const f = getFriends().find(x => x.key === b.dataset.key);
     if (f) openFriendSpots(f.data);
@@ -1627,12 +1789,15 @@ async function handleApi (method, { query = '', body = null } = {}) {
 // The link printed on share images: your public page when it's on, else the site.
 async function myShareLink () {
   const site = 'feed-the-bear.com';
-  if (!window._ftbUid) return site;
-  if (_myHandleFor !== window._ftbUid || _myHandle === null) {
+  const uid = window._ftbUid;
+  const generation = _dataGeneration;
+  if (!uid) return site;
+  if (_myHandleFor !== uid || _myHandle === null) {
     try {
       const { ok, data } = await handleApi('GET', { query: '?mine=1' });
+      if (uid !== window._ftbUid || generation !== _dataGeneration) return site;
       if (ok) {
-        _myHandleFor = window._ftbUid;
+        _myHandleFor = uid;
         _myHandle = data.handle || '';
         _myPage = { public: !!data.public, views: Number(data.views) || 0, joins: Number(data.joins) || 0, earnedCents: Number(data.earnedCents) || 0, owedCents: Number(data.owedCents) || 0 };
       }
@@ -1644,6 +1809,9 @@ window.myShareLink = myShareLink;
 
 // Your username and public page show in Friends and in Settings (Account).
 async function renderMyHandle () {
+  const uid = window._ftbUid;
+  const generation = _dataGeneration;
+  const isCurrent = () => uid === window._ftbUid && generation === _dataGeneration;
   const boxes = ['friends-handle', 'settings-handle'].map(id => document.getElementById(id)).filter(Boolean);
   if (!boxes.length) return;
   if (!window._ftbUid) {
@@ -1656,11 +1824,13 @@ async function renderMyHandle () {
     boxes.forEach(box => { if (!box.innerHTML.trim()) box.innerHTML = '<span class="my-handle-loading">Loading your username…</span>'; });
     try {
       const { ok, status, data } = await handleApi('GET', { query: '?mine=1' });
+      if (!isCurrent()) return;
       if (!ok) throw new Error(data.error || `error ${status}`);
       _myHandle = data.handle || '';
       _myPage = { public: !!data.public, views: Number(data.views) || 0, joins: Number(data.joins) || 0, earnedCents: Number(data.earnedCents) || 0, owedCents: Number(data.owedCents) || 0 };
-    } catch (err) { failed = err.message || 'no connection'; }
+    } catch (err) { if (!isCurrent()) return; failed = err.message || 'no connection'; }
   }
+  if (!isCurrent()) return;
   boxes.forEach(box => {
     if (failed) {
       box.innerHTML = `<div class="friends-load-error">Your username didn't load (${escHtml(failed)}). <button type="button" class="link-btn my-handle-retry">Try again</button></div>`;

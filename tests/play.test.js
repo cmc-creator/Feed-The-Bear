@@ -26,6 +26,7 @@ const { BASE, check, launch, newPage, finish } = require('./lib');
   await p.evaluate(async () => {
     const log = window.__log = [];
     const user = {
+      uid: 'play-test-account',
       email: 'bear@example.com',
       providerData: [{ providerId: 'password' }],
       reauthenticateWithCredential: async () => { log.push('reauth'); },
@@ -33,7 +34,12 @@ const { BASE, check, launch, newPage, finish } = require('./lib');
     };
     window._auth = _auth || {};
     Object.defineProperty(_auth, 'currentUser', { value: user, configurable: true });
-    _auth.signOut = async () => { log.push('signout'); };
+    _auth.signOut = async () => {
+      log.push('signout');
+      Object.defineProperty(_auth, 'currentUser', { value: null, configurable: true });
+      _sessionTask = handleFirebaseUser(null);
+      await _sessionTask;
+    };
     window.firebase = window.firebase || {};
     firebase.auth = firebase.auth || {};
     firebase.auth.EmailAuthProvider = { credential: () => ({}) };

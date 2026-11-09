@@ -177,8 +177,9 @@ const spot = (id, name) => ({ id, name, status: 'visited', tags: [], dishes: [],
 
   await p.reload();
   await p.evaluate(() => { window._sessionTaskForTest = () => _sessionTask; return _sessionTask; });
-  check(await p.evaluate(() => !window._ftbUid && !state.restaurants.length && !loadUserProfile()),
-    'a cold signed-out launch does not expose the previous account cache');
+  const cold = await p.evaluate(() => ({ uid: window._ftbUid, spots: state.restaurants.map(r => r.id), profile: loadUserProfile(), switching: window._ftbAccountSwitching }));
+  check(!cold.uid && !cold.spots.length && (!cold.profile || (cold.profile.name === 'Foodie' && !cold.profile.phone && !cold.profile.bio)),
+    `a cold signed-out launch does not expose the previous account cache (${JSON.stringify(cold)})`);
   await p.evaluate(() => window.__signIn('accountA'));
   check(await p.evaluate(() => state.restaurants.some(r => r.id === 'privateA')), 'the scoped diary survives a browser reload');
 
