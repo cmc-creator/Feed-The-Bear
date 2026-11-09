@@ -1,5 +1,13 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-08 (notes and visit reliability)
+
+- Bind pending detail-note edits to their original place and account generation.
+  Flush them before detail navigation, closing and account snapshots.
+- Update sync freshness on detail check-ins and close the saved check-in form.
+- Label unknown historical dates clearly. Add immediate-navigation and snapshot
+  regressions without adding or removing features.
+
 ## [Unreleased] - 2026-11-08 (accurate meal sharing)
 
 - Pass the saved moment's media explicitly from Quick Add, full Add and Just Ate.

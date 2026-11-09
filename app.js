@@ -1222,6 +1222,7 @@ function deviceAppearance () {
 }
 
 function captureAccountData () {
+  flushDetailNotes();
   const owner = localStorage.getItem('ftb_data_owner_v1') || localStorage.getItem('ftb_uid_v1') || '';
   const legacy = !owner && !!localStorage.getItem('ftb_last_account_v1') && window._ftbDataOwner === undefined;
   const snapshotOwner = owner || (legacy ? `legacy:${localStorage.getItem('ftb_last_account_v1').trim().toLowerCase()}` : '');
@@ -3883,6 +3884,7 @@ function deleteSavedRestaurant (id) {
 }
 
 function openDetailModal (id) {
+  flushDetailNotes();
   const r = state.restaurants.find(x => x.id === id);
   if (!r) return;
   state.detailId = id;
@@ -3964,7 +3966,7 @@ function openDetailModal (id) {
   logList.innerHTML = visits.length
     ? visits.slice().reverse().map(v => `
         <div class="visit-log-item">
-          <span class="visit-date">${fmtDate(v.date)}</span>
+          <span class="visit-date">${v.date ? fmtDate(v.date) : 'Date not recorded'}</span>
           ${v.rating ? `<span class="visit-stars">${'\u2605'.repeat(v.rating)}</span>` : ''}
           ${v.note ? `<span class="visit-note">${escHtml(v.note)}</span>` : ''}
         </div>`).join('')
@@ -3993,6 +3995,8 @@ function openDetailModal (id) {
       state.restaurants[idx].status = 'visited';
       state.restaurants[idx].dateVisited = state.restaurants[idx].dateVisited || iso();
       if (rating) state.restaurants[idx].myRating = rating;
+      state.restaurants[idx].updatedAt = Date.now();
+      form.classList.add('hidden');
       saveData();
       renderAll();
       openDetailModal(id);
@@ -4072,6 +4076,7 @@ function openDetailModal (id) {
 }
 
 function closeDetailModal () {
+  flushDetailNotes();
   document.getElementById('detail-overlay').classList.add('hidden');
   maybeHideOverlay();
 }
@@ -4155,16 +4160,32 @@ function initDetailQuickCapture () {
   const notes = document.getElementById('detail-notes-edit');
   if (notes) {
     let t = null;
-    const save = () => {
-      if (!state.detailId) return;
-      patchRestaurant(state.detailId, { notes: notes.value.trim() });
-      const saved = document.getElementById('detail-notes-saved');
-      if (saved) { saved.textContent = 'Saved ✓'; clearTimeout(t); t = setTimeout(() => saved.textContent = '', 1600); }
-    };
-    let dt = null;
-    notes.addEventListener('input', () => { clearTimeout(dt); dt = setTimeout(save, 600); });
-    notes.addEventListener('blur', save);
+    notes.addEventListener('input', () => {
+      if (!state.detailId || window._ftbAccountSwitching) return;
+      _pendingDetailNotes = { id: state.detailId, value: notes.value.trim(), generation: _dataGeneration };
+      clearTimeout(_detailNotesTimer);
+      _detailNotesTimer = setTimeout(() => {
+        const id = _pendingDetailNotes?.id;
+        if (!flushDetailNotes() || state.detailId !== id) return;
+        const saved = document.getElementById('detail-notes-saved');
+        if (saved) {
+          saved.textContent = 'Saved ✓'; clearTimeout(t);
+          t = setTimeout(() => { if (state.detailId === id) saved.textContent = ''; }, 1600);
+        }
+      }, 600);
+    });
+    notes.addEventListener('blur', flushDetailNotes);
   }
+}
+
+let _pendingDetailNotes = null;
+let _detailNotesTimer = null;
+function flushDetailNotes () {
+  clearTimeout(_detailNotesTimer);
+  const pending = _pendingDetailNotes;
+  _pendingDetailNotes = null;
+  if (!pending || pending.generation !== _dataGeneration || window._ftbAccountSwitching) return false;
+  return !!patchRestaurant(pending.id, { notes: pending.value, updatedAt: Date.now() });
 }
 
 /* ── Celebration / milestone helpers (delight) ───────────────── */

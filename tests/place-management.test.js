@@ -33,6 +33,42 @@ async function say (page, text) {
     await p.waitForTimeout(1500);
     await closeAllDialogs(p);
 
+    await p.evaluate(() => openDetailModal('open'));
+    await p.fill('#detail-notes-edit', 'Keep this note on Open Cafe');
+    await p.evaluate(() => openDetailModal('old'));
+    await p.waitForTimeout(700);
+    check(await p.evaluate(() => state.restaurants.find(r => r.id === 'open').notes === 'Keep this note on Open Cafe'
+      && state.restaurants.find(r => r.id === 'old').notes === 'Great memories'),
+      'switching details immediately saves the typed note to its original place only');
+    await p.evaluate(() => openDetailModal('open'));
+    await p.fill('#detail-notes-edit', 'Last edit before closing');
+    await p.evaluate(() => closeDetailModal());
+    check(await p.evaluate(() => state.restaurants.find(r => r.id === 'open').notes === 'Last edit before closing'),
+      'closing details flushes the pending note without requiring a pause');
+    await p.evaluate(() => openDetailModal('open'));
+    await p.fill('#detail-notes-edit', 'Keep my edit before sign-out');
+    check(await p.evaluate(() => {
+      const captured = captureAccountData();
+      return JSON.parse(captured.snapshot[STORAGE_KEY]).find(r => r.id === 'open').notes === 'Keep my edit before sign-out';
+    }), 'account snapshot captures pending note edits before transitioning sessions');
+    await p.evaluate(() => {
+      const r = state.restaurants.find(r => r.id === 'open');
+      r.visits = [{ date: '', note: 'A remembered visit' }];
+      openDetailModal('open');
+    });
+    check((await p.locator('#detail-visit-log-list').innerText()).includes('Date not recorded'),
+      'unknown historical dates are clearly labelled rather than blank or invented');
+    await p.click('#detail-checkin-btn');
+    await p.fill('#detail-checkin-form .checkin-note', 'Fresh visit');
+    await p.evaluate(() => { state.restaurants.find(r => r.id === 'open').updatedAt = 1; });
+    await p.click('#detail-checkin-submit');
+    check(await p.evaluate(() => {
+      const r = state.restaurants.find(r => r.id === 'open');
+      return r.updatedAt > 1 && r.visits.at(-1).note === 'Fresh visit';
+    }) && await p.locator('#detail-checkin-form').isHidden(),
+      'check-in updates sync freshness and closes the saved form');
+    await closeAllDialogs(p);
+
     await p.evaluate(() => openDetailModal('old'));
     p.once('dialog', d => d.dismiss());
     await p.click('#detail-closed-btn');

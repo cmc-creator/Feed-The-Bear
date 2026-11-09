@@ -16,6 +16,10 @@ Then open http://127.0.0.1:8765/app.html.
 
 ## Photos, videos, sharing and account privacy
 
+- Place notes autosave to the place where they were typed, including when
+  switching/closing details or taking an account snapshot. Check-ins refresh
+  sync timestamps; historical visits without dates show **Date not recorded**.
+
 - Post-save meal cards and original-media collections use only that moment's
   attachments. A meal without photos stays photo-free rather than borrowing
   pictures or video from an earlier visit. Place-detail sharing still uses
