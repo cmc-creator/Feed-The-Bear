@@ -10,6 +10,8 @@
    POST { action: 'code', code, percent, duration, months, maxUses, expiresDays }
         a Stripe discount code (duration: once | repeating | forever)
    POST { action: 'codeOff', id }                   switch a code off
+   POST { action: 'alerts', push, email }           sign-up alerts on/off (api/push.js 'joined')
+   GET also returns signups: the newest accounts, read from Firebase Auth.
 
    VIPs are kept in vips/{email}. Someone without an account yet gets it the
    first time they sign in with that email (verify-session.js 'restore', via
@@ -37,6 +39,28 @@ function getAdmin () {
 function owners () {
   const extra = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
   return new Set([...OWNERS, ...extra]);
+}
+
+// Everyone who has an account, newest first (Firebase Auth is the record,
+// so sign-ups the app never reported still show).
+async function signupList (fb) {
+  const users = [];
+  let pageToken;
+  for (let i = 0; i < 10; i++) {
+    const page = await fb.auth().listUsers(1000, pageToken);
+    users.push(...page.users);
+    pageToken = page.pageToken;
+    if (!pageToken) break;
+  }
+  const now = Date.now();
+  const at = u => Date.parse(u.metadata?.creationTime || '') || 0;
+  const since = days => users.filter(u => now - at(u) < days * 86400000).length;
+  const recent = users.sort((a, b) => at(b) - at(a)).slice(0, 100).map(u => ({
+    email: u.email || '', name: u.displayName || '',
+    via: (u.providerData || []).some(p => p.providerId === 'google.com') ? 'Google' : 'email',
+    at: new Date(at(u)).toISOString(), lastAt: u.metadata?.lastSignInTime ? new Date(u.metadata.lastSignInTime).toISOString() : '',
+  }));
+  return { recent, today: since(1), week: since(7), month: since(30), total: users.length };
 }
 
 const stripeOrNull = () => (process.env.STRIPE_SECRET_KEY ? Stripe(process.env.STRIPE_SECRET_KEY) : null);
@@ -184,7 +208,13 @@ module.exports = async function handler (req, res) {
         return { uid: d.id, email, handle, owedCents: e.owedCents || 0, earnedCents: e.earnedCents || 0, paidCents: e.paidCents || 0, payments: e.payments || 0, lastAt: e.lastAt || '' };
       }));
       creators.sort((a, b) => b.owedCents - a.owedCents);
-      return res.status(200).json({ vips, codes: codes.codes, codesError: codes.error || null, me, partners: await partnerCodes(db), featured, creators });
+      const signups = await signupList(fb).catch(err => ({ error: err.message }));
+      const alerts = (await db.doc('config/ownerAlerts').get()).data() || {};
+      let phone = 0;
+      try { phone = ((await db.doc(`pushTokens/${(await fb.auth().getUserByEmail(me)).uid}`).get()).data()?.tokens || []).length; } catch { /* no phone yet */ }
+      const { emailReady } = require('./_email');
+      return res.status(200).json({ vips, codes: codes.codes, codesError: codes.error || null, me, partners: await partnerCodes(db), featured, creators,
+        signups, alerts: { push: alerts.push !== false, email: alerts.email !== false, phone, emailReady: emailReady() } });
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -265,6 +295,14 @@ module.exports = async function handler (req, res) {
       }
       await db.doc('config/partners').set(next);
       return res.status(200).json({ ok: true, message: 'Affiliate codes saved. Book and Order links use them within the hour.' });
+    }
+
+    if (body.action === 'alerts') {
+      const set = { at: new Date().toISOString(), by: me };
+      if (typeof body.push === 'boolean') set.push = body.push;
+      if (typeof body.email === 'boolean') set.email = body.email;
+      await db.doc('config/ownerAlerts').set(set, { merge: true });
+      return res.status(200).json({ ok: true });
     }
 
     if (body.action === 'codeOff') {

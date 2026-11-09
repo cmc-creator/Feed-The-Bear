@@ -21,6 +21,10 @@ firestore.FieldValue = { delete: () => '__delete__' };
 const fakeAdmin = { apps: [1], firestore, auth: () => ({
   verifyIdToken: async t => { if (!tokens[t]) throw new Error('bad'); return tokens[t]; },
   getUserByEmail: async e => { if (!users[e]) throw new Error('none'); return { uid: users[e] }; },
+  listUsers: async () => ({ users: [
+    { email: 'old@example.com', metadata: { creationTime: new Date(Date.now() - 40 * 864e5).toUTCString() }, providerData: [] },
+    { email: 'jo@example.com', displayName: 'Jo', metadata: { creationTime: new Date(Date.now() - 3600e3).toUTCString() }, providerData: [{ providerId: 'google.com' }] },
+  ] }),
 }) };
 const codes = [];
 const fakeStripe = () => ({
@@ -49,6 +53,11 @@ const call = (token, method, body) => new Promise(resolve => {
 
 (async () => {
   check((await call('stranger', 'GET')).status === 403 && (await call(null, 'GET')).status === 401, 'only the owner gets in');
+  const g = await call('owner', 'GET');
+  check(g.signups?.total === 2 && g.signups.today === 1 && g.signups.recent[0].email === 'jo@example.com' && g.signups.recent[0].via === 'Google', `sign-ups, newest first, with counts (${JSON.stringify(g.signups?.recent?.[0])})`);
+  check(g.alerts?.push === true && g.alerts.email === true, 'sign-up alerts start on');
+  await call('owner', 'POST', { action: 'alerts', email: false });
+  check(docs['config/ownerAlerts']?.email === false && docs['config/ownerAlerts'].push === undefined, 'the owner can switch one off');
 
   let r = await call('owner', 'POST', { action: 'grant', email: 'Friend@Example.com', months: 3, note: 'Food blogger' });
   check(r.status === 200 && docs['users/uidFriend/meta/profile']?.plan === 'grizzly' && docs['users/uidFriend/meta/profile'].compedBy === 'owner', `an existing account gets Grizzly now (${r.message})`);

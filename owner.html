@@ -43,6 +43,16 @@
     .gate p { color: var(--text-muted); }
     a { color: var(--gold); }
     [hidden] { display: none !important; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 4px 0 12px; }
+    .stat { background: var(--surface2); border-radius: 12px; padding: 10px 6px; text-align: center; }
+    .stat b { display: block; font-size: 1.35rem; }
+    .stat span { font-size: .72rem; font-weight: 700; color: var(--text-dim); }
+    .alerts { display: grid; gap: 8px; margin: 0 0 6px; }
+    .alerts label { display: flex; gap: 10px; align-items: flex-start; font-size: .9rem; color: var(--text); font-weight: 600; }
+    .alerts input { width: 20px; height: 20px; margin: 2px 0 0; padding: 0; flex: none; accent-color: var(--gold); }
+    .alerts small { display: block; color: var(--text-dim); font-weight: 600; font-size: .78rem; }
+    .pill.new { background: rgba(200,162,106,.25); color: var(--gold); }
+    #signup-more { margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -60,6 +70,24 @@
   </section>
 
   <div id="portal" hidden>
+    <section class="panel">
+      <h2>New sign-ups <span class="pill new" id="signup-new" hidden></span></h2>
+      <p class="lead">Everyone who made an account, newest first.</p>
+      <div class="stats">
+        <div class="stat"><b id="su-today">-</b><span>Today</span></div>
+        <div class="stat"><b id="su-week">-</b><span>7 days</span></div>
+        <div class="stat"><b id="su-month">-</b><span>30 days</span></div>
+        <div class="stat"><b id="su-total">-</b><span>All time</span></div>
+      </div>
+      <div class="alerts">
+        <label><input type="checkbox" id="alert-push" /> <span>Notify my phone for each new sign-up<small id="alert-push-note"></small></span></label>
+        <label><input type="checkbox" id="alert-email" /> <span>Email me for each new sign-up<small id="alert-email-note"></small></span></label>
+      </div>
+      <p class="msg" id="alert-msg" role="status"></p>
+      <div class="rows" id="signup-list"><p class="empty">Loading…</p></div>
+      <button type="button" class="btn ghost" id="signup-more" hidden>Show more</button>
+    </section>
+
     <section class="panel">
       <h2>Give free Grizzly</h2>
       <p class="lead">Type their email. If they already have an account it turns on now; if not, it turns on the first time they sign in with that email.</p>
@@ -164,6 +192,35 @@ async function api (method, body) {
 function say (id, text, ok = true) { const el = $(id); el.textContent = text; el.className = `msg ${ok ? 'ok' : 'bad'}`; }
 function showGate (text) { $('gate').hidden = false; $('portal').hidden = true; $('gate-msg').textContent = text; }
 
+const SEEN_KEY = 'ftb_owner_signups_seen';
+let signupShown = 15;
+let signupData = null;
+function renderSignups (s, alerts) {
+  if (s) signupData = s;
+  s = signupData;
+  const el = $('signup-list');
+  if (!s || s.error) { el.innerHTML = `<p class="empty">Sign-ups didn't load${s?.error ? `: ${esc(s.error)}` : ''}.</p>`; return; }
+  $('su-today').textContent = s.today; $('su-week').textContent = s.week; $('su-month').textContent = s.month; $('su-total').textContent = s.total;
+  let seen = 0;
+  try { seen = Number(localStorage.getItem(SEEN_KEY)) || 0; } catch { /* private mode */ }
+  const isNew = u => seen && Date.parse(u.at) > seen;
+  const fresh = s.recent.filter(isNew).length;
+  $('signup-new').hidden = !fresh;
+  $('signup-new').textContent = `${fresh} new since your last look`;
+  const when = iso => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  el.innerHTML = s.recent.length ? s.recent.slice(0, signupShown).map(u => `<div class="row"><div class="who"><b>${esc(u.name || u.email || 'No name')}</b>
+    <small>${u.name ? `${esc(u.email)} · ` : ''}joined ${esc(when(u.at))} with ${esc(u.via)}${u.lastAt && u.lastAt !== u.at ? ` · last in ${esc(day(u.lastAt))}` : ''}</small></div>
+    ${isNew(u) ? '<span class="pill new">New</span>' : ''}</div>`).join('') : '<p class="empty">No sign-ups yet.</p>';
+  $('signup-more').hidden = s.recent.length <= signupShown;
+  try { localStorage.setItem(SEEN_KEY, String(Date.now())); } catch { /* private mode */ }
+  if (alerts) {
+    $('alert-push').checked = alerts.push; $('alert-email').checked = alerts.email;
+    $('alert-push-note').textContent = alerts.phone ? 'Your phone is set up for notifications.'
+      : 'Your phone is not set up yet: open the Feed The Bear app, sign in as this account and allow notifications.';
+    $('alert-email-note').textContent = alerts.emailReady ? 'Sent to your owner email.' : 'Email sending is not set up yet (Brevo), so these wait until it is.';
+  }
+}
+
 function renderVips (vips) {
   const el = $('vip-list');
   if (!vips.length) { el.innerHTML = '<p class="empty">No VIPs yet.</p>'; return; }
@@ -209,6 +266,7 @@ async function load () {
     const data = await api('GET');
     $('gate').hidden = true; $('portal').hidden = false;
     $('who').textContent = `Signed in as ${data.me}`;
+    try { renderSignups(data.signups, data.alerts); } catch (err) { console.warn(err); }
     renderVips(data.vips || []);
     renderFeatured(data.featured || []);
     renderCreators(data.creators || []);
@@ -245,6 +303,13 @@ $('code-form').addEventListener('submit', async e => {
     say('code-msg', `${r.message} Link: ${r.link}`); $('code-code').value = ''; load();
   } catch (err) { say('code-msg', err.message, false); }
 });
+$('signup-more').addEventListener('click', () => { signupShown += 30; renderSignups(); });
+['push', 'email'].forEach(k => $(`alert-${k}`).addEventListener('change', async e => {
+  say('alert-msg', 'Saving…');
+  try { await api('POST', { action: 'alerts', [k]: e.target.checked }); say('alert-msg', e.target.checked ? 'On.' : 'Off.'); }
+  catch (err) { e.target.checked = !e.target.checked; say('alert-msg', err.message, false); }
+}));
+
 document.addEventListener('click', async e => {
   const revoke = e.target.closest('[data-revoke]');
   const off = e.target.closest('[data-off]');

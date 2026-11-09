@@ -660,7 +660,8 @@ var FriendPings = (() => {
     p.addListener('pushNotificationActionPerformed', a => {
       const open = a?.notification?.data?.open;
       setTimeout(() => {
-        if (open === 'contests') window.openFoodEvents?.();
+        if (open === 'owner') (window.openOwnerPortal || (() => { location.href = '/owner.html'; }))();
+        else if (open === 'contests') window.openFoodEvents?.();
         else if (open === 'want') window.setView?.('want-to-try');
         else window.openFoodieFriends?.();
       }, 400);
@@ -829,6 +830,8 @@ async function handleFirebaseUser (user) {
         if (fresh && localStorage.getItem('ftb_counted_signup') !== user.uid) {
           localStorage.setItem('ftb_counted_signup', user.uid);
           if (typeof trackProductEvent === 'function') trackProductEvent('account_created');
+          // Tells the owner (push and/or email, api/push.js 'joined').
+          user.getIdToken().then(t => fetch('/api/push', { method: 'POST', headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'joined' }) })).catch(() => {});
         }
       } catch { /* analytics only */ }
 

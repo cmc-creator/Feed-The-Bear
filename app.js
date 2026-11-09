@@ -2079,15 +2079,19 @@ function openProfileSetup () {
 // The owner's own account sees a way into the owner portal (owner.html; the server checks too).
 const OWNER_EMAIL = 'cmc@conniemichelleconsulting.com';
 // Opening it from the app hands over this sign-in, so the portal never asks again.
-document.addEventListener('click', async e => {
-  const link = e.target.closest('#account-owner-row, #settings-owner-row');
-  if (!link) return;
-  e.preventDefault();
+async function openOwnerPortal () {
   try {
     const user = typeof _auth !== 'undefined' ? _auth?.currentUser : null;
     if (user) sessionStorage.setItem('ftb_owner_handoff', JSON.stringify({ token: await user.getIdToken(true), email: user.email, at: Date.now() }));
   } catch { /* the portal can still sign in itself */ }
   location.href = '/owner.html';
+}
+window.openOwnerPortal = openOwnerPortal;
+document.addEventListener('click', e => {
+  const link = e.target.closest('#account-owner-row, #settings-owner-row');
+  if (!link) return;
+  e.preventDefault();
+  openOwnerPortal();
 });
 
 function openAccountModal () {
