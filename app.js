@@ -959,7 +959,7 @@ function pickFoodFiles ({ max = FOOD_MEDIA_MAX, source = 'library', accept = 'im
     try { input.click(); }
     catch (err) {
       console.error('[FTB] Media picker failed:', err);
-      showToast('Could not open camera or gallery', 'Allow camera access in device settings, or choose Gallery.', 'error');
+      showToast('Could not open media picker', 'Allow camera access in device settings, or tap Choose photos or video.', 'error');
       finish([]);
     }
   });
@@ -986,7 +986,7 @@ async function pickFoodMediaList (max = FOOD_MEDIA_MAX, source = 'library') {
         if (isVideo && !m && !hasGrizzly()) upsold = true;
         if (m) out.push(m);
       }
-      if (!files.length && source !== 'library') showToast('No media added', 'If camera access is blocked, allow it in device settings or choose Gallery.', 'info');
+      if (!files.length && source !== 'library') showToast('No media added', 'If camera access is blocked, allow it in device settings or tap Choose photos or video.', 'info');
       return mergeFoodMedia([], out);
   } finally {
     _foodMediaJobs--;

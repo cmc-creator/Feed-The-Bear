@@ -1,5 +1,12 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-08 (existing-flow reliability)
+
+- Clear stale visit selections when searching for a replacement place and
+  discard delayed AI details after a place, form or account changes.
+- Align camera recovery instructions with Choose photos or video.
+  No new features or removed media options.
+
 ## [Unreleased] - 2026-11-08 (clear existing-photo selection)
 
 - Rename Gallery to Choose photos or video across capture forms. Make it

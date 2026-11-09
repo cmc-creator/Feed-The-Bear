@@ -244,7 +244,7 @@ window.Cub = (() => {
     if (pick.source === 'social') {
       setStatus('want-to-try');
       if (pick.dish) sheet.querySelector('.qa-dish').value = pick.dish;
-      say(pick.dish ? `Saving it to Want to Try, with the ${pick.dish} on your Crave List.` : 'Saving it to your Want to Try list. Been already? Tap Been there.');
+      say(pick.dish ? `Saving it to Want to Try, with the ${pick.dish} on your Crave List.` : 'Saving it to your Want to Try list. Been already? Choose Here now or Went before.');
     }
     track('quick_add_place_picked', { source: pick.source, hasCuisine: !!pick.cuisine });
   }
@@ -278,15 +278,21 @@ window.Cub = (() => {
   async function aiFill () {
     if (!pick) return;
     if (!app().hasGrizzly()) { app().showGrizzlyUpsell('smartfill'); return; }
+    const target = pick;
+    const generation = _dataGeneration;
+    const isCurrent = () => pick === target && generation === _dataGeneration && !sheet.classList.contains('hidden');
     say('Sniffing out the details…');
     try {
-      const data = await app().AI.smartFill(pick.name, pick.address || '');
+      const data = await app().AI.smartFill(target.name, target.address || '');
+      if (!isCurrent()) return;
       if (data.cuisine) sheet.querySelector('.qa-cuisine').value = data.cuisine;
       if (data.priceRange) pick.priceRange = Number(data.priceRange) || 0;
       if (data.description) pick.notes = data.description;
       if (Array.isArray(data.tags)) pick.tags = data.tags.slice(0, 6);
       say(`Filled in: ${[data.cuisine, data.priceRange ? '$'.repeat(Number(data.priceRange)) : '', data.tags?.length ? 'tags' : ''].filter(Boolean).join(', ') || 'what I could find'}.`);
     } catch (err) {
+      if (!isCurrent()) return;
+      console.warn('[FTB] Quick Add smart fill failed:', err);
       say("I couldn't find more just now. You can still save it.");
     }
   }
@@ -458,7 +464,15 @@ window.Cub = (() => {
       if (btn.dataset.typed) choose({ name: input.value.trim(), cuisine: guessCuisine(input.value), source: 'typed' });
       else choose(suggestions[Number(btn.dataset.i)]);
     });
-    el.querySelector('.qa-change').addEventListener('click', () => { el.classList.remove('step-2', 'been', 'want'); pick = null; status = null; input.focus(); say('Who are we looking for?'); });
+    el.querySelector('.qa-change').addEventListener('click', () => {
+      el.classList.remove('step-2', 'been', 'want', 'went-before');
+      pick = null; status = null; visitChoice = null;
+      el.querySelectorAll('.qa-status').forEach(button => {
+        button.classList.remove('active'); button.setAttribute('aria-pressed', 'false');
+      });
+      syncSave();
+      input.focus(); say('Who are we looking for?');
+    });
     el.querySelectorAll('.qa-status').forEach(b => b.addEventListener('click', () => setStatus(b.dataset.status)));
     el.querySelectorAll('.qa-star').forEach(b => b.addEventListener('click', () => setStars(Number(b.dataset.n))));
     el.querySelector('.qa-ai').addEventListener('click', aiFill);
@@ -538,6 +552,7 @@ window.Cub = (() => {
     sheet.querySelector('.qa-visit-date').max = app().iso();
     sheet.querySelector('.qa-input').value = '';
     sheet.querySelector('.qa-dish').value = '';
+    sheet.querySelector('.qa-cuisine').value = '';
     sheet.querySelector('.qa-save').disabled = true;
     sheet.querySelector('.qa-photo-preview').classList.add('hidden');
     sheet.querySelectorAll('.qa-star').forEach(b => b.classList.remove('on'));

@@ -106,6 +106,30 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
     && await p.evaluate(() => !state.restaurants.some(r => r.name === 'Future Date Cafe')),
     'an invalid future visit reveals the date field instead of silently saving bad data');
   await p.evaluate(() => Cub.close());
+  await p.evaluate(() => {
+    window._ftbPlan = 'grizzly';
+    window._ftbUid = 'smart-fill-test-member';
+    window.__originalSmartFill = AI.smartFill;
+    AI.smartFill = () => new Promise(resolve => { window.__finishSmartFill = resolve; });
+    Cub.openAdd();
+  });
+  await p.fill('.qa-input', 'Old Smart Fill Cafe');
+  await p.locator('.qa-input').press('Enter');
+  await p.click('.qa-status[data-status="visited-before"]');
+  await p.click('.qa-details summary');
+  await p.click('.qa-ai');
+  await p.waitForFunction(() => !!window.__finishSmartFill);
+  await p.click('.qa-change');
+  await p.fill('.qa-input', 'New Smart Fill Cafe');
+  await p.locator('.qa-input').press('Enter');
+  check(await p.locator('.qa-save').isDisabled()
+    && await p.locator('.qa-status[aria-pressed="true"]').count() === 0,
+    'searching again clears stale visit selection and requires a fresh choice');
+  await p.evaluate(() => __finishSmartFill({ cuisine: 'Stale cuisine', description: 'Old place note' }));
+  await p.waitForTimeout(100);
+  check(await p.locator('.qa-cuisine').inputValue() !== 'Stale cuisine',
+    'late AI details cannot overwrite the replacement place');
+  await p.evaluate(() => { AI.smartFill = __originalSmartFill; Cub.close(); });
   check(!p.errors.length, `no unexpected page errors (${p.errors.join(' | ')})`);
   await browser.close();
   finish('simple-add');

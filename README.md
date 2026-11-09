@@ -61,9 +61,9 @@ Then open http://127.0.0.1:8765/app.html.
   Sharing stays optional and appears only after the place is saved.
 
 - Quick Add, Just Ate, and the full Add form offer **Take photo**, **Record
-  video**, and **Gallery**. Recording uses the rear-camera capture intent on
+  video**, and **Choose photos or video**. Recording uses the rear-camera capture intent on
   supported phones; desktop browsers may offer a file picker instead. If
-  camera access is denied, allow it in device settings or choose Gallery.
+  camera access is denied, allow it in device settings or select existing media.
 - Quick Add highlights both camera actions with full-width buttons and a
   gentle, finite glow that respects reduced motion. Post-save sharing names
   TikTok, Instagram and Facebook: choose an available installed app in the
