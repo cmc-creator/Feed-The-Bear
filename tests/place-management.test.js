@@ -33,6 +33,40 @@ async function say (page, text) {
     await p.waitForTimeout(1500);
     await closeAllDialogs(p);
 
+    await p.evaluate(() => {
+      const r = state.restaurants.find(r => r.id === 'open');
+      r.updatedAt = 1;
+      openDetailModal('open');
+    });
+    await p.click('#dq-stars [data-val="4"]');
+    check(await p.evaluate(() => {
+      const r = state.restaurants.find(r => r.id === 'open');
+      return r.myRating === 4 && r.updatedAt > 1;
+    }) && await p.locator('#dq-stars [data-val="4"]').getAttribute('aria-pressed') === 'true',
+      'quick rating refreshes sync freshness and accessible selection');
+    await p.evaluate(() => { state.restaurants.find(r => r.id === 'open').updatedAt = 1; });
+    await p.click('#dq-price [data-price="2"]');
+    check(await p.evaluate(() => {
+      const r = state.restaurants.find(r => r.id === 'open');
+      return r.priceRange === 2 && r.updatedAt > 1;
+    }) && await p.locator('#dq-price [data-price="2"]').getAttribute('aria-pressed') === 'true',
+      'quick price changes persist with updated timestamps and selected state');
+    await p.click('#dq-price [data-price="2"]');
+    check(await p.evaluate(() => state.restaurants.find(r => r.id === 'open').priceRange === 0),
+      'tapping the selected price still clears it');
+    await p.evaluate(() => {
+      const r = state.restaurants.find(r => r.id === 'open');
+      r.status = 'visited'; r.dateVisited = null; r.updatedAt = 1;
+      renderDetailQuickCapture(r);
+    });
+    await p.click('#dq-status [data-status="visited"]');
+    check(await p.evaluate(() => {
+      const r = state.restaurants.find(r => r.id === 'open');
+      return r.dateVisited === null && r.updatedAt === 1;
+    }), 'tapping the already-selected visit status does not invent a historical date or create an edit');
+    await p.evaluate(() => { state.restaurants.find(r => r.id === 'open').status = 'want-to-try'; });
+    await closeAllDialogs(p);
+
     await p.evaluate(() => openDetailModal('open'));
     await p.fill('#detail-notes-edit', 'Keep this note on Open Cafe');
     await p.evaluate(() => openDetailModal('old'));

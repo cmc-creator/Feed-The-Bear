@@ -1,5 +1,13 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-08 (detail-control polish)
+
+- Refresh sync timestamps for existing quick detail edits, update lists after
+  rating/price changes, and expose selected control states to screen readers.
+- Ignore reselecting the current visit status so unknown historical dates stay
+  unknown. Block shared detail patches during account transitions.
+- Test rating/price persistence, price clearing and unchanged historical dates.
+
 ## [Unreleased] - 2026-11-08 (notes and visit reliability)
 
 - Bind pending detail-note edits to their original place and account generation.

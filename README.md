@@ -16,6 +16,10 @@ Then open http://127.0.0.1:8765/app.html.
 
 ## Photos, videos, sharing and account privacy
 
+- Quick detail ratings, prices and status edits refresh sync timestamps and
+  selected accessibility states. Ratings/prices refresh lists immediately.
+  Tapping an already-selected visit status does not invent a missing date.
+
 - Place notes autosave to the place where they were typed, including when
   switching/closing details or taking an account snapshot. Check-ins refresh
   sync timestamps; historical visits without dates show **Date not recorded**.

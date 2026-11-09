@@ -4084,19 +4084,29 @@ function closeDetailModal () {
 /* ── Detail Quick Capture: set rating / status / price inline ── */
 function renderDetailQuickCapture (r) {
   const stars = document.querySelectorAll('#dq-stars .dq-star');
-  stars.forEach(b => b.classList.toggle('on', parseInt(b.dataset.val) <= (r.myRating || 0)));
-  document.querySelectorAll('#dq-status .dq-seg-btn').forEach(b =>
-    b.classList.toggle('active', b.dataset.status === r.status));
-  document.querySelectorAll('#dq-price .dq-seg-btn').forEach(b =>
-    b.classList.toggle('active', parseInt(b.dataset.price) === (r.priceRange || 0)));
+  stars.forEach(b => {
+    b.classList.toggle('on', parseInt(b.dataset.val) <= (r.myRating || 0));
+    b.setAttribute('aria-pressed', String(parseInt(b.dataset.val) === (r.myRating || 0)));
+  });
+  document.querySelectorAll('#dq-status .dq-seg-btn').forEach(b => {
+    const selected = b.dataset.status === r.status;
+    b.classList.toggle('active', selected);
+    b.setAttribute('aria-pressed', String(selected));
+  });
+  document.querySelectorAll('#dq-price .dq-seg-btn').forEach(b => {
+    const selected = parseInt(b.dataset.price) === (r.priceRange || 0);
+    b.classList.toggle('active', selected);
+    b.setAttribute('aria-pressed', String(selected));
+  });
 }
 
 /* Patch a restaurant in place, persist, and refresh the open detail + lists
    without closing the modal. */
 function patchRestaurant (id, patch) {
+  if (window._ftbAccountSwitching) return null;
   const i = state.restaurants.findIndex(x => x.id === id);
   if (i === -1) return null;
-  Object.assign(state.restaurants[i], patch);
+  Object.assign(state.restaurants[i], patch, { updatedAt: Date.now() });
   saveData();
   return state.restaurants[i];
 }
@@ -4114,7 +4124,7 @@ function initDetailQuickCapture () {
       renderDetailQuickCapture(r);
       stars.classList.remove('just-set'); void stars.offsetWidth; stars.classList.add('just-set');
       if (val === 5) launchConfetti(1200);
-      renderStats();
+      renderAll();
     });
   }
 
@@ -4124,6 +4134,7 @@ function initDetailQuickCapture () {
       const btn = e.target.closest('[data-status]');
       if (!btn || !state.detailId) return;
       const status = btn.dataset.status;
+      if (state.restaurants.find(x => x.id === state.detailId)?.status === status) return;
       const patch = { status };
       if (status === 'visited') {
         const cur = state.restaurants.find(x => x.id === state.detailId);
@@ -4153,6 +4164,7 @@ function initDetailQuickCapture () {
       renderDetailQuickCapture(r);
       document.getElementById('detail-price').innerHTML =
         `<label>Price Range</label><div style="font-size:1.2rem;color:var(--gold);font-weight:700">${priceDollars(r.priceRange)||'<span style="color:var(--text-dim);font-size:.85rem">Unknown</span>'}</div>`;
+      renderAll();
     });
   }
 
@@ -4185,7 +4197,7 @@ function flushDetailNotes () {
   const pending = _pendingDetailNotes;
   _pendingDetailNotes = null;
   if (!pending || pending.generation !== _dataGeneration || window._ftbAccountSwitching) return false;
-  return !!patchRestaurant(pending.id, { notes: pending.value, updatedAt: Date.now() });
+  return !!patchRestaurant(pending.id, { notes: pending.value });
 }
 
 /* ── Celebration / milestone helpers (delight) ───────────────── */
