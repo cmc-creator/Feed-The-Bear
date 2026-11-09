@@ -1057,6 +1057,8 @@ function openFoodiePlan (restaurantId = '', friendKey = '') {
 /* ── Share moments: right after you log a meal ── */
 function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', note = '', rememberedVisit = false }) {
   if (!r || !window.StoryCard) return;
+  const momentMedia = mediaOf(r.visits?.at(-1) || r);
+  video = video || momentMedia.find(m => m.video)?.video || '';
   const generation = _dataGeneration;
   document.querySelector('.share-nudge')?.remove();
   const el = document.createElement('div');
@@ -1170,6 +1172,7 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
       await StoryCard.openStory({
         kind: 'meal', kicker, title: dish || r.name, place: r.name, location: r.address || r.cuisine || '',
         sub: dish ? `at ${r.name}` : (r.cuisine || ''), photo, photos: StoryCard.photosFor(r, photo),
+        media: mediaOf(r.visits?.at(-1) || r),
         stars: r.myRating || 0,
         sections: note && el.querySelector('.sn-include-note')?.checked ? [{ label: 'My take', items: [note], tone: 'soft' }] : [],
       }, caption.value.trim(), `${r.name}-${dish || 'meal'}`);

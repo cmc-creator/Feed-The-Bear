@@ -372,7 +372,7 @@ function cloudSafeRestaurant (r) {
   const slots = [];
   const add = (obj, key, extra = false) => { if (typeof obj?.[key] === 'string' && obj[key].startsWith('data:')) slots.push({ obj, key, extra, size: obj[key].length }); };
   const addAll = o => { (Array.isArray(o?.media) ? o.media : []).forEach(m => add(m, 'photo', true)); add(o, 'photo'); };
-  add(copy, 'photo');
+  addAll(copy);
   (copy.visits || []).forEach(addAll);
   (copy.dishes || []).forEach(addAll);
   // Extra photos are trimmed first so the main photo on a dish or visit survives longest.

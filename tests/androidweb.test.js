@@ -34,6 +34,13 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
   await a.evaluate(() => navigator.share({ title: 'Card', files: [new File([new Uint8Array([137, 80, 78, 71])], 'card.png', { type: 'image/png' })] }));
   let f = await last('shareFile');
   check(f?.name === 'card.png' && f.mime === 'image/png' && f.base64 === 'iVBORw==', `images go to the share sheet as files (${f?.name} ${f?.base64})`);
+  check(await a.evaluate(async () => {
+    const files = [new File(['a'], 'a.jpg', { type: 'image/jpeg' }), new File(['b'], 'b.jpg', { type: 'image/jpeg' })];
+    const before = __calls.length;
+    if (navigator.canShare({ files })) return false;
+    try { await navigator.share({ files }); return false; }
+    catch (err) { return err.name === 'NotAllowedError' && __calls.length === before; }
+  }), 'single-file Android bridge rejects collections rather than silently sharing only the cover');
 
   // Downloads: the backup.
   await a.evaluate(() => exportData());

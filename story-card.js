@@ -246,6 +246,12 @@ window.StoryCard = (() => {
           <button type="button" class="story-save">Save image</button>
           <button type="button" class="story-copy">Copy text</button>
         </div>
+        <details class="story-collection hidden"><summary>Your original photos &amp; video</summary>
+          <p>Share the cover and originals together when supported, or save individual files to upload in your social app. Apps decide what they accept.</p>
+          <button type="button" class="btn-primary story-share-all">Share card + originals</button>
+          <div class="story-files"></div>
+          <span class="story-collection-status" role="status"></span>
+        </details>
       </div>`;
     document.body.appendChild(el);
     el.addEventListener('click', e => { if (e.target === el) close(); });
@@ -253,6 +259,26 @@ window.StoryCard = (() => {
     el.querySelector('.story-share').addEventListener('click', shareNow);
     el.querySelector('.story-save').addEventListener('click', save);
     el.querySelector('.story-copy').addEventListener('click', copy);
+    el.querySelector('.story-share-all').addEventListener('click', async () => {
+      if (!current) return;
+      const snapshot = current;
+      try { await navigator.share({ title: snapshot.name, text: snapshot.text, files: [snapshot.file, ...snapshot.originals] }); }
+      catch (err) {
+        if (err?.name === 'AbortError' || current !== snapshot) return;
+        console.warn('[FTB] Collection sharing failed:', err);
+        el.querySelector('.story-collection-status').textContent = 'Sharing was blocked. Save the individual files below and upload them in your social app.';
+      }
+    });
+    el.querySelector('.story-files').addEventListener('click', e => {
+      const button = e.target.closest('[data-file]');
+      const file = button && current?.originals[Number(button.dataset.file)];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      const a = document.createElement('a'); a.href = url; a.download = file.name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      el.querySelector('.story-collection-status').textContent = 'Download requested. Upload this file in your social app.';
+    });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && !el.classList.contains('hidden')) close(); });
     return el;
   }
@@ -447,11 +473,11 @@ window.StoryCard = (() => {
     return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
   }
 
-  function showCard (blob, text, title, fileBase) {
+  function showCard (blob, text, title, fileBase, originals = [], collectionError = '') {
     overlay = overlay || buildOverlay();
     if (!blob) throw new Error('Could not draw the card');
     const name = `${String(fileBase || 'feed-the-bear').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'feed-the-bear'}.png`;
-    current = { blob, file: new File([blob], name, { type: 'image/png' }), text, name: title };
+    current = { blob, file: new File([blob], name, { type: 'image/png' }), text, name: title, originals };
     const img = overlay.querySelector('.story-img');
     if (img.src) URL.revokeObjectURL(img.src);
     img.src = URL.createObjectURL(blob);
@@ -459,6 +485,21 @@ window.StoryCard = (() => {
     const canShare = !!navigator.canShare?.({ files: [current.file] });
     overlay.querySelector('.story-share').textContent = canShare ? 'Share to Stories & more' : 'Download image';
     overlay.querySelector('.story-save').classList.toggle('hidden', !canShare);
+    const collection = overlay.querySelector('.story-collection');
+    collection.classList.toggle('hidden', !originals.length && !collectionError);
+    collection.open = false;
+    overlay.querySelector('.story-collection-status').textContent = collectionError;
+    overlay.querySelector('.story-files').replaceChildren();
+    originals.forEach((file, i) => {
+      const button = document.createElement('button'); button.type = 'button'; button.dataset.file = i;
+      button.textContent = file.type.startsWith('video/') ? 'Save video clip' : `Save photo ${i + 1}`;
+      overlay.querySelector('.story-files').appendChild(button);
+    });
+    const shareAll = overlay.querySelector('.story-share-all');
+    shareAll.disabled = !navigator.share || !navigator.canShare?.({ files: [current.file, ...originals] });
+    if (shareAll.disabled && !collectionError && originals.length) {
+      overlay.querySelector('.story-collection-status').textContent = 'This device cannot share the whole collection at once. Save individual files below.';
+    }
     overlay.classList.remove('hidden');
     document.body.classList.add('overlay-open');
   }
@@ -475,8 +516,30 @@ window.StoryCard = (() => {
   async function openStory (spec, text, fileBase) {
     const generation = _dataGeneration;
     const blob = await drawStory(spec);
+    const originals = [];
+    let collectionError = '';
+    const sources = window.mergeFoodMedia ? window.mergeFoodMedia([], spec.media || [], { notify: false }) : [];
+    for (const [i, item] of sources.entries()) {
+      try {
+        const response = await fetch(item.photo);
+        if (!response.ok) throw new Error(`Photo ${i + 1} could not load`);
+        const photo = await response.blob();
+        if (!photo.type.startsWith('image/')) throw new Error(`Photo ${i + 1} is not a readable image`);
+        // A video's poster is used on the cover; the original clip is a separate file.
+        if (!item.video) originals.push(new File([photo], `food-photo-${i + 1}.${photo.type.includes('png') ? 'png' : 'jpg'}`, { type: photo.type }));
+        if (item.video) {
+          const video = await window.getFoodVideo(item.video);
+          if (!video) throw new Error('The video clip is not on this device');
+          originals.push(new File([video], `food-video.${video.type.includes('mp4') ? 'mp4' : video.type.includes('quicktime') ? 'mov' : 'webm'}`, { type: video.type }));
+        }
+      } catch (err) {
+        console.warn('[FTB] Original media preparation failed:', err);
+        collectionError = `${err.message}. Your cover is ready; unavailable originals cannot be shared.`;
+      }
+      if (generation !== _dataGeneration) return;
+    }
     if (generation !== _dataGeneration) return;
-    showCard(blob, text, spec.title || 'Feed The Bear', fileBase || spec.title);
+    showCard(blob, text, spec.title || 'Feed The Bear', fileBase || spec.title, originals, collectionError);
     track('story_card_opened', { kind: spec.kind || 'story' });
   }
 

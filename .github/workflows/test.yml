@@ -66,6 +66,9 @@ jobs:
       - name: Simple Add and optional social posting
         working-directory: tests
         run: node simple-add.test.js
+      - name: Ten-photo media collection and advanced options
+        working-directory: tests
+        run: node media-collection.test.js
 
       - name: Food videos
         working-directory: tests

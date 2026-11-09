@@ -56,6 +56,7 @@ const _blobToBase64 = blob => new Promise((resolve, reject) => {
       Object.defineProperty(navigator, 'share', {
         configurable: true, writable: true,
         value: ({ title = '', text = '', url = '', files } = {}) => {
+          if (files?.length > 1) return Promise.reject(new DOMException('Share these files individually', 'NotAllowedError'));
           if (files?.length && sheet.shareFile) return shareFile(files[0], { title, text: [text, url].filter(Boolean).join(' ') });
           if (files?.length && !text && !url) return Promise.reject(new DOMException('Files not supported', 'NotAllowedError'));
           return sheet.share({ title: String(title), text: String(text), url: String(url) });
@@ -63,7 +64,7 @@ const _blobToBase64 = blob => new Promise((resolve, reject) => {
       });
       Object.defineProperty(navigator, 'canShare', {
         configurable: true, writable: true,
-        value: (data = {}) => !data.files?.length || !!sheet.shareFile,
+        value: (data = {}) => !data.files?.length || (data.files.length === 1 && !!sheet.shareFile),
       });
     }
     if (!sheet.shareFile) return;
@@ -838,9 +839,21 @@ function getFoodVideo (ref) {
     .catch(() => null);
 }
 
-// Most photos and clips one meal or dish keeps. Each photo is ~80 KB and
-// synced docs cap near 1 MB, so this leaves room for the rest of the spot.
-const FOOD_MEDIA_MAX = 6;
+const FOOD_MEDIA_MAX = 11;
+const FOOD_PHOTO_MAX = 10;
+
+function mergeFoodMedia (existing, added, { notify = true } = {}) {
+  const out = [];
+  let photos = 0, videos = 0, omitted = 0;
+  for (const item of [...existing, ...added]) {
+    if (!item?.photo) continue;
+    if (item.video ? videos >= 1 : photos >= FOOD_PHOTO_MAX) { omitted++; continue; }
+    if (item.video) videos++; else photos++;
+    out.push(item);
+  }
+  if (omitted && notify) showToast('10 photos and one video per moment', 'Some media was not added. Remove an item to make room.', 'info');
+  return out;
+}
 
 // One picked file to { photo } or { photo: poster, video }, or null.
 // Videos are Grizzly; `quiet` skips the upsell (already shown this batch).
@@ -868,9 +881,10 @@ async function mediaFromFile (file, { quiet = false } = {}) {
       showToast('Keep it to 15 seconds', `That clip is ${Math.round(duration)}s. Trim it in your camera app, then add it again.`, 'info');
       return null;
     }
+    if (!poster) throw new Error('No video poster');
     const video = await storeFoodVideo(file);
     trackProductEvent('video_added', { seconds: Math.round(duration) });
-    return { photo: poster || 'assets/food/pizza.jpg', video };
+    return { photo: poster, video };
   } catch {
     showToast('Video Error', 'Could not read that video. Try one from your camera.', 'error');
     return null;
@@ -952,6 +966,7 @@ function pickFoodFiles ({ max = FOOD_MEDIA_MAX, source = 'library', accept = 'im
 }
 
 async function pickFoodMediaList (max = FOOD_MEDIA_MAX, source = 'library') {
+  if (max <= 0) { showToast('Your media collection is full', 'Remove an item to add another.', 'info'); return []; }
   if (source === 'video' && !hasGrizzly()) { showGrizzlyUpsell('video'); return []; }
   if (foodMediaBusy()) return [];
   const context = _mediaContext;
@@ -972,7 +987,7 @@ async function pickFoodMediaList (max = FOOD_MEDIA_MAX, source = 'library') {
         if (m) out.push(m);
       }
       if (!files.length && source !== 'library') showToast('No media added', 'If camera access is blocked, allow it in device settings or choose Gallery.', 'info');
-      return out;
+      return mergeFoodMedia([], out);
   } finally {
     _foodMediaJobs--;
     refreshMediaBusy();
@@ -994,7 +1009,7 @@ function mediaOf (obj) {
 }
 
 function setMediaOn (obj, list) {
-  const items = (list || []).filter(m => m && m.photo).slice(0, FOOD_MEDIA_MAX);
+  const items = mergeFoodMedia([], list || []);
   if (items[0]) obj.photo = items[0].photo; else delete obj.photo;
   if (items[0]?.video) obj.video = items[0].video; else delete obj.video;
   if (items.length > 1) obj.media = items.slice(1).map(m => ({ photo: m.photo, ...(m.video ? { video: m.video } : {}) }));
@@ -4230,6 +4245,7 @@ let _formPlaceResults = [];
 let _formMedia = [];
 
 function setFormMedia (media = []) {
+  media = mergeFoodMedia([], media);
   _formMedia = media;
   const preview = document.getElementById('form-media-preview');
   if (preview) {
@@ -4440,12 +4456,15 @@ function handleFormSubmit (e) {
     updatedAt:     Date.now(),
     dateVisited:   status === 'visited'
       ? (document.getElementById('form-date-visited').value ||
-         state.restaurants.find(r => r.id === state.editingId)?.dateVisited || now)
+         state.restaurants.find(r => r.id === state.editingId)?.dateVisited || (isNew && _pendingAddPrefill?.quickUnknownDate ? null : now))
       : null,
   };
   if (_formMedia.length) setMediaOn(entry, _formMedia);
 
   if (isNew && _pendingAddPrefill && normalizeName(_pendingAddPrefill.name || name) === normalizeName(name)) {
+    if (_pendingAddPrefill.sourceUrl && safeUrl(_pendingAddPrefill.sourceUrl)) {
+      entry.links = [{ url: String(_pendingAddPrefill.sourceUrl).slice(0, 500), added: now }];
+    }
     if (!entry.website && _pendingAddPrefill.website) entry.website = String(_pendingAddPrefill.website || '').trim();
     if (!entry.address && _pendingAddPrefill.address) entry.address = String(_pendingAddPrefill.address || '').trim();
     if (!entry.photo && _pendingAddPrefill.photo) entry.photo = String(_pendingAddPrefill.photo || '').trim();
@@ -4492,6 +4511,13 @@ function handleFormSubmit (e) {
     showToast('Saved', `"${name}" is now on your list.`, 'success');
   }
 
+  if (isNew && _pendingAddPrefill?.quickDish) {
+    upsertDish(entry, { name: _pendingAddPrefill.quickDish,
+      verdict: status === 'visited' ? _pendingAddPrefill.quickVerdict : 'want',
+      media: _formMedia, date: status === 'visited' ? entry.dateVisited || '' : iso() });
+    if (entry.visits[0]) entry.visits[0].dish = _pendingAddPrefill.quickDish;
+  }
+
   // Geocode in background if address provided
   if (picked) {
     const saved = state.restaurants.find(r => r.id === entry.id);
@@ -4501,7 +4527,7 @@ function handleFormSubmit (e) {
   saveData();
   renderAll();
   closeModal();
-  if (isNew && typeof offerShareMeal === 'function') offerShareMeal({ r: state.restaurants.find(r => r.id === entry.id), photo: entry.photo, video: entry.video || '' });
+  if (isNew && typeof offerShareMeal === 'function') offerShareMeal({ r: state.restaurants.find(r => r.id === entry.id), photo: entry.photo, video: entry.video || '', note: entry.notes });
   _pendingAddPrefill = null;
   _formPlace = null;
 }
@@ -6880,6 +6906,7 @@ async function shareCard (r) {
       stars: r.myRating || 0,
       photo: StoryCard.photosFor(r)[0] || '',
       photos: StoryCard.photosFor(r),
+      media: mediaOf(r),
       place: r.name,
       location: r.address || area,
       sections: goTo ? [{ label: goTo.verdict === 'want' ? 'Dying to try' : 'Get the', items: [goTo.name], tone: 'gold' }] : [],
@@ -8469,8 +8496,8 @@ function setupEvents () {
   });
 
   const attachFormMedia = async (source = 'library') => {
-    const media = await pickFoodMediaList(FOOD_MEDIA_MAX, source);
-    if (media.length) setFormMedia(media);
+    const media = await pickFoodMediaList(FOOD_MEDIA_MAX - _formMedia.length, source);
+    if (media.length) setFormMedia(mergeFoodMedia(_formMedia, media));
   };
   addFoodCaptureActions(document.getElementById('form-media-preview'), attachFormMedia);
   document.getElementById('form-photo-file').addEventListener('change', async e => {
@@ -8485,7 +8512,7 @@ function setupEvents () {
         const item = await mediaFromFile(file);
         if (item) media.push(item);
       }
-      if (context === _mediaContext && media.length) setFormMedia(media);
+      if (context === _mediaContext && media.length) setFormMedia(mergeFoodMedia(_formMedia, media));
     } finally { _foodMediaJobs--; refreshMediaBusy(); e.target.value = ''; }
   });
   document.getElementById('form-photo').addEventListener('input', () => {
@@ -8883,7 +8910,7 @@ function setupEvents () {
   const room = FOOD_MEDIA_MAX - _justAte.media.length;
   if (room <= 0) { showToast(`Up to ${FOOD_MEDIA_MAX} per meal`, 'Remove one to add another.', 'info'); return; }
   const picked = await pickFoodMediaList(room, source);
-  if (picked.length) setJustAteMedia([..._justAte.media, ...picked]);
+  if (picked.length) setJustAteMedia(mergeFoodMedia(_justAte.media, picked));
   };
   document.getElementById('just-ate-photo')?.addEventListener('click', () => attachJustAteMedia());
   addFoodCaptureActions(document.getElementById('just-ate-photo'), attachJustAteMedia);
@@ -8903,7 +8930,7 @@ function setupEvents () {
   if (room <= 0) { showToast(`Up to ${FOOD_MEDIA_MAX} per dish`, 'Remove one to add another.', 'info'); return; }
   const picked = await pickFoodMediaList(room, source);
   if (!picked.length) return;
-  setYourOrderPending([..._yoPendingMedia, ...picked]);
+  setYourOrderPending(mergeFoodMedia(_yoPendingMedia, picked));
   document.getElementById('your-order-input')?.focus();
   };
   document.getElementById('your-order-photo')?.addEventListener('click', () => attachOrderMedia());
@@ -12323,7 +12350,7 @@ let _yoPendingMedia = [];
 
 // Photos/clips picked before the dish is named. Pass [] to clear.
 function setYourOrderPending (list = []) {
-  _yoPendingMedia = list.slice(0, FOOD_MEDIA_MAX);
+  _yoPendingMedia = mergeFoodMedia([], list);
   const box = document.getElementById('your-order-pending');
   if (!box) return;
   box.classList.toggle('hidden', !_yoPendingMedia.length);
@@ -12473,7 +12500,7 @@ function openJustAte (restaurantId = null) {
 }
 
 function setJustAteMedia (list = []) {
-  _justAte.media = list.slice(0, FOOD_MEDIA_MAX);
+  _justAte.media = mergeFoodMedia([], list);
   const n = _justAte.media.length;
   const preview = document.getElementById('just-ate-photo-preview');
   const label = document.getElementById('just-ate-photo-label');

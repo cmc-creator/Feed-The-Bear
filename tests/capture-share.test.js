@@ -22,8 +22,8 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
       p.click(`#quick-add-overlay [data-source="${source}"]`),
     ]);
     const attrs = await chooser.element().evaluate(el => ({ accept: el.accept, capture: el.getAttribute('capture'), multiple: el.multiple }));
-    check(attrs.accept === accept && attrs.capture === capture && !attrs.multiple,
-      `${source} launches the correct single-media camera/gallery intent (${JSON.stringify(attrs)})`);
+    check(attrs.accept === accept && attrs.capture === capture && attrs.multiple === (source === 'library'),
+      `${source} launches the correct camera or multi-select gallery intent (${JSON.stringify(attrs)})`);
     check(await p.locator('.qa-save').isDisabled(), 'save is disabled while the picker is open');
     await chooser.element().dispatchEvent('cancel');
     await p.waitForFunction(() => !foodMediaBusy());

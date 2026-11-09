@@ -22,6 +22,17 @@ Then open http://127.0.0.1:8765/app.html.
   Listing/stock photos are never substituted. Without a personal photo the
   card is text-only; unreadable attached photos report an error.
   Original photo/video sharing remains a separate choice.
+- Add up to **10 photos and one video clip** per moment, with removable
+  previews. The cover showcases up to three photos; expand **Your original
+  photos & video** in its preview to share the cover and originals together
+  when supported, or save individual files for uploading. Video still follows
+  the existing Grizzly, 15-second and recording-device limits.
+  Large photo collections remain on this device; cloud backups may trim
+  photos to stay within the existing per-place document budget.
+- Optional **My notes**, ratings, dish and AI tools stay under Add details.
+  **More details** opens the full form without discarding attached media,
+  notes, rating, dish or visit status. Discovery, friends and planning features
+  remain available through their existing entry points.
 
 - **Add** starts with the place name or link, then **Here now**, **Went
   before**, or **Want to try**. Add a photo if you like and save; ratings,

@@ -1,5 +1,17 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-08 (complete food moments)
+
+- Keep up to ten photos plus one clip per moment; Quick Add now appends media
+  with removable previews instead of replacing the previous attachment.
+- Add optional notes and preserve media, notes, rating, dish, tags and visit
+  status when opening the full form from More details.
+- Share a clean cover plus the original collection when the device supports it;
+  otherwise offer individual downloads and explicit social upload guidance.
+- Keep the existing Grizzly video restrictions and cloud document budget;
+  include root-level extra photos in cloud budget trimming.
+- Add exact-count, original-file, failed-share and advanced-handoff regressions.
+
 ## [Unreleased] - 2026-11-08 (personal place cards)
 
 - Make the post-save place card the first sharing choice, with a clean

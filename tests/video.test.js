@@ -59,7 +59,7 @@ const grizzly = p => p.evaluate(() => { window._ftbUid = 'u1'; window._ftbPlan =
   await chooser.setFiles({ name: 'clip.webm', mimeType: 'video/webm', buffer: short });
   await p.waitForSelector('#just-ate-photo-preview .video-badge', { timeout: 8000 }).catch(() => {});
   check(await p.locator('#just-ate-photo-preview .video-badge').count() === 1, 'the preview shows a play badge');
-  check((await p.locator('#just-ate-photo-label').innerText()) === 'Add more (1/6)', 'the button offers to add more');
+  check((await p.locator('#just-ate-photo-label').innerText()) === 'Add more (1/11)', 'the button offers to add more');
   await p.fill('#just-ate-dish', 'Birria tacos');
   await p.click('#just-ate-verdicts .yo-btn[data-verdict="again"]');
   await p.click('#just-ate-save');

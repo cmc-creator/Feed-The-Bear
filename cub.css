@@ -70,6 +70,8 @@
 }
 .qa-photo-preview { display: block; width: 120px; height: 120px; object-fit: cover; margin: 10px auto 0; border: 6px solid #fffdf8; border-bottom-width: 18px; border-radius: 3px; transform: rotate(-3deg); box-shadow: 0 8px 18px rgba(0, 0, 0, .3); }
 .qa-photo-preview.hidden { display: none; }
+.qa-media:has(.pm-strip) .qa-photo-preview { display: none; }
+.qa-media-list .pm-strip { max-height: 150px; overflow-y: auto; }
 .qa-save { width: 100%; min-height: 50px; font-size: 1rem; }
 .qa-save:disabled { opacity: .5; cursor: not-allowed; }
 .qa-more { margin: 2px auto 0; background: none; border: 0; font: inherit; font-size: .8rem; color: var(--text-dim); text-decoration: underline; cursor: pointer; }

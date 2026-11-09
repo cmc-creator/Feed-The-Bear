@@ -6096,6 +6096,12 @@ body.light-mode .today-vibe-pill {
 .sn-social-help p { line-height: 1.5; }
 .sn-social-help button { min-height: 44px; margin: 0 6px 8px 0; }
 .sn-social-help small { display: block; color: var(--text-dim); }
+.story-collection { padding: 12px; font-size: .85rem; }
+.story-collection summary, .story-collection button { min-height: 44px; cursor: pointer; }
+.story-files { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.story-collection-status { display: block; margin-top: 10px; }
+.story-sheet:has(.story-collection:not(.hidden)) { overflow-y: auto; }
+.story-collection { width: 100%; box-sizing: border-box; }
 .foodie-social-start { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; margin: 10px 0; border-radius: var(--radius-sm); background: rgba(var(--primary-rgb), .09); border: 1px solid rgba(var(--primary-rgb), .25); }
 .foodie-social-start > div, .foodie-social-start > span { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; }
 .foodie-social-start p { color: var(--text-dim); font-size: .85rem; margin: 6px 0 0; }
