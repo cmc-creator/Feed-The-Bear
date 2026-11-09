@@ -52,6 +52,21 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
     const copy = cloudSafeRestaurant(r);
     return JSON.stringify(copy).length <= 900 * 1024 && r.media.every(m => m.photo.length > 100000);
   }), 'large root-level photo collections respect cloud budgets without changing device originals');
+  check(await p.evaluate(() => {
+    const local = { photo: 'cover', media: [{ photo: 'extra-one' }, { photo: 'poster', video: 'clip-one' }] };
+    const cloud = { photo: 'new-cover', media: [{ photo: '' }, { photo: '', video: 'clip-one' }], notes: 'New cloud note' };
+    restoreTrimmedPhotos(cloud, local);
+    return cloud.photo === 'new-cover' && cloud.media[0].photo === 'extra-one'
+      && cloud.media[1].photo === 'poster' && cloud.notes === 'New cloud note';
+  }), 'cloud restore recovers device-only root photos and clip posters without overwriting newer fields');
+  check(await p.evaluate(() => {
+    const local = { media: [{ photo: 'old-poster', video: 'old-clip' }] };
+    const cloud = { media: [{ photo: '', video: 'new-clip' }] };
+    restoreTrimmedPhotos(cloud, local);
+    const removed = { media: [] };
+    restoreTrimmedPhotos(removed, local);
+    return cloud.media[0].photo === '' && removed.media.length === 0;
+  }), 'restore never attaches an old poster to a different clip or recreates removed media entries');
   await p.click('.qa-details summary');
   await p.fill('.qa-notes', 'Order the birria. My private food diary.');
   await p.fill('.qa-dish', 'Birria tacos');

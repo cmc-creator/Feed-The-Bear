@@ -16,6 +16,10 @@ Then open http://127.0.0.1:8765/app.html.
 
 ## Photos, videos, sharing and account privacy
 
+- Same-device cloud restores recover budget-trimmed extra place photos as well
+  as visit/dish photos. Restored video posters must match the stored clip reference;
+  removed media entries are not recreated.
+
 - Quick detail ratings, prices and status edits refresh sync timestamps and
   selected accessibility states. Ratings/prices refresh lists immediately.
   Tapping an already-selected visit status does not invent a missing date.

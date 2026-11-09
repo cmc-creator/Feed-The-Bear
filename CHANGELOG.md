@@ -1,5 +1,12 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-08 (photo restore reliability)
+
+- Recover budget-trimmed root-level extra photos during same-device cloud merges,
+  using the existing visit/dish recovery logic.
+- Match video references before restoring posters and preserve newer fields and
+  removed media entries. Test collection restore alongside account isolation.
+
 ## [Unreleased] - 2026-11-08 (detail-control polish)
 
 - Refresh sync timestamps for existing quick detail edits, update lists after

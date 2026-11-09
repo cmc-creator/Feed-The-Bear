@@ -387,17 +387,24 @@ function cloudSafeRestaurant (r) {
 // When a newer cloud copy wins a merge, put back photos that
 // cloudSafeRestaurant trimmed but this device still has.
 function restoreTrimmedPhotos (cloud, local) {
-  if (!cloud.photo && local.photo) cloud.photo = local.photo;
+  const restore = (target, source) => {
+    if (!target.photo && source.photo) target.photo = source.photo;
+    if (Array.isArray(target.media) && Array.isArray(source.media)) {
+      target.media.forEach((m, i) => {
+        if (m && !m.photo && source.media[i]?.photo && m.video === source.media[i].video) {
+          m.photo = source.media[i].photo;
+        }
+      });
+    }
+  };
+  restore(cloud, local);
   const fill = (cloudList, localList, keyOf) => {
     if (!Array.isArray(cloudList) || !Array.isArray(localList)) return;
     const byKey = new Map(localList.map(x => [keyOf(x), x]));
     cloudList.forEach(x => {
       const l = byKey.get(keyOf(x));
       if (!l) return;
-      if (!x.photo && l.photo) x.photo = l.photo;
-      if (Array.isArray(x.media) && Array.isArray(l.media)) {
-        x.media.forEach((m, i) => { if (m && !m.photo && l.media[i]?.photo) m.photo = l.media[i].photo; });
-      }
+      restore(x, l);
     });
   };
   fill(cloud.visits, local.visits, v => `${v.date}|${v.dish || ''}|${v.note || ''}`);
