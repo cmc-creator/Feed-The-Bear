@@ -1,5 +1,11 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-08 (clear existing-photo selection)
+
+- Rename Gallery to Choose photos or video across capture forms. Make it
+  prominent above Quick Add camera actions without removing capture choices.
+- Verify multi-select intent, appended attachments and small-phone button fit.
+
 ## [Unreleased] - 2026-11-08 (cover and caption polish)
 
 - Add personal-photo cover selection to Quick Add, size thumbnails explicitly,

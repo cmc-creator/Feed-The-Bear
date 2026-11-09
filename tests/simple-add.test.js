@@ -31,6 +31,11 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
       return save.bottom <= innerHeight && save.top >= 0 && card.scrollHeight <= card.clientHeight + 1
         && document.documentElement.scrollWidth <= innerWidth;
     }), `the collapsed Add flow and Save fit a ${width}px phone without scrolling`);
+    check(await p.locator('#quick-add-overlay [data-source="library"]').evaluate(button => {
+      const bounds = button.getBoundingClientRect();
+      return bounds.height >= 52 && button.scrollWidth <= button.clientWidth
+        && bounds.top < document.querySelector('.qa-photo').getBoundingClientRect().top;
+    }), `Choose photos or video is prominent above camera actions and fits at ${width}px`);
     for (const selector of ['.qa-photo', '.qa-video']) check(await p.locator(selector).evaluate(button => {
       const label = button.querySelector('span');
       const rect = label.getBoundingClientRect();

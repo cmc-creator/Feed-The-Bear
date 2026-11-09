@@ -97,7 +97,11 @@
   color: var(--on-primary); background: var(--primary); border: 2px solid var(--primary); border-radius: var(--radius-sm);
   animation: qa-camera-glow 2.4s ease-in-out 3;
 }
-.qa-card .food-capture-buttons [data-source="library"] { grid-column: 1 / -1; }
+.qa-card .food-capture-buttons [data-source="library"] {
+  grid-column: 1 / -1; grid-row: 1; width: 100%; min-height: 52px; padding: 8px 12px;
+  border: 2px solid var(--primary); border-radius: var(--radius-sm);
+  background: var(--surface2); color: var(--text); font-size: .95rem; font-weight: 800;
+}
 .qa-photo svg, .qa-video svg { flex-shrink: 0; }
 .qa-photo span, .qa-video span { min-width: 0; }
 .qa-card .qa-photo:disabled, .qa-card .qa-video:disabled { animation: none; opacity: .65; }
@@ -116,6 +120,7 @@ body[data-ui-motion='reduced'] .qa-card .food-capture-buttons .qa-video { animat
 }
 @media (max-width: 360px) {
   #quick-add-overlay.step-2 .qa-step-2 { gap: 6px; }
+  #quick-add-overlay.step-2 .qa-title { margin: 4px 0; }
   .qa-card { padding: 14px 16px; }
   .qa-place { padding: 8px 12px; gap: 2px; }
 }

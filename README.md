@@ -16,6 +16,10 @@ Then open http://127.0.0.1:8765/app.html.
 
 ## Photos, videos, sharing and account privacy
 
+- **Choose photos or video** selects existing media from your device.
+  In Quick Add it is a prominent outlined button above Take photo and Record
+  video. Existing selections are appended, not replaced.
+
 - Card previews always offer **Share card**, **Save image**, and **Copy text**.
   Share card opens native file sharing when supported; unsupported or blocked
   sharing explains the manual save-and-upload workflow without auto-downloading.

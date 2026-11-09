@@ -15,6 +15,8 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
   await p.fill('.qa-input', 'Capture Cafe');
   await p.locator('.qa-input').press('Enter');
   await p.click('.qa-status[data-status="visited"]');
+  check(await p.locator('#quick-add-overlay [data-source="library"]').innerText() === 'Choose photos or video',
+    'existing photo selection is explicitly labelled separately from taking a new photo');
 
   for (const [source, accept, capture] of [['photo', 'image/*', 'environment'], ['video', 'video/*', 'environment'], ['library', 'image/*,video/*', null]]) {
     const [chooser] = await Promise.all([
