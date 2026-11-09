@@ -28,6 +28,21 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
   await p.evaluate(() => { window.__batch = [__clip]; });
   await p.click('.qa-video');
   check(await p.locator('.qa-media-list .pm-item').count() === 11, 'a clip can be added after ten photos without replacing them');
+  for (const width of [320, 390]) {
+    await p.setViewportSize({ width, height: 740 });
+    check(await p.evaluate(() => {
+      const strip = document.querySelector('.qa-media-list .pm-strip');
+      return document.documentElement.scrollWidth <= innerWidth && strip.getBoundingClientRect().height <= 221
+        && [...strip.querySelectorAll('img')].every(img => img.getBoundingClientRect().width === 64)
+        && [...strip.querySelectorAll('button')].every(button => button.getBoundingClientRect().height >= 44)
+        && document.querySelector('.qa-save').getBoundingClientRect().bottom <= innerHeight
+        && document.querySelector('.qa-save').getBoundingClientRect().top >= 0;
+    }), `all eleven previews stay compact with tappable cover/removal actions at ${width}px`);
+  }
+  await p.locator('.qa-cover-pick').nth(4).click();
+  check(await p.locator('.qa-cover-pick').first().getAttribute('aria-pressed') === 'true'
+    && await p.locator('.qa-cover-pick img').first().getAttribute('src') === await p.evaluate(() => __photos[4].photo),
+    'tapping a thumbnail selects that exact personal photo as cover');
   check(await p.evaluate(() => mergeFoodMedia([], [...__photos, __clip, __clip], { notify: false }).length === 11
     && mergeFoodMedia([], [...__photos, __photos[0]], { notify: false }).length === 10),
     'limits are ten photos plus one video, not eleven arbitrary items');
@@ -45,7 +60,7 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
   check(await p.evaluate(() => {
     const r = state.restaurants[0];
     return mediaOf(r).length === 11 && mediaOf(r.visits[0]).length === 11 && mediaOf(r.dishes[0]).length === 11
-      && r.notes.includes('private food diary') && r.myRating === 5;
+      && r.notes.includes('private food diary') && r.myRating === 5 && r.photo === __photos[4].photo;
   }), 'saving retains all photos, clip, notes, rating and dish');
   await p.waitForSelector('.sn-media:not([disabled])');
   await p.evaluate(() => {

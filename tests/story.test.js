@@ -54,9 +54,18 @@ const SEED = [
 
   // With a share sheet, the image file goes to it.
   await p.evaluate(() => { navigator.canShare = () => true; navigator.share = async d => { window._shared = d; }; });
+  await p.click('.story-caption summary');
+  await p.fill('.story-caption-text', 'Birria tacos: my new favorite bite!');
   await p.click('.story-share');
   const shared = await p.evaluate(() => window._shared && { name: window._shared.files?.[0]?.name, text: window._shared.text });
   check(shared?.name === 'taqueria-el-sol-what-to-order.png' && /Birria tacos/.test(shared.text), `Share sends the image and the text (${shared?.name})`);
+  check(shared.text === 'Birria tacos: my new favorite bite!', 'card preview shares the edited caption, not the original generated text');
+  await p.evaluate(() => { navigator.clipboard.writeText = async () => { throw new DOMException('Blocked', 'NotAllowedError'); }; });
+  await p.click('.story-copy');
+  check(await p.locator('.story-caption-text').isVisible()
+    && (await p.locator('.story-caption-status').innerText()).includes('manually')
+    && await p.locator('.story-caption-text').inputValue() === shared.text,
+    'blocked clipboard reveals the exact edited caption for manual copying');
 
   await p.click('.story-x');
   check(await p.locator('#story-card-overlay').isHidden(), 'the ✕ closes it');

@@ -175,7 +175,7 @@ jobs:
       - name: Reinstalling never repeats first-time setup
         working-directory: tests
         run: node reinstall.test.js
-      - name: Share images carry your link and a Google Play badge
+      - name: Personal share cards carry your link with subtle branding
         working-directory: tests
         run: node brand.test.js
       - name: City guides at /eat, with Save buttons

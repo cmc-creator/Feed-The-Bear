@@ -246,6 +246,10 @@ window.StoryCard = (() => {
           <button type="button" class="story-save">Save image</button>
           <button type="button" class="story-copy">Copy text</button>
         </div>
+        <details class="story-caption"><summary>Edit caption</summary>
+          <label>Your social caption<textarea class="form-input story-caption-text" rows="3" maxlength="2000"></textarea></label>
+          <span class="story-caption-status" role="status"></span>
+        </details>
         <div class="story-share-help hidden" role="status">
           <strong>Post your card to TikTok, Instagram or Facebook</strong>
           <p class="story-share-message"></p>
@@ -264,12 +268,15 @@ window.StoryCard = (() => {
     el.querySelector('.story-share').addEventListener('click', shareNow);
     el.querySelector('.story-save').addEventListener('click', save);
     el.querySelector('.story-copy').addEventListener('click', copy);
+    el.querySelector('.story-caption-text').addEventListener('input', e => {
+      if (current) current.text = e.target.value;
+    });
     el.querySelector('.story-share-all').addEventListener('click', async () => {
       if (!current) return;
       const snapshot = current;
       try { await navigator.share({ title: snapshot.name, text: snapshot.text, files: [snapshot.file, ...snapshot.originals] }); }
       catch (err) {
-        if (err?.name === 'AbortError' || current !== snapshot) return;
+        if (err?.name === 'AbortError' || current !== snapshot || el.classList.contains('hidden')) return;
         console.warn('[FTB] Collection sharing failed:', err);
         el.querySelector('.story-collection-status').textContent = 'Sharing was blocked. Save the individual files below and upload them in your social app.';
       }
@@ -292,6 +299,7 @@ window.StoryCard = (() => {
     overlay?.classList.add('hidden');
     const img = overlay?.querySelector('.story-img');
     if (img?.src) { URL.revokeObjectURL(img.src); img.removeAttribute('src'); }
+    current = null;
     if (typeof window.maybeHideOverlay === 'function') window.maybeHideOverlay();
   }
 
@@ -329,16 +337,25 @@ window.StoryCard = (() => {
     a.href = url; a.download = current.file.name;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
-    window.showToast?.('Saved!', 'Post it to your story or send it to a friend.', 'success');
+    window.showToast?.('Download requested', 'Once saved, upload it in your social app or send it to a friend.', 'info');
   }
 
   async function copy () {
     if (!current) return;
+    const snapshot = current;
+    const status = overlay.querySelector('.story-caption-status');
+    status.textContent = '';
     try {
-      await navigator.clipboard.writeText(current.text);
+      await navigator.clipboard.writeText(snapshot.text);
+      if (current !== snapshot || overlay.classList.contains('hidden')) return;
       window.showToast?.('Copied!', 'Paste it to a friend who is going.', 'success');
-    } catch {
-      window.showToast?.('Could not copy', 'Your browser blocked the clipboard here.', 'error');
+    } catch (err) {
+      if (current !== snapshot || overlay.classList.contains('hidden')) return;
+      console.warn('[FTB] Story caption copy failed:', err);
+      overlay.querySelector('.story-caption').open = true;
+      const caption = overlay.querySelector('.story-caption-text');
+      caption.focus(); caption.select();
+      status.textContent = 'Copying was blocked. Select the caption above and copy it manually.';
     }
   }
 
@@ -500,6 +517,9 @@ window.StoryCard = (() => {
     overlay.querySelector('.story-share').textContent = 'Share card';
     overlay.querySelector('.story-save').classList.remove('hidden');
     overlay.querySelector('.story-share-help').classList.add('hidden');
+    overlay.querySelector('.story-caption').open = false;
+    overlay.querySelector('.story-caption-text').value = text || '';
+    overlay.querySelector('.story-caption-status').textContent = '';
     const collection = overlay.querySelector('.story-collection');
     collection.classList.toggle('hidden', !originals.length && !collectionError);
     collection.open = false;

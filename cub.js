@@ -478,10 +478,34 @@ window.Cub = (() => {
       prev.src = app().safeUrl(photo);
       prev.classList.toggle('hidden', !photo);
       el.querySelector('.qa-media-list').innerHTML = attachments.length ? app().pendingMediaHtml(attachments) : '';
+      el.querySelectorAll('.qa-media-list .pm-item').forEach((item, i) => {
+        const image = item.querySelector('img');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'qa-cover-pick';
+        button.dataset.cover = i;
+        button.setAttribute('aria-label', `Use ${attachments[i].video ? 'video preview' : `photo ${i + 1}`} as cover`);
+        button.setAttribute('aria-pressed', String(i === 0));
+        image.replaceWith(button);
+        button.appendChild(image);
+        const label = document.createElement('span');
+        label.textContent = i === 0 ? 'Cover' : 'Set cover';
+        button.appendChild(label);
+      });
+      el.querySelector('.qa-media-label').textContent = attachments.length
+        ? `${attachments.filter(m => !m.video).length}/10 photos${video ? ' + 1 video' : ''}. Tap a photo to set your cover.`
+        : 'Up to 10 photos + 1 video (optional)';
     };
     el.querySelector('.qa-media-list').addEventListener('click', e => {
       const remove = e.target.closest('.pm-remove');
       if (remove) { attachments.splice(Number(remove.dataset.idx), 1); renderMedia(); }
+      const cover = e.target.closest('.qa-cover-pick');
+      if (cover) {
+        const [chosen] = attachments.splice(Number(cover.dataset.cover), 1);
+        attachments.unshift(chosen);
+        renderMedia();
+        el.querySelector('.qa-cover-pick').focus();
+      }
     });
     const capture = app().addFoodCaptureActions(el.querySelector('.qa-media'), attachMedia);
     const cameraButton = capture.querySelector('[data-source="photo"]');
@@ -505,6 +529,7 @@ window.Cub = (() => {
     pick = null; status = null; visitChoice = null; stars = 0; verdict = null; photo = ''; video = '';
     attachments = [];
     sheet.querySelector('.qa-media-list').innerHTML = '';
+    sheet.querySelector('.qa-media-label').textContent = 'Up to 10 photos + 1 video (optional)';
     sheet.querySelector('.qa-notes').value = '';
     sheet.classList.remove('step-2', 'been', 'want', 'went-before');
     sheet.querySelector('.qa-details').open = false;

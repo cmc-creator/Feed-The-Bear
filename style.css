@@ -6101,6 +6101,11 @@ body.light-mode .today-vibe-pill {
 .story-files { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .story-collection-status { display: block; margin-top: 10px; }
 .story-share-help { padding: 12px; font-size: .85rem; line-height: 1.5; }
+.story-caption { width: 100%; padding: 0 12px; box-sizing: border-box; font-size: .85rem; }
+.story-caption summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+.story-caption label { display: grid; gap: 6px; }
+.story-caption-status { display: block; margin-top: 8px; }
+.story-sheet:has(.story-caption[open]) { overflow-y: auto; }
 .story-sheet:has(.story-share-help:not(.hidden)) { overflow-y: auto; }
 .story-sheet:has(.story-collection:not(.hidden)) { overflow-y: auto; }
 .story-collection { width: 100%; box-sizing: border-box; }

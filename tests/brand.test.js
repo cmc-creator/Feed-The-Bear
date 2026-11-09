@@ -1,5 +1,5 @@
 // Share images carry your link (feed-the-bear.com/@you when your public page
-// is on, else the site) and a Google Play badge, so each share brings people in.
+// is on, else the site). Personal place cards use subtle branding.
 const { BASE, check, launch, newPage, finish } = require('./lib');
 
 (async () => {
@@ -27,7 +27,8 @@ const { BASE, check, launch, newPage, finish } = require('./lib');
     CanvasRenderingContext2D.prototype.fillText = orig;
     return texts;
   });
-  check(drawn.includes('feed-the-bear.com') && drawn.includes('GET IT ON') && drawn.includes('Google Play'), `story cards end with your link and a Google Play badge (${drawn.slice(-4).join(' | ')})`);
+  check(drawn.includes('feed-the-bear.com') && drawn.includes('FEED THE BEAR') && !drawn.includes('Google Play'),
+    `personal place cards keep your link and subtle branding (${drawn.slice(-4).join(' | ')})`);
   check(!p.errors.length, `no page errors ${p.errors.join(' | ')}`);
   await browser.close();
   finish('brand');

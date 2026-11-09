@@ -3,7 +3,7 @@
    Offline-first cache strategy
    ════════════════════════════════════════════════════════════ */
 
-const CACHE = 'ftb-v167';
+const CACHE = 'ftb-v168';
 const ASSETS = [
   './',
   './index.html',

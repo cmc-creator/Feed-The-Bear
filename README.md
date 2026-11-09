@@ -19,6 +19,10 @@ Then open http://127.0.0.1:8765/app.html.
 - Card previews always offer **Share card**, **Save image**, and **Copy text**.
   Share card opens native file sharing when supported; unsupported or blocked
   sharing explains the manual save-and-upload workflow without auto-downloading.
+- In Quick Add, tap a personal thumbnail to choose the cover photo.
+  Previews stay compact, removal buttons are touch-sized, and Save stays
+  pinned inside the scrolling sheet. Captions can also be edited directly in
+  the card preview; blocked clipboard access reveals the text for manual copying.
 
 - Selected profile photos survive same-account login/restores. Legacy cloud
   defaults do not erase a personal photo; explicit photo changes/removals

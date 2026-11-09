@@ -1,5 +1,15 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-08 (cover and caption polish)
+
+- Add personal-photo cover selection to Quick Add, size thumbnails explicitly,
+  enlarge removal targets, and keep Save visible while the sheet scrolls.
+- Keep caption editing expandable in the card preview, preserve edits when
+  sharing, and expose manual copying when clipboard access is blocked.
+- Release private card files on close and avoid stale share/copy feedback.
+- Align the branding workflow test with the intentionally understated personal
+  card design. Test cover choice, 11-item geometry and CI-style sharing limits.
+
 ## [Unreleased] - 2026-11-08 (clear card sharing)
 
 - Keep Share card as the main preview action on all browsers, with Save image
