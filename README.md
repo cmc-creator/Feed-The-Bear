@@ -16,6 +16,12 @@ Then open http://127.0.0.1:8765/app.html.
 
 ## Photos, videos, sharing and account privacy
 
+- Selected profile photos survive same-account login/restores. Legacy cloud
+  defaults do not erase a personal photo; explicit photo changes/removals
+  have their own timestamp, separate from appearance settings.
+  Profile uploads are compressed before saving and Save waits for processing.
+  Account switches discard late uploads and never share another account's photo.
+
 - **Share my place card** previews a clean 1080x1920 card with the restaurant
   name, saved address, and up to three of your own attached photos (including
   a video's poster frame). Place-detail sharing uses the same design.

@@ -892,9 +892,23 @@ async function handleFirebaseUser (user) {
         const { friends, friendsAt, profileShareId, ...cloudRest } = cloudProfile;
         const localNewer = Number(localProf.updatedAt || 0) > Number(cloudProfile.updatedAt || 0);
         const mergedProfile = localNewer ? { ...cloudRest, ...localProf, plan: cloudProfile.plan } : { ...localProf, ...cloudRest };
+        // Default/partial legacy cloud profiles are not an explicit photo removal.
+        const localVisualAt = Number(localProf.visualUpdatedAt ?? localProf.updatedAt ?? 0);
+        const cloudVisualAt = Number(cloudRest.visualUpdatedAt ?? cloudRest.updatedAt ?? 0);
+        const localHasVisual = !!localProf.photo || (localProf.avatar && localProf.avatar !== DEFAULT_AVATAR);
+        const cloudHasVisual = !!cloudRest.photo || (cloudRest.avatar && cloudRest.avatar !== DEFAULT_AVATAR);
+        let visual = cloudRest;
+        if (localProf.photo && !cloudRest.photo && !cloudRest.visualUpdatedAt) visual = localProf;
+        else if (cloudRest.photo && !localProf.photo && !localProf.visualUpdatedAt) visual = cloudRest;
+        else if ((localHasVisual || localProf.visualUpdatedAt) && localVisualAt > cloudVisualAt) visual = localProf;
+        else if (!cloudHasVisual && !cloudRest.visualUpdatedAt) visual = localProf;
+        const keepLocalVisual = visual === localProf;
+        for (const key of ['photo', 'avatar', 'visualUpdatedAt']) {
+          if (key in visual) mergedProfile[key] = visual[key];
+        }
         saveUserProfile(mergedProfile, { fromCloud: true });
-        if (localNewer) fbSaveProfileCloud(user.uid, mergedProfile);
-        updateHeaderAvatar(mergedProfile.avatar || 'FTB');
+        if (localNewer || keepLocalVisual) fbSaveProfileCloud(user.uid, mergedProfile);
+        updateProfileVisuals(mergedProfile);
 
         const appearance = mergedProfile.appearance || null;
         if (appearance && typeof applyThemeChoice === 'function') {
@@ -906,7 +920,7 @@ async function handleFirebaseUser (user) {
 
           const settingsKey = (typeof SETTINGS_KEY !== 'undefined') ? SETTINGS_KEY : 'ftb_settings_v1';
           localStorage.setItem(settingsKey, JSON.stringify(state.settings));
-          applyThemeChoice(appearance.themeManual === false && appearance.themeChoice !== 'auto' ? 'dark' : state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark'));
+          applyThemeChoice(appearance.themeManual === false && appearance.themeChoice !== 'auto' ? 'dark' : state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark'), { persist: false });
           if (typeof applyPersonalizationSettings === 'function') applyPersonalizationSettings();
         }
       } else {

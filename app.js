@@ -1879,7 +1879,7 @@ function persistAppearanceProfile () {
     uiCorners: UI_CORNERS.has(state.settings.uiCorners) ? state.settings.uiCorners : 'rounded',
     uiMotion: UI_MOTION.has(state.settings.uiMotion) ? state.settings.uiMotion : 'playful',
   };
-  saveUserProfile({ ...base, appearance });
+  saveUserProfile({ ...base, visualUpdatedAt: base.visualUpdatedAt ?? base.updatedAt ?? 0, appearance });
 }
 
 function initUserProfile () {
@@ -2026,7 +2026,7 @@ function openProfileSetup () {
 
   const doSave = () => {
     const name = (document.getElementById('setup-name')?.value || '').trim() || 'Foodie';
-    const profile = { name, avatar: chosenAvatar, joinDate: new Date().toISOString() };
+    const profile = { name, avatar: chosenAvatar, joinDate: new Date().toISOString(), visualUpdatedAt: Date.now() };
     saveUserProfile(profile);
     updateHeaderAvatar(profile.avatar);
     overlay.classList.add('hidden');
@@ -2138,6 +2138,7 @@ function closeAccountModal () {
   maybeHideOverlay();
 }
 
+let _profileEditSession = 0;
 function openEditProfile () {
   closeAccountModal();
   const overlay = document.getElementById('edit-profile-overlay');
@@ -2145,6 +2146,14 @@ function openEditProfile () {
   const profile = loadUserProfile() || { name: 'Foodie', avatar: DEFAULT_AVATAR };
   let chosenAvatar = normalizeAvatar(profile.avatar);
   let chosenPhoto = profile.photo || '';
+  const generation = _dataGeneration;
+  const editSession = ++_profileEditSession;
+  const uid = window._ftbUid;
+  const isCurrent = () => generation === _dataGeneration && uid === window._ftbUid
+    && editSession === _profileEditSession && !window._ftbAccountSwitching;
+  let photoBusy = false;
+  const saveButton = document.getElementById('edit-profile-save-btn');
+  saveButton.disabled = false;
   document.getElementById('edit-name').value = profile.name || '';
 
   const setEditPhotoState = () => {
@@ -2178,6 +2187,7 @@ function openEditProfile () {
     photoUploadBtn.onclick = () => photoInput.click();
   }
   if (photoRemoveBtn) {
+    photoRemoveBtn.disabled = false;
     photoRemoveBtn.onclick = () => {
       chosenPhoto = '';
       if (photoInput) photoInput.value = '';
@@ -2185,6 +2195,7 @@ function openEditProfile () {
     };
   }
   if (photoInput) {
+    if (photoUploadBtn) photoUploadBtn.disabled = false;
     photoInput.onchange = async e => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -2196,22 +2207,37 @@ function openEditProfile () {
         showToast('Photo too large', 'Please choose an image under 2 MB.', 'error');
         return;
       }
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      chosenPhoto = String(dataUrl);
-      setEditPhotoState();
+      photoBusy = true;
+      saveButton.disabled = true;
+      if (photoUploadBtn) photoUploadBtn.disabled = true;
+      if (photoRemoveBtn) photoRemoveBtn.disabled = true;
+      try {
+        const dataUrl = await readImageFileCompressed(file, 512, .85);
+        if (!isCurrent() || overlay.classList.contains('hidden')) return;
+        chosenPhoto = dataUrl;
+        setEditPhotoState();
+      } catch (err) {
+        if (isCurrent()) {
+          console.warn('[FTB] Profile photo processing failed:', err);
+          showToast('Could not load profile photo', 'Your previous photo is unchanged. Try another image.', 'error');
+        }
+      } finally {
+        photoBusy = false;
+        if (isCurrent()) {
+          saveButton.disabled = false;
+          if (photoUploadBtn) photoUploadBtn.disabled = false;
+          if (photoRemoveBtn) photoRemoveBtn.disabled = false;
+        }
+      }
     };
   }
 
   overlay.classList.remove('hidden');
   document.body.classList.add('overlay-open');
   document.getElementById('edit-profile-save-btn').onclick = () => {
+    if (!isCurrent() || photoBusy) return;
     const name = document.getElementById('edit-name').value.trim() || profile.name || 'Foodie';
-    const updated = { ...profile, name, avatar: chosenAvatar, photo: chosenPhoto || '' };
+    const updated = { ...(loadUserProfile() || profile), name, avatar: chosenAvatar, photo: chosenPhoto || '', visualUpdatedAt: Date.now() };
     saveUserProfile(updated);
     updateProfileVisuals(updated);
     overlay.classList.add('hidden');

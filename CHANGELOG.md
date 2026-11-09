@@ -1,5 +1,15 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-08 (profile persistence)
+
+- Prevent legacy/default cloud avatars from replacing a saved personal photo.
+  Track explicit photo/avatar choices separately from appearance updates and
+  respect newer intentional selections/removals across devices.
+- Compress uploaded profile photos for cloud backup, wait for processing before
+  Save, report image errors, and discard late results after account/editor changes.
+- Refresh all profile visuals after restoration without re-saving restored theme
+  defaults as a new profile edit. Add login, cold-reload and isolation regressions.
+
 ## [Unreleased] - 2026-11-08 (complete food moments)
 
 - Keep up to ten photos plus one clip per moment; Quick Add now appends media

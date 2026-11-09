@@ -69,6 +69,9 @@ jobs:
       - name: Ten-photo media collection and advanced options
         working-directory: tests
         run: node media-collection.test.js
+      - name: Profile photo persistence across logins
+        working-directory: tests
+        run: node profile-persistence.test.js
 
       - name: Food videos
         working-directory: tests
