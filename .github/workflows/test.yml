@@ -85,6 +85,12 @@ jobs:
       - name: Free accounts
         working-directory: tests
         run: node account.test.js
+      - name: Account session isolation
+        working-directory: tests
+        run: node session-isolation.test.js
+      - name: Capture and immediate sharing
+        working-directory: tests
+        run: node capture-share.test.js
       - name: Place info
         working-directory: tests
         run: node placeinfo.test.js

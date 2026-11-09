@@ -262,7 +262,13 @@ window.StoryCard = (() => {
     track('story_card_shared', {});
     const data = { title: current.name, text: current.text, files: [current.file] };
     if (navigator.share && navigator.canShare?.({ files: [current.file] })) {
-      try { await navigator.share(data); return; } catch (err) { if (err?.name === 'AbortError') return; }
+      try { await navigator.share(data); return; }
+      catch (err) {
+        if (err?.name === 'AbortError') return;
+        console.warn('[FTB] Story sharing failed:', err);
+        window.showToast?.('Sharing was blocked', 'Try Save image, then upload it in your social app.', 'error');
+        return;
+      }
     }
     save();
   }

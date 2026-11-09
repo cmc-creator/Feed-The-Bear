@@ -421,12 +421,14 @@ function sanitizeRecent (list) {
 
 // Pull followed friends' live profiles (at most every 30 minutes).
 async function refreshFriendsLive (force = false) {
+  const generation = _dataGeneration;
   if (typeof fbFetchFriendProfiles !== 'function') return;
   if (!force && Date.now() - _friendsLiveAt < FRIENDS_LIVE_EVERY) return;
   const friends = getFriends().filter(f => f.data?.id);
   if (!friends.length) return;
   _friendsLiveAt = Date.now();
   const docs = await fbFetchFriendProfiles(friends.map(f => f.data.id));
+  if (generation !== _dataGeneration || window._ftbAccountSwitching) return;
   let changed = false;
   const list = getFriends();
   docs.forEach((doc, i) => {
@@ -636,9 +638,12 @@ function followNoted () {
 async function noteFollow (id, action = 'followed') {
   if (!id || !window._ftbUid || !/^[a-z0-9]{8,40}$/.test(String(id))) return false;
   try {
+    const generation = _dataGeneration;
     startSharingLive();
     if (typeof fbPublishFriendProfile === 'function') await fbPublishFriendProfile();
+    if (generation !== _dataGeneration || !window._ftbUid) return false;
     const { ok } = await handleApi('POST', { body: { action, id, me: getProfileShareId() } });
+    if (generation !== _dataGeneration || !window._ftbUid) return false;
     if (ok) {
       const noted = followNoted();
       if (action === 'followed') noted.add(id); else noted.delete(id);
@@ -667,8 +672,10 @@ let _restoringFollows = false;
 async function loadFollowing () {
   if (!window._ftbUid || _restoringFollows) return;
   _restoringFollows = true;
+  const generation = _dataGeneration;
   try {
     const { ok, status, data } = await handleApi('GET', { query: '?following=1' });
+    if (generation !== _dataGeneration || !window._ftbUid) return;
     if (!ok || !Array.isArray(data.following)) { noteFriendsError('who you follow', status, data); return; }
     clearFriendsError('who you follow');
     const have = new Set(getFriends().map(f => f.data?.id).filter(Boolean));
@@ -686,21 +693,27 @@ async function loadFollowing () {
     await refreshFriendsLive(true);
     renderAll();
     if (!document.getElementById('friends-overlay')?.classList.contains('hidden')) renderFriendsList();
-  } catch { noteFriendsError('who you follow', 0, {}); } finally { _restoringFollows = false; }
+  } catch { if (generation === _dataGeneration) noteFriendsError('who you follow', 0, {}); }
+  finally { if (generation === _dataGeneration) _restoringFollows = false; }
 }
 window.loadFollowing = loadFollowing;
 
 let _followers = null;
 async function loadFollowers () {
   if (!window._ftbUid) { _followers = []; return; }
+  const generation = _dataGeneration;
   try {
     const { ok, status, data } = await handleApi('GET', { query: '?followers=1' });
+    if (generation !== _dataGeneration || !window._ftbUid) return;
     if (!ok) noteFriendsError('who follows you', status, data);
     else clearFriendsError('who follows you');
     _followers = ok && Array.isArray(data.followers) ? data.followers.slice(0, 200).map(f => ({
       id: String(f?.id || '').slice(0, 40), u: String(f?.u || 'Friend').slice(0, 30),
     })).filter(f => /^[a-z0-9]{8,40}$/.test(f.id)) : [];
-  } catch { _followers = []; noteFriendsError('who follows you', 0, {}); }
+  } catch {
+    if (generation !== _dataGeneration) return;
+    _followers = []; noteFriendsError('who follows you', 0, {});
+  }
   followBackNew();
   if (!document.getElementById('friends-overlay')?.classList.contains('hidden')) renderFriendsList();
 }
@@ -734,6 +747,15 @@ function followBackNew () {
 /* What the Friends screen knows, said at the top: which account, how much
    loaded, and any part that failed (with Try again), so nothing fails quietly. */
 const _friendsErrors = {};
+function resetFriendsSession () {
+  _followers = null;
+  _friendsLiveAt = 0;
+  _restoringFollows = false;
+  _notingFollows = false;
+  Object.keys(_friendsErrors).forEach(k => delete _friendsErrors[k]);
+  document.getElementById('friends-list')?.replaceChildren();
+  document.getElementById('friends-feed-home')?.replaceChildren();
+}
 function noteFriendsError (what, status, data) {
   _friendsErrors[what] = status === 401 ? 'your sign-in expired, so sign out and back in'
     : status ? `${data?.error || 'server error'} (${status})` : 'no connection';
@@ -893,33 +915,84 @@ async function askFriendToGo (r, friendName = '') {
 }
 
 /* ── Share moments: right after you log a meal ── */
-function offerShareMeal ({ r, dish = '', verdict = '', photo = '', note = '' }) {
-  if (!window.StoryCard || (!photo && !dish)) return;
+function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', note = '' }) {
+  if (!r || !window.StoryCard) return;
+  const generation = _dataGeneration;
   document.querySelector('.share-nudge')?.remove();
   const el = document.createElement('div');
   el.className = 'share-nudge';
   el.setAttribute('role', 'status');
   el.innerHTML = `${safeUrl(photo) ? `<img src="${escHtml(safeUrl(photo))}" alt="" />` : '<span class="sn-emoji" aria-hidden="true">📸</span>'}
-    <span class="sn-text"><strong>Share this meal?</strong><span>Make a Story card for Instagram, TikTok and more</span></span>
-    <button type="button" class="btn-sm btn-primary sn-go">Share</button>
-    <button type="button" class="sn-x" aria-label="Not now">✕</button>`;
+    <span class="sn-text"><strong>${r.status === 'visited' ? 'Share this meal?' : 'Share this spot?'}</strong><span>Send to socials or a friend using your share sheet</span></span>
+    <div class="sn-actions">
+      <button type="button" class="btn-sm btn-primary sn-media" ${photo || video ? 'disabled' : ''}>${video ? 'Preparing video...' : photo ? 'Preparing photo...' : 'Share spot'}</button>
+      <button type="button" class="btn-sm sn-go">Make Story card</button>
+      <button type="button" class="btn-sm sn-x">Done</button>
+    </div><span class="sn-error" role="status"></span>`;
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add('in'));
   const hide = () => { el.classList.remove('in'); setTimeout(() => el.remove(), 300); };
-  const timer = setTimeout(hide, 9000);
-  el.querySelector('.sn-x').addEventListener('click', () => { clearTimeout(timer); hide(); });
+  const text = `${dish ? `${dish} at ${r.name}` : `${r.status === 'visited' ? 'Just ate at' : 'Want to try'} ${r.name}`}${verdict === 'again' ? ' — 10/10 would order again' : ''}. Saved with Feed The Bear https://www.feed-the-bear.com`;
+  const error = message => { el.querySelector('.sn-error').textContent = message; };
+  let file = null;
+  const mediaButton = el.querySelector('.sn-media');
+  const prepare = async () => {
+    try {
+      let blob;
+      if (video) {
+        blob = await getFoodVideo(video);
+        if (!blob) throw new Error('That video is not on this device. Share the Story card instead.');
+      } else {
+        const resp = await fetch(safeUrl(photo));
+        if (!resp.ok) throw new Error('Could not prepare the photo. Try the Story card.');
+        blob = await resp.blob();
+      }
+      if (generation !== _dataGeneration || !el.isConnected) return;
+      const extension = video ? (/mp4/.test(blob.type) ? 'mp4' : /quicktime/.test(blob.type) ? 'mov' : 'webm') : 'jpg';
+      file = new File([blob], `${r.name.replace(/[^a-z0-9-]/gi, '-')}.${extension}`, { type: blob.type });
+      mediaButton.textContent = navigator.canShare?.({ files: [file] }) ? `Share ${video ? 'video' : 'photo'}` : `Download ${video ? 'video' : 'photo'}`;
+      mediaButton.disabled = false;
+    } catch (err) {
+      console.warn('[FTB] Share media preparation failed:', err);
+      error(err.message);
+    }
+  };
+  if (photo || video) prepare();
+  mediaButton.addEventListener('click', () => {
+    if (generation !== _dataGeneration) return;
+    error('');
+    if (file && !navigator.canShare?.({ files: [file] })) {
+      const url = URL.createObjectURL(file);
+      const link = document.createElement('a');
+      link.href = url; link.download = file.name;
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      error('Download requested. Open your social app to upload it.');
+      return;
+    }
+    // The file is prepared before this click, preserving iOS user activation.
+    navigator.share({ title: r.name, text, ...(file ? { files: [file] } : {}) }).catch(err => {
+      if (err?.name === 'AbortError') return;
+      console.warn('[FTB] Media share failed:', err);
+      error('Sharing was blocked. Try the Story card or save it from there.');
+    });
+  });
+  el.querySelector('.sn-x').addEventListener('click', hide);
   el.querySelector('.sn-go').addEventListener('click', async () => {
-    clearTimeout(timer); hide();
+    if (generation !== _dataGeneration) return;
+    hide();
     trackProductEvent('share_meal_clicked', { hasPhoto: !!photo });
     const kicker = verdict === 'again' ? 'Order this again' : verdict === 'skip' ? 'Skip this one' : 'Just ate';
-    const text = `${dish ? `${dish} at ${r.name}` : `Just ate at ${r.name}`}${verdict === 'again' ? ' — 10/10 would order again' : ''}. Saved with Feed The Bear https://www.feed-the-bear.com`;
     try {
       await StoryCard.openStory({
         kind: 'meal', kicker, title: dish || r.name, sub: dish ? `at ${r.name}` : (r.cuisine || ''), photo,
         stars: r.myRating || 0,
         sections: note ? [{ label: 'Note to self', items: [note], tone: 'soft' }] : [],
       }, text, `${r.name}-${dish || 'meal'}`);
-    } catch (err) { console.warn('[FTB] meal card failed:', err); }
+    } catch (err) {
+      console.warn('[FTB] meal card failed:', err);
+      showToast('Could not make Story card', 'Your place is saved. Try sharing again from its details.', 'error');
+    }
   });
 }
 

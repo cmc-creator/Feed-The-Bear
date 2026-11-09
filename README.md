@@ -14,6 +14,42 @@ python -m http.server 8765      # from the repo root
 
 Then open http://127.0.0.1:8765/app.html.
 
+## Photos, videos, sharing and account privacy
+
+- Quick Add, Just Ate, and the full Add form offer **Take photo**, **Record
+  video**, and **Gallery**. Recording uses the rear-camera capture intent on
+  supported phones; desktop browsers may offer a file picker instead. If
+  camera access is denied, allow it in device settings or choose Gallery.
+- Saving is disabled while media is being picked or processed. Closing or
+  replacing a form discards late picker results rather than attaching them
+  to another place. Grizzly videos remain limited to 15 seconds and stay on
+  the recording device; their poster photos can be backed up.
+- After a new place or meal is saved, choose **Share photo/video**, **Make
+  Story card**, or **Done**. Actual files go to the device share sheet, where
+  you choose an installed social app. Browsers without file sharing offer a
+  download instead. Sharing does not automatically publish a post, and
+  blocked sharing is reported explicitly.
+- Sign-out immediately hides the account's spots, profile, friends, chats,
+  lists and pending sharing UI. Local account copies are kept in IndexedDB
+  separately, so signing back into the same account can recover unsynced
+  edits. Only a never-signed-in guest diary is automatically adopted on
+  first sign-in. Older signed-out diaries with a remembered email are
+  restored only when that same email signs in.
+- Account deletion waits for local sign-out cleanup before erasing device
+  storage. If you explicitly keep your local spots, they become a signed-out
+  diary; the deleted account's profile, friends and chats are not kept with it.
+- Theme and display preferences remain on the device. Signing into another
+  account does not import the previous account's diary. Stale cloud loads,
+  uploads, shared-list listeners and chat responses cannot repopulate the
+  app after the session changes.
+- Cloud failures show **Retry backup** and retain local edits. A failed cloud
+  restore blocks uploads until a successful retry; reconnecting retries
+  automatically. Signing in is not advertised as proof that backup succeeded.
+  Persistent sign-in requires browser/site storage; storage failures are shown.
+- Before release, test camera permissions, cancellation, photos/video and
+  social share targets on physical Android and iPhone devices. Browser tests
+  verify capture input attributes and native-share payloads, not camera hardware.
+
 ## Managing places and finding competitions
 
 - The default appearance is the readable **Dark** theme, on phones and web,

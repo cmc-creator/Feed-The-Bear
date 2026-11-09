@@ -1,5 +1,33 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-08
+
+### Account isolation and reliable backup
+- Hide private data immediately on sign-out and keep local diaries scoped to
+  the owning account, including profiles, friends, lists, chats and deletion
+  markers. Preserve existing caches and migrate older email-identified diaries
+  only when the matching account signs in.
+- Ignore stale account loads, plan checks, shared-list callbacks and chat
+  responses; cancel pending account uploads, chat backups and location alerts.
+- Show failed backup/restoration with Retry backup instead of silently treating
+  failures as empty cloud data or claiming that sign-in proves backup succeeded.
+- Explicitly use persistent Firebase authentication and surface storage failures.
+- Close custom account dialogs and pending welcome prompts on account changes.
+  Wait for sign-out storage cleanup during account deletion and preserve only
+  an explicitly kept signed-out diary, not the deleted account's identity.
+
+### Capture, save and share
+- Add separate Take photo, Record video and Gallery actions across the
+  primary add-place/meal flows and dish media editing.
+- Disable saving during media selection/processing, handle cancellation, and
+  reject late attachments from a closed or replaced form.
+- Offer immediate photo/video sharing, a Story card, or Done after new saves.
+  Share the actual video, not only its poster. Retain explicit download
+  fallbacks and show blocked-sharing errors.
+- Reflow capture/share controls for small phones and enlarged text, keep
+  sharing prompts out of other dialogs, and fix the malformed Travel Mode
+  notification. Refresh the offline asset cache.
+
 ## [Unreleased] - 2026-11-01 (fourth drop)
 
 ### Post to social media

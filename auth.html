@@ -346,6 +346,13 @@
     };
     firebase.initializeApp(_FB_CONFIG);
     const auth = firebase.auth();
+    const persistenceReady = auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).then(() => null, err => {
+      console.error('[FTB] Persistent sign-in unavailable:', err);
+      return err;
+    });
+    async function ensurePersistence () {
+      if (await persistenceReady) throw new Error('Could not keep you signed in. Allow site storage/cookies, then reload.');
+    }
 
     // ── Read URL mode ──
     const urlParams = new URLSearchParams(window.location.search);
@@ -399,11 +406,12 @@
       const provider = new firebase.auth.GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' }); // choose the account every time
       try {
+        await ensurePersistence();
         await auth.signInWithPopup(provider);
         redirectToApp();
       } catch (err) {
         if (err.code !== 'auth/popup-closed-by-user') {
-          showMsg(friendlyError(err.code));
+          showMsg(err.code ? friendlyError(err.code) : err.message);
         }
       }
     }
@@ -416,10 +424,11 @@
       const password = document.getElementById('siPassword').value;
       setLoading('signinBtn', 'signinSpinner', true);
       try {
+        await ensurePersistence();
         await auth.signInWithEmailAndPassword(email, password);
         redirectToApp();
       } catch (err) {
-        showMsg(friendlyError(err.code));
+        showMsg(err.code ? friendlyError(err.code) : err.message);
         setLoading('signinBtn', 'signinSpinner', false);
       }
     }
@@ -434,11 +443,12 @@
       if (password.length < 8) { showMsg('Password must be at least 8 characters.'); return; }
       setLoading('signupBtn', 'signupSpinner', true);
       try {
+        await ensurePersistence();
         const cred = await auth.createUserWithEmailAndPassword(email, password);
         if (name) await cred.user.updateProfile({ displayName: name });
         redirectToApp();
       } catch (err) {
-        showMsg(friendlyError(err.code));
+        showMsg(err.code ? friendlyError(err.code) : err.message);
         setLoading('signupBtn', 'signupSpinner', false);
       }
     }

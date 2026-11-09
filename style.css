@@ -6075,6 +6075,16 @@ body.light-mode .today-vibe-pill {
 .sn-emoji { font-size: 1.6rem; }
 .sn-text { flex: 1; min-width: 0; display: grid; gap: 1px; font-size: .78rem; color: var(--text-dim); }
 .sn-text strong { font-size: .92rem; color: var(--text); }
+.food-capture-actions { display: grid; gap: 6px; margin: 8px 0; min-width: 0; }
+.food-capture-buttons, .sn-actions { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.food-capture-buttons button, .sn-actions button { min-height: 44px; white-space: normal; overflow-wrap: anywhere; }
+.food-media-status, .sn-error { font-size: .8rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.share-nudge { flex-wrap: wrap; max-height: calc(100dvh - 120px); overflow-y: auto; }
+.share-nudge .sn-actions, .share-nudge .sn-error { flex-basis: 100%; }
+.overlay-open .share-nudge { display: none; }
+.backup-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px; margin: 8px 0; border: 1px solid var(--border); border-radius: 12px; color: var(--text); background: var(--card); }
+.backup-status span { flex: 1 1 200px; overflow-wrap: anywhere; }
+.backup-status button { min-height: 44px; }
 .sn-x { background: none; border: 0; color: var(--text-dim); font-size: .9rem; padding: 6px; cursor: pointer; }
 @media (min-width: 769px) { .share-nudge { left: auto; right: 24px; bottom: 24px; width: 380px; } }
 

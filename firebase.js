@@ -38,6 +38,40 @@ try {
 }
 
 let _syncTimer = null;
+const _authPersistenceReady = _auth
+  ? _auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).then(() => null, err => {
+    console.error('[FTB] Persistent sign-in unavailable:', err);
+    return err;
+  }) : Promise.resolve(new Error('Sign-in is unavailable. Reload and try again.'));
+
+async function ensureAuthPersistence () {
+  const error = await _authPersistenceReady;
+  if (error) throw new Error('Could not keep you signed in on this device. Allow site storage/cookies, then reload and try again.');
+}
+let _authGeneration = 0;
+let _accountSwitchChain = Promise.resolve();
+let _sessionTask = Promise.resolve();
+let _signingOut = false;
+
+function setBackupStatus (status, message = '') {
+  window._ftbBackupStatus = status;
+  let el = document.getElementById('backup-status');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'backup-status';
+    el.className = 'backup-status hidden';
+    el.setAttribute('role', 'status');
+    el.innerHTML = '<span></span><button type="button" class="btn-sm">Retry backup</button>';
+    document.querySelector('main')?.prepend(el);
+    el.querySelector('button').onclick = () => {
+      if (_auth?.currentUser) _sessionTask = handleFirebaseUser(_auth.currentUser);
+      else openAuthModal();
+    };
+  }
+  el.classList.toggle('hidden', status !== 'error' && status !== 'loading');
+  el.querySelector('span').textContent = message;
+  el.querySelector('button').classList.toggle('hidden', status !== 'error');
+}
 
 // ─── PREMIUM CHECK ────────────────────────────────────────────
 function isPremium () {
@@ -55,6 +89,7 @@ function requiresPremium (featureName, fn) {
 
 // ─── AUTH FUNCTIONS ───────────────────────────────────────────
 async function fbSignInGoogle () {
+  await ensureAuthPersistence();
   const provider = new firebase.auth.GoogleAuthProvider();
   // Always ask which Google account: a phone signed in to several picks one
   // silently, and the wrong one is a different (free) Feed The Bear account.
@@ -63,24 +98,26 @@ async function fbSignInGoogle () {
 }
 
 async function fbSignInEmail (email, password) {
+  await ensureAuthPersistence();
   return _auth.signInWithEmailAndPassword(email, password);
 }
 
 async function fbSignUpEmail (email, password) {
+  await ensureAuthPersistence();
   return _auth.createUserWithEmailAndPassword(email, password);
 }
 
 async function fbSignOut () {
-  // This phone stops getting the account's friend notifications.
-  await FriendPings.stop();
-  await _auth.signOut();
-  window._ftbUid  = null;
-  window._ftbPlan = 'free';
-  localStorage.removeItem('ftb_plan_v1');
-  localStorage.removeItem('ftb_uid_v1');
-  closeAuthModal?.();
-  closeAccountModal?.();
-  showToast?.('Signed out', 'You are now signed out. Your theme and local settings were kept.', 'info');
+  _signingOut = true;
+  try {
+    await _auth.signOut();
+    if (window._ftbUid) _sessionTask = handleFirebaseUser(null);
+    await _sessionTask;
+    showToast('Signed out', 'Your diary is hidden until you sign back into this account. Your theme was kept.', 'info');
+  } catch (err) {
+    console.error('[FTB] Sign-out failed:', err);
+    showToast('Could not sign out', 'Please try again. Your saved diary has not been deleted.', 'error');
+  } finally { _signingOut = false; }
 }
 
 // ─── DELETE ACCOUNT ───────────────────────────────────────────
@@ -223,17 +260,22 @@ function savePhone () {
   showToast(raw ? 'Phone saved' : 'Phone removed', raw ? 'Your phone number is saved to your account.' : 'Your phone number was removed.', 'success');
 }
 
-function eraseLocalData () {
-  try {
-    Object.keys(localStorage).filter(k => k.startsWith('ftb_') || k.startsWith('ftb-')).forEach(k => localStorage.removeItem(k));
-    sessionStorage.clear();
-  } catch { /* storage blocked */ }
-  try { indexedDB.deleteDatabase(typeof PHOTO_DB !== 'undefined' ? PHOTO_DB : 'ftb-photos'); } catch { /* not available */ }
+async function eraseLocalData () {
+  Object.keys(localStorage).filter(k => k.startsWith('ftb_') || k.startsWith('ftb-')).forEach(k => localStorage.removeItem(k));
+  sessionStorage.clear();
+  await new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(typeof PHOTO_DB !== 'undefined' ? PHOTO_DB : 'ftb-photos');
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => reject(new Error('Close other Feed The Bear tabs, then clear this device data in browser settings.'));
+  });
 }
 
 async function fbDeleteAccount () {
   const user = _auth?.currentUser;
   if (!user) return;
+  const generation = _authGeneration;
+  let accountDeleted = false;
   const btn = document.getElementById('delete-account-go');
   const eraseLocal = document.getElementById('delete-account-local').checked;
   btn.disabled = true;
@@ -241,25 +283,50 @@ async function fbDeleteAccount () {
   try {
     await _reauthForDelete(user);
     const token = await user.getIdToken(true);
+    await _saveChain;
+    const keptDiary = eraseLocal ? null : localStorage.getItem(STORAGE_KEY);
+    if (generation !== _authGeneration || _auth.currentUser?.uid !== user.uid) throw new Error('Your account changed. Reopen Delete account to confirm the current account.');
     const resp = await fetch('/api/delete-account', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
     const body = await resp.json().catch(() => ({}));
     if (!resp.ok) throw new Error(body.message || body.error || 'Deleting your account failed. Please try again.');
+    accountDeleted = true;
     if (typeof trackProductEvent === 'function') trackProductEvent('account_deleted');
-    try { await _auth.signOut(); } catch { /* already gone */ }
+    if (generation !== _authGeneration || _auth.currentUser?.uid !== user.uid) {
+      if (eraseLocal) await photoDbOp('readwrite', store => store.delete(user.uid), 'accounts');
+      showToast('Account deleted', 'The deleted account is gone. Your current account was left unchanged.', 'info');
+      return;
+    }
+    await _auth.signOut();
+    if (window._ftbUid) _sessionTask = handleFirebaseUser(null);
+    await _sessionTask;
+    if (_auth.currentUser) {
+      showToast('Account deleted', 'Your current account was left unchanged.', 'info');
+      return;
+    }
     window._ftbUid = null;
     window._ftbPlan = 'free';
     localStorage.removeItem('ftb_plan_v1');
     localStorage.removeItem('ftb_uid_v1');
     localStorage.removeItem(LAST_ACCOUNT_KEY);
-    if (eraseLocal) eraseLocalData();
+    if (eraseLocal) await eraseLocalData();
+    else {
+      const removed = await photoDbOp('readwrite', store => store.delete(user.uid), 'accounts');
+      if (!removed) throw new Error('Device storage is unavailable. Reload before using your kept diary.');
+      localStorage.setItem(STORAGE_KEY, keptDiary || '[]');
+      localStorage.setItem('ftb_data_owner_v1', '');
+      window._ftbDataOwner = '';
+      loadData();
+      renderAll();
+    }
     closeDeleteAccount();
-    showToast('Account deleted', eraseLocal ? 'Your account and this device are wiped clean.' : 'Your account is gone. Spots on this device were kept.', 'success');
+    showToast('Account deleted', eraseLocal ? 'Your account and this device are wiped clean.' : 'Your spots were kept as a signed-out diary. Your profile, friends and chats were removed.', 'success');
     setTimeout(() => window.location.replace('app.html'), 1800);
   } catch (err) {
+    console.error('[FTB] Account deletion or device cleanup failed:', err);
     const msg = err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' ? 'That password is not right.'
       : err.code === 'auth/popup-closed-by-user' ? 'Confirm with Google to delete your account.'
       : err.message;
-    showToast('Account not deleted', msg, 'error');
+    showToast(accountDeleted ? 'Account deleted; device cleanup needs attention' : 'Account not deleted', msg, 'error');
     btn.disabled = false;
   } finally {
     btn.textContent = 'Delete forever';
@@ -278,7 +345,7 @@ async function fbLoadUserData (uid) {
     return { restaurants, cloudProfile };
   } catch (err) {
     console.warn('[FTB] Firestore load failed:', err);
-    return { restaurants: [], cloudProfile: null };
+    throw err;
   }
 }
 
@@ -338,33 +405,42 @@ function restoreTrimmedPhotos (cloud, local) {
 }
 
 async function fbSaveRestaurants (uid, restaurants) {
-  if (!uid || !restaurants || !restaurants.length) return;
+  const generation = _authGeneration;
+  if (!uid || uid !== window._ftbUid || window._ftbAccountSwitching || window._ftbSyncBlocked || !restaurants?.length) return;
   // Wait until stored photos are back in memory so the cloud gets photos, not references.
   if (typeof photosReadyForSync === 'function' && !photosReadyForSync()) {
-    setTimeout(() => fbSaveRestaurants(uid, state.restaurants), 2000);
+    setTimeout(() => { if (generation === _authGeneration && uid === window._ftbUid) fbSaveRestaurants(uid, state.restaurants); }, 2000);
     return;
   }
   try {
     // Batch in chunks of 400 (Firestore limit is 500 per batch)
     for (let i = 0; i < restaurants.length; i += 400) {
+      if (generation !== _authGeneration || uid !== window._ftbUid || window._ftbAccountSwitching) return;
       const batch = _db.batch();
       restaurants.slice(i, i + 400).forEach(r => {
         batch.set(_db.doc(`users/${uid}/restaurants/${r.id}`), cloudSafeRestaurant(r));
       });
       await batch.commit();
     }
+    if (generation === _authGeneration && uid === window._ftbUid && window._ftbBackupStatus !== 'error') setBackupStatus('synced');
   } catch (err) {
     console.warn('[FTB] Firestore save failed:', err);
+    if (generation === _authGeneration && uid === window._ftbUid) setBackupStatus('error', 'Your spots are saved on this device, but cloud backup failed. Check your connection and retry.');
   }
 }
 
 async function fbSaveProfileCloud (uid, profile) {
-  if (!uid || !profile) return;
+  const generation = _authGeneration;
+  if (!uid || uid !== window._ftbUid || window._ftbAccountSwitching || window._ftbSyncBlocked || !profile) return;
   // Billing fields are server-owned (see firestore.rules) — never send them
   // from the client or the whole write gets rejected. Friends sync on their
   // own (fbSaveFriendsCloud), so a stale copy here can't overwrite them.
   const { plan, stripeCustomerId, stripeSessionId, upgradedAt, friends, friendsAt, profileShareId, ...safe } = profile;
-  try { await _db.doc(`users/${uid}/meta/profile`).set(safe, { merge: true }); } catch {}
+  try { await _db.doc(`users/${uid}/meta/profile`).set(safe, { merge: true }); }
+  catch (err) {
+    console.warn('[FTB] Profile backup failed:', err);
+    if (generation === _authGeneration && uid === window._ftbUid) setBackupStatus('error', 'Your profile is saved on this device, but its cloud backup failed. Retry when connected.');
+  }
 }
 
 // ─── FRIENDS YOU FOLLOW ───────────────────────────────────────
@@ -375,7 +451,9 @@ function fbSaveFriendsCloud () {
   const uid = window._ftbUid;
   if (!uid || !_db || typeof getFriends !== 'function') return;
   clearTimeout(_friendsSyncTimer);
+  const generation = _authGeneration;
   _friendsSyncTimer = setTimeout(() => {
+    if (generation !== _authGeneration || uid !== window._ftbUid || window._ftbSyncBlocked) return;
     const friends = getFriends().map(({ recent, liveAt, ...f }) => f);
     _db.doc(`users/${uid}/meta/profile`).set({
       friends, friendsAt: friendsUpdatedAt() || Date.now(),
@@ -424,9 +502,11 @@ function _mergeFriendsFromCloud (cloud) {
 
 // Delete restaurant docs from Firestore so deletions propagate across devices
 async function fbDeleteRestaurantsCloud (uid, ids) {
-  if (!uid || !_db || !Array.isArray(ids) || !ids.length) return;
+  if (!uid || uid !== window._ftbUid || window._ftbSyncBlocked || !_db || !Array.isArray(ids) || !ids.length) return;
+  const generation = _authGeneration;
   try {
     for (let i = 0; i < ids.length; i += 400) {
+      if (generation !== _authGeneration || uid !== window._ftbUid) return;
       const batch = _db.batch();
       ids.slice(i, i + 400).forEach(id => batch.delete(_db.doc(`users/${uid}/restaurants/${id}`)));
       await batch.commit();
@@ -441,9 +521,11 @@ window.fbDeleteRestaurantsCloud = fbDeleteRestaurantsCloud;
 // Every signed-in account is backed up; Grizzly sells unlimited spots and AI.
 function fbDebouncedSync () {
   const uid = window._ftbUid;
-  if (!uid) return;
+  if (!uid || window._ftbAccountSwitching || window._ftbSyncBlocked) return;
   clearTimeout(_syncTimer);
+  const generation = _authGeneration;
   _syncTimer = setTimeout(() => {
+    if (generation !== _authGeneration || uid !== window._ftbUid) return;
     fbSaveRestaurants(uid, state.restaurants);
     fbPublishFriendProfile();
   }, 3000);
@@ -455,16 +537,16 @@ function fbDebouncedSync () {
 // the random part of your link; only people with the link can read it.
 let _lastPublishedProfile = '';
 async function fbPublishFriendProfile () {
+  const generation = _authGeneration;
   const uid = window._ftbUid;
-  if (!uid || !_db || typeof buildLiveProfile !== 'function') return;
+  if (!uid || window._ftbAccountSwitching || window._ftbSyncBlocked || !_db || typeof buildLiveProfile !== 'function') return;
   const doc = buildLiveProfile();
   if (!doc) return;
   const json = JSON.stringify(doc);
   if (json === _lastPublishedProfile) return;
   try {
     await _db.doc(`profiles/${doc.id}`).set({ ...doc, uid, updatedAt: Date.now() });
-    _lastPublishedProfile = json;
-    FriendPings.notify(doc.id);
+    if (generation === _authGeneration && uid === window._ftbUid) { _lastPublishedProfile = json; FriendPings.notify(doc.id); }
   } catch (err) {
     // The phone's share id belongs to another account (signed in with a
     // different one on this phone). Friends could never see this account or
@@ -507,7 +589,16 @@ async function ftbApiHeaders () {
   for (let i = 0; i < 40 && !window._ftbAuthReady; i++) await new Promise(r => setTimeout(r, 100));
   const user = _auth?.currentUser;
   if (!user) return {};
-  try { return { 'X-FTB-Token': await user.getIdToken() }; } catch { return {}; }
+  const generation = _authGeneration;
+  try {
+    const token = await user.getIdToken();
+    if (generation !== _authGeneration || _auth.currentUser?.uid !== user.uid) throw new Error('The account changed while preparing this request.');
+    return { 'X-FTB-Token': token };
+  } catch (err) {
+    console.warn('[FTB] Could not verify the current sign-in:', err);
+    if (generation === _authGeneration) setBackupStatus('error', 'Could not verify your sign-in. Check your connection, retry, or sign in again.');
+    throw err;
+  }
 }
 window.ftbApiHeaders = ftbApiHeaders;
 
@@ -562,9 +653,12 @@ var FriendPings = (() => {
   async function start () {
     const p = plugin();
     if (!p || !_auth?.currentUser) return;
+    const generation = _authGeneration;
     listen(p);
     try {
-      if ((await p.checkPermissions()).receive === 'granted') await p.register();
+      const permission = await p.checkPermissions();
+      if (generation !== _authGeneration || !_auth?.currentUser) return;
+      if (permission.receive === 'granted') await p.register();
       // Wait for the friends list to sync down from the account first.
       else setTimeout(() => { if (getFriends().length && localStorage.getItem(ASKED_KEY) !== '1') offer(); }, 6000);
     } catch (err) { console.warn('[FTB] push start failed:', err); }
@@ -600,9 +694,11 @@ var FriendPings = (() => {
   function notify (id) { if (id) call('notify', { id }); }
 
   async function stop () {
+    lastFollows = '';
     const p = plugin();
     if (!p) return;
-    try { await p.unregister(); } catch { /* already off */ }
+    try { await p.unregister(); }
+    catch (err) { console.warn('[FTB] Could not stop account notifications:', err); }
   }
 
   // Roughly where you are and your Want to Try pins, for the daily nudges.
@@ -653,10 +749,48 @@ window.fbSharedListSubscribe = fbSharedListSubscribe;
 
 // ─── AUTH STATE OBSERVER ──────────────────────────────────────
 function initFirebaseAuth () {
+  window.addEventListener('online', () => {
+    if (_auth?.currentUser && window._ftbBackupStatus === 'error') _sessionTask = handleFirebaseUser(_auth.currentUser);
+  });
   _capturePaidSession();
   _captureInviteRef();
   _finishNativeSignIn();
-  _auth.onAuthStateChanged(async user => {
+  _auth.onAuthStateChanged(user => {
+    _sessionTask = handleFirebaseUser(user);
+  }, err => {
+    console.error('[FTB] Auth observer failed:', err);
+    setBackupStatus('error', 'Could not restore your sign-in. Reload or sign in again.');
+  });
+}
+
+async function handleFirebaseUser (user) {
+  const generation = ++_authGeneration;
+  const isCurrent = () => generation === _authGeneration;
+  const wasSignedIn = !!window._ftbUid;
+  const captured = captureAccountData();
+  window._ftbUid = null;
+  window._ftbPlan = 'free';
+  window._ftbUserEmail = null;
+  window._ftbTrialEnd = null;
+  window._ftbCancelAtEnd = false;
+  window._ftbSyncBlocked = true;
+  clearTimeout(_syncTimer);
+  clearTimeout(_friendsSyncTimer);
+  _lastPublishedProfile = '';
+  _profileIdReplaced = false;
+  _restoreTried = '';
+  window._ftbAuthReady = true;
+  if (typeof refreshSharedRealtimeSubscriptions === 'function') refreshSharedRealtimeSubscriptions();
+  const hasOwnedData = !!captured.snapshotOwner;
+  try {
+    if (user || hasOwnedData) {
+      clearAccountUI(captured.appearance);
+      setBackupStatus('loading', user ? 'Restoring your diary...' : 'Securing your diary...');
+      _accountSwitchChain = _accountSwitchChain.catch(err => console.warn('[FTB] Previous account transition failed:', err))
+        .then(() => { if (isCurrent()) return switchAccountData(user?.uid || '', isCurrent, captured, user?.email || ''); });
+      await _accountSwitchChain;
+      if (!isCurrent()) return;
+    }
     window._ftbAuthReady = true;
     if (user) {
       window._ftbUid       = user.uid;
@@ -676,6 +810,7 @@ function initFirebaseAuth () {
       // Load plan from Firestore
       try {
         const snap = await _db.doc(`users/${user.uid}/meta/profile`).get();
+        if (!isCurrent()) return;
         const data = snap.exists ? snap.data() : {};
         window._ftbPlan = data.plan || 'free';
         // Trial end and cancellation, for the reminder near the end (app.js renderTrialReminder).
@@ -683,7 +818,9 @@ function initFirebaseAuth () {
         window._ftbCancelAtEnd = !!data.cancelAtPeriodEnd;
         localStorage.setItem('ftb_plan_v1', window._ftbPlan);
         localStorage.setItem('ftb_uid_v1',  user.uid);
-      } catch {
+      } catch (err) {
+        if (!isCurrent()) return;
+        console.warn('[FTB] Plan load failed:', err);
         // Offline (or a blip): keep the plan this phone last saw, so Grizzly
         // doesn't turn into Cub in a basement with no signal.
         window._ftbPlan = localStorage.getItem('ftb_uid_v1') === user.uid ? (localStorage.getItem('ftb_plan_v1') || 'free') : 'free';
@@ -698,17 +835,19 @@ function initFirebaseAuth () {
       let pendingUpgrade = null;
       try { pendingUpgrade = sessionStorage.getItem('ftb_pending_upgrade'); sessionStorage.removeItem('ftb_pending_upgrade'); } catch { /* private mode */ }
       if (pendingUpgrade && window._ftbPlan !== 'grizzly') {
-        setTimeout(() => openUpgradeModal({ key: 'resume', period: pendingUpgrade, title: "You're in! One tap to Grizzly",
-          body: 'Unlimited spots, Byte Cub AI picks, Year in Review, and 15-second food videos.' }), 700);
+        setTimeout(() => { if (isCurrent()) openUpgradeModal({ key: 'resume', period: pendingUpgrade, title: "You're in! One tap to Grizzly",
+          body: 'Unlimited spots, Byte Cub AI picks, Year in Review, and 15-second food videos.' }); }, 700);
       }
 
       // Restore restaurants on sign-in for ALL users (never lock anyone out
-      // of data they previously synced). Ongoing background sync/uploads stay
-      // Grizzly-only via fbDebouncedSync.
+      // of data they previously synced). Background backup is included for all accounts.
       // Merge by id (newest updatedAt wins) instead of the old "whichever
       // side has more wins", which resurrected deleted spots and let a
       // stale device overwrite newer edits.
       const { restaurants, cloudProfile } = await fbLoadUserData(user.uid);
+      if (!isCurrent()) return;
+      window._ftbSyncBlocked = false;
+      setBackupStatus('synced');
       {
         let local = state.restaurants || [];
         if (!local.length) {
@@ -716,6 +855,7 @@ function initFirebaseAuth () {
           // read localStorage directly so a slow start doesn't wipe local spots.
           try { local = JSON.parse(localStorage.getItem('ftb_restaurants_v2') || '[]') || []; } catch { local = []; }
         }
+
         const deletedIds = new Set((typeof getDeletedRestaurantIds === 'function') ? getDeletedRestaurantIds() : []);
         const ts = v => (typeof v === 'number' ? v : (Date.parse(v) || 0));
         const byId = new Map();
@@ -731,7 +871,7 @@ function initFirebaseAuth () {
         state.restaurants = merged;
         // A list read straight from localStorage carries photo references; restore them.
         if (typeof hydrateStoredPhotos === 'function') hydrateStoredPhotos();
-        saveData(); // persists locally + (Grizzly) debounced push of merged set
+        saveData();
         renderAll();
         if (deletedIds.size) fbDeleteRestaurantsCloud(user.uid, [...deletedIds]);
         if (typeof onboardingAfterSignIn === 'function') onboardingAfterSignIn(restaurants.length > 0 || !!cloudProfile);
@@ -742,18 +882,21 @@ function initFirebaseAuth () {
 
       _mergeFriendsFromCloud(cloudProfile);
       // Let the people you follow see you under "Following you" (once each).
-      setTimeout(() => { window.loadFollowing?.(); window.loadFollowers?.(); window.noteExistingFollows?.(); window.noteInviteJoined?.(); window.myShareLink?.(); }, 5000);
+      setTimeout(() => { if (!isCurrent()) return; window.loadFollowing?.(); window.loadFollowers?.(); window.noteExistingFollows?.(); window.noteInviteJoined?.(); window.myShareLink?.(); }, 5000);
       // Opened an invite before signing in: follow them and show their spots now.
-      setTimeout(() => window.resumePendingInvite?.(), 600);
+      setTimeout(() => { if (isCurrent()) window.resumePendingInvite?.(); }, 600);
 
       // Merge profile (cloud wins for plan fields)
       if (cloudProfile) {
         const localProf = loadUserProfile() || {};
         const { friends, friendsAt, profileShareId, ...cloudRest } = cloudProfile;
-        saveUserProfile({ ...localProf, ...cloudRest });
-        updateHeaderAvatar(cloudProfile.avatar || localProf.avatar || 'FTB');
+        const localNewer = Number(localProf.updatedAt || 0) > Number(cloudProfile.updatedAt || 0);
+        const mergedProfile = localNewer ? { ...cloudRest, ...localProf, plan: cloudProfile.plan } : { ...localProf, ...cloudRest };
+        saveUserProfile(mergedProfile, { fromCloud: true });
+        if (localNewer) fbSaveProfileCloud(user.uid, mergedProfile);
+        updateHeaderAvatar(mergedProfile.avatar || 'FTB');
 
-        const appearance = cloudProfile.appearance || null;
+        const appearance = mergedProfile.appearance || null;
         if (appearance && typeof applyThemeChoice === 'function') {
           if (appearance.themeChoice) state.settings.themeChoice = appearance.themeChoice;
           if (appearance.themeMode) state.settings.theme = appearance.themeMode;
@@ -779,6 +922,7 @@ function initFirebaseAuth () {
       const pendingSession = _getPendingSession();
       if (pendingSession) {
         const result = await _verifyAndActivatePlan(pendingSession, user.uid);
+        if (!isCurrent()) return;
         if (result === 'grizzly') {
           _clearPendingSession();
           if (typeof renderGrizzlyUi === 'function') renderGrizzlyUi();
@@ -799,13 +943,19 @@ function initFirebaseAuth () {
       }
     } else {
       window._ftbUid  = null;
-      window._ftbPlan = localStorage.getItem('ftb_plan_v1') || 'free';
+      window._ftbPlan = 'free';
+      localStorage.removeItem('ftb_plan_v1');
+      localStorage.removeItem('ftb_uid_v1');
+      setBackupStatus('idle');
+      await FriendPings.stop();
+      if (!isCurrent()) return;
       updateAuthUI(null);
+      if (wasSignedIn && !_signingOut) showToast('Please sign in again', 'Your session ended. Your diary is kept for this account and is hidden until you sign back in.', 'info');
       if (typeof refreshSharedRealtimeSubscriptions === 'function') refreshSharedRealtimeSubscriptions();
       // Back from Stripe but signed out here (e.g. it opened in a browser, not the app)
       if (_getPendingSession()) {
         showToast('Payment received!', 'Sign in to the account you upgraded to finish turning on Grizzly.', 'success');
-        setTimeout(() => openAuthModal({ forUpgrade: true }), 400);
+        setTimeout(() => { if (isCurrent()) openAuthModal({ forUpgrade: true }); }, 400);
       } else if (_signInRequired()) {
         openAuthModal();
       } else if (_tryingFirst() && _gateOn()) {
@@ -816,7 +966,13 @@ function initFirebaseAuth () {
         else if (typeof onboardingAfterSignIn === 'function') onboardingAfterSignIn(false);
       }
     }
-  });
+  } catch (err) {
+    if (!isCurrent()) return;
+    console.error('[FTB] Account restore failed:', err);
+    updateAuthUI(user);
+    setBackupStatus('error', window._ftbAccountSwitching ? err.message : 'Your local diary is available, but cloud backup could not be restored. Check your connection and retry.');
+    showToast('Backup needs attention', 'Your saved data has not been deleted. Use Retry backup when connected.', 'error');
+  }
 }
 
 // Stripe sends buyers back with ?upgrade=success&session_id=…; keep the id until
@@ -842,9 +998,11 @@ function _clearPendingSession () {
 // Asks the server to confirm the Stripe payment and turn on Grizzly.
 // Returns 'grizzly', 'wrong-account', 'unpaid' or 'retry'.
 async function _verifyAndActivatePlan (sessionId, uid) {
+  const generation = _authGeneration;
   try {
     const resp = await fetch(`/api/verify-session?sessionId=${encodeURIComponent(sessionId)}&uid=${encodeURIComponent(uid)}`);
     const data = await resp.json().catch(() => ({}));
+    if (generation !== _authGeneration || window._ftbUid !== uid) return 'retry';
     if (data.plan === 'grizzly') {
       window._ftbPlan = 'grizzly';
       window._ftbTrialEnd = data.trialEnd || null;
@@ -1013,7 +1171,7 @@ async function _handleAuthSubmit () {
     closeAuthModal();
     showToast(
       'You are in',
-      'Your food diary is backed up. Sign in on any device to see it.',
+      'Your diary is opening. Backup status will appear if anything needs attention.',
       'success'
     );
   } catch (err) {
@@ -1082,10 +1240,15 @@ const _isNativeApp = () => !!window.Capacitor?.isNativePlatform?.();
 const _b64url = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
 async function _nativeGoogleSignIn () {
+  await ensureAuthPersistence();
   const verifier = _b64url(crypto.getRandomValues(new Uint8Array(32)));
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
   const challenge = _b64url(new Uint8Array(digest));
-  try { localStorage.setItem(NATIVE_VERIFIER_KEY, verifier); } catch { /* private mode */ }
+  try { localStorage.setItem(NATIVE_VERIFIER_KEY, verifier); }
+  catch (err) {
+    console.warn('[FTB] Could not save native sign-in verifier:', err);
+    throw new Error('Allow site storage for Feed The Bear, then try Google sign-in again.');
+  }
   const url = `https://www.feed-the-bear.com/native-signin.html?c=${challenge}`;
   const browser = window.Capacitor?.Plugins?.Browser;
   if (browser) await browser.open({ url });
@@ -1116,22 +1279,23 @@ async function _finishNativeSignInNow () {
     });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok || !data.token) throw new Error(data.error || 'Please try again.');
+    await ensureAuthPersistence();
     await _auth.signInWithCustomToken(data.token);
     closeAuthModal?.();
-    showToast('You are in', 'Your food diary is backed up. Sign in on any device to see it.', 'success');
+    showToast('You are in', 'Your diary is opening. Backup status will appear if anything needs attention.', 'success');
   } catch (err) {
     showToast('Sign-in did not finish', err.message || 'Please try again.', 'error');
   }
 }
 
 async function _handleGoogleAuth () {
-  if (_isNativeApp()) { _nativeGoogleSignIn(); return; }
   const btn = document.getElementById('auth-google-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Connecting Google...'; }
   try {
+    if (_isNativeApp()) { await _nativeGoogleSignIn(); return; }
     await fbSignInGoogle();
     closeAuthModal();
-    showToast('You are in', 'Your food diary is backed up. Sign in on any device to see it.', 'success');
+    showToast('You are in', 'Your diary is opening. Backup status will appear if anything needs attention.', 'success');
   } catch (err) {
     if (err.code !== 'auth/popup-closed-by-user') showToast('Google Sign-In failed', err.message, 'error');
   } finally {
@@ -1297,9 +1461,10 @@ let _restoreTried = '';
 async function _restoreGrizzly (user, { quiet = false } = {}) {
   if (!user || (_restoreTried === user.uid && quiet !== 'force')) return false;
   _restoreTried = user.uid;
+  const generation = _authGeneration;
   try {
     const { ok, data } = await _accountAction('restore');
-    if (!ok || data.plan !== 'grizzly' || window._ftbUid !== user.uid) return false;
+    if (generation !== _authGeneration || !ok || data.plan !== 'grizzly' || window._ftbUid !== user.uid) return false;
     window._ftbPlan = 'grizzly';
     window._ftbTrialEnd = data.trialEnd || null;
     try { localStorage.setItem('ftb_plan_v1', 'grizzly'); } catch { /* private mode */ }

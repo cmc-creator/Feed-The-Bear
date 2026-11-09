@@ -254,7 +254,11 @@ window.Cub = (() => {
     sheet.classList.toggle('want', s === 'want-to-try');
     sheet.querySelector('.qa-dish').placeholder = s === 'visited' ? 'What did you have? (optional)' : 'Heard about a must-order dish? (optional)';
     say(s === 'visited' ? 'Nice! How was it? Tap the stars.' : 'Good call. Any dish you have to try there?');
-    sheet.querySelector('.qa-save').disabled = false;
+    syncSave();
+  }
+
+  function syncSave () {
+    if (sheet) sheet.querySelector('.qa-save').disabled = !pick || !status || app().foodMediaBusy() || !!window._ftbAccountSwitching;
   }
 
   function setStars (n) {
@@ -283,6 +287,7 @@ window.Cub = (() => {
   function save () {
     if (!pick || !status) return;
     const a = app();
+    if (a.foodMediaBusy() || window._ftbAccountSwitching) { a.showToast('Please wait', 'Finish adding media before saving.', 'info'); return; }
     const atLimit = typeof a.isPremium === 'function' && !a.isPremium() && state.restaurants.length >= FREE_RESTAURANT_LIMIT;
     const today = a.iso();
     const cuisine = sheet.querySelector('.qa-cuisine').value.trim().slice(0, 40);
@@ -298,6 +303,7 @@ window.Cub = (() => {
     };
     if (status === 'visited') r.visits.push({ date: today, note: '', rating: stars, dish, photo, ...(video ? { video } : {}) });
     if (photo) r.photo = photo;
+    if (video) r.video = video;
     if (atLimit) {
       // Over the free limit: the spot waits, and is saved the moment they go Grizzly.
       if (typeof a.holdSpotForGrizzly === 'function') a.holdSpotForGrizzly(r, dish ? { name: dish, verdict: status === 'visited' ? (verdict || 'ok') : 'want' } : null);
@@ -319,6 +325,7 @@ window.Cub = (() => {
     if (photo) a.photoReveal(photo, dish || r.name);
     a.showToast(status === 'visited' ? `${r.name} logged` : `${r.name} saved`, status === 'visited' ? 'In your den, with your rating.' : 'On your Want to Try list.', 'success');
     if (typeof a.celebrateMilestones === 'function') a.celebrateMilestones();
+    a.offerShareMeal({ r, dish, verdict: status === 'visited' ? verdict || 'ok' : '', photo, video });
     if (welcomeActive) { resumeWelcome(true); return; }
     buddyTip(status === 'want-to-try' && !dish ? `Tip: open ${r.name} and add a must-try dish to your Crave List.` : '', true);
   }
@@ -414,8 +421,8 @@ window.Cub = (() => {
     el.querySelectorAll('.qa-status').forEach(b => b.addEventListener('click', () => setStatus(b.dataset.status)));
     el.querySelectorAll('.qa-star').forEach(b => b.addEventListener('click', () => setStars(Number(b.dataset.n))));
     el.querySelector('.qa-ai').addEventListener('click', aiFill);
-    el.querySelector('.qa-photo').addEventListener('click', async () => {
-      const media = await app().pickFoodMedia();
+    const attachMedia = async (source = 'library') => {
+      const media = await app().pickFoodMedia(source);
       if (!media) return;
       photo = media.photo;
       video = media.video || '';
@@ -423,7 +430,9 @@ window.Cub = (() => {
       prev.src = app().safeUrl(photo);
       prev.classList.remove('hidden');
       say(video ? 'Ooh, a video! That looks amazing.' : 'Looks delicious.');
-    });
+    };
+    el.querySelector('.qa-photo').addEventListener('click', () => attachMedia());
+    app().addFoodCaptureActions(el.querySelector('.qa-extra'), attachMedia);
     el.querySelector('.qa-save').addEventListener('click', save);
     el.querySelector('.qa-more').addEventListener('click', moreDetails);
     el.querySelector('.qa-close').addEventListener('click', close);
@@ -434,6 +443,7 @@ window.Cub = (() => {
   }
 
   function openAdd (prefill = '') {
+    app().invalidateFoodMedia();
     sheet = sheet || build();
     pick = null; status = null; stars = 0; verdict = null; photo = ''; video = '';
     sheet.classList.remove('step-2', 'been', 'want');
@@ -467,6 +477,7 @@ window.Cub = (() => {
   }
 
   function close () {
+    app().invalidateFoodMedia();
     // Closed on purpose (or saved): the shared post is dealt with.
     try { localStorage.removeItem(PENDING_SHARE_KEY); } catch { /* private mode */ }
     linkBusy = false;
@@ -484,6 +495,7 @@ window.Cub = (() => {
   let welcomeEl = null;
   let welcomeStep = 0;
   let welcomeActive = false;
+  let welcomeTimer = null;
   const welcomeDid = new Set();
 
   const WELCOME_STEPS = [
@@ -567,7 +579,8 @@ window.Cub = (() => {
   function resumeWelcome (saved) {
     if (!welcomeActive || WELCOME_STEPS[welcomeStep]?.key !== 'spot') return;
     if (!saved) welcomeDid.delete('spot');
-    setTimeout(() => showWelcomeStep(welcomeStep + 1), saved ? 900 : 150);
+    clearTimeout(welcomeTimer);
+    welcomeTimer = setTimeout(() => { if (welcomeActive) showWelcomeStep(welcomeStep + 1); }, saved ? 900 : 150);
   }
 
   function finishWelcome (skippedAll) {
@@ -712,11 +725,19 @@ window.Cub = (() => {
 
   // Signed in to an account that already set up: close it without a toast.
   function endWelcome () {
+    clearTimeout(welcomeTimer);
     welcomeActive = false;
     welcomeEl?.classList.add('hidden');
   }
 
-  return { init, openAdd, close, welcome, endWelcome, guessCuisine, parseMapsLink, tip: buddyTip, hide: hideBuddy, resumeShare };
+  function resetSession () {
+    endWelcome();
+    close();
+    hideBubble();
+    lastAsk = null;
+  }
+
+  return { init, openAdd, close, welcome, endWelcome, resetSession, guessCuisine, parseMapsLink, tip: buddyTip, hide: hideBuddy, resumeShare, syncSave };
 })();
 
 document.addEventListener('DOMContentLoaded', () => window.Cub.init());

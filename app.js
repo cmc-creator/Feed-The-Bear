@@ -676,6 +676,14 @@ const BEAR_REACTION_COPY = {
    STORAGE
    ════════════════════════════════════════════════════════════ */
 function loadData () {
+  const owner = localStorage.getItem('ftb_data_owner_v1') || localStorage.getItem('ftb_uid_v1');
+  const legacy = !owner && !!localStorage.getItem('ftb_last_account_v1') && window._ftbDataOwner === undefined;
+  if (window._ftbAccountSwitching || legacy || (owner && owner !== window._ftbUid)) {
+    state.restaurants = [];
+    state.settings = deviceAppearance();
+    return;
+  }
+  window._ftbDataOwner = owner || '';
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : seedData();
@@ -709,7 +717,8 @@ function loadData () {
   if (_vlMigrated) saveData();
   if (mergeLegacyDishStores()) saveData();
   // Restore photos kept in IndexedDB, then move any still stored inline there.
-  hydrateStoredPhotos().then(() => { if (_photoDbReady && localStorage.getItem(STORAGE_KEY)?.includes('"data:image/')) saveData(); });
+  const generation = _dataGeneration;
+  hydrateStoredPhotos().then(() => { if (generation === _dataGeneration && _photoDbReady && localStorage.getItem(STORAGE_KEY)?.includes('"data:image/')) saveData(); });
 
   try {
     const s = localStorage.getItem(SETTINGS_KEY);
@@ -836,6 +845,10 @@ const FOOD_MEDIA_MAX = 6;
 // One picked file to { photo } or { photo: poster, video }, or null.
 // Videos are Grizzly; `quiet` skips the upsell (already shown this batch).
 async function mediaFromFile (file, { quiet = false } = {}) {
+  if (!/^(image|video)\//.test(file.type)) {
+    showToast('Unsupported file', 'Choose a photo or a video file.', 'error');
+    return null;
+  }
   if (!file.type.startsWith('video/')) {
     try { return { photo: await readImageFileCompressed(file, FOOD_PHOTO_MAX_DIM, FOOD_PHOTO_QUALITY) }; }
     catch { showToast('Photo Error', `Could not load ${file.name || 'that image'}.`, 'error'); return null; }
@@ -847,6 +860,10 @@ async function mediaFromFile (file, { quiet = false } = {}) {
   if (file.size > FOOD_VIDEO_MAX_BYTES) { showToast('Video too big', 'Try a shorter clip (up to 15 seconds).', 'error'); return null; }
   try {
     const { duration, poster } = await readVideoPoster(file);
+    if (!Number.isFinite(duration) || duration <= 0) {
+      showToast('Could not read video length', 'Choose a clip with a readable duration, up to 15 seconds.', 'error');
+      return null;
+    }
     if (duration > FOOD_VIDEO_MAX_SECONDS + 0.5) {
       showToast('Keep it to 15 seconds', `That clip is ${Math.round(duration)}s. Trim it in your camera app, then add it again.`, 'info');
       return null;
@@ -862,32 +879,109 @@ async function mediaFromFile (file, { quiet = false } = {}) {
 
 // Photo and video picker, several at a time. Resolves an array (empty if
 // nothing usable was picked), at most `max` items.
-function pickFoodMediaList (max = FOOD_MEDIA_MAX) {
+let _foodMediaJobs = 0;
+let _mediaContext = 0;
+function foodMediaBusy () { return _foodMediaJobs > 0; }
+function invalidateFoodMedia () {
+  _mediaContext++;
+  document.querySelector('.share-nudge')?.remove();
+}
+
+function refreshMediaBusy () {
+  const busy = foodMediaBusy();
+  document.querySelectorAll('#modal-save-btn, #just-ate-save, .your-order-verdicts button').forEach(btn => {
+    btn.disabled = busy;
+    btn.setAttribute('aria-busy', String(busy));
+  });
+  syncJustAteSave();
+  window.Cub?.syncSave();
+  document.querySelectorAll('.food-capture-actions').forEach(el => {
+    el.querySelectorAll('button').forEach(btn => { btn.disabled = busy; });
+    el.querySelector('.food-media-status').textContent = busy ? 'Adding media... Please wait before saving.' : '';
+  });
+}
+
+function addFoodCaptureActions (anchor, onPick, { video = true } = {}) {
+  const el = document.createElement('div');
+  el.className = 'food-capture-actions';
+  el.innerHTML = `<div class="food-capture-buttons">
+    <button type="button" class="btn-sm" data-source="photo">Take photo</button>
+    ${video ? '<button type="button" class="btn-sm" data-source="video">Record video</button>' : ''}
+    <button type="button" class="btn-sm" data-source="library">Gallery</button>
+    </div><span class="food-media-status" role="status"></span>`;
+  anchor.insertAdjacentElement('afterend', el);
+  el.addEventListener('click', e => {
+    const button = e.target.closest('button[data-source]');
+    if (button) onPick(button.dataset.source);
+  });
+  return el;
+}
+
+function pickFoodFiles ({ max = FOOD_MEDIA_MAX, source = 'library', accept = 'image/*,video/*' } = {}) {
   return new Promise(resolve => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*,video/*';
-    input.multiple = max > 1;
-    input.onchange = async () => {
-      const files = [...(input.files || [])];
+    input.accept = source === 'photo' ? 'image/*' : source === 'video' ? 'video/*' : accept;
+    input.multiple = source === 'library' && max > 1;
+    if (source !== 'library') input.setAttribute('capture', 'environment');
+    input.hidden = true;
+    document.body.appendChild(input);
+    let settled = false;
+    let focusTimer;
+    const finish = files => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(focusTimer);
+      window.removeEventListener('focus', onFocus);
+      input.remove();
+      resolve(files);
+    };
+    const onFocus = () => {
+      if (!('oncancel' in input)) focusTimer = setTimeout(() => { if (!input.files?.length) finish([]); }, 1000);
+    };
+    input.onchange = () => finish([...(input.files || [])]);
+    input.addEventListener('cancel', () => finish([]), { once: true });
+    window.addEventListener('focus', onFocus);
+    try { input.click(); }
+    catch (err) {
+      console.error('[FTB] Media picker failed:', err);
+      showToast('Could not open camera or gallery', 'Allow camera access in device settings, or choose Gallery.', 'error');
+      finish([]);
+    }
+  });
+}
+
+async function pickFoodMediaList (max = FOOD_MEDIA_MAX, source = 'library') {
+  if (source === 'video' && !hasGrizzly()) { showGrizzlyUpsell('video'); return []; }
+  if (foodMediaBusy()) return [];
+  const context = _mediaContext;
+  const generation = _dataGeneration;
+  _foodMediaJobs++;
+  refreshMediaBusy();
+  try {
+      const files = await pickFoodFiles({ max, source });
+      if (context !== _mediaContext || generation !== _dataGeneration) return [];
       if (files.length > max) showToast(`Up to ${max} at a time`, `Added the first ${max}.`, 'info');
       const out = [];
       let upsold = false;
       for (const file of files.slice(0, max)) {
         const isVideo = file.type.startsWith('video/');
         const m = await mediaFromFile(file, { quiet: upsold });
+        if (context !== _mediaContext || generation !== _dataGeneration) return [];
         if (isVideo && !m && !hasGrizzly()) upsold = true;
         if (m) out.push(m);
       }
-      resolve(out);
-    };
-    input.click();
-  });
+      if (!files.length && source !== 'library') showToast('No media added', 'If camera access is blocked, allow it in device settings or choose Gallery.', 'info');
+      return out;
+  } finally {
+    _foodMediaJobs--;
+    refreshMediaBusy();
+  }
 }
 
 // Single-item picker kept for callers that hold one photo.
-async function pickFoodMedia () {
-  return (await pickFoodMediaList(1))[0] || null;
+async function pickFoodMedia (source = 'library') {
+  return (await pickFoodMediaList(1, source))[0] || null;
 }
 
 // Every photo/clip on a dish or visit: the main one (photo/video) first,
@@ -956,14 +1050,18 @@ function openPhotoDb () {
   if (_photoDb) return _photoDb;
   _photoDb = new Promise(resolve => {
     try {
-      // v2 adds the videos store; v1 databases keep their photos.
-      const req = indexedDB.open(PHOTO_DB, 2);
+      const req = indexedDB.open(PHOTO_DB, 3);
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains(PHOTO_STORE)) db.createObjectStore(PHOTO_STORE);
         if (!db.objectStoreNames.contains(VIDEO_STORE)) db.createObjectStore(VIDEO_STORE);
+        if (!db.objectStoreNames.contains('accounts')) db.createObjectStore('accounts');
       };
-      req.onsuccess = () => { _photoDbReady = true; resolve(req.result); };
+      req.onsuccess = () => {
+        req.result.onversionchange = () => { req.result.close(); _photoDb = null; };
+        _photoDbReady = true;
+        resolve(req.result);
+      };
       req.onerror = () => resolve(null);
       req.onblocked = () => resolve(null);
     } catch { resolve(null); }
@@ -997,9 +1095,9 @@ function photoRefFor (dataUrl) {
 }
 
 // The saved copy of the list, plus any photos that still need writing.
-function serializeRestaurants (offload) {
+function serializeRestaurants (offload, restaurants = state.restaurants) {
   const pending = new Map();
-  const json = JSON.stringify(state.restaurants, (key, value) => {
+  const json = JSON.stringify(restaurants, (key, value) => {
     if (offload && key === 'photo' && typeof value === 'string' && value.startsWith('data:image/')) {
       const ref = photoRefFor(value);
       if (!_storedPhotoRefs.has(ref)) pending.set(ref, value);
@@ -1019,8 +1117,9 @@ function writeRestaurantsToLocalStorage (json) {
   }
 }
 
-async function persistRestaurants () {
+async function persistRestaurants (generation = _dataGeneration) {
   const db = await openPhotoDb();
+  if (generation !== _dataGeneration || window._ftbAccountSwitching) return;
   // Until stored photos are back in memory, the list still holds references;
   // saving them as-is is fine, but new data URLs must be offloaded too.
   const { json, pending } = serializeRestaurants(!!db);
@@ -1030,16 +1129,18 @@ async function persistRestaurants () {
       pending.forEach((_, k) => _storedPhotoRefs.add(k));
     } catch (err) {
       console.warn('[FTB] photo store write failed, keeping photos inline:', err);
-      writeRestaurantsToLocalStorage(serializeRestaurants(false).json);
+      if (generation === _dataGeneration && !window._ftbAccountSwitching) writeRestaurantsToLocalStorage(serializeRestaurants(false).json);
       return;
     }
   }
-  writeRestaurantsToLocalStorage(json);
+  if (generation === _dataGeneration && !window._ftbAccountSwitching) writeRestaurantsToLocalStorage(json);
 }
 
 // Put stored photos back into the in-memory restaurants.
 async function hydrateStoredPhotos () {
+  const generation = _dataGeneration;
   const db = await openPhotoDb(); // also lets later saves offload photos
+  if (generation !== _dataGeneration) return;
   const holders = [];
   const visit = obj => {
     if (obj && typeof obj.photo === 'string' && obj.photo.startsWith(PHOTO_REF)) holders.push(obj);
@@ -1062,6 +1163,7 @@ async function hydrateStoredPhotos () {
   } catch (err) {
     console.warn('[FTB] photo store read failed:', err);
   }
+  if (generation !== _dataGeneration) return;
   holders.forEach(h => {
     const data = found.get(h.photo);
     if (data) {
@@ -1078,8 +1180,138 @@ function photosReadyForSync () { return _photosHydrated; }
 
 let _photoDbReady = false;
 let _queuedSaves = 0;
+let _dataGeneration = 0;
+
+const ACCOUNT_LOCAL_KEYS = [
+  STORAGE_KEY, SETTINGS_KEY, USER_KEY, 'ftb_deleted_v1', 'ftb_dishes_v1', 'ftb_menu_notes_v1',
+  'ftb_dishes_merged_v1', 'ftb_friends_v1', 'ftb_friends_at_v1', 'ftb_friends_uid_v1',
+  'ftb_invites_sent_v1', 'ftb_invite_code_v1', 'ftb_follow_noted_v1', 'ftb_followed_back_v1',
+  'ftb_cub_chats_v1', 'ftb_cub_ask_skip_v1', 'ftb_waiting_spot_v1', SWIPE_PREFS_KEY,
+  'ftb_bear_swipe_v2', DAILY_QUEST_KEY, 'ftb_challenges_v1', 'ftb_reminders', 'ftb_travel_v1',
+  'ftb_crave_alerts_v1', 'ftb_near_alerts_v1', 'ftb_dinner_votes_v1', 'ftb_area_sent_v1',
+  'ftb_collab_id_v1',
+];
+const APPEARANCE_KEYS = ['theme', 'themeChoice', 'themeManual', 'uiDensity', 'uiCorners', 'uiMotion',
+  'onboardingDone', 'profileSetupDone', 'locationBannerDismissed'];
+
+function deviceAppearance () {
+  let settings;
+  try { settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); }
+  catch (err) {
+    console.warn('[FTB] Saved appearance could not be read:', err);
+    showToast('Settings need attention', 'Saved appearance settings could not be read. Your diary has not been deleted.', 'error');
+    return {};
+  }
+  if (!settings || typeof settings !== 'object') return {};
+  return Object.fromEntries(APPEARANCE_KEYS.filter(k => k in settings).map(k => [k, settings[k]]));
+}
+
+function captureAccountData () {
+  const owner = localStorage.getItem('ftb_data_owner_v1') || localStorage.getItem('ftb_uid_v1') || '';
+  const legacy = !owner && !!localStorage.getItem('ftb_last_account_v1') && window._ftbDataOwner === undefined;
+  const snapshotOwner = owner || (legacy ? `legacy:${localStorage.getItem('ftb_last_account_v1').trim().toLowerCase()}` : '');
+  const snapshot = Object.fromEntries(ACCOUNT_LOCAL_KEYS.map(k => [k, localStorage.getItem(k)]));
+  const diskSnapshot = { ...snapshot };
+  if (window._ftbDataOwner === owner) {
+    snapshot[STORAGE_KEY] = serializeRestaurants(false).json;
+    snapshot[SETTINGS_KEY] = JSON.stringify(state.settings);
+  }
+  const appearance = deviceAppearance();
+  return { owner, snapshotOwner, snapshot, diskSnapshot, appearance };
+}
+
+function clearAccountUI (appearance) {
+  _dataGeneration++;
+  Object.keys(sessionStorage).filter(k => k.startsWith('ftb_airec_') || k === 'ftb_owner_handoff')
+    .forEach(k => sessionStorage.removeItem(k));
+  window._ftbAccountSwitching = true;
+  window._ftbDataOwner = null;
+  state.restaurants = [];
+  state.settings = appearance;
+  state.detailId = state.editingId = null;
+  state.dinnerRooms = {};
+  state.activeDinnerRoomCode = '';
+  state.swipeDeck = []; state.swipeLikes = [];
+  state.selectedIds.clear();
+  state.bulkMode = false;
+  state.filter = { search: '', cuisine: '', price: '', sort: 'date-desc', tag: '', collection: '' };
+  setYourOrderPending([]);
+  CubChats.resetSession();
+  closeChat();
+  _aiHistory.length = 0;
+  document.getElementById('ai-chat-history')?.replaceChildren();
+  setFormMedia([]);
+  closeJustAte();
+  window.Cub?.resetSession();
+  window.StoryCard?.close();
+  document.querySelector('#video-viewer .video-viewer-close')?.click();
+  document.querySelectorAll('[role="dialog"]:not(#auth-overlay), .share-nudge, .photo-reveal, #save-diary-nudge')
+    .forEach(el => el.classList.add('hidden'));
+  updateProfileVisuals({ name: 'Foodie', avatar: DEFAULT_AVATAR });
+  renderAll();
+  NativeAlerts?.clear();
+}
+
+async function switchAccountData (uid, isCurrent, captured = captureAccountData(), email = '') {
+  const { owner, snapshotOwner, snapshot, diskSnapshot, appearance } = captured;
+
+  if (snapshotOwner) {
+    const stored = await photoDbOp('readwrite', store => store.put(snapshot, snapshotOwner), 'accounts');
+    if (!stored) throw new Error('Device storage is unavailable. Your saved diary was kept; reload to try again.');
+  }
+  if (!isCurrent()) return;
+  let restored = uid && uid === owner ? snapshot : null;
+  if (uid && uid !== owner) {
+    let request;
+    await photoDbOp('readonly', store => { request = store.get(uid); return request; }, 'accounts');
+    restored = request?.result || null;
+  }
+  if (uid && !restored && email) {
+    const legacyKey = `legacy:${email.trim().toLowerCase()}`;
+    let request;
+    await photoDbOp('readonly', store => { request = store.get(legacyKey); return request; }, 'accounts');
+    restored = request?.result || null;
+    if (restored && isCurrent()) {
+      const saved = await photoDbOp('readwrite', store => { store.put(restored, uid); return store.delete(legacyKey); }, 'accounts');
+      if (!saved) throw new Error('Could not migrate your saved diary. Reload to try again.');
+    }
+  }
+  if (!isCurrent()) return;
+  // Only a never-signed-in guest diary may be adopted by a new account.
+  if (uid && !snapshotOwner && !restored && !localStorage.getItem('ftb_last_account_v1')) restored = snapshot;
+  if (restored?.[STORAGE_KEY] && await openPhotoDb()) {
+    const { json, pending } = serializeRestaurants(true, JSON.parse(restored[STORAGE_KEY]));
+    if (pending.size) {
+      await photoDbOp('readwrite', store => pending.forEach((value, ref) => store.put(value, ref)));
+      pending.forEach((_, ref) => _storedPhotoRefs.add(ref));
+    }
+    restored = { ...restored, [STORAGE_KEY]: json };
+  }
+  if (!isCurrent()) return;
+  const diskOwner = localStorage.getItem('ftb_data_owner_v1');
+  try {
+    ACCOUNT_LOCAL_KEYS.forEach(k => localStorage.removeItem(k));
+    if (restored) Object.entries(restored).forEach(([k, value]) => { if (ACCOUNT_LOCAL_KEYS.includes(k) && value !== null) localStorage.setItem(k, value); });
+    if (!restored) localStorage.setItem(SETTINGS_KEY, JSON.stringify(appearance));
+    localStorage.setItem('ftb_data_owner_v1', uid || '');
+  } catch (err) {
+    ACCOUNT_LOCAL_KEYS.forEach(k => localStorage.removeItem(k));
+    Object.entries(diskSnapshot).forEach(([k, value]) => { if (value !== null) localStorage.setItem(k, value); });
+    if (diskOwner === null) localStorage.removeItem('ftb_data_owner_v1');
+    else localStorage.setItem('ftb_data_owner_v1', diskOwner);
+    throw err;
+  }
+  window._ftbUid = uid || null;
+  window._ftbDataOwner = uid || '';
+  window._ftbAccountSwitching = false;
+  window.resetFriendsSession?.();
+  loadData();
+  updateProfileVisuals(loadUserProfile() || { name: 'Foodie', avatar: DEFAULT_AVATAR });
+  renderAll();
+}
 
 function saveData () {
+  if (window._ftbAccountSwitching) return;
   // Most saves have no new photo: write now, as before. A save with a new
   // photo, or any save while one is queued, goes through the chain in order
   // (each run re-reads the latest state).
@@ -1088,7 +1320,9 @@ function saveData () {
     writeRestaurantsToLocalStorage(json);
   } else {
     _queuedSaves++;
-    _saveChain = _saveChain.then(persistRestaurants, persistRestaurants).finally(() => { _queuedSaves--; });
+    const generation = _dataGeneration;
+    const persist = () => persistRestaurants(generation);
+    _saveChain = _saveChain.then(persist, persist).finally(() => { _queuedSaves--; });
   }
   updateTagSuggestions();
   NativeAlerts?.schedule();
@@ -1173,20 +1407,9 @@ const FOOD_PHOTO_QUALITY = 0.7;
 // Opens the camera/library picker and resolves with a compressed data URL,
 // or '' if nothing was picked. No `capture` attribute, so phones offer both
 // "Take Photo" and "Photo Library".
-function pickFoodPhoto () {
-  return new Promise(resolve => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = () => {
-      const file = input.files?.[0];
-      if (!file) { resolve(''); return; }
-      readImageFileCompressed(file, FOOD_PHOTO_MAX_DIM, FOOD_PHOTO_QUALITY)
-        .then(resolve)
-        .catch(() => { showToast('Photo Error', 'Could not load that image.', 'error'); resolve(''); });
-    };
-    input.click();
-  });
+async function pickFoodPhoto (source = 'library') {
+  const media = await pickFoodMedia(source);
+  return media?.photo || '';
 }
 
 function readImageFileCompressed (file, maxDim = 1280, quality = 0.8) {
@@ -1609,6 +1832,9 @@ const UI_CORNERS = new Set(['rounded', 'sharp']);
 const UI_MOTION = new Set(['playful', 'reduced']);
 
 function loadUserProfile () {
+  if (window._ftbAccountSwitching) return null;
+  const owner = localStorage.getItem('ftb_data_owner_v1') || localStorage.getItem('ftb_uid_v1');
+  if (owner && owner !== window._ftbUid) return null;
   try {
     const profile = JSON.parse(localStorage.getItem(USER_KEY)) || null;
     if (!profile) return null;
@@ -1618,10 +1844,12 @@ function loadUserProfile () {
     return null;
   }
 }
-function saveUserProfile (profile) {
-  localStorage.setItem(USER_KEY, JSON.stringify(profile));
-  if (window._ftbUid && typeof fbSaveProfileCloud === 'function') {
-    fbSaveProfileCloud(window._ftbUid, profile);
+function saveUserProfile (profile, { fromCloud = false } = {}) {
+  if (window._ftbAccountSwitching) return;
+  const saved = fromCloud ? profile : { ...profile, updatedAt: Date.now() };
+  localStorage.setItem(USER_KEY, JSON.stringify(saved));
+  if (!fromCloud && window._ftbUid && typeof fbSaveProfileCloud === 'function') {
+    fbSaveProfileCloud(window._ftbUid, saved);
   }
 }
 
@@ -2519,6 +2747,14 @@ var NativeAlerts = (() => {
       if (!plugin()) return;
       clearTimeout(timer);
       timer = setTimeout(sync, 1500);
+    },
+    async clear () {
+      clearTimeout(timer);
+      lastSig = '';
+      const p = plugin();
+      if (!p) return;
+      try { await p.setSpots({ enabled: false, radiusMeters: 1609, spots: [] }); }
+      catch (err) { console.warn('[FTB] Could not clear account location alerts:', err); }
     },
     refresh,
     // Explain first (Google Play requires it), then ask for "Allow all the time".
@@ -3990,6 +4226,17 @@ let _formPlace = null;
 let _formPlaceTimer = null;
 let _formPlaceSeq = 0;
 let _formPlaceResults = [];
+let _formMedia = [];
+
+function setFormMedia (media = []) {
+  _formMedia = media;
+  const preview = document.getElementById('form-media-preview');
+  if (preview) {
+    preview.classList.toggle('hidden', !media.length);
+    preview.innerHTML = media.length ? pendingMediaHtml(media) : '';
+  }
+  if (media.length) document.getElementById('form-photo').value = media[0].photo;
+}
 
 function clearFormPlaceSearch () {
   clearTimeout(_formPlaceTimer);
@@ -4042,6 +4289,8 @@ function pickFormPlace (p) {
 }
 
 function openAddModal () {
+  invalidateFoodMedia();
+  setFormMedia([]);
   state.editingId = null;
   _pendingAddPrefill = null;
   _formPlace = null;
@@ -4065,6 +4314,8 @@ function openAddModal () {
 }
 
 function openEditModal (id) {
+  invalidateFoodMedia();
+  setFormMedia([]);
   const r = state.restaurants.find(x => x.id === id);
   if (!r) return;
   state.editingId = id;
@@ -4113,6 +4364,7 @@ function openEditModal (id) {
 }
 
 function closeModal () {
+  invalidateFoodMedia();
   clearFormPlaceSearch();
   document.getElementById('modal-overlay').classList.add('hidden');
   maybeHideOverlay();
@@ -4147,6 +4399,7 @@ function setCheckinStars (n) {
 
 function handleFormSubmit (e) {
   e.preventDefault();
+  if (foodMediaBusy() || window._ftbAccountSwitching) { showToast('Please wait', 'Finish adding media before saving.', 'info'); return; }
   const name = document.getElementById('form-name').value.trim();
   if (!name) { showToast('Missing Name', 'Please enter a restaurant name.', 'error'); return; }
 
@@ -4189,6 +4442,7 @@ function handleFormSubmit (e) {
          state.restaurants.find(r => r.id === state.editingId)?.dateVisited || now)
       : null,
   };
+  if (_formMedia.length) setMediaOn(entry, _formMedia);
 
   if (isNew && _pendingAddPrefill && normalizeName(_pendingAddPrefill.name || name) === normalizeName(name)) {
     if (!entry.website && _pendingAddPrefill.website) entry.website = String(_pendingAddPrefill.website || '').trim();
@@ -4228,6 +4482,11 @@ function handleFormSubmit (e) {
     showToast('Updated', `"${name}" was refreshed in your list.`, 'success');
   } else {
     entry.visits = [];
+    if (status === 'visited' && _formMedia.length) {
+      const visit = { date: entry.dateVisited, rating: entry.myRating, dish: '', note: '' };
+      setMediaOn(visit, _formMedia);
+      entry.visits.push(visit);
+    }
     state.restaurants.unshift(entry);
     showToast('Saved', `"${name}" is now on your list.`, 'success');
   }
@@ -4241,6 +4500,7 @@ function handleFormSubmit (e) {
   saveData();
   renderAll();
   closeModal();
+  if (isNew && typeof offerShareMeal === 'function') offerShareMeal({ r: state.restaurants.find(r => r.id === entry.id), photo: entry.photo, video: entry.video || '' });
   _pendingAddPrefill = null;
   _formPlace = null;
 }
@@ -5386,6 +5646,9 @@ function cubAddWant (r) {
 
 // Finds the place you mean: one of yours, or real ones to choose from.
 async function cubResolve (name, onPick) {
+  const generation = _dataGeneration;
+  const choose = onPick;
+  onPick = value => { if (generation === _dataGeneration && !window._ftbAccountSwitching) choose(value); };
   const query = name.replace(/^the\s+/i, '').trim();
   const branch = query.match(/^(.+?)\s+(?:on|at|in|near)\s+(.+)$/i);
   const key = normalizeName(branch ? branch[1] : query);
@@ -5402,6 +5665,7 @@ async function cubResolve (name, onPick) {
   }
   showTyping();
   const found = (await searchRealPlaces(query)).filter(p => normalizeName(p.name).includes(key) && matchesBranch(p));
+  if (generation !== _dataGeneration) return;
   hideTyping();
   if (!found.length) {
   cubSay(`I couldn't verify "${name}" on the map. I won't substitute another location. Want me to save it with just the name?`, [
@@ -5547,6 +5811,8 @@ function answerCubQuestion (text) {
 }
 
 async function sendChat (message) {
+  if (window._ftbAccountSwitching) return;
+  const generation = _dataGeneration;
   const input = document.getElementById('chat-input');
   const text = (typeof message === 'string' ? message : input.value).trim();
   if (!text) return;
@@ -5574,7 +5840,10 @@ async function sendChat (message) {
   showTyping();
   if (window.AI?.hasAccess?.()) {
     try {
-      const reply = await AI.chat(text, _cubChatHistory.slice(-12), state.restaurants, await userAreaName());
+      const area = await userAreaName();
+      if (generation !== _dataGeneration) return;
+      const reply = await AI.chat(text, _cubChatHistory.slice(-12), state.restaurants, area);
+      if (generation !== _dataGeneration) return;
       hideTyping();
       // He asks the app to search real places near you rather than asking where you are.
       const find = String(reply).match(/\[\[\s*FIND:\s*([^\]]{2,60})\]\]/i);
@@ -5583,13 +5852,14 @@ async function sendChat (message) {
       cubSay(reply);
       return;
     } catch (err) {
+      if (generation !== _dataGeneration) return;
       console.warn('[FTB] Byte Cub chat failed:', err);
       hideTyping();
       cubSay("I couldn't reach the AI just now. Here's what I can tell from your saved list:\n\n" + chatResponse(text));
       return;
     }
   }
-  setTimeout(() => { hideTyping(); cubSay(chatResponse(text)); }, 350);
+  setTimeout(() => { if (generation === _dataGeneration) { hideTyping(); cubSay(chatResponse(text)); } }, 350);
 }
 
 function openChat () {
@@ -5655,7 +5925,12 @@ const CubChats = (() => {
     // A chat with only Byte Cub talking isn't worth keeping on the account yet.
     if (c.messages.some(m => m.r === 'u')) {
       clearTimeout(saveTimer);
-      saveTimer = setTimeout(() => api('POST', { body: { id: c.id, title: c.title, messages: c.messages } }).catch(() => {}), 1500);
+      const generation = _dataGeneration;
+      saveTimer = setTimeout(() => {
+        if (generation !== _dataGeneration) return;
+        api('POST', { body: { id: c.id, title: c.title, messages: c.messages } })
+          .catch(err => console.warn('[FTB] Chat backup failed:', err));
+      }, 1500);
     }
   }
 
@@ -5718,11 +5993,13 @@ const CubChats = (() => {
   }
 
   async function showHistory () {
+    const generation = _dataGeneration;
     document.getElementById('chat-history').classList.remove('hidden');
     document.getElementById('chat-panel').classList.add('history-open');
     drawList(window._ftbUid ? 'Looking for your chats…' : '');
     try {
       const data = await api('GET');
+      if (generation !== _dataGeneration) return;
       if (Array.isArray(data?.chats)) {
         const d = load();
         data.chats.forEach(s => {
@@ -5741,11 +6018,13 @@ const CubChats = (() => {
   }
 
   async function openById (id) {
+    const generation = _dataGeneration;
     const d = load();
     let c = d.chats[id];
     if (!c) return;
     if (!Array.isArray(c.messages)) {
       const data = await api('GET', { query: `?id=${encodeURIComponent(id)}` }).catch(() => null);
+      if (generation !== _dataGeneration) return;
       if (!data?.chat) { showToast("Couldn't open that chat", 'Check your connection and try again.', 'error'); return; }
       c = { ...c, ...data.chat, count: data.chat.messages.length };
     }
@@ -5789,7 +6068,17 @@ const CubChats = (() => {
     });
   });
 
-  return { record, restore, startNew, showHistory, closeHistory, openById };
+  function resetSession () {
+    clearTimeout(saveTimer);
+    _cubChatHistory = [];
+    _cubAwaiting = null;
+    closeHistory();
+    document.getElementById('chat-messages')?.replaceChildren();
+    document.getElementById('chat-history-list')?.replaceChildren();
+    document.getElementById('chat-suggestions')?.replaceChildren();
+  }
+
+  return { record, restore, startNew, showHistory, closeHistory, openById, resetSession };
 })();
 window.CubChats = CubChats;
 
@@ -6371,12 +6660,41 @@ async function _discFetch () {
   _discRenderLimit = DISC_PAGE_SIZE;
   _discApplyFilters();
 
+    // Track successful nearby search
+    if (window.Analytics) {
+      Analytics.track('nearby_search_success', {
+        resultCount: _discAllResults.length,
+        radius,
+        lat,
+        lng
+      });
+    }
+
   } catch (err) {
-  resultsEl.innerHTML = `<div class="disc-empty">
-    <div class="disc-empty-icon" aria-hidden="true">🐻</div>
-    <div class="disc-empty-title">${err?.name === 'AbortError' ? 'Took too long' : 'Connection error'}</div>
-    <div class="disc-empty-sub">Check your connection and tap the refresh button.</div>
-  </div>`;
+    console.error('[Nearby] Error fetching restaurants:', err);
+
+    // Track error in analytics
+    if (window.Analytics) {
+      Analytics.track('nearby_search_error', {
+        error: err?.message || 'Unknown error',
+        errorType: err?.name || 'Error',
+        lat,
+        lng,
+        radius
+      });
+    }
+
+    resultsEl.innerHTML = `<div class="disc-empty">
+      <div class="disc-empty-icon" aria-hidden="true">🐻</div>
+      <div class="disc-empty-title">${err?.name === 'AbortError' ? 'Search took too long' : 'Could not find nearby restaurants'}</div>
+      <div class="disc-empty-sub">The bear is having trouble sniffing out restaurants. Check your connection and try again!</div>
+      <button class="btn-primary" style="margin-top:16px" onclick="_discFetch()">Try Again</button>
+    </div>`;
+
+    // Show toast for better visibility
+    if (window.showToast) {
+      showToast('Nearby Search', err?.name === 'AbortError' ? 'Search timeout - try a smaller radius' : 'Could not load restaurants. Try again!', 'error');
+    }
   }
 }
 
@@ -6755,11 +7073,13 @@ function refreshSharedRealtimeSubscriptions () {
   Object.values(_sharedRealtimeUnsubs).forEach(unsub => { try { unsub(); } catch {} });
   Object.keys(_sharedRealtimeUnsubs).forEach(k => delete _sharedRealtimeUnsubs[k]);
   if (!window._ftbUid || typeof fbSharedListSubscribe !== 'function') return;
+  const uid = window._ftbUid;
+  const generation = _dataGeneration;
 
   Object.entries(getSharedListsMap()).forEach(([cid, meta]) => {
   const cloudId = getSharedCloudId(cid);
   _sharedRealtimeUnsubs[cid] = fbSharedListSubscribe(cloudId, data => {
-    if (!data) return;
+    if (!data || uid !== window._ftbUid || generation !== _dataGeneration) return;
     applySharedCloudData(cid, { ...data, cloudId });
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
     renderCollectionsList();
@@ -8140,18 +8460,35 @@ function setupEvents () {
   });
   });
 
-  // Photo file upload → read as data URL into URL field
-  document.getElementById('form-photo-file').addEventListener('change', e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  if (!file.type.startsWith('image/')) {
-    showToast('Invalid File', 'Please select an image file.', 'error');
-    return;
-  }
-  readImageFileCompressed(file, FOOD_PHOTO_MAX_DIM, FOOD_PHOTO_QUALITY).then(dataUrl => {
-    document.getElementById('form-photo').value = dataUrl;
-    showToast('Photo Added ', 'Image loaded successfully.', 'success');
-  }).catch(() => showToast('Photo Error', 'Could not load that image.', 'error'));
+  const attachFormMedia = async (source = 'library') => {
+    const media = await pickFoodMediaList(FOOD_MEDIA_MAX, source);
+    if (media.length) setFormMedia(media);
+  };
+  addFoodCaptureActions(document.getElementById('form-media-preview'), attachFormMedia);
+  document.getElementById('form-photo-file').addEventListener('change', async e => {
+    const files = [...(e.target.files || [])].slice(0, FOOD_MEDIA_MAX);
+    if (!files.length) return;
+    const context = _mediaContext;
+    _foodMediaJobs++;
+    refreshMediaBusy();
+    try {
+      const media = [];
+      for (const file of files) {
+        const item = await mediaFromFile(file);
+        if (item) media.push(item);
+      }
+      if (context === _mediaContext && media.length) setFormMedia(media);
+    } finally { _foodMediaJobs--; refreshMediaBusy(); e.target.value = ''; }
+  });
+  document.getElementById('form-photo').addEventListener('input', () => {
+    if (_formMedia.length && document.getElementById('form-photo').value !== _formMedia[0].photo) setFormMedia([]);
+  });
+  document.getElementById('form-media-preview').addEventListener('click', e => {
+    const rm = e.target.closest('.pm-remove');
+    if (!rm) return;
+    const media = _formMedia.filter((_, i) => i !== Number(rm.dataset.idx));
+    if (!media.length) document.getElementById('form-photo').value = '';
+    setFormMedia(media);
   });
 
   // Export / Import
@@ -8534,12 +8871,14 @@ function setupEvents () {
   if (e.key === 'Enter') { e.preventDefault(); if (!document.getElementById('just-ate-save').disabled) saveJustAte(); }
   });
   document.getElementById('just-ate-save')?.addEventListener('click', saveJustAte);
-  document.getElementById('just-ate-photo')?.addEventListener('click', async () => {
+  const attachJustAteMedia = async (source = 'library') => {
   const room = FOOD_MEDIA_MAX - _justAte.media.length;
   if (room <= 0) { showToast(`Up to ${FOOD_MEDIA_MAX} per meal`, 'Remove one to add another.', 'info'); return; }
-  const picked = await pickFoodMediaList(room);
+  const picked = await pickFoodMediaList(room, source);
   if (picked.length) setJustAteMedia([..._justAte.media, ...picked]);
-  });
+  };
+  document.getElementById('just-ate-photo')?.addEventListener('click', () => attachJustAteMedia());
+  addFoodCaptureActions(document.getElementById('just-ate-photo'), attachJustAteMedia);
   document.getElementById('just-ate-photo-preview')?.addEventListener('click', e => {
   const rm = e.target.closest('.pm-remove');
   if (rm) setJustAteMedia(_justAte.media.filter((_, i) => i !== Number(rm.dataset.idx)));
@@ -8551,14 +8890,16 @@ function setupEvents () {
   const r = state.restaurants.find(x => x.id === state.detailId);
   logYourOrder(r?.status === 'want-to-try' ? 'want' : 'ok');
   });
-  document.getElementById('your-order-photo')?.addEventListener('click', async () => {
+  const attachOrderMedia = async (source = 'library') => {
   const room = FOOD_MEDIA_MAX - _yoPendingMedia.length;
   if (room <= 0) { showToast(`Up to ${FOOD_MEDIA_MAX} per dish`, 'Remove one to add another.', 'info'); return; }
-  const picked = await pickFoodMediaList(room);
+  const picked = await pickFoodMediaList(room, source);
   if (!picked.length) return;
   setYourOrderPending([..._yoPendingMedia, ...picked]);
   document.getElementById('your-order-input')?.focus();
-  });
+  };
+  document.getElementById('your-order-photo')?.addEventListener('click', () => attachOrderMedia());
+  addFoodCaptureActions(document.getElementById('your-order-pending'), attachOrderMedia);
   document.getElementById('your-order-pending')?.addEventListener('click', e => {
   const rm = e.target.closest('.pm-remove');
   if (rm) setYourOrderPending(_yoPendingMedia.filter((_, i) => i !== Number(rm.dataset.idx)));
@@ -8578,7 +8919,7 @@ function setupEvents () {
   if (photoFor) {
     // Adds to the dish's photos; the oldest drop off past the limit.
     const d = dishesOf(r).find(x => x.id === photoFor.dataset.photoFor);
-    const picked = d ? await pickFoodMediaList() : [];
+    const picked = d ? await pickFoodMediaList(FOOD_MEDIA_MAX, photoFor.dataset.source || 'library') : [];
     if (!picked.length) return;
     setMediaOn(d, [...picked, ...mediaOf(d)]);
     r.updatedAt = Date.now();
@@ -11955,7 +12296,11 @@ function renderYourOrder (restaurantId) {
         </div>
         ${d.note ? `<div class="yo-dish-note">${escHtml(d.note)}</div>` : ''}
         <span class="yo-dish-actions">
-          <button type="button" class="yo-move yo-photo-btn" data-photo-for="${escHtml(d.id)}">${d.photo ? 'Add more photos/videos' : 'Add photos/videos'}</button>
+          <div class="food-capture-buttons">
+            <button type="button" class="yo-move yo-photo-btn" data-photo-for="${escHtml(d.id)}" data-source="library">${d.photo ? 'Add more photos/videos' : 'Add photos/videos'}</button>
+            <button type="button" class="yo-move yo-photo-btn" data-photo-for="${escHtml(d.id)}" data-source="photo">Take photo</button>
+            <button type="button" class="yo-move yo-photo-btn" data-photo-for="${escHtml(d.id)}" data-source="video">Record video</button>
+          </div>
           ${DISH_VERDICTS.filter(v => v !== g).map(v => `<button type="button" class="yo-move" data-move="${v}" data-id="${escHtml(d.id)}">${DISH_VERDICT_LABEL[v]}</button>`).join('')}
           <button type="button" class="yo-remove" data-remove="${escHtml(d.id)}" aria-label="Remove ${escHtml(d.name)}">✕</button>
         </span>
@@ -12090,10 +12435,11 @@ function renderJustAtePlaces () {
 function syncJustAteSave () {
   const btn = document.getElementById('just-ate-save');
   const typed = (document.getElementById('just-ate-place')?.value || '').trim();
-  if (btn) btn.disabled = !(_justAte.placeId || typed);
+  if (btn) btn.disabled = foodMediaBusy() || !!window._ftbAccountSwitching || !(_justAte.placeId || typed);
 }
 
 function openJustAte (restaurantId = null) {
+  invalidateFoodMedia();
   const overlay = document.getElementById('just-ate-overlay');
   if (!overlay) return;
   const preset = restaurantId ? state.restaurants.find(r => r.id === restaurantId) : null;
@@ -12140,11 +12486,13 @@ function toggleJustAteTag (btn) {
 }
 
 function closeJustAte () {
+  invalidateFoodMedia();
   document.getElementById('just-ate-overlay')?.classList.add('hidden');
   maybeHideOverlay();
 }
 
 function saveJustAte () {
+  if (foodMediaBusy() || window._ftbAccountSwitching) { showToast('Please wait', 'Finish adding media before saving.', 'info'); return; }
   const placeName = (document.getElementById('just-ate-place')?.value || '').trim();
   const dishName = (document.getElementById('just-ate-dish')?.value || '').trim();
   const note = (document.getElementById('just-ate-note')?.value || '').trim().slice(0, 300);
@@ -12200,8 +12548,7 @@ function saveJustAte () {
   [stars ? '★'.repeat(stars) : '', dishName ? `${DISH_VERDICT_LABEL[verdict]}: ${dishName}` : ''].filter(Boolean).join(' · ') || 'Find it any time under Lists.',
   'success');
   if (typeof celebrateMilestones === 'function') celebrateMilestones();
-  // The moment people actually post: offer a Story card once the photo has landed.
-  setTimeout(() => offerShareMeal({ r, dish: dishName, verdict: dishName ? verdict : '', photo, note }), photo ? 2200 : 600);
+  offerShareMeal({ r, dish: dishName, verdict: dishName ? verdict : '', photo, video: media[0]?.video || '', note });
 }
 
 // "At The Mission get the guacamole, skip the churros" — the text a friend
@@ -12241,6 +12588,7 @@ async function shareYourOrder () {
 }
 
 function logYourOrder (verdict) {
+  if (foodMediaBusy() || window._ftbAccountSwitching) { showToast('Please wait', 'Finish adding media before saving.', 'info'); return; }
   const input = document.getElementById('your-order-input');
   const name = (input?.value || '').trim();
   if (!name) {
@@ -12806,10 +13154,50 @@ function firstSuccess (tasks, hedgeMs) {
   });
 }
 
+/* Overpass endpoint health tracking: deprioritize mirrors that failed recently
+   so a dead/hung mirror doesn't eat the entire timeout budget. */
+const OVERPASS_FAIL_KEY = 'ftb_overpass_failures_v1';
+const OVERPASS_FAIL_TTL = 10 * 60 * 1000; // 10 minutes
+
+function getOverpassFailures () {
+  try { return JSON.parse(localStorage.getItem(OVERPASS_FAIL_KEY)) || {}; } catch (_) { return {}; }
+}
+
+function markOverpassEndpointHealthy (endpoint) {
+  try {
+    const fails = getOverpassFailures();
+    if (fails[endpoint]) {
+      delete fails[endpoint];
+      localStorage.setItem(OVERPASS_FAIL_KEY, JSON.stringify(fails));
+    }
+  } catch (_) {}
+}
+
+function markOverpassEndpointFailed (endpoint) {
+  try {
+    const fails = getOverpassFailures();
+    fails[endpoint] = Date.now();
+    localStorage.setItem(OVERPASS_FAIL_KEY, JSON.stringify(fails));
+  } catch (_) {}
+}
+
+function orderOverpassEndpoints (endpoints) {
+  const fails = getOverpassFailures();
+  const now = Date.now();
+  const fresh = [], stale = [];
+  for (const ep of endpoints) {
+    const failedAt = Number(fails[ep] || 0);
+    (failedAt && (now - failedAt) < OVERPASS_FAIL_TTL ? stale : fresh).push(ep);
+  }
+  return [...fresh, ...stale];
+}
+
 async function fetchOverpassElements (query, opts = {}) {
   const timeoutMs = Number(opts.timeoutMs) || 6000;
-  const healthy = (opts.endpoints || OVERPASS_ENDPOINTS).filter(u => !(_overpassDownUntil[u] > Date.now()));
-  const endpoints = healthy.length ? healthy : (opts.endpoints || OVERPASS_ENDPOINTS);
+  const ordered = orderOverpassEndpoints(opts.endpoints || OVERPASS_ENDPOINTS);
+  const failures = getOverpassFailures();
+  const healthy = ordered.filter(u => !(_overpassDownUntil[u] > Date.now()) && !(Number(failures[u]) + OVERPASS_FAIL_TTL > Date.now()));
+  const endpoints = healthy.length ? healthy : ordered;
 
   const overpassTask = endpoint => async signal => {
   const ctrl = new AbortController();
@@ -12830,9 +13218,11 @@ async function fetchOverpassElements (query, opts = {}) {
     const json = await resp.json();
     const elements = (json.elements || []).filter(isCredibleFoodVenue);
     if (!elements.length) throw new Error('Overpass empty');
+    markOverpassEndpointHealthy(endpoint);
     return elements;
   } catch (err) {
     if (timedOut) _overpassDownUntil[endpoint] = Date.now() + OVERPASS_DOWN_MS;
+    if (timedOut || err?.name !== 'AbortError') markOverpassEndpointFailed(endpoint);
     throw err;
   } finally {
     clearTimeout(t);
@@ -12872,10 +13262,25 @@ async function fetchNominatimNearbyElements (lat, lng, radiusMeters = 1609, limi
   if (i) await new Promise(r => setTimeout(r, i * 1000));
   if (signal?.aborted) return [];
   const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&bounded=1&extratags=1&addressdetails=1&limit=${Math.max(6, Math.ceil(limit / terms.length))}&viewbox=${encodeURIComponent(viewbox)}&q=${encodeURIComponent(term)}`;
-  const resp = await fetch(url, { headers: { 'Accept-Language': 'en' }, signal }).catch(() => null);
-  if (!resp || !resp.ok) return [];
-  const json = await resp.json();
-  return Array.isArray(json) ? json : [];
+    const ctrl = new AbortController();
+    const abort = () => ctrl.abort();
+    signal?.addEventListener('abort', abort, { once: true });
+    const timer = setTimeout(abort, 10000);
+    try {
+      const resp = await fetch(url, {
+        headers: { 'Accept-Language': 'en' },
+        signal: ctrl.signal,
+      });
+      if (!resp.ok) return [];
+      const json = await resp.json();
+      return Array.isArray(json) ? json : [];
+    } catch (err) {
+      if (!signal?.aborted) console.warn('[Nearby] Nominatim request failed:', err);
+      return [];
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+    }
   }));
 
   const seen = new Set();
@@ -15001,6 +15406,7 @@ function showLocalDailyPick (opts) {
 }
 
 async function loadAiRec (discData) {
+  const generation = _dataGeneration;
   if (!window.AI || (typeof isPremium === 'function' && !isPremium())) { showLocalDailyPick(); return; }
   const banner = document.getElementById('ai-rec-banner');
   const textEl = document.getElementById('ai-rec-text');
@@ -15040,10 +15446,15 @@ ${swipe ? `- They just played Bear Swipe and are craving ${swipe.cuisine} food r
 ` : ''}Mention a specific place or cuisine name. Be warm and exciting.`;
 
   const rec = await AI.call(prompt);
+  if (generation !== _dataGeneration) return;
   const clean = wholeSentences((rec || '').trim().split('\n')[0].replace(/^["']|["']$/g, ''));
   if (clean) { sessionStorage.setItem(cacheKey, clean); textEl.textContent = clean; }
   else if (!showLocalDailyPick()) banner.classList.add('hidden');
-  } catch { if (!showLocalDailyPick()) banner.classList.add('hidden'); }
+  } catch (err) {
+    if (generation !== _dataGeneration) return;
+    console.warn('[FTB] Daily recommendation failed:', err);
+    if (!showLocalDailyPick()) banner.classList.add('hidden');
+  }
 }
 
 // Never show a reply that stops mid-sentence: keep the complete sentences, or nothing.
@@ -15484,6 +15895,8 @@ function _buildListContext () {
 }
 
 async function sendAiMessage (userText) {
+  if (window._ftbAccountSwitching) return;
+  const generation = _dataGeneration;
   if (!userText.trim()) return;
   if (!ensureAiUpgradeAccess('Byte Cub AI')) return;
   _appendAiMsg('user', userText);
@@ -15505,7 +15918,10 @@ async function sendAiMessage (userText) {
 
   const thinking = _showAiThinking();
   try {
-  const reply = await AI.chat(userText, _aiHistory.slice(-12), state.restaurants, await userAreaName());
+  const area = await userAreaName();
+  if (generation !== _dataGeneration) { thinking.remove(); return; }
+  const reply = await AI.chat(userText, _aiHistory.slice(-12), state.restaurants, area);
+  if (generation !== _dataGeneration) { thinking.remove(); return; }
   thinking.remove();
   // A search for real places runs in Byte Cub's chat, which shows them with save buttons.
   const find = String(reply).match(/\[\[\s*FIND:\s*([^\]]{2,60})\]\]/i);
@@ -15520,6 +15936,7 @@ async function sendAiMessage (userText) {
   _appendAiMsg('assistant', reply);
   } catch (err) {
   thinking.remove();
+  if (generation !== _dataGeneration) return;
   console.warn('[FTB] Byte Cub AI panel failed:', err);
   if (err.message === 'NO_KEY') {
     _appendAiMsg('assistant', 'Byte Cub is included by default. If AI is unavailable right now, please try again in a moment.');
@@ -15947,7 +16364,7 @@ function clearTravelMode () {
   delete state._travelLat;
   delete state._travelLng;
   _refreshTravelUI();
-  showToast('C:\Users\baild Travel Mode Off', 'Back to real location', 'info');
+  showToast('Travel Mode Off', 'Back to real location', 'info');
 }
 
 function _refreshTravelUI () {

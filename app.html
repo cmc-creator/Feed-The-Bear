@@ -185,6 +185,7 @@
       </div>
       <p>This permanently deletes your account and everything backed up with it: your spots, ratings, dishes, photos, profile and anything you shared with friends. A Grizzly subscription is cancelled. This can't be undone.</p>
       <label class="delete-account-check"><input type="checkbox" id="delete-account-local" aria-label="Also erase the data on this device" checked /> Also erase everything saved on this device</label>
+      <p class="form-hint">Uncheck to keep only your spots as a signed-out diary on this device. Your profile, friends and chats are removed.</p>
       <div id="delete-account-password-wrap" class="hidden">
         <label class="form-label" for="delete-account-password">Your password</label>
         <input id="delete-account-password" class="form-input" type="password" autocomplete="current-password" />
@@ -1428,13 +1429,14 @@
 
           <!-- Photo -->
           <div class="form-group form-full">
-            <label for="form-photo">Photo <span class="label-hint">(URL or upload)</span> <button type="button" id="ai-photo-btn" class="btn-sm btn-ai"> AI Fill</button></label>
+            <label for="form-photo">Photos &amp; videos <span class="label-hint">(or paste a photo URL)</span> <button type="button" id="ai-photo-btn" class="btn-sm btn-ai"> AI Fill</button></label>
             <input type="url" id="form-photo" placeholder="https://example.com/photo.jpg" />
             <label class="photo-upload-label">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              Upload from device
-              <input type="file" id="form-photo-file" accept="image/*" capture="environment" style="display:none" />
+              Choose from device
+              <input type="file" id="form-photo-file" accept="image/*,video/*" multiple style="display:none" />
             </label>
+            <div id="form-media-preview" class="hidden"></div>
           </div>
 
           <!-- Status -->

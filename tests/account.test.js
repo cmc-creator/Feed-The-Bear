@@ -44,6 +44,7 @@ const SEED = [spot('r1', 'Taqueria Uno'), spot('r2', 'Taqueria Dos')];
     // eslint-disable-next-line no-global-assign
     fbSaveRestaurants = window.fbSaveRestaurants;
     window._ftbUid = 'test-user';
+    window._ftbSyncBlocked = false;
     localStorage.setItem('ftb_plan_v1', 'free');
     fbDebouncedSync();
     await new Promise(r => setTimeout(r, 4500));

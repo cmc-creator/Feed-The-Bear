@@ -62,6 +62,17 @@ async function newPage (browser, { seed = null, settings = {}, viewport = { widt
   const page = await ctx.newPage();
   page.errors = [];
   page.on('pageerror', e => page.errors.push(e.message));
+  if (grizzly) {
+    page.on('load', async () => {
+      if (!new URL(page.url()).pathname.endsWith('/app.html')) return;
+      try {
+        await page.waitForFunction(() => window._ftbAuthReady === true);
+        await page.evaluate(() => { window._ftbPlan = 'grizzly'; });
+      } catch (err) {
+        if (!page.isClosed()) page.errors.push('Grizzly fixture could not restore its test session: ' + err.message);
+      }
+    });
+  }
   page.on('console', m => {
     // Missing /api functions and blocked third-party assets are expected on a static server.
     // Public map servers (Overpass, Nominatim) reject busy requests without CORS
