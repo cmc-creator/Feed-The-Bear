@@ -1024,7 +1024,7 @@ function openFoodiePlan (restaurantId = '', friendKey = '') {
       if (action === 'story') {
         await StoryCard.openStory({
           kind: 'invite', kicker: 'You + me + good food', title: r.name, sub: r.cuisine || 'Our next delicious adventure',
-          photo: r.photo || r.placePhoto || '',
+          photo: StoryCard.photosFor(r)[0] || '',
           sections: [{ label: 'The plan', items: [when() || 'Let\'s pick a time', noteField.value.trim()].filter(Boolean), tone: 'soft' }],
           footer: 'Good food is better together',
         }, text, `${r.name}-food-date`);
@@ -1063,10 +1063,10 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
   el.className = 'share-nudge';
   el.setAttribute('role', 'status');
   el.innerHTML = `${safeUrl(photo) ? `<img src="${escHtml(safeUrl(photo))}" alt="" />` : '<span class="sn-emoji" aria-hidden="true">📸</span>'}
-    <span class="sn-text"><strong>${r.status === 'visited' ? 'Share this meal?' : 'Share this spot?'}</strong><span>Choose TikTok, Instagram, Facebook or a friend in your share sheet, when available.</span></span>
+    <span class="sn-text"><strong>${r.status === 'visited' ? 'Share this meal?' : 'Share this spot?'}</strong><span>${StoryCard.photosFor(r, photo).length ? 'Your photos, your place. Preview your card before sharing.' : 'No personal photo yet. Your card uses text, never stock photos.'} Choose TikTok, Instagram, Facebook or a friend in your share sheet, when available.</span></span>
     <div class="sn-actions">
-      <button type="button" class="btn-sm btn-primary sn-media" ${photo || video ? 'disabled' : ''}>${video ? 'Preparing video...' : photo ? 'Preparing photo...' : 'Share spot'}</button>
-      <button type="button" class="btn-sm sn-go">Make Story card</button>
+      <button type="button" class="btn-sm btn-primary sn-go">Share my place card</button>
+      <button type="button" class="btn-sm sn-media" ${photo || video ? 'disabled' : ''}>${video ? 'Preparing video...' : photo ? 'Preparing photo...' : 'Share spot'}</button>
       <button type="button" class="btn-sm sn-plan">Go together</button>
       <button type="button" class="btn-sm sn-x">Done</button>
     </div><details class="sn-caption"><summary>Edit caption</summary>
@@ -1168,13 +1168,14 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
     const kicker = r.status === 'want-to-try' ? 'On my food bucket list' : verdict === 'again' ? 'Order this again' : verdict === 'skip' ? 'Skip this one' : rememberedVisit ? 'A bite worth remembering' : 'Just ate';
     try {
       await StoryCard.openStory({
-        kind: 'meal', kicker, title: dish || r.name, sub: dish ? `at ${r.name}` : (r.cuisine || ''), photo,
+        kind: 'meal', kicker, title: dish || r.name, place: r.name, location: r.address || r.cuisine || '',
+        sub: dish ? `at ${r.name}` : (r.cuisine || ''), photo, photos: StoryCard.photosFor(r, photo),
         stars: r.myRating || 0,
         sections: note && el.querySelector('.sn-include-note')?.checked ? [{ label: 'My take', items: [note], tone: 'soft' }] : [],
       }, caption.value.trim(), `${r.name}-${dish || 'meal'}`);
     } catch (err) {
       console.warn('[FTB] meal card failed:', err);
-      showToast('Could not make Story card', 'Your place is saved. Try sharing again from its details.', 'error');
+      showToast('Could not make Story card', err.message || 'Your place is saved. Try sharing again from its details.', 'error');
     }
   });
 }

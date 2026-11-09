@@ -1,5 +1,15 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-08 (personal place cards)
+
+- Make the post-save place card the first sharing choice, with a clean
+  cream layout, restaurant name/address, up to three personal photos,
+  optional dish/rating and understated branding. Keep original media sharing.
+- Use the same personal-photo design from place details; remove listing-photo
+  fallbacks from order cards and food-date invitations too.
+- Keep no-photo cards text-only and report unreadable personal photos explicitly.
+- Verify collage pixels, metadata, photo priority, and listing-photo exclusion.
+
 ## [Unreleased] - 2026-11-08 (video and social handoff)
 
 - Give Record video the same full-width icon, 60px touch target and finite,

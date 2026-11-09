@@ -45,7 +45,13 @@ window.StoryCard = (() => {
 
   function heroPhotoFor (r, picks) {
     const withPhoto = [...picks.get, ...picks.want].find(d => d.photo);
-    return withPhoto?.photo || r.photo || r.placePhoto || '';
+    return withPhoto?.photo || photosFor(r)[0] || '';
+  }
+
+  function photosFor (r, preferred = '') {
+    const media = obj => window.mediaOf ? window.mediaOf(obj) : [{ photo: obj?.photo }, ...(obj?.media || [])];
+    const sources = [preferred, ...[r, ...(r.visits || []), ...(r.dishes || [])].flatMap(obj => media(obj).map(m => m.photo))];
+    return [...new Set(sources.filter(src => src && (!window.safeUrl || window.safeUrl(src))))].slice(0, 3);
   }
 
   function cover (ctx, img, x, y, w, h) {
@@ -139,6 +145,7 @@ window.StoryCard = (() => {
 
     const picks = pickDishes(r);
     const [hero, cub] = await Promise.all([loadImage(heroPhotoFor(r, picks)), loadImage('assets/cub-avatar.jpg')]);
+    if (heroPhotoFor(r, picks) && !hero) throw new Error('Your photo could not load. Reattach it before sharing.');
 
     // Background: the food photo fading into warm brown, or just the brown.
     const BASE = '#1c120b';
@@ -298,6 +305,7 @@ window.StoryCard = (() => {
      spec: { kicker, title, sub, stars, photo, stats: [{ n, label }],
              sections: [{ label, items: [text], tone: 'gold'|'soft'|'skip' }] } */
   async function drawStory (spec) {
+    if (spec.kind === 'meal' || spec.kind === 'spot') return drawPlaceStory(spec);
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
@@ -382,6 +390,63 @@ window.StoryCard = (() => {
     return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
   }
 
+  async function drawPlaceStory (spec) {
+    const sources = [...new Set([...(spec.photos || []), spec.photo].filter(Boolean))].slice(0, 3);
+    const images = await Promise.all(sources.map(loadImage));
+    if (images.some(img => !img)) throw new Error('Your photo could not load. Reattach it or choose another photo before sharing.');
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    try { await document.fonts?.load(`800 64px Manrope`); } catch { /* system font is fine */ }
+    ctx.fillStyle = '#fff6e6'; ctx.fillRect(0, 0, W, H);
+    const photo = (img, x, y, w, h) => {
+      ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, w, h, 32); ctx.clip();
+      cover(ctx, img, x, y, w, h); ctx.restore();
+    };
+    ctx.fillStyle = '#79542d'; ctx.font = `800 30px ${FONT}`;
+    ctx.fillText(wrap(ctx, String(spec.kicker || 'My food find').toUpperCase(), W - PAD * 2, 1)[0], PAD, 130);
+    ctx.fillStyle = '#21170f'; ctx.font = `800 76px ${FONT}`;
+    let y = 158;
+    wrap(ctx, spec.place || spec.title || '', W - PAD * 2, 2).forEach(line => { y += 86; ctx.fillText(line, PAD, y); });
+    ctx.fillStyle = '#79542d'; ctx.font = `600 32px ${FONT}`;
+    wrap(ctx, spec.location || spec.sub || '', W - PAD * 2, 1).forEach(line => { y += 48; ctx.fillText(line, PAD, y); });
+    const top = y + 40;
+    const bottom = 1450;
+    if (images.length) {
+      const extras = images.length - 1;
+      const heroH = bottom - top - (extras ? 290 : 0);
+      photo(images[0], PAD, top, W - PAD * 2, heroH);
+      if (extras) {
+        const gap = 20, width = (W - PAD * 2 - gap * (extras - 1)) / extras;
+        images.slice(1).forEach((img, i) => photo(img, PAD + i * (width + gap), top + heroH + gap, width, 270));
+      }
+    } else {
+      ctx.fillStyle = '#efe1ca'; ctx.beginPath(); ctx.roundRect(PAD, top, W - PAD * 2, bottom - top, 32); ctx.fill();
+      ctx.fillStyle = '#79542d'; ctx.font = `700 40px ${FONT}`;
+      ctx.fillText('A place on my food map', PAD + 40, top + 100);
+    }
+    y = 1520;
+    ctx.fillStyle = '#21170f'; ctx.font = `800 46px ${FONT}`;
+    if (spec.place && spec.title !== spec.place) {
+      wrap(ctx, spec.title, W - PAD * 2, 1).forEach(line => ctx.fillText(line, PAD, y));
+      y += 64;
+    }
+    if (spec.stars) { ctx.fillStyle = '#79542d'; ctx.fillText(stars(spec.stars), PAD, y); y += 64; }
+    for (const section of spec.sections || []) {
+      for (const item of section.items || []) {
+        if (!item || y > 1740) continue;
+        ctx.fillStyle = '#79542d'; ctx.font = `600 34px ${FONT}`;
+        wrap(ctx, item, W - PAD * 2, 2).forEach(line => { if (y <= 1740) { ctx.fillText(line, PAD, y); y += 46; } });
+      }
+    }
+    ctx.fillStyle = '#d7c2a1'; ctx.fillRect(PAD, 1800, W - PAD * 2, 2);
+    ctx.fillStyle = '#79542d'; ctx.font = `700 26px ${FONT}`;
+    ctx.fillText('FEED THE BEAR', PAD, 1850);
+    ctx.textAlign = 'right';
+    ctx.fillText(wrap(ctx, await shareLink(), 560, 1)[0], W - PAD, 1850);
+    return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+  }
+
   function showCard (blob, text, title, fileBase) {
     overlay = overlay || buildOverlay();
     if (!blob) throw new Error('Could not draw the card');
@@ -415,5 +480,5 @@ window.StoryCard = (() => {
     track('story_card_opened', { kind: spec.kind || 'story' });
   }
 
-  return { open, openStory, draw, drawStory, close, pickDishes, brand, shareLink };
+  return { open, openStory, draw, drawStory, close, pickDishes, photosFor, brand, shareLink };
 })();

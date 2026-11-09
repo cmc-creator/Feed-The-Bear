@@ -6869,7 +6869,7 @@ async function shareCard (r) {
   const uidRef = window._ftbUid && /^[A-Za-z0-9]{10,64}$/.test(window._ftbUid) ? window._ftbUid : '';
   const link = uidRef ? `https://www.feed-the-bear.com/app.html?ref=${uidRef}` : 'https://www.feed-the-bear.com';
   const text = `${visited ? 'Eating at' : 'Next up:'} ${r.name}${goTo ? ` (the ${goTo.name}!)` : ''}. I keep all my spots on Feed The Bear: ${link}`;
-  trackProductEvent('spot_card_shared', { photo: !!(r.photo || r.placePhoto) });
+  trackProductEvent('spot_card_shared', { photo: !!window.StoryCard?.photosFor(r).length });
   if (window.StoryCard?.openStory) {
   try {
     await StoryCard.openStory({
@@ -6878,12 +6878,19 @@ async function shareCard (r) {
       title: r.name,
       sub: [r.cuisine, priceDollars(r.priceRange), area].filter(Boolean).join(' · '),
       stars: r.myRating || 0,
-      photo: safeUrl(r.photo || r.placePhoto || ''),
+      photo: StoryCard.photosFor(r)[0] || '',
+      photos: StoryCard.photosFor(r),
+      place: r.name,
+      location: r.address || area,
       sections: goTo ? [{ label: goTo.verdict === 'want' ? 'Dying to try' : 'Get the', items: [goTo.name], tone: 'gold' }] : [],
       footer: visited ? 'Remember every great bite' : 'Never lose a place to try',
     }, text, `${r.name}-feed-the-bear`);
     return;
-  } catch (err) { console.warn('[FTB] spot story failed:', err); }
+  } catch (err) {
+    console.warn('[FTB] spot story failed:', err);
+    showToast('Could not make place card', err.message || 'Try attaching your photo again.', 'error');
+    return;
+  }
   }
   try {
   if (navigator.share) await navigator.share({ title: r.name, text });

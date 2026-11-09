@@ -93,6 +93,40 @@ const SEED = [
   });
   await p.keyboard.press('Escape');
   check(await p.locator('#story-card-overlay').isHidden(), 'Escape closes it');
+  check(await p.evaluate(() => StoryCard.photosFor({ placePhoto: 'https://example.com/stock.jpg', visits: [], dishes: [] }).length === 0),
+    'place listing and stock fallback photos never become personal share photos');
+  check(await p.evaluate(() => {
+    const r = { photo: 'https://example.com/one.jpg', media: [{ photo: 'https://example.com/two.jpg' }],
+      visits: [{ photo: 'https://example.com/three.jpg' }], dishes: [{ photo: 'https://example.com/four.jpg' }] };
+    return JSON.stringify(StoryCard.photosFor(r, 'https://example.com/two.jpg'))
+      === '["https://example.com/two.jpg","https://example.com/one.jpg","https://example.com/three.jpg"]';
+  }), 'personal photo selection prioritizes the current photo, deduplicates, and limits the collage to three');
+  check(await p.evaluate(async () => {
+    const solid = color => {
+      const c = document.createElement('canvas'); c.width = c.height = 20;
+      const g = c.getContext('2d'); g.fillStyle = color; g.fillRect(0, 0, 20, 20);
+      return c.toDataURL();
+    };
+    const text = [];
+    const original = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (...args) { text.push(args[0]); return original.apply(this, args); };
+    let blob;
+    try {
+      blob = await StoryCard.drawStory({ kind: 'meal', place: 'My Taco Cafe', location: '123 Taco St', title: 'Birria',
+        photos: [solid('#ff0000'), solid('#00ff00'), solid('#0000ff')] });
+    } finally { CanvasRenderingContext2D.prototype.fillText = original; }
+    const image = await createImageBitmap(blob);
+    const c = new OffscreenCanvas(1080, 1920); const g = c.getContext('2d'); g.drawImage(image, 0, 0);
+    const pixel = (x, y) => [...g.getImageData(x, y, 1, 1).data].slice(0, 3).join(',');
+    return image.width === 1080 && image.height === 1920 && pixel(540, 600) === '255,0,0'
+      && pixel(250, 1300) === '0,255,0' && pixel(800, 1300) === '0,0,255'
+      && text.includes('My Taco Cafe') && text.includes('123 Taco St') && text.includes('Birria')
+      && !text.includes('Google Play');
+  }), 'clean story card renders all three actual photos, restaurant, location and dish with understated branding');
+  check(await p.evaluate(async () => {
+    try { await StoryCard.drawStory({ kind: 'spot', title: 'Broken photo', photo: 'data:image/png;base64,broken' }); return false; }
+    catch (err) { return err.message.includes('Your photo could not load'); }
+  }), 'an unreadable personal photo fails explicitly instead of replacing it with stock imagery');
   check(p.errors.length === 0, `no page errors (${p.errors.slice(0, 2).join(' | ')})`);
 
   await browser.close();

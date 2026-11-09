@@ -16,6 +16,13 @@ Then open http://127.0.0.1:8765/app.html.
 
 ## Photos, videos, sharing and account privacy
 
+- **Share my place card** previews a clean 1080x1920 card with the restaurant
+  name, saved address, and up to three of your own attached photos (including
+  a video's poster frame). Place-detail sharing uses the same design.
+  Listing/stock photos are never substituted. Without a personal photo the
+  card is text-only; unreadable attached photos report an error.
+  Original photo/video sharing remains a separate choice.
+
 - **Add** starts with the place name or link, then **Here now**, **Went
   before**, or **Want to try**. Add a photo if you like and save; ratings,
   dishes, cuisine and AI fill are tucked under **Add details**. Bulk import

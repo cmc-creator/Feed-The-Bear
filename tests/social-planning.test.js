@@ -100,6 +100,18 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
   await p.check('.sn-include-note');
   await p.click('.sn-go');
   check(await p.evaluate(() => window.__bucketStory.sections[0].items[0] === 'A note I choose to share'), 'meal notes enter the card only after explicit opt-in');
+  check(await p.evaluate(() => window.__bucketStory.place === 'Tacos & Friends' && window.__bucketStory.location === '123 Taco St'
+    && window.__bucketStory.photos.length === 0), 'post-save card receives the restaurant and address without inventing a photo');
+  await p.evaluate(async () => {
+    const r = state.restaurants[0];
+    r.placePhoto = 'https://example.com/listing.jpg';
+    r.photo = 'https://example.com/my-photo.jpg';
+    r.media = [{ photo: 'https://example.com/my-second-photo.jpg' }];
+    await shareCard(r);
+  });
+  check(await p.evaluate(() => window.__bucketStory.kind === 'spot'
+    && window.__bucketStory.photos.join('|') === 'https://example.com/my-photo.jpg|https://example.com/my-second-photo.jpg'
+    && window.__bucketStory.place === 'Tacos & Friends'), 'detail sharing uses the same personal-photo place card and excludes listing imagery');
   await p.evaluate(() => { StoryCard.openStory = window.__realOpenStory; });
   await p.waitForTimeout(350);
   await p.evaluate(() => openFoodiePlan('tacos'));
