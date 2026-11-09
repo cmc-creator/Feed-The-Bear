@@ -17,6 +17,16 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
   await p.click('.qa-status[data-status="visited"]');
   check(await p.locator('#quick-add-overlay [data-source="library"]').innerText() === 'Choose photos or video',
     'existing photo selection is explicitly labelled separately from taking a new photo');
+  check((await p.locator('#quick-add-overlay .qa-save-hint').innerText()).includes('Grizzly, 15s'),
+    'video plan and duration limits are visible before recording');
+  await p.evaluate(() => { window._ftbPlan = 'free'; });
+  await p.click('.qa-video');
+  await p.click('#upgrade-close-btn');
+  check(await p.locator('#upgrade-overlay').isHidden()
+    && await p.locator('#quick-add-overlay').isVisible()
+    && await p.locator('.qa-place-name').innerText() === 'Capture Cafe',
+    'video upgrade is tappable above Quick Add and dismissal preserves the unfinished place');
+  await p.evaluate(() => { window._ftbPlan = 'grizzly'; });
 
   for (const [source, accept, capture] of [['photo', 'image/*', 'environment'], ['video', 'video/*', 'environment'], ['library', 'image/*,video/*', null]]) {
     const [chooser] = await Promise.all([

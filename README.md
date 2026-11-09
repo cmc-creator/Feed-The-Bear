@@ -16,6 +16,14 @@ Then open http://127.0.0.1:8765/app.html.
 
 ## Photos, videos, sharing and account privacy
 
+- Video upgrade dialogs appear above the unfinished Add form; dismissal keeps
+  the place and attachments. Capture forms explain Grizzly, 15-second and
+  device-local clip limits before recording.
+- Cloud-trimmed photos carry a content reference so recovery survives media
+  reordering/removal and never assigns a poster to another clip. Ambiguous older
+  extra-photo slots show a warning instead of guessing. Login copy explains
+  backup limits rather than guaranteeing all photos follow you to a new phone.
+
 - Sharing a photo-free place on a browser without a share sheet reveals its
   editable caption and manual social-posting guidance. Blocked sharing reports
   a usable fallback; cancelling the share sheet is not an error.

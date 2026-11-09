@@ -360,10 +360,14 @@ function cloudSafeRestaurant (r) {
   const hasLocalRefs = json.includes('"idb:');
   if (json.length <= FB_DOC_BUDGET && !hasLocalRefs) return r;
   const copy = JSON.parse(json);
+  const trim = o => {
+    o.trimmedPhotoRef = o.photo.startsWith('idb:') ? o.photo : photoRefFor(o.photo);
+    o.photo = '';
+  };
   if (hasLocalRefs) {
     const clear = o => {
-      if (typeof o?.photo === 'string' && o.photo.startsWith('idb:')) o.photo = '';
-      (Array.isArray(o?.media) ? o.media : []).forEach(m => { if (typeof m?.photo === 'string' && m.photo.startsWith('idb:')) m.photo = ''; });
+      if (typeof o?.photo === 'string' && o.photo.startsWith('idb:')) trim(o);
+      (Array.isArray(o?.media) ? o.media : []).forEach(m => { if (typeof m?.photo === 'string' && m.photo.startsWith('idb:')) trim(m); });
     };
     clear(copy);
     (copy.visits || []).forEach(clear);
@@ -379,7 +383,7 @@ function cloudSafeRestaurant (r) {
   slots.sort((a, b) => b.extra - a.extra || b.size - a.size);
   for (const s of slots) {
     if (JSON.stringify(copy).length <= FB_DOC_BUDGET) break;
-    s.obj[s.key] = '';
+    trim(s.obj);
   }
   return copy;
 }
@@ -387,15 +391,25 @@ function cloudSafeRestaurant (r) {
 // When a newer cloud copy wins a merge, put back photos that
 // cloudSafeRestaurant trimmed but this device still has.
 function restoreTrimmedPhotos (cloud, local) {
+  let ambiguous = false;
   const restore = (target, source) => {
-    if (!target.photo && source.photo) target.photo = source.photo;
-    if (Array.isArray(target.media) && Array.isArray(source.media)) {
-      target.media.forEach((m, i) => {
-        if (m && !m.photo && source.media[i]?.photo && m.video === source.media[i].video) {
-          m.photo = source.media[i].photo;
-        }
-      });
-    }
+    const originals = [source, ...(Array.isArray(source.media) ? source.media : [])].filter(m => m?.photo);
+    const fillPhoto = (item, main = false) => {
+      if (!item || item.photo || !Object.hasOwn(item, 'photo')) return;
+      const original = item.trimmedPhotoRef
+        ? originals.find(m => m.video === item.video
+          && (m.photo.startsWith('idb:') ? m.photo : photoRefFor(m.photo)) === item.trimmedPhotoRef)
+        : item.video ? originals.find(m => m.video === item.video)
+          : main && !source.video ? source : null;
+      if (original?.photo) {
+        item.photo = original.photo;
+        delete item.trimmedPhotoRef;
+      } else if (!item.trimmedPhotoRef && !item.video && originals.length) {
+        ambiguous = true;
+      }
+    };
+    fillPhoto(target, true);
+    (Array.isArray(target.media) ? target.media : []).forEach(item => fillPhoto(item));
   };
   restore(cloud, local);
   const fill = (cloudList, localList, keyOf) => {
@@ -409,6 +423,10 @@ function restoreTrimmedPhotos (cloud, local) {
   };
   fill(cloud.visits, local.visits, v => `${v.date}|${v.dish || ''}|${v.note || ''}`);
   fill(cloud.dishes, local.dishes, d => d.id);
+  if (ambiguous) {
+    console.warn('[FTB] Older cloud photo slots lack identity; skipped unsafe positional restore.');
+    showToast('Some older photos need checking', 'An older backup could not identify every photo safely. Check this place on the device where you added its photos.', 'info');
+  }
 }
 
 async function fbSaveRestaurants (uid, restaurants) {
@@ -1044,7 +1062,7 @@ async function _verifyAndActivatePlan (sessionId, uid) {
 
 // ─── AUTH MODAL ───────────────────────────────────────────────
 // forUpgrade: opened from the Grizzly upgrade, so it talks about upgrading, not "free".
-const AUTH_SUB_DEFAULT = "It's free. Your spots, ratings and photos get backed up, so a new phone never means a lost food diary.";
+const AUTH_SUB_DEFAULT = "It's free. Back up your spots, ratings and notes. Photos sync within backup limits; large photo collections and video clips may remain only on this device.";
 const AUTH_SUB_UPGRADE = 'Sign in or create your account, and you will go straight to Grizzly checkout.';
 
 // The app needs an account. Signed out, the sign-in sheet stays up and can't

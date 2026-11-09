@@ -1,5 +1,15 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-08 (foodie audit reliability fixes)
+
+- Place upgrade dialogs above Add so video restrictions no longer appear to do
+  nothing; dismissing the offer preserves the unfinished place.
+- Identify trimmed photos using existing content references rather than array
+  positions, including main covers and visit/dish photos. Reject mismatched
+  video posters and warn about ambiguous legacy extra-photo slots.
+- Explain photo backup limits and device-local videos honestly; show video plan
+  and duration limits without expanding the compact Quick Add layout.
+
 ## [Unreleased] - 2026-11-08 (sharing fallback reliability)
 
 - Fix photo-free post-save sharing on browsers without a native share sheet.

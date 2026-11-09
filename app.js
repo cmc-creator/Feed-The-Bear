@@ -922,7 +922,7 @@ function addFoodCaptureActions (anchor, onPick, { video = true } = {}) {
     <button type="button" class="btn-sm" data-source="photo">Take photo</button>
     ${video ? '<button type="button" class="btn-sm" data-source="video">Record video</button>' : ''}
     <button type="button" class="btn-sm" data-source="library">Choose photos or video</button>
-    </div><span class="food-media-status" role="status"></span>`;
+    </div>${video ? '<small class="food-video-limits">Video: Grizzly, up to 15 seconds. Clips stay on this device.</small>' : ''}<span class="food-media-status" role="status"></span>`;
   anchor.insertAdjacentElement('afterend', el);
   el.addEventListener('click', e => {
     const button = e.target.closest('button[data-source]');

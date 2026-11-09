@@ -522,6 +522,8 @@ window.Cub = (() => {
       }
     });
     const capture = app().addFoodCaptureActions(el.querySelector('.qa-media'), attachMedia);
+    capture.querySelector('.food-video-limits').remove();
+    el.querySelector('.qa-save-hint').textContent = 'Video: Grizzly, 15s; clips stay on this device.';
     const cameraButton = capture.querySelector('[data-source="photo"]');
     cameraButton.classList.add('qa-photo');
     cameraButton.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Take photo</span>';

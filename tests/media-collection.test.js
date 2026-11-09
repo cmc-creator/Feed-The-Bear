@@ -54,7 +54,7 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
   }), 'large root-level photo collections respect cloud budgets without changing device originals');
   check(await p.evaluate(() => {
     const local = { photo: 'cover', media: [{ photo: 'extra-one' }, { photo: 'poster', video: 'clip-one' }] };
-    const cloud = { photo: 'new-cover', media: [{ photo: '' }, { photo: '', video: 'clip-one' }], notes: 'New cloud note' };
+    const cloud = { photo: 'new-cover', media: [{ photo: '', trimmedPhotoRef: photoRefFor('extra-one') }, { photo: '', video: 'clip-one' }], notes: 'New cloud note' };
     restoreTrimmedPhotos(cloud, local);
     return cloud.photo === 'new-cover' && cloud.media[0].photo === 'extra-one'
       && cloud.media[1].photo === 'poster' && cloud.notes === 'New cloud note';
@@ -67,6 +67,44 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
     restoreTrimmedPhotos(removed, local);
     return cloud.media[0].photo === '' && removed.media.length === 0;
   }), 'restore never attaches an old poster to a different clip or recreates removed media entries');
+  check(await p.evaluate(() => {
+    const local = { photo: 'old-poster', video: 'old-clip' };
+    const changed = { photo: '', video: 'new-clip' };
+    const removed = {};
+    restoreTrimmedPhotos(changed, local);
+    restoreTrimmedPhotos(removed, local);
+    return changed.photo === '' && !Object.hasOwn(removed, 'photo');
+  }), 'main-photo recovery respects changed clips and explicit cover removal');
+  check(await p.evaluate(() => {
+    const photo = n => 'data:image/jpeg;base64,' + n.repeat(350000);
+    const local = { photo: photo('A'), media: [{ photo: photo('B') }, { photo: photo('C') }] };
+    const cloud = cloudSafeRestaurant(local);
+    const blank = cloud.media.find(m => !m.photo);
+    if (!blank?.trimmedPhotoRef) return false;
+    const expected = local.media.find(m => photoRefFor(m.photo) === blank.trimmedPhotoRef).photo;
+    cloud.media = [blank];
+    restoreTrimmedPhotos(cloud, { ...local, media: [...local.media].reverse() });
+    return cloud.media.length === 1 && cloud.media[0].photo === expected
+      && !cloud.media[0].trimmedPhotoRef && local.media.every(m => m.photo.length > 350000);
+  }), 'real budget-trimmed photos restore by identity after reordering and removal without altering originals');
+  check(await p.evaluate(() => {
+    const picture = 'data:image/jpeg;base64,' + 'D'.repeat(400000);
+    const local = {
+      visits: [{ date: '2026-11-08', dish: 'Tacos', photo: picture, media: [{ photo: picture }] }],
+      dishes: [{ id: 'dish', photo: picture, media: [{ photo: picture }] }],
+    };
+    const cloud = cloudSafeRestaurant(local);
+    restoreTrimmedPhotos(cloud, local);
+    return cloud.visits[0].photo === picture && cloud.visits[0].media[0].photo === picture
+      && cloud.dishes[0].photo === picture && cloud.dishes[0].media[0].photo === picture;
+  }), 'content-based recovery preserves trimmed visit and dish photos as well as place photos');
+  check(await p.evaluate(() => {
+    const local = { media: [{ photo: 'B' }, { photo: 'C' }] };
+    const legacy = { media: [{ photo: '' }] };
+    restoreTrimmedPhotos(legacy, local);
+    return legacy.media[0].photo === ''
+      && document.querySelector('#toast-container').textContent.includes('Some older photos need checking');
+  }), 'ambiguous legacy photo slots show a warning instead of guessing a removed photo');
   await p.click('.qa-details summary');
   await p.fill('.qa-notes', 'Order the birria. My private food diary.');
   await p.fill('.qa-dish', 'Birria tacos');
