@@ -664,11 +664,13 @@ var FriendPings = (() => {
         else if (open === 'add') (window.Cub?.openAdd || window.openAddModal)?.();
         else if (open === 'contests') window.openFoodEvents?.();
         else if (open === 'want') window.setView?.('want-to-try');
+        else if (open === 'foodfight') window.checkFoodFight?.({ force: true });
         else window.openFoodieFriends?.();
       }, 400);
     });
     // While the app is open Android doesn't show it, so say it in the app.
     p.addListener('pushNotificationReceived', n => {
+      if (n?.data?.open === 'foodfight') { window.checkFoodFight?.({ force: true }); return; }
       if (typeof showToast === 'function') showToast(n.title || 'Feed The Bear', n.body || '', 'info');
       if (typeof refreshFriendsLive === 'function') refreshFriendsLive(true);
     });
@@ -915,7 +917,7 @@ async function handleFirebaseUser (user) {
 
       _mergeFriendsFromCloud(cloudProfile);
       // Let the people you follow see you under "Following you" (once each).
-      setTimeout(() => { if (!isCurrent()) return; window.loadFollowing?.(); window.loadFollowers?.(); window.noteExistingFollows?.(); window.noteInviteJoined?.(); window.myShareLink?.(); }, 5000);
+      setTimeout(() => { if (!isCurrent()) return; window.loadFollowing?.(); window.loadFollowers?.(); window.noteExistingFollows?.(); window.noteInviteJoined?.(); window.myShareLink?.(); window.checkFoodFight?.({ force: true }); }, 5000);
       // Opened an invite before signing in: follow them and show their spots now.
       setTimeout(() => { if (isCurrent()) window.resumePendingInvite?.(); }, 600);
 

@@ -1584,8 +1584,10 @@ function friendCardHtml (f, { waiting = false } = {}) {
       <button type="button" class="friend-remove icon-btn" data-key="${escHtml(f.key)}" aria-label="Unfollow ${escHtml(f.name)}">✕</button></div>
     ${top ? `<ul class="fx-picks">${top}</ul>` : `<p class="fx-quiet">${escHtml(first)} hasn't rated any spots yet.</p>`}
     ${overlap}
+    ${f.data?.id ? `<div class="fft-score" data-id="${escHtml(f.data.id)}">${ffScoreLine(_ffScores[f.data.id], first)}</div>` : ''}
     <div class="fx-actions">
       <button type="button" class="btn-sm ${fresh ? 'btn-orange' : 'btn-ghost'} friend-spots" data-key="${escHtml(f.key)}">${fresh ? `${fresh} new spot${fresh === 1 ? '' : 's'}` : 'All their spots'}</button>
+      ${f.data?.id ? `<button type="button" class="btn-sm btn-ghost fx-throw" data-key="${escHtml(f.key)}" aria-label="Throw food at ${escHtml(first)}">🥧 Throw</button>` : ''}
       ${page ? `<a class="btn-sm btn-ghost fx-page" href="/@${encodeURIComponent(page)}" target="_blank" rel="noopener">🐻 Bear Cave</a>`
         : f.data?.id ? `<button type="button" class="btn-sm btn-ghost fx-page-invite" data-key="${escHtml(f.key)}">Invite to make a Bear Cave page</button>` : ''}
     </div>
@@ -1688,6 +1690,11 @@ function renderFriendsList () {
     const r = (state.restaurants || []).find(x => x.id === b.dataset.id);
     if (r) askFriendToGo(r, String(f?.name || '').split(/\s+/)[0]);
   }));
+  el.querySelectorAll('.fx-throw').forEach(b => b.addEventListener('click', () => {
+    const f = getFriends().find(x => x.key === b.dataset.key);
+    if (f?.data?.id) openFriendThrow({ to: f.data.id, name: f.name, av: f.av });
+  }));
+  if (friends.length && !renderFriendsList._ffLoaded) { renderFriendsList._ffLoaded = true; loadFoodFightScores(); }
   el.querySelectorAll('.fx-page-invite').forEach(b => b.addEventListener('click', () => inviteToBearCave(getFriends().find(x => x.key === b.dataset.key))));
   loadFriendPages();
   el.querySelectorAll('.friend-follow-back').forEach(b => b.addEventListener('click', () => {
@@ -2016,4 +2023,158 @@ async function findFriendByHandle (raw) {
       refreshFriendsLive(true);
     }
   };
+}
+
+/* ── Food fight ──
+   Throw a pie (or taco, donut...) at a friend you follow. They get a push,
+   and next time they open the app it lands on their screen with a splat;
+   they can throw one back. A running score per pair of friends; a few
+   throws a day (api/foodfight.js keeps it fair). */
+const FF_FOODS = [['pie', '🥧', 'Pie'], ['taco', '🌮', 'Taco'], ['spaghetti', '🍝', 'Spaghetti'], ['donut', '🍩', 'Donut'], ['pizza', '🍕', 'Pizza'], ['cake', '🎂', 'Cake']];
+const FF_WHAT = { pie: 'a pie', taco: 'a taco', spaghetti: 'spaghetti', donut: 'a donut', pizza: 'pizza', cake: 'cake' };
+let _ffScores = {};
+async function ffApi (body) {
+  const headers = { 'Content-Type': 'application/json', ...(typeof ftbApiHeaders === 'function' ? await ftbApiHeaders() : {}) };
+  const resp = await fetch('/api/foodfight', { method: 'POST', headers, body: JSON.stringify(body) });
+  const data = await resp.json().catch(() => ({}));
+  return { ok: resp.ok, status: resp.status, data };
+}
+function ffScoreLine (s, first) {
+  return s && (s.me || s.them) ? `🥧 Food fight: You ${s.me} · ${escHtml(first)} ${s.them}` : '';
+}
+async function loadFoodFightScores () {
+  if (!window._ftbUid) return;
+  const ids = getFriends().map(f => f.data?.id).filter(Boolean);
+  if (!ids.length) return;
+  try {
+    const { ok, data } = await ffApi({ action: 'scores', ids });
+    if (!ok) return;
+    _ffScores = data.scores || {};
+    document.querySelectorAll('.fft-score[data-id]').forEach(el => {
+      const f = getFriends().find(x => x.data?.id === el.dataset.id);
+      el.innerHTML = ffScoreLine(_ffScores[el.dataset.id], String(f?.name || 'Friend').split(/\s+/)[0]);
+    });
+  } catch { /* offline: scores just don't show */ }
+}
+window.loadFoodFightScores = loadFoodFightScores;
+
+function closeFriendThrow () {
+  document.querySelector('.fft-overlay')?.remove();
+}
+// Pick a food and throw it. `to` is a friend's share id; `pair` throws back.
+function openFriendThrow ({ to = '', pair = '', name = 'Friend', av = '' } = {}) {
+  if (!window._ftbUid) { showToast('Sign in first', 'Food fights need an account so your friend knows who threw it.', 'info'); return; }
+  closeFriendThrow();
+  const first = String(name || 'Friend').split(/\s+/)[0];
+  const ov = document.createElement('div');
+  ov.className = 'fft-overlay';
+  ov.setAttribute('role', 'dialog');
+  ov.setAttribute('aria-modal', 'true');
+  ov.setAttribute('aria-label', `Food fight with ${first}`);
+  ov.innerHTML = `<div class="fft-card">
+    <button type="button" class="fft-close icon-btn" aria-label="Close">✕</button>
+    <h3 class="fft-title">Throw something at ${escHtml(first)}!</h3>
+    <div class="fft-target" aria-hidden="true"><span class="fft-face">${av && typeof avatarSvg === 'function' ? avatarSvg(av) : '🐻'}</span></div>
+    <p class="fft-status" aria-live="polite">Pick your food:</p>
+    <div class="fft-foods">${FF_FOODS.map(([k, e, l]) => `<button type="button" class="fft-food" data-food="${k}" aria-label="Throw ${l.toLowerCase()}"><span aria-hidden="true">${e}</span><small>${l}</small></button>`).join('')}</div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => { if (e.target === ov) closeFriendThrow(); });
+  ov.querySelector('.fft-close').addEventListener('click', closeFriendThrow);
+  const status = ov.querySelector('.fft-status');
+  ov.querySelectorAll('.fft-food').forEach(b => b.addEventListener('click', async () => {
+    if (ov.dataset.busy) return;
+    ov.dataset.busy = '1';
+    const food = b.dataset.food;
+    const emoji = FF_FOODS.find(x => x[0] === food)[1];
+    ffFly(ov, b, emoji);
+    if (typeof hapticTap === 'function') hapticTap('medium');
+    let res;
+    try { res = await ffApi({ action: 'throw', food, name: shownName() || 'A friend', ...(pair ? { pair } : { to }) }); }
+    catch { res = { ok: false, data: { error: 'No connection. Try again in a bit.' } }; }
+    if (!document.body.contains(ov)) return;
+    if (!res.ok) {
+      ov.querySelector('.fft-target').classList.remove('fft-hit');
+      status.textContent = res.data?.error || 'Missed! Try again in a bit.';
+      delete ov.dataset.busy;
+      return;
+    }
+    const d = res.data;
+    if (to) _ffScores[to] = { pair: d.pair, me: d.me, them: d.them };
+    status.innerHTML = `<strong>Splat! 🎯</strong> You ${d.me} · ${escHtml(first)} ${d.them}`;
+    trackProductEvent('food_fight_throw', { food, back: !!pair });
+    setTimeout(() => {
+      closeFriendThrow();
+      showToast(`Direct hit on ${first}!`, `${d.pushed ? 'They will get a ping.' : 'They will see it next time they open the app.'} Score: You ${d.me} · ${first} ${d.them}`, 'success');
+      if (document.getElementById('friends-list')?.offsetParent) renderFriendsList();
+    }, 1300);
+  }));
+}
+window.openFriendThrow = openFriendThrow;
+
+// The food arcs from the button to the target, then splats.
+function ffFly (ov, from, emoji) {
+  const target = ov.querySelector('.fft-target');
+  const a = from.getBoundingClientRect();
+  const t = target.getBoundingClientRect();
+  const el = document.createElement('span');
+  el.className = 'fft-flying';
+  el.textContent = emoji;
+  el.style.left = `${a.left + a.width / 2}px`;
+  el.style.top = `${a.top + a.height / 2}px`;
+  el.style.setProperty('--dx', `${t.left + t.width / 2 - (a.left + a.width / 2)}px`);
+  el.style.setProperty('--dy', `${t.top + t.height / 2 - (a.top + a.height / 2)}px`);
+  ov.appendChild(el);
+  setTimeout(() => {
+    el.remove();
+    target.classList.add('fft-hit');
+    target.dataset.splat = emoji;
+  }, 520);
+}
+
+// Food thrown at you lands on your screen. Checked after sign-in, when the
+// app comes back to the front, and from the push.
+let _ffChecking = false;
+let _ffCheckedAt = 0;
+async function checkFoodFight ({ force = false } = {}) {
+  if (!window._ftbUid || _ffChecking || (!force && Date.now() - _ffCheckedAt < 60000)) return;
+  _ffChecking = true;
+  _ffCheckedAt = Date.now();
+  try {
+    const { ok, data } = await ffApi({ action: 'inbox' });
+    if (ok && data.hits?.length) ffSplat(data.hits);
+  } catch { /* try again later */ } finally { _ffChecking = false; }
+}
+window.checkFoodFight = checkFoodFight;
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkFoodFight(); });
+
+function ffSplat (hits) {
+  const h = hits[hits.length - 1];
+  const first = String(h.name || 'A friend').split(/\s+/)[0];
+  const others = hits.length - 1;
+  const what = FF_WHAT[h.food] || 'food';
+  closeFriendThrow();
+  const ov = document.createElement('div');
+  ov.className = 'fft-overlay fft-incoming';
+  ov.setAttribute('role', 'dialog');
+  ov.setAttribute('aria-modal', 'true');
+  ov.setAttribute('aria-label', `${first} threw food at you`);
+  ov.innerHTML = `<div class="fft-splat" aria-hidden="true"><span>${h.emoji}</span></div>
+  <div class="fft-card">
+    <h3 class="fft-title">${escHtml(first)} threw ${what} at you! ${h.emoji}</h3>
+    ${others ? `<p class="fft-more">And ${others} more came flying while you were away.</p>` : ''}
+    <p class="fft-status">Food fight: You ${h.me} · ${escHtml(first)} ${h.them}</p>
+    <div class="fft-btns">
+      <button type="button" class="btn-primary fft-back">Throw one back</button>
+      <button type="button" class="btn-ghost fft-wipe">Wipe it off</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  if (typeof hapticTap === 'function') hapticTap('heavy');
+  ov.querySelector('.fft-wipe').addEventListener('click', () => {
+    closeFriendThrow();
+    setTimeout(() => showToast('Ha! 😂', `You still have a little ${h.food} on your face.`, 'info'), 300);
+  });
+  ov.querySelector('.fft-back').addEventListener('click', () => openFriendThrow({ pair: h.pair, name: h.name }));
+  trackProductEvent('food_fight_hit', { food: h.food });
 }

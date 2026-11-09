@@ -5219,7 +5219,7 @@ function _nextCubSay () {
 }
 // A share card or rate prompt hides Byte Cub's bubble; keep it until that
 // closes, then give it a few seconds so the message is actually seen.
-const CUB_HUSH = '#rate-prompt, .share-nudge, #save-diary-nudge, .photo-reveal';
+const CUB_HUSH = '#rate-prompt, .share-nudge, #save-diary-nudge, .photo-reveal, .ff-overlay';
 function _cubSayTimeUp () {
   const el = _cubSay.el;
   if (el?.isConnected && !el.classList.contains('error') && document.querySelector(CUB_HUSH)) {
