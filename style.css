@@ -9727,3 +9727,10 @@ body.light-mode .food-capture-buttons .food-capture-btn { background: rgba(var(-
 /* Friend spots: Been there or Want to try (2026-11-09) */
 .friend-save-pair { display:flex; flex-direction:column; gap:6px; flex-shrink:0; }
 .friend-save-pair .btn-sm { min-height:32px; white-space:nowrap; }
+
+/* Card buttons never split a word ("Directio/ns"): tighter padding, and the
+   icon steps aside on narrow phones so the word fits. (2026-11-09) */
+.card-action-btn { overflow-wrap: normal; word-break: normal; hyphens: none; padding-inline: 8px; }
+@media (max-width: 430px) {
+  .card-action-btn.directions svg, .card-action-btn.website svg, .card-action-btn.edit-card svg { display: none; }
+}

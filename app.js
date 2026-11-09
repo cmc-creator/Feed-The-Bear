@@ -179,7 +179,7 @@ const CUISINE_EMOJI = {
   chinese: '🥡', desserts: '🍰', dessert: '🍰', bakery: '🥐', french: '🥐', greek: '🥙', indian: '🍛', italian: '🍝',
   japanese: '🍱', korean: '🍲', mediterranean: '🫒', mexican: '🌮', pizza: '🍕', seafood: '🦞', steakhouse: '🥩',
   steak: '🥩', sushi: '🍣', thai: '🍜', vegan: '🥗', vegetarian: '🥗', vietnamese: '🍜', ramen: '🍜', irish: '☘️',
-  pub: '🍺', bar: '🍺', sandwiches: '🥪', deli: '🥪', chicken: '🍗', wings: '🍗', 'fast food': '🍟', southern: '🍗',
+  pub: '🍺', bar: '🍺', sandwiches: '🥪', sandwich: '🥪', deli: '🥪', brewery: '🍺', 'tex mex': '🌮', noodle: '🍜', donut: '🍩', burger: '🍔', chicken: '🍗', wings: '🍗', 'fast food': '🍟', southern: '🍗',
   'middle eastern': '🧆', spanish: '🥘', german: '🥨', caribbean: '🍹', ethiopian: '🍲', peruvian: '🐟', 'ice cream': '🍦',
   'dim sum': '🥟', pasta: '🍝', 'pub/bar': '🍺', 'salad/healthy': '🥗', 'bakery/cafe': '🥐', 'korean bbq': '🥩',
   donuts: '🍩', healthy: '🥗', salad: '🥗', soul_food: '🍗', 'soul food': '🍗', turkish: '🥙', filipino: '🍢', hawaiian: '🍍',
@@ -715,6 +715,7 @@ function loadData () {
     }
     if ('visitLog' in r) { delete r.visitLog; _vlMigrated = true; }
   });
+  if (tidyCuisines()) _vlMigrated = true;
   if (_vlMigrated) saveData();
   if (mergeLegacyDishStores()) saveData();
   // Restore photos kept in IndexedDB, then move any still stored inline there.
@@ -1335,8 +1336,23 @@ async function switchAccountData (uid, isCurrent, captured = captureAccountData(
   renderAll();
 }
 
+// Map tags saved from Discover ("steak_house", "mexican;pizza", "regional") read like a person wrote them.
+function tidyCuisine (raw) {
+  const s = String(raw ?? '').trim();
+  if (!/[_;]/.test(s) && !/^[a-z]/.test(s) && !/^(regional|yes|restaurant)$/i.test(s)) return s;
+  const first = s.split(';')[0].replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  if (['regional', 'yes', 'restaurant', 'food'].includes(first)) return '';
+  return ({ 'steak house': 'steakhouse', 'coffee shop': 'coffee' }[first] || first).replace(/\b\w/g, c => c.toUpperCase());
+}
+function tidyCuisines () {
+  let changed = false;
+  (state.restaurants || []).forEach(r => { if (r && r.cuisine) { const c = tidyCuisine(r.cuisine); if (c !== r.cuisine) { r.cuisine = c; changed = true; } } });
+  return changed;
+}
+
 function saveData () {
   if (window._ftbAccountSwitching) return;
+  tidyCuisines();
   // Most saves have no new photo: write now, as before. A save with a new
   // photo, or any save while one is queued, goes through the chain in order
   // (each run re-reads the latest state).

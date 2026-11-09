@@ -1022,7 +1022,8 @@ function _ftbHUD() {
   const hfs = Math.round(fs * 1.05);
   ctx.font = `${hfs}px serif`;
   ctx.textAlign = 'right';
-  ctx.fillText('❤'.repeat(Math.max(0, g.lives)), canvas.width - 8, fs + 4);
+  ctx.fillStyle = '#ff4d5e';
+  ctx.fillText('♥'.repeat(Math.max(0, g.lives)), canvas.width - 8, fs + 4);
 
   /* level */
   ctx.font = `${Math.round(fs * 0.78)}px sans-serif`;

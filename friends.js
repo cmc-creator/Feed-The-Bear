@@ -14,6 +14,14 @@
 
 // The shareable profile: your top spots with what to order and what to skip,
 // plus your Crave List, all inside the link (no account or server needed).
+// Map tags ("steak_house", "regional", "mexican;pizza") read like a person wrote them.
+function niceCuisine (raw) {
+  const first = String(raw ?? '').split(';')[0].replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  if (!first || ['regional', 'restaurant', 'food', 'fast food', 'local', 'yes', 'other'].includes(first)) return '';
+  const fixed = { 'steak house': 'steakhouse', 'coffee shop': 'coffee', 'ice cream': 'ice cream', 'bubble tea': 'bubble tea' }[first] || first;
+  return fixed.replace(/\b\w/g, c => c.toUpperCase()).slice(0, 40);
+}
+
 function buildProfileData () {
   const dishNames = (r, verdict, n) => dishesOf(r).filter(d => d.verdict === verdict).slice(0, n).map(d => String(d.name).slice(0, 40));
   const picks = [...state.restaurants]
@@ -22,7 +30,7 @@ function buildProfileData () {
     .sort((a, b) => (b.myRating || 0) - (a.myRating || 0))
     .slice(0, 15)
     .map(r => {
-      const pick = { n: r.name, c: r.cuisine || '', r: r.myRating || 0, a: (r.address || '').slice(0, 60) };
+      const pick = { n: r.name, c: niceCuisine(r.cuisine), r: r.myRating || 0, a: (r.address || '').slice(0, 60) };
       // Data-URL photos are far too big for a link, and cutting one breaks it.
       const photo = safeUrl(r.photo || '');
       if (/^https?:/i.test(photo) && photo.length <= 300) pick.p = photo;
@@ -565,7 +573,7 @@ function sanitizeFriendData (raw) {
   const str = (v, n) => String(v ?? '').slice(0, n);
   const list = (v, n, len) => (Array.isArray(v) ? v : []).slice(0, n).map(x => str(x, len)).filter(Boolean);
   const picks = (Array.isArray(raw?.picks) ? raw.picks : []).slice(0, 20).map(p => ({
-    n: str(p?.n, 80), c: str(p?.c, 40), a: str(p?.a, 60),
+    n: str(p?.n, 80), c: niceCuisine(str(p?.c, 60)), a: str(p?.a, 60),
     r: Math.max(0, Math.min(5, Math.round(Number(p?.r) || 0))),
     p: /^https?:/i.test(safeUrl(p?.p || '')) ? safeUrl(p.p).slice(0, 300) : '',
     g: list(p?.g, 3, 40), s: list(p?.s, 2, 40),

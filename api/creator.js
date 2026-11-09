@@ -32,13 +32,22 @@ const str = (v, n) => String(v ?? '').slice(0, n);
 const httpUrl = v => (/^https:\/\/[^\s"'<>]+$/i.test(String(v || '')) ? String(v).slice(0, 300) : '');
 
 const EMOJI = { mexican: '🌮', pizza: '🍕', italian: '🍝', japanese: '🍣', sushi: '🍣', chinese: '🥡', thai: '🍜', burgers: '🍔', burger: '🍔', bbq: '🍖', barbecue: '🍖', indian: '🍛', coffee: '☕', cafe: '☕', bakery: '🥐', breakfast: '🥞', seafood: '🦞', vietnamese: '🍜', korean: '🍲', mediterranean: '🥙', dessert: '🍨', american: '🍔', vegan: '🥗' };
-const emojiFor = c => EMOJI[String(c || '').toLowerCase().trim()] || '🍽️';
+// Map tags ("steak_house", "regional", "mexican;pizza") read like a person wrote them.
+function niceCuisine (raw) {
+  const first = String(raw ?? '').split(';')[0].replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  if (!first || ['regional', 'restaurant', 'food', 'fast food', 'local', 'yes', 'other'].includes(first)) return '';
+  const fixed = { 'steak house': 'steakhouse', 'coffee shop': 'coffee', 'ice cream': 'ice cream', 'bubble tea': 'bubble tea' }[first] || first;
+  return fixed.replace(/\b\w/g, c => c.toUpperCase()).slice(0, 40);
+}
+const EMOJI_WORDS = [[/steak/, '🥩'], [/brew|pub|bar|beer/, '🍺'], [/sandwich|sub|deli/, '🥪'], [/chicken|wing/, '🍗'],
+  [/taco|mexican|tex mex/, '🌮'], [/pizza/, '🍕'], [/burger|american|diner/, '🍔'], [/noodle|ramen|pho/, '🍜'], [/donut/, '🍩'], [/ice cream|gelato|frozen/, '🍦']];
+const emojiFor = c => { const k = String(c || '').toLowerCase().trim(); return EMOJI[k] || EMOJI_WORDS.find(([re]) => re.test(k))?.[1] || '🍽️'; };
 
 // The same shape the app's profile links use (friends.js sanitizeFriendData).
 function cleanPicks (raw) {
   const list = (v, n, len) => (Array.isArray(v) ? v : []).slice(0, n).map(x => str(x, len)).filter(Boolean);
   return (Array.isArray(raw) ? raw : []).slice(0, 15).map(p => ({
-    n: str(p?.n, 80), c: str(p?.c, 40), a: str(p?.a, 60),
+    n: str(p?.n, 80), c: niceCuisine(str(p?.c, 60)), a: str(p?.a, 60),
     r: Math.max(0, Math.min(5, Math.round(Number(p?.r) || 0))),
     p: httpUrl(p?.p), g: list(p?.g, 3, 40), s: list(p?.s, 2, 40),
   })).filter(p => p.n);
