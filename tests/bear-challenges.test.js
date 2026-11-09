@@ -130,6 +130,7 @@ const seed = [{ id: 'spot', name: 'Cafe', status: 'visited', tags: [], dishes: [
   await p.locator('#bc-list [data-bc-action=detail]').click();
   await p.evaluate(() => { navigator.share = async () => { throw new DOMException('Blocked', 'NotAllowedError'); }; });
   await p.locator('#bc-detail [data-detail-action=share]').click();
+  await p.waitForFunction(() => /Could not share/.test(document.querySelector('#toast-container')?.innerText || ''), null, { timeout: 12000 }).catch(() => {});
   check(/Could not share/.test(await p.locator('.toast').last().innerText()), 'failed invitation is disclosed');
   await p.evaluate(() => {
     window.__setItem = Storage.prototype.setItem;
@@ -139,6 +140,7 @@ const seed = [{ id: 'spot', name: 'Cafe', status: 'visited', tags: [], dishes: [
     };
   });
   await p.locator('#bc-detail [data-detail-action=save]').click();
+  await p.waitForFunction(() => /Could not save/.test(document.querySelector('#toast-container')?.innerText || ''), null, { timeout: 12000 }).catch(() => {});
   check(await p.locator('#bc-detail [data-detail-action=save]').getAttribute('aria-pressed') === 'true' && /Could not save/.test(await p.locator('.toast').last().innerText()), 'storage failure never reports a successful unsave');
   await p.evaluate(() => { Storage.prototype.setItem = window.__setItem; });
   await p.locator('#bc-detail [data-detail-action=save]').click();

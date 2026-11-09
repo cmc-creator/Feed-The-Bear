@@ -3069,6 +3069,10 @@ function renderCards () {
   const empty  = document.getElementById('empty-state');
   const noRes  = document.getElementById('no-results');
   const list   = getFiltered();
+  // Home shows your saved cards only while you search or filter (Lists has them all).
+  const f = state.filter || {};
+  document.body.dataset.view = state.currentView;
+  document.body.classList.toggle('home-filtering', !!(f.search || f.cuisine || f.price || f.tag || f.collection));
 
   grid.innerHTML = '';
   grid.classList.add('restaurant-grid-single');
@@ -3696,11 +3700,12 @@ window.addEventListener('online', () => {
 });
 
 /* ── "Enjoying Feed The Bear?" ───────────────────────────────
-   Asked right after someone logs a new 5-star visit, once they've opened
-   the app a few times and saved a few spots; at most every 4 months, and
-   never again after they answer. Happy: share it with a friend (Google Play
-   review once the app is listed there). Not happy: a private note that goes
-   to the owner (api/feedback.js) instead of a public review. */
+   Asked right after a good moment (a new 5-star visit, a 4-5 star Just Ate,
+   a finished Bear Swipe round), once they've opened the app a few times and
+   saved a few spots; at most every 4 months, and never again after they
+   answer. Happy: rate it on Google Play (in the Android app), or share it.
+   Not happy: a private note to the owner (api/feedback.js), not a public review. */
+const PLAY_URL = 'https://play.google.com/store/apps/details?id=com.feedthebear.app';
 const RATE_ASK_KEY = 'ftb_rate_ask_v1';
 const RATE_ASK_EVERY = 120 * 864e5;
 
@@ -3715,12 +3720,21 @@ function maybeAskForRating () {
   if (s.five === undefined || five < s.five) { s.five = five; saveRateAsk(s); return; }
   if (five === s.five) return;
   s.five = five;
+  saveRateAsk(s);
+  noteGoodMoment();
+}
+// Something went well: ask now, if it's time.
+function noteGoodMoment () {
+  const s = loadRateAsk();
   const ready = !s.answered && !(s.at && Date.now() - s.at < RATE_ASK_EVERY)
     && (loadProductEvents().counts.app_opened || 0) >= 3 && (state.restaurants || []).length >= 3;
-  if (ready) s.at = Date.now();
+  if (!ready) return false;
+  s.at = Date.now();
   saveRateAsk(s);
-  if (ready) setTimeout(showRatePrompt, 1200);
+  setTimeout(() => whenCubQuiet(showRatePrompt), 1200);
+  return true;
 }
+window.noteGoodMoment = noteGoodMoment;
 
 function showRatePrompt () {
   if (document.getElementById('rate-prompt')) return;
@@ -3736,9 +3750,19 @@ function showRatePrompt () {
     <div class="rate-actions"><button type="button" class="btn-primary rate-love">Love it 🐻</button><button type="button" class="btn-ghost rate-meh">Not really</button></div>`);
   box.querySelector('.rate-love').onclick = () => {
     answer('love');
-    step(`<div class="rate-title">That makes the bear happy!</div>
+    const inApp = !!window.Capacitor?.isNativePlatform?.();
+    step(inApp
+      ? `<div class="rate-title">That makes the bear happy!</div>
+      <p class="rate-sub">Would you give us a quick rating on Google Play? It's the biggest help a small app can get.</p>
+      <div class="rate-actions"><button type="button" class="btn-primary rate-play">★ Rate on Google Play</button><button type="button" class="btn-ghost rate-share">Share instead</button></div>`
+      : `<div class="rate-title">That makes the bear happy!</div>
       <p class="rate-sub">Know someone who'd love it too? Sharing is the best thank-you.</p>
       <div class="rate-actions"><button type="button" class="btn-primary rate-share">Share Feed The Bear</button></div>`);
+    box.querySelector('.rate-play')?.addEventListener('click', () => {
+      trackProductEvent('rate_play_opened');
+      window.open(PLAY_URL, '_blank');
+      close();
+    });
     box.querySelector('.rate-share').onclick = async () => {
       const data = { title: 'Feed The Bear', text: 'I keep every restaurant I want to try in Feed The Bear. You should too:', url: 'https://www.feed-the-bear.com' };
       try { if (navigator.share) await navigator.share(data); else { await navigator.clipboard.writeText(`${data.text} ${data.url}`); showToast('Link copied', 'Paste it to a friend.', 'success'); } } catch { /* closed the share sheet */ }
@@ -5142,34 +5166,77 @@ function isLocationBannerSnoozed () {
 /* ════════════════════════════════════════════════════════════
    TOAST NOTIFICATIONS
    ════════════════════════════════════════════════════════════ */
-function showToast (title, msg, type = 'default') {
-  const safeTitle = String(title || '').replace(/\s+/g, ' ').trim();
-  const safeMsg = String(msg || '').replace(/\s+/g, ' ').trim();
+/* Every message comes from Byte Cub: one speech bubble with his face, one at
+   a time. A burst waits its turn (errors go first, repeats are dropped); a new
+   one cuts the current short once it has been up a moment, so nothing piles
+   up on screen. Optional `action` = { label, run } adds a button. */
+const _cubSay = { queue: [], el: null, shownAt: 0, timer: null };
+function showToast (title, msg, type = 'default', action = null) {
+  const item = { title: String(title || '').replace(/\s+/g, ' ').trim(), msg: String(msg || '').replace(/\s+/g, ' ').trim(), type, action };
+  if (!item.title && !item.msg) return;
+  const same = x => x && x.title === item.title && x.msg === item.msg;
+  if ((_cubSay.el?.isConnected && same(_cubSay.el._item)) || _cubSay.queue.some(same)) return;
+  if (type === 'error') _cubSay.queue.unshift(item); else _cubSay.queue.push(item);
+  if (_cubSay.queue.length > 4) _cubSay.queue.splice(_cubSay.queue.findIndex(x => x.type !== 'error'), 1);
+  if (!_cubSay.el?.isConnected) { _nextCubSay(); return; }
+  // Something is up: let it stay a moment, then make room.
+  clearTimeout(_cubSay.timer);
+  _cubSay.timer = setTimeout(_dismissCubSay, type === 'error' ? 0 : Math.max(0, 1100 - (Date.now() - _cubSay.shownAt)));
+}
+function _dismissCubSay () {
+  clearTimeout(_cubSay.timer);
+  const el = _cubSay.el;
+  _cubSay.el = null;
+  if (el?.isConnected) { el.classList.add('removing'); setTimeout(() => el.remove(), 220); }
+  setTimeout(_nextCubSay, el?.isConnected ? 160 : 0);
+}
+function _nextCubSay () {
+  if (_cubSay.el?.isConnected) return;
+  const item = _cubSay.queue.shift();
   const container = document.getElementById('toast-container');
-  const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
-  toast.innerHTML = `
+  document.body.classList.toggle('cub-talking', !!item);
+  if (!item || !container) return;
+  const el = document.createElement('div');
+  el.className = `toast cub-say ${item.type}`;
+  el.setAttribute('role', item.type === 'error' ? 'alert' : 'status');
+  el.innerHTML = `<img class="cub-say-face" src="assets/cub-avatar.jpg" alt="" aria-hidden="true" />
   <div class="toast-body">
-    <div class="toast-title">${escHtml(safeTitle)}</div>
-    ${safeMsg ? `<div class="toast-msg">${escHtml(safeMsg)}</div>` : ''}
+    ${item.title ? `<div class="toast-title">${escHtml(item.title)}</div>` : ''}
+    ${item.msg ? `<div class="toast-msg">${escHtml(item.msg)}</div>` : ''}
+    ${item.action?.label ? `<button type="button" class="btn-sm btn-orange cub-say-act">${escHtml(item.action.label)}</button>` : ''}
   </div>
   <button class="toast-close" aria-label="Dismiss">✕</button>`;
-
-  const dismiss = () => {
-  toast.classList.add('removing');
-  setTimeout(() => toast.remove(), 300);
-  };
-  toast.querySelector('.toast-close').onclick = dismiss;
-  // Tapping anywhere on it dismisses it too (phones show them over the header).
-  toast.addEventListener('click', e => { if (!e.target.closest('a, button:not(.toast-close)')) dismiss(); });
-  // Two at most: a burst of messages shouldn't bury the screen.
-  [...container.querySelectorAll('.toast:not(.removing)')].slice(0, -1).forEach(old => {
-  old.classList.add('removing');
-  setTimeout(() => old.remove(), 300);
-  });
-  container.appendChild(toast);
-  setTimeout(dismiss, type === 'error' ? 6000 : 4000);
+  el._item = item;
+  el.querySelector('.toast-close').onclick = e => { e.stopPropagation(); _dismissCubSay(); };
+  el.querySelector('.cub-say-act')?.addEventListener('click', e => { e.stopPropagation(); _dismissCubSay(); try { item.action.run(); } catch (err) { console.warn(err); } });
+  // Tapping the bubble itself dismisses it.
+  el.addEventListener('click', e => { if (!e.target.closest('a, button')) _dismissCubSay(); });
+  container.replaceChildren(el);
+  _cubSay.el = el;
+  _cubSay.shownAt = Date.now();
+  const read = Math.min(4000, (item.title.length + item.msg.length) * 35);
+  _cubSay.timer = setTimeout(_cubSayTimeUp, (item.type === 'error' ? 5000 : 3000) + read + (item.action ? 4000 : 0));
 }
+// A share card or rate prompt hides Byte Cub's bubble; keep it until that
+// closes, then give it a few seconds so the message is actually seen.
+const CUB_HUSH = '#rate-prompt, .share-nudge, #save-diary-nudge, .photo-reveal';
+function _cubSayTimeUp () {
+  const el = _cubSay.el;
+  if (el?.isConnected && !el.classList.contains('error') && document.querySelector(CUB_HUSH)) {
+    el._held = true;
+    _cubSay.timer = setTimeout(_cubSayTimeUp, 700);
+    return;
+  }
+  if (el?._held) { el._held = false; _cubSay.shownAt = Date.now(); _cubSay.timer = setTimeout(_dismissCubSay, 3500); return; }
+  _dismissCubSay();
+}
+// Floating prompts (rate us, share nudges) wait until Byte Cub is quiet.
+function whenCubQuiet (fn, tries = 20) {
+  const busy = _cubSay.el?.isConnected || _cubSay.queue.length || document.querySelector(CUB_HUSH);
+  if (!busy || tries <= 0) { fn(); return; }
+  setTimeout(() => whenCubQuiet(fn, tries - 1), 1500);
+}
+window.whenCubQuiet = whenCubQuiet;
 
 /* ════════════════════════════════════════════════════════════
    CHAT BUDDY - BYTE CUB
@@ -10871,7 +10938,10 @@ function checkWeeklySuggestion () {
   banner.remove();
   if (!e.target.closest('.wsb-dismiss')) openDetailModal(suggestion.id);
   });
-  main.prepend(banner);
+  // Byte Cub says it, instead of another banner on the screen.
+  const plain = document.createElement('div');
+  plain.innerHTML = weeklyPickSentence(suggestion, favCuisine);
+  whenCubQuiet(() => showToast("Byte Cub's pick of the week", plain.textContent, 'info', { label: 'See it', run: () => openDetailModal(suggestion.id) }));
 }
 
 function weeklyPickSentence (pick, favCuisine) {
@@ -12667,6 +12737,7 @@ function saveJustAte () {
   closeJustAte();
   renderAll();
   if (photo) photoReveal(photo, dishName || r.name);
+  if (stars >= 4) noteGoodMoment();
   trackProductEvent('just_ate_logged', { restaurantId: r.id, isNew, hasDish: !!dishName, hasPhoto: !!photo, mediaCount: media.length, hasNote: !!note, verdict: dishName ? verdict : null });
   showToast(`${r.name} is on your Been There list`,
   [stars ? '★'.repeat(stars) : '', dishName ? `${DISH_VERDICT_LABEL[verdict]}: ${dishName}` : ''].filter(Boolean).join(' · ') || 'Find it any time under Lists.',

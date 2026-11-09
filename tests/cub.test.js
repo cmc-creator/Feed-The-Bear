@@ -25,7 +25,7 @@ const NEARBY = [
   await p.evaluate(() => closeChat());
 
   // Quick add: nearby suggestions, pick one, "Want to try" with a crave dish
-  await p.click('#home-add-bar');
+  await p.evaluate(() => openAddPlace());
   await p.waitForSelector('#quick-add-overlay:not(.hidden)');
   const suggs = await p.$$eval('.qa-sugg strong', s => s.map(x => x.textContent));
   check(suggs.includes('Taqueria El Sol') && suggs.includes('Ramen Ya'), `shows nearby places to pick (${suggs.join(', ')})`);

@@ -128,6 +128,8 @@ Give up to ${max} events.`;
   const resp = await fetch(GEMINI_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+    // A slow search gives up and the saved list is used (it once hit the function's time limit).
+    signal: AbortSignal.timeout(45000),
     body: JSON.stringify({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       tools: [{ google_search: {} }],

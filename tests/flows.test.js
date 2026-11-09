@@ -72,7 +72,7 @@ async function legacyDishMigration (browser) {
   await closeAllDialogs(p);
 
   // Just Ate with photo, tags, note
-  await p.click('#home-quick-justate-btn');
+  await p.evaluate(() => openJustAte());
   await p.waitForTimeout(300);
   await p.click('.ja-place[data-id="r3"]');
   const [c2] = await Promise.all([p.waitForEvent('filechooser'), p.click('#just-ate-photo')]);
@@ -95,11 +95,11 @@ async function legacyDishMigration (browser) {
   await p.waitForTimeout(2300);
 
   // Just Ate: new spot by typing; exact name reuses the spot
-  await p.click('#home-quick-justate-btn');
+  await p.evaluate(() => openJustAte());
   await p.fill('#just-ate-place', 'Pho Cao');
   await p.click('#just-ate-save');
   await p.waitForTimeout(300);
-  await p.click('#home-quick-justate-btn');
+  await p.evaluate(() => openJustAte());
   await p.fill('#just-ate-place', 'the mission');
   await p.click('#just-ate-save');
   await p.waitForTimeout(300);

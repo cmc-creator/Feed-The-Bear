@@ -47,10 +47,13 @@ const call = (uid, body) => new Promise(resolve => {
   let r = await call('newbie', { action: 'joined' });
   check(r.told && sent.length === 1 && sent[0].tokens[0] === 'owner-phone-token-000000000001', "a new account pings the owner's phone");
   check(/New sign-up/.test(sent[0].notification.title) && /Jo \(jo@example\.com\).*Google/.test(sent[0].notification.body) && sent[0].data.open === 'owner', `saying who and how (${sent[0].notification.body})`);
-  check(emails.length === 1 && emails[0].to[0].email === 'cmc@conniemichelleconsulting.com' && /jo@example\.com/.test(emails[0].subject), 'and emails the owner');
+  const toOwner = () => emails.filter(e => e.tags?.[0] === 'owner-signup');
+  const welcomes = () => emails.filter(e => e.tags?.[0] === 'welcome');
+  check(toOwner().length === 1 && toOwner()[0].to[0].email === 'cmc@conniemichelleconsulting.com' && /jo@example\.com/.test(toOwner()[0].subject), 'and emails the owner');
+  check(welcomes().length === 1 && welcomes()[0].to[0].email === 'jo@example.com' && /Welcome, Jo/.test(welcomes()[0].htmlContent) && /Save 3 spots/.test(welcomes()[0].htmlContent), 'the new member gets a welcome email with first steps');
   check(docs['signups/newbie']?.via === 'Google', 'the sign-up is recorded');
   r = await call('newbie', { action: 'joined' });
-  check(!r.told && sent.length === 1 && emails.length === 1, 'only once per account');
+  check(!r.told && sent.length === 1 && toOwner().length === 1 && welcomes().length === 1, 'only once per account');
   r = await call('oldie', { action: 'joined' });
   check(!r.told && r.reason === 'not new', 'an old account signing in again is not a sign-up');
   r = await call('boss', { action: 'joined' });
@@ -58,6 +61,26 @@ const call = (uid, body) => new Promise(resolve => {
   docs['config/ownerAlerts'] = { push: false, email: false };
   people.newbie2 = { ...people.newbie, uid: 'newbie2', email: 'sam@example.com', displayName: '' };
   r = await call('newbie2', { action: 'joined' });
-  check(r.told && sent.length === 1 && emails.length === 1, 'switched off in the portal: no push, no email (still recorded)');
+  check(r.told && sent.length === 1 && toOwner().length === 1 && welcomes().length === 2, 'switched off in the portal: no push or email to the owner (the member is still welcomed)');
+  // Next day: nothing saved yet gets one nudge (push if they have the app, else email).
+  const realLoad2 = Module._load;
+  Module._load = function (req, ...rest) { return req === 'firebase-admin' ? fakeAdmin : req === 'stripe' ? (() => ({})) : realLoad2.call(this, req, ...rest); };
+  const { welcomeNudges } = require(path.join(__dirname, '..', 'api', 'nudges.js'));
+  Module._load = realLoad2;
+  const ago = h => new Date(Date.now() - h * 3600e3).toISOString();
+  const nd = { 'signups/empty': { email: 'e@example.com', at: ago(24) }, 'signups/busy': { email: 'b@example.com', at: ago(24) }, 'signups/tooSoon': { email: 's@example.com', at: ago(2) } };
+  const ndb = {
+    doc: p => ({ get: async () => ({ data: () => nd[p] }) }),
+    collection: c => ({
+      where: () => ({ limit: () => ({ get: async () => ({ docs: Object.keys(nd).filter(k => k.startsWith('signups/')).map(k => ({ id: k.split('/')[1], data: () => nd[k], ref: { set: async d => { nd[k] = { ...nd[k], ...d }; } } })) }) }) }),
+      limit: () => ({ get: async () => ({ size: c === 'users/busy/restaurants' ? 1 : 0 }) }),
+    }),
+  };
+  const before = emails.length;
+  const n = await welcomeNudges(ndb, fakeAdmin);
+  const nudgeMails = emails.slice(before);
+  check(n === 1 && nudgeMails.length === 1 && nudgeMails[0].to[0].email === 'e@example.com', `day two: only the empty den gets a nudge (${n})`);
+  check(nd['signups/busy'].nudgedAt && !nd['signups/tooSoon'].nudgedAt, 'someone with spots is left alone, and a brand-new one waits a day');
+  check(await welcomeNudges(ndb, fakeAdmin) === 0, 'never twice');
   finish('signupalert');
 })();

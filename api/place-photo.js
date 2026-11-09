@@ -39,10 +39,11 @@ async function fetchJsonWithTimeout (url, timeoutMs = 4500) {
   try {
     const resp = await fetch(url, {
       method: 'GET',
-      headers: { 'Accept': 'application/json', 'User-Agent': 'FeedTheBear/1.0 (+photo-lookup)' },
+      // Wikimedia asks for an app name and a way to reach us; vague agents get throttled first.
+      headers: { 'Accept': 'application/json', 'User-Agent': 'FeedTheBear/1.0 (https://www.feed-the-bear.com; photo lookup)' },
       signal: ctrl.signal,
     });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    if (!resp.ok) { const e = new Error(`HTTP ${resp.status}`); e.status = resp.status; throw e; }
     return await resp.json();
   } finally {
     clearTimeout(timer);
@@ -149,6 +150,9 @@ module.exports = async function handler (req, res) {
     }
 
     const url = page?.thumbnail?.source || '';
+    // Same place, same answer: Vercel's CDN keeps it a week (a miss for a day),
+    // so busy lists don't ask Wikipedia again and get rate-limited (HTTP 429).
+    res.setHeader('Cache-Control', url ? 'public, s-maxage=604800, stale-while-revalidate=86400' : 'public, s-maxage=86400');
     if (!url) {
       sendJson(res, 404, { found: false });
       return;
@@ -161,6 +165,12 @@ module.exports = async function handler (req, res) {
       title: page?.title || '',
     });
   } catch (err) {
+    // Wikipedia busy: no photo this time (the app shows a dish photo), try again in a while.
+    if (err?.status === 429) {
+      res.setHeader('Cache-Control', 'public, s-maxage=900');
+      sendJson(res, 404, { found: false, busy: true });
+      return;
+    }
     console.error('[FTB] place-photo error:', err?.message || err);
     sendJson(res, 500, { error: 'Lookup failed' });
   }

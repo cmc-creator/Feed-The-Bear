@@ -60,6 +60,27 @@ const spot = (id, name) => ({ id, name, cuisine: 'Mexican', status: 'visited', t
   check(await p.locator('#rate-prompt').count() === 0, 'never asked again after answering');
 
   check(!p.errors.length, `no page errors ${p.errors.join(' | ')}`);
+
+  // In the Android app, "Love it" asks for a Google Play rating; a finished
+  // Bear Swipe round counts as a good moment too.
+  const q = await newPage(browser, { seed: [spot('a', 'Bacanora'), spot('b', 'Kai'), spot('c', 'Pizzeria Bianco')] });
+  await q.route(/overpass|nominatim|open-meteo|place-info|restaurant-image|place-photo|wikipedia/, r => r.abort());
+  await q.addInitScript(() => {
+    localStorage.setItem('ftb_product_events_v1', JSON.stringify({ counts: { app_opened: 5 }, recent: [] }));
+    window.Capacitor = { isNativePlatform: () => true, Plugins: {}, isPluginAvailable: () => false };
+    window.__opened = [];
+    window.open = u => { window.__opened.push(u); return null; };
+  });
+  await q.goto(`${BASE}/app.html`);
+  await q.waitForTimeout(1500);
+  await closeAllDialogs(q);
+  check(await q.evaluate(() => noteGoodMoment()), 'a good moment (like a Bear Swipe round) asks');
+  await q.waitForTimeout(1500);
+  await q.click('#rate-prompt .rate-love');
+  check(await q.locator('#rate-prompt .rate-play').isVisible(), '"Love it" in the app offers Rate on Google Play');
+  await q.click('#rate-prompt .rate-play');
+  check(await q.evaluate(() => window.__opened[0]) === 'https://play.google.com/store/apps/details?id=com.feedthebear.app', 'which opens the Play Store listing');
+  check(await q.evaluate(() => noteGoodMoment()) === false, 'and it never asks again');
   await browser.close();
   finish('rate');
 })();

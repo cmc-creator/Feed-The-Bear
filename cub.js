@@ -791,6 +791,8 @@ window.Cub = (() => {
     let shown = false;
     try { shown = sessionStorage.getItem(TIP_KEY) === '1'; } catch { /* private mode */ }
     if (shown && !force) return;
+    // Byte Cub is already saying something (app.js showToast): one thing at a time.
+    if (document.body.classList.contains('cub-talking') && !force) return;
     const tip = text ? { text } : pickTip();
     if (!tip?.text) return;
     const bubble = buddy.querySelector('.cub-bubble');

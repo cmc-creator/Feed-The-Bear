@@ -34,7 +34,7 @@ const photo = name => path.join(ROOT, 'assets', 'food', `${name}.jpg`);
   check(migrated.memPhoto === 'data:image/jpeg' && migrated.visitPhoto === 'data:image/jpeg', 'photos are back in memory after reload');
 
   // New photos through Just Ate go straight to IndexedDB and survive reload.
-  await p.click('#home-quick-justate-btn');
+  await p.evaluate(() => openJustAte());
   await p.waitForTimeout(300);
   await p.click('.ja-place[data-id="r1"]');
   const [chooser] = await Promise.all([p.waitForEvent('filechooser'), p.click('#just-ate-photo')]);

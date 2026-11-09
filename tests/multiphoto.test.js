@@ -13,7 +13,7 @@ const FOOD = n => path.join(ROOT, 'assets', 'food', n);
   await p.waitForTimeout(1500);
 
   // Just Ate: pick three photos in one go, remove one, add one more.
-  await p.click('#home-quick-justate-btn');
+  await p.evaluate(() => openJustAte());
   await p.click('.ja-place[data-id="r1"]');
   let [chooser] = await Promise.all([p.waitForEvent('filechooser'), p.click('#just-ate-photo')]);
   check(chooser.isMultiple(), 'the picker allows several files');

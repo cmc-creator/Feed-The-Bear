@@ -42,7 +42,7 @@ const grizzly = p => p.evaluate(() => { window._ftbUid = 'u1'; window._ftbPlan =
   check(short.length > 1000, `test video recorded (${Math.round(short.length / 1024)} KB)`);
 
   // Free users get the pitch, nothing is saved
-  await p.click('#home-quick-justate-btn');
+  await p.evaluate(() => openJustAte());
   await p.click('.ja-place[data-id="r1"]');
   let [chooser] = await Promise.all([p.waitForEvent('filechooser'), p.click('#just-ate-photo')]);
   await chooser.setFiles({ name: 'clip.webm', mimeType: 'video/webm', buffer: short });
@@ -53,7 +53,7 @@ const grizzly = p => p.evaluate(() => { window._ftbUid = 'u1'; window._ftbPlan =
 
   // Grizzly: video with a poster, saved with the visit and dish
   await grizzly(p);
-  await p.click('#home-quick-justate-btn');
+  await p.evaluate(() => openJustAte());
   await p.click('.ja-place[data-id="r1"]');
   [chooser] = await Promise.all([p.waitForEvent('filechooser'), p.click('#just-ate-photo')]);
   await chooser.setFiles({ name: 'clip.webm', mimeType: 'video/webm', buffer: short });
@@ -96,7 +96,7 @@ const grizzly = p => p.evaluate(() => { window._ftbUid = 'u1'; window._ftbPlan =
 
   // Over 15 seconds is turned away
   const long = await recordVideo(p, 16.5);
-  await p.click('#home-quick-justate-btn');
+  await p.evaluate(() => openJustAte());
   await p.click('.ja-place[data-id="r1"]');
   [chooser] = await Promise.all([p.waitForEvent('filechooser'), p.click('#just-ate-photo')]);
   await chooser.setFiles({ name: 'long.webm', mimeType: 'video/webm', buffer: long });
@@ -106,7 +106,7 @@ const grizzly = p => p.evaluate(() => { window._ftbUid = 'u1'; window._ftbPlan =
   await closeAllDialogs(p);
 
   // Photos still work through the same picker
-  await p.click('#home-quick-justate-btn');
+  await p.evaluate(() => openJustAte());
   await p.click('.ja-place[data-id="r1"]');
   [chooser] = await Promise.all([p.waitForEvent('filechooser'), p.click('#just-ate-photo')]);
   await chooser.setFiles(path.join(ROOT, 'assets', 'food', 'tacos.jpg'));

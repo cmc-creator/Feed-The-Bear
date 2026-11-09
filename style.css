@@ -9734,3 +9734,30 @@ body.light-mode .food-capture-buttons .food-capture-btn { background: rgba(var(-
 @media (max-width: 430px) {
   .card-action-btn.directions svg, .card-action-btn.website svg, .card-action-btn.edit-card svg { display: none; }
 }
+
+/* Lean Home (2026-11-09, owner's call): Bear Swipe, Near You Now and Bear
+   Challenges; then friends' feed and, for free users, Go Grizzly. Everything
+   else lives in Play, Lists or Byte Cub. Your saved cards show on Home only
+   while you search or filter. */
+body[data-view="all"]:not(.home-full) :is(#home-add-bar, #home-quick-actions, #ai-rec-banner, #today-vibe-row, #open-now-home, #crave-home,
+  #for-you-home, #mood-picks-home, #week-recap-home, #today-status-row, #weekly-goal-widget, .weekly-suggest-banner) { display: none !important; }
+body[data-view="all"]:not(.home-filtering) :is(#restaurant-grid, #list-header, #no-results) { display: none !important; }
+
+/* Byte Cub says every message (app.js showToast): his face, one speech bubble,
+   one at a time. Phones: just above the bottom bar, next to the cub; over an
+   open sheet it sits at the top so it never covers a Save button. (2026-11-09) */
+.toast.cub-say { align-items: center; gap: 10px; border-radius: 18px 18px 6px 18px; background: var(--surface2); box-shadow: 0 10px 28px rgba(0,0,0,.35); }
+.cub-say-face { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; flex: none; border: 2px solid var(--primary, #e8b15a); }
+.cub-say .toast-body { min-width: 0; flex: 1; }
+.cub-say .cub-say-act { margin-top: 6px; }
+.cub-say.error { border-color: var(--red); }
+body.cub-talking .cub-bubble { display: none !important; }
+body:has(.share-nudge, #save-diary-nudge, #rate-prompt, .photo-reveal) #toast-container .cub-say:not(.error) { display: none; }
+@media (max-width: 768px) {
+  body:not(.overlay-open) #toast-container {
+    top: auto;
+    bottom: calc(150px + env(safe-area-inset-bottom, 0px));
+  }
+  body:not(.overlay-open) #toast-container .toast.cub-say { animation-name: cub-say-up; }
+  @keyframes cub-say-up { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
+}

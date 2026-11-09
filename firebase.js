@@ -661,6 +661,7 @@ var FriendPings = (() => {
       const open = a?.notification?.data?.open;
       setTimeout(() => {
         if (open === 'owner') (window.openOwnerPortal || (() => { location.href = '/owner.html'; }))();
+        else if (open === 'add') (window.Cub?.openAdd || window.openAddModal)?.();
         else if (open === 'contests') window.openFoodEvents?.();
         else if (open === 'want') window.setView?.('want-to-try');
         else window.openFoodieFriends?.();
@@ -902,7 +903,11 @@ async function handleFirebaseUser (user) {
         saveData();
         renderAll();
         if (deletedIds.size) fbDeleteRestaurantsCloud(user.uid, [...deletedIds]);
-        if (typeof onboardingAfterSignIn === 'function') onboardingAfterSignIn(restaurants.length > 0 || !!cloudProfile);
+        // A brand-new account always gets the cub's welcome, even if something
+        // (a trial, an invite reward) already wrote its profile.
+        const bornAt = Date.parse(user.metadata?.creationTime || '') || 0;
+        const brandNew = bornAt && Date.now() - bornAt < 30 * 60 * 1000 && !restaurants.length;
+        if (typeof onboardingAfterSignIn === 'function') onboardingAfterSignIn(!brandNew && (restaurants.length > 0 || !!cloudProfile));
         if (gained > 0) {
           showToast('☁️ Den synced!', `Loaded ${gained} spot${gained === 1 ? '' : 's'} from the cloud.`, 'success');
         }

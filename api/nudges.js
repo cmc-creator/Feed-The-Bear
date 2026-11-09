@@ -19,6 +19,7 @@ const admin = require('firebase-admin');
 const { nationalList } = require('./food-events');
 const { refreshGuides } = require('./guide');
 const { expireVips } = require('./owner');
+const { sendEmail, emailHtml, emailReady } = require('./_email');
 
 const DAY = 86400000;
 
@@ -74,6 +75,32 @@ function pick (area, events, now = Date.now()) {
   return null;
 }
 
+async function welcomeNudges (db, fb) {
+  const now = Date.now();
+  const snap = await db.collection('signups').where('at', '>=', new Date(now - 3 * DAY).toISOString()).limit(300).get();
+  let sent = 0;
+  for (const d of snap.docs) {
+    const s = d.data();
+    if (s.nudgedAt || now - Date.parse(s.at) < 18 * 3600000) continue;
+    const spots = (await db.collection(`users/${d.id}/restaurants`).limit(1).get()).size;
+    await d.ref.set({ nudgedAt: new Date().toISOString(), hadSpots: spots > 0 }, { merge: true });
+    if (spots) continue;
+    const title = 'Your den is empty 🐻';
+    const body = 'Save one spot you love. It takes ten seconds, and the bear starts learning your taste.';
+    const tokens = (await db.doc(`pushTokens/${d.id}`).get()).data()?.tokens || [];
+    if (tokens.length) {
+      const r = await fb.messaging().sendEachForMulticast({ tokens, notification: { title, body }, data: { open: 'add' }, android: { notification: { tag: 'welcome-nudge' } } });
+      if (r.successCount) { sent++; continue; }
+    }
+    if (s.email && emailReady()) {
+      const ok = await sendEmail({ to: s.email, name: s.name || '', tag: 'welcome-nudge', subject: title,
+        html: emailHtml([body, '<a href="https://www.feed-the-bear.com/app.html?action=add" style="display:inline-block;background:#ff8a3d;color:#1b130b;font-weight:800;padding:12px 20px;border-radius:12px;text-decoration:none">Save my first spot</a>']) }).catch(() => false);
+      if (ok) sent++;
+    }
+  }
+  return sent;
+}
+
 module.exports = async function handler (req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (!process.env.CRON_SECRET || req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) return res.status(401).json({ error: 'Not allowed' });
@@ -115,6 +142,9 @@ module.exports = async function handler (req, res) {
       console.error('[FTB] nudge send failed:', err.message);
     }
   }
+  // New accounts from 18-72 hours ago that still have nothing saved: one
+  // friendly nudge (push if they have the app, else email). signups/{uid}.nudgedAt.
+  if (!dry) { try { out.welcomeNudges = await welcomeNudges(db, fb); } catch (err) { console.error('[FTB] nudges welcome failed:', err.message); } }
   // VIP Grizzly (owner.js) that has run out.
   if (!dry) { try { out.vipsEnded = await expireVips(db); } catch (err) { console.error('[FTB] nudges vips failed:', err.message); } }
   // City guides (api/guide.js): the oldest few, searched again.
@@ -123,3 +153,4 @@ module.exports = async function handler (req, res) {
 };
 
 module.exports.pick = pick;
+module.exports.welcomeNudges = welcomeNudges;

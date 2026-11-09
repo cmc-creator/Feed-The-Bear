@@ -133,6 +133,20 @@ async function joined (db, fb, uid) {
       pushed = r.successCount;
     }
   }
+  // Their welcome email: three easy first things to do.
+  if (u.email && emailReady()) {
+    const first = String(u.displayName || '').trim().split(/\s+/)[0];
+    await sendEmail({
+      to: u.email, name: u.displayName || '', tag: 'welcome', subject: 'Welcome to the den 🐻',
+      html: emailHtml([
+        `<b>Welcome${first ? `, ${esc(first)}` : ''}!</b> Feed The Bear is your food diary: where you've eaten, what to order again, and where to go next.`,
+        'Three things to do first (about a minute):<br>1. <b>Save 3 spots</b> you love or want to try. Tap the big + button.<br>2. <b>Play Bear Swipe</b> on Home so the bear learns what you like.<br>3. <b>Turn on location</b> to see the best food near you right now.',
+        '<a href="https://www.feed-the-bear.com/app.html" style="display:inline-block;background:#ff8a3d;color:#1b130b;font-weight:800;padding:12px 20px;border-radius:12px;text-decoration:none">Open Feed The Bear</a>',
+      ]),
+    }).then(ok => ok && ref.set({ welcomedAt: new Date().toISOString() }, { merge: true }))
+      .catch(err => console.warn('[FTB] welcome email failed:', err.message));
+  }
+
   let emailed = false;
   if (prefs.email !== false && emailReady()) {
     emailed = await sendEmail({

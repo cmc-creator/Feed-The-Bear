@@ -86,7 +86,7 @@ async function newPage (browser, { seed = null, settings = {}, viewport = { widt
     // headers; the app falls back to another source, so that isn't a failure here.
     const text = m.text();
     if (m.type() === 'error' && !/Failed to load resource|ERR_|navigator\.vibrate/.test(text)
-        && !/CORS policy/.test(text) && !/overpass|nominatim|maps\.mail\.ru/.test(text)) page.errors.push('[console] ' + text.slice(0, 160));
+        && !/CORS policy|has not allowed access to system location/.test(text) && !/overpass|nominatim|maps\.mail\.ru/.test(text)) page.errors.push('[console] ' + text.slice(0, 160));
   });
   return page;
 }
