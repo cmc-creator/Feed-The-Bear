@@ -1,5 +1,11 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-08 (clear card sharing)
+
+- Keep Share card as the main preview action on all browsers, with Save image
+  separate. Unsupported or blocked image sharing opens explicit social posting
+  instructions instead of silently downloading. Preserve native file sharing.
+
 ## [Unreleased] - 2026-11-08 (profile persistence)
 
 - Prevent legacy/default cloud avatars from replacing a saved personal photo.

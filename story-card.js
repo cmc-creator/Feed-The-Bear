@@ -246,6 +246,11 @@ window.StoryCard = (() => {
           <button type="button" class="story-save">Save image</button>
           <button type="button" class="story-copy">Copy text</button>
         </div>
+        <div class="story-share-help hidden" role="status">
+          <strong>Post your card to TikTok, Instagram or Facebook</strong>
+          <p class="story-share-message"></p>
+          <p>Choose Save image, open your social app and upload the card as a post or Story. Use Copy text to paste your caption. Nothing posts automatically.</p>
+        </div>
         <details class="story-collection hidden"><summary>Your original photos &amp; video</summary>
           <p>Share the cover and originals together when supported, or save individual files to upload in your social app. Apps decide what they accept.</p>
           <button type="button" class="btn-primary story-share-all">Share card + originals</button>
@@ -292,18 +297,28 @@ window.StoryCard = (() => {
 
   async function shareNow () {
     if (!current) return;
+    const snapshot = current;
+    overlay.querySelector('.story-share-help').classList.add('hidden');
     track('story_card_shared', {});
     const data = { title: current.name, text: current.text, files: [current.file] };
     if (navigator.share && navigator.canShare?.({ files: [current.file] })) {
       try { await navigator.share(data); return; }
       catch (err) {
         if (err?.name === 'AbortError') return;
+        if (current !== snapshot || overlay.classList.contains('hidden')) return;
         console.warn('[FTB] Story sharing failed:', err);
-        window.showToast?.('Sharing was blocked', 'Try Save image, then upload it in your social app.', 'error');
+        showShareHelp('Your browser blocked image sharing. Your card is still ready to save and post.');
         return;
       }
     }
-    save();
+    showShareHelp('This browser cannot open a share sheet for image files. You can still post your card using the steps below.');
+  }
+
+  function showShareHelp (message) {
+    const help = overlay.querySelector('.story-share-help');
+    help.querySelector('.story-share-message').textContent = message;
+    help.classList.remove('hidden');
+    help.scrollIntoView({ block: 'nearest' });
   }
 
   function save () {
@@ -482,9 +497,9 @@ window.StoryCard = (() => {
     if (img.src) URL.revokeObjectURL(img.src);
     img.src = URL.createObjectURL(blob);
     img.alt = title;
-    const canShare = !!navigator.canShare?.({ files: [current.file] });
-    overlay.querySelector('.story-share').textContent = canShare ? 'Share to Stories & more' : 'Download image';
-    overlay.querySelector('.story-save').classList.toggle('hidden', !canShare);
+    overlay.querySelector('.story-share').textContent = 'Share card';
+    overlay.querySelector('.story-save').classList.remove('hidden');
+    overlay.querySelector('.story-share-help').classList.add('hidden');
     const collection = overlay.querySelector('.story-collection');
     collection.classList.toggle('hidden', !originals.length && !collectionError);
     collection.open = false;

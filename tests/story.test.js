@@ -82,9 +82,14 @@ const SEED = [
   await p.click('#your-order-share');
   await p.waitForSelector('#story-card-overlay:not(.hidden)', { timeout: 6000 });
   check(await p.locator('#story-card-overlay').isVisible(), 'a long name with no photo still makes a card');
-  check(await p.locator('.story-share').innerText() === 'Download image' && await p.locator('.story-save').isHidden(), 'with no share sheet, the main button downloads');
-  const dl = p.waitForEvent('download', { timeout: 4000 }).catch(() => null);
+  check(await p.locator('.story-share').innerText() === 'Share card' && await p.locator('.story-save').isVisible(), 'Share card stays the primary action with Save image separate');
+  let downloads = 0;
+  p.on('download', () => { downloads++; });
   await p.click('.story-share');
+  check(await p.locator('.story-share-help').isVisible() && downloads === 0,
+    'unsupported image sharing opens clear social instructions without silently downloading');
+  const dl = p.waitForEvent('download', { timeout: 4000 }).catch(() => null);
+  await p.click('.story-save');
   const file = await dl;
   check(/what-to-order\.png$/.test(file?.suggestedFilename() || ''), `and the image downloads (${file?.suggestedFilename()})`);
   await p.$eval('.story-img', i => i.src).then(async src => {

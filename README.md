@@ -16,6 +16,10 @@ Then open http://127.0.0.1:8765/app.html.
 
 ## Photos, videos, sharing and account privacy
 
+- Card previews always offer **Share card**, **Save image**, and **Copy text**.
+  Share card opens native file sharing when supported; unsupported or blocked
+  sharing explains the manual save-and-upload workflow without auto-downloading.
+
 - Selected profile photos survive same-account login/restores. Legacy cloud
   defaults do not erase a personal photo; explicit photo changes/removals
   have their own timestamp, separate from appearance settings.
