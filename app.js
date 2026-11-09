@@ -1207,7 +1207,9 @@ const ACCOUNT_LOCAL_KEYS = [
   'ftb_collab_id_v1',
 ];
 const APPEARANCE_KEYS = ['theme', 'themeChoice', 'themeManual', 'uiDensity', 'uiCorners', 'uiMotion',
-  'onboardingDone', 'profileSetupDone', 'locationBannerDismissed'];
+  'onboardingDone', 'profileSetupDone', 'locationBannerDismissed', 'locationEnabled'];
+// Belong to the phone, not the account: switching accounts never asks for location again.
+const DEVICE_SETTING_KEYS = ['locationEnabled', 'locationBannerDismissed'];
 
 function deviceAppearance () {
   let settings;
@@ -1310,6 +1312,12 @@ async function switchAccountData (uid, isCurrent, captured = captureAccountData(
     ACCOUNT_LOCAL_KEYS.forEach(k => localStorage.removeItem(k));
     if (restored) Object.entries(restored).forEach(([k, value]) => { if (ACCOUNT_LOCAL_KEYS.includes(k) && value !== null) localStorage.setItem(k, value); });
     if (!restored) localStorage.setItem(SETTINGS_KEY, JSON.stringify(appearance));
+    else {
+      let s = {};
+      try { s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') || {}; } catch { s = {}; }
+      DEVICE_SETTING_KEYS.forEach(k => { if (k in appearance) s[k] = appearance[k]; });
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    }
     localStorage.setItem('ftb_data_owner_v1', uid || '');
   } catch (err) {
     ACCOUNT_LOCAL_KEYS.forEach(k => localStorage.removeItem(k));

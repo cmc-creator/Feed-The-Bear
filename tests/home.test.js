@@ -13,20 +13,18 @@ asGrizzly(); // uses Grizzly-only features
   const order = await p.$$eval('#home-discovery > [id], #home-discovery > .nearby-home-header', els => els.map(e => e.id || 'nearby'));
   const at = id => order.indexOf(id);
   check(at('home-quick-actions') < at('nearby') && at('nearby') < at('crave-home') && at('crave-home') < at('for-you-home'), `act now, then near you, then your lists (${order.join(' > ')})`);
-  check(at('home-add-bar') === 0 && at('home-quick-actions') === 1
-    && at('ai-rec-banner') > at('home-quick-actions')
-    && at('bear-swipe-home') > at('for-you-home') && at('grizzly-home') > at('bear-swipe-home'),
-    'Add and meal actions lead Home; recommendations, games and upgrade remain available afterward');
+  check(at('bear-swipe-home') === 0 && at('home-add-bar') === 1 && at('home-quick-actions') === 2
+    && at('ai-rec-banner') > at('home-quick-actions') && at('grizzly-home') > at('for-you-home'),
+    'Bear Swipe leads Home (owner asked), then Add and meal actions; upgrade comes after the useful stuff');
   await closeAllDialogs(p);
   for (const width of [320, 390]) {
     await p.setViewportSize({ width, height: 740 });
     await p.evaluate(() => { setView('all'); window.scrollTo(0, 0); });
     check(await p.evaluate(() => {
-      const add = document.querySelector('#home-add-bar').getBoundingClientRect();
-      const meal = document.querySelector('#home-quick-justate-btn').getBoundingClientRect();
+      const swipe = document.querySelector('#bear-swipe-home');
       const nav = document.querySelector('#mobile-add-btn').getBoundingClientRect();
-      return add.top >= 0 && meal.top >= 0 && add.bottom <= nav.top && meal.bottom <= nav.top;
-    }), `Add and Just Ate are above the bottom navigation on the first ${width}px phone screen`);
+      return swipe.offsetHeight > 0 && swipe.getBoundingClientRect().top < nav.top - 150;
+    }), `Bear Swipe is on the first ${width}px phone screen`);
   }
   await p.setViewportSize({ width: 390, height: 844 });
   check(order[order.length - 1] === 'today-status-row', 'the stats row sits at the bottom');
