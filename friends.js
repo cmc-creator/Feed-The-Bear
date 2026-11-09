@@ -1142,21 +1142,32 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
     }
   };
   if (photo || video) prepare();
-  mediaButton.addEventListener('click', () => {
+  mediaButton.addEventListener('click', async () => {
     if (generation !== _dataGeneration) return;
     error('');
     if (file && !canShareFile()) {
       download();
       return;
     }
+    if (!navigator.share) {
+      el.querySelector('.sn-social-help').open = true;
+      el.querySelector('.sn-caption').open = true;
+      caption.focus(); caption.select();
+      error('This browser has no share sheet. Copy your caption below and paste it into TikTok, Instagram, Facebook or a message, or save your Story card.');
+      return;
+    }
     // The file is prepared before this click, preserving iOS user activation.
-    navigator.share({ title: r.name, text: caption.value.trim(), ...(file ? { files: [file] } : {}) }).catch(err => {
+    try {
+      await navigator.share({ title: r.name, text: caption.value.trim(), ...(file ? { files: [file] } : {}) });
+    } catch (err) {
       if (err?.name === 'AbortError') return;
       if (generation !== _dataGeneration || !el.isConnected) return;
       console.warn('[FTB] Media share failed:', err);
       el.querySelector('.sn-social-help').open = true;
-      error('Sharing was blocked. Save your media below and upload it in your social app, or try the Story card.');
-    });
+      error(file
+        ? 'Sharing was blocked. Save your media below and upload it in your social app, or try the Story card.'
+        : 'Sharing was blocked. Copy your caption below and paste it into your social app or a message, or try the Story card.');
+    }
   });
   el.querySelector('.sn-x').addEventListener('click', hide);
   el.querySelector('.sn-plan').addEventListener('click', () => {

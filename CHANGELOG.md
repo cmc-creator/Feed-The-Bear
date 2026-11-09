@@ -1,5 +1,14 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-08 (sharing fallback reliability)
+
+- Fix photo-free post-save sharing on browsers without a native share sheet.
+  Reveal caption copying and social-posting guidance instead of throwing.
+- Handle synchronous share failures and show text-specific fallback instructions;
+  dismissing the share sheet remains a normal cancellation.
+- Wait for actual auth readiness in account-reload regressions rather than
+  assuming deferred authentication scripts have loaded.
+
 ## [Unreleased] - 2026-11-08 (photo restore reliability)
 
 - Recover budget-trimmed root-level extra photos during same-device cloud merges,

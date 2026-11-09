@@ -53,7 +53,7 @@ const spot = (id, name) => ({ id, name, status: 'visited', tags: [], dishes: [],
     };
   });
   await p.goto(`${BASE}/app.html`);
-  await p.waitForTimeout(500);
+  await p.waitForFunction(() => typeof window.__observer === 'function' && window._ftbAuthReady === true);
   await p.evaluate(() => { window._sessionTaskForTest = () => _sessionTask; });
 
   await p.evaluate(() => window.__signIn('accountA'));
@@ -176,6 +176,7 @@ const spot = (id, name) => ({ id, name, status: 'visited', tags: [], dishes: [],
   check(!delayed, 'switching accounts cancels the previous account upload timer');
 
   await p.reload();
+  await p.waitForFunction(() => typeof window.__observer === 'function' && window._ftbAuthReady === true);
   await p.evaluate(() => { window._sessionTaskForTest = () => _sessionTask; return _sessionTask; });
   const cold = await p.evaluate(() => ({ uid: window._ftbUid, spots: state.restaurants.map(r => r.id), profile: loadUserProfile(), switching: window._ftbAccountSwitching }));
   check(!cold.uid && !cold.spots.length && (!cold.profile || (cold.profile.name === 'Foodie' && !cold.profile.phone && !cold.profile.bio)),

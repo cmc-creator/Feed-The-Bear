@@ -16,6 +16,10 @@ Then open http://127.0.0.1:8765/app.html.
 
 ## Photos, videos, sharing and account privacy
 
+- Sharing a photo-free place on a browser without a share sheet reveals its
+  editable caption and manual social-posting guidance. Blocked sharing reports
+  a usable fallback; cancelling the share sheet is not an error.
+
 - Same-device cloud restores recover budget-trimmed extra place photos as well
   as visit/dish photos. Restored video posters must match the stored clip reference;
   removed media entries are not recreated.

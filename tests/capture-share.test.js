@@ -128,6 +128,26 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
   await p.click('#modal-save-btn');
   check(await p.evaluate(() => !!state.restaurants.find(r => r.name === 'Full Form Cafe')?.photo), 'the full form saves camera-picked media');
 
+  await p.evaluate(() => {
+    navigator.share = undefined;
+    offerShareMeal({ r: { name: 'Photo-free Cafe', status: 'want-to-try' }, media: [] });
+  });
+  await p.click('.sn-media');
+  check(await p.locator('.sn-caption-text').isVisible()
+    && (await p.locator('.sn-error').innerText()).includes('no share sheet')
+    && await p.locator('.sn-copy').isVisible(),
+    'photo-free places expose caption copying when the browser has no share sheet');
+  await p.evaluate(() => {
+    navigator.share = () => { throw new DOMException('Blocked synchronously', 'NotAllowedError'); };
+  });
+  await p.click('.sn-media');
+  check((await p.locator('.sn-error').innerText()).includes('Copy your caption')
+    && !(await p.locator('.sn-error').innerText()).includes('Save your media'),
+    'synchronously blocked text sharing gives a real caption fallback, not a nonexistent media download');
+  await p.evaluate(() => { navigator.share = async () => { throw new DOMException('Cancelled', 'AbortError'); }; });
+  await p.click('.sn-media');
+  check((await p.locator('.sn-error').innerText()) === '', 'cancelling the share sheet is not reported as a failure');
+
   for (const width of [320, 390]) {
     await p.setViewportSize({ width, height: 640 });
     await closeAllDialogs(p);
