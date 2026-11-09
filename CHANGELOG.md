@@ -1,5 +1,13 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-08 (foodie-first Home)
+
+- Move Add and existing meal/decision actions to the top of Home, ahead of
+  recommendations and games. Keep Bear Swipe below personal recommendations.
+- Preserve all controls and handlers; DOM order matches the visible hierarchy.
+- Verify Add and Just Ate fit above phone navigation at 320px and 390px, plus
+  swipe behavior, first impressions, smoke and multi-theme layouts.
+
 ## [Unreleased] - 2026-11-08 (foodie audit reliability fixes)
 
 - Place upgrade dialogs above Add so video restrictions no longer appear to do

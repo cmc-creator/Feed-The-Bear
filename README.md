@@ -16,6 +16,10 @@ Then open http://127.0.0.1:8765/app.html.
 
 ## Photos, videos, sharing and account privacy
 
+- Home leads with Add and the existing meal/decision actions, followed by
+  recommendations and nearby discovery. Bear Swipe remains available below
+  the personal recommendations rather than pushing meal logging off-screen.
+
 - Video upgrade dialogs appear above the unfinished Add form; dismissal keeps
   the place and attachments. Capture forms explain Grizzly, 15-second and
   device-local clip limits before recording.
