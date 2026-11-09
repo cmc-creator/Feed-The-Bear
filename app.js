@@ -11733,14 +11733,14 @@ function runToolAction (action) {
 // Six favorites up top, themed rows you swipe sideways, and utilities
 // folded under "More tools". Overlapping tools only show up in search.
 const HUB_SECTIONS = [
+  { title: 'Games', layout: 'featured', items: [
+  ['foodfight','🍕','Food Fight'], ['burgerbar','🍔','Bear Burger Bar'],
+  ['foodmatch','🃏','Food Match'], ['feedbear','🐻','Feed the Bear'],
+  ]},
   { title: 'Start here', layout: 'featured', items: [
   ['just-ate','📸','Just Ate'], ['swipe','👆','Swipe to Decide'],
   ['tonight','🌙',"Tonight's Pick"], ['open-now','🟢','Open Now'],
   ['friends','👯','Friends'], ['spin','🎡','Spin the Wheel'],
-  ]},
-  { title: 'Games', items: [
-  ['foodfight','🍕','Food Fight'], ['burgerbar','🍔','Bear Burger Bar'],
-  ['foodmatch','🃏','Food Match'], ['feedbear','🐻','Feed the Bear'],
   ]},
   { title: "Can't decide?", items: [
   ['decision','🏆','Decision Mode'], ['duel','⚔️','Restaurant Duel'],
@@ -11813,7 +11813,7 @@ const HUB_INFO = {
   feedbear:      ['Catch food, dodge pests', 'bear'],
   foodfight:     ['Toss food to hungry bears', 'bear'],
   burgerbar:     ['Build each bear an order', 'stack'],
-  foodmatch:     ['Find the food pairs', 'grid'],
+  foodmatch:     ['Flip cards, find the food pairs', 'podium'],
 };
 
 function hubPreviewHtml (style) {

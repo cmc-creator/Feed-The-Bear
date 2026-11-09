@@ -60,6 +60,17 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
   check(await p.locator('#game-overlay').isHidden(), 'the ✕ closes the game');
   check(!p.errors.length, `no page errors ${p.errors.join(' | ')}`);
 
+  // Feed the Bear draws the bear mascot (it was once an empty emoji).
+  const bearPx = await p.evaluate(async () => {
+    document.querySelectorAll('.modal-overlay').forEach(o => o.classList.add('hidden'));
+    openFeedBearGame();
+    await new Promise(r => setTimeout(r, 600)); _ftbDrawIdle();
+    const c = document.getElementById('feedbear-canvas'), x = c.getContext('2d');
+    const d = x.getImageData(Math.round(c.width / 2) - 10, Math.round(c.height * 0.49) - 10, 20, 20).data;
+    let lit = 0; for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 120) lit++;
+    closeFeedBearGame(); return lit;
+  });
+  check(bearPx > 100, `Feed the Bear shows the bear (${bearPx}/400 bear pixels)`);
   await browser.close();
   finish('games');
 })();

@@ -515,16 +515,23 @@ function renderFriendsFeedHome () {
       <span class="ff-avatar" aria-hidden="true">${avatarSvg(x.who.av)}</span>
       <span class="ff-text">${line}<span class="ff-meta">${escHtml([cuisineEmoji(x.c) + ' ' + (x.c || ''), feedAgo(x.at)].map(s => s.trim()).filter(Boolean).join(' · '))}</span></span>
       ${have ? `<button type="button" class="btn-ghost btn-sm ff-view" data-id="${escHtml(have.id)}">View</button>`
-        : `<button type="button" class="btn-sm btn-orange ff-save" data-i="${i}">＋ Save</button>`}
+        : friendSaveChoice('ff-save', i)}
     </div>`;
   }).join('');
   list.querySelectorAll('.ff-view').forEach(b => b.addEventListener('click', () => openDetailModal(b.dataset.id)));
   list.querySelectorAll('.ff-save').forEach(b => b.addEventListener('click', () => saveFromFriend(items[Number(b.dataset.i)])));
+  list.querySelectorAll('.ff-save-been').forEach(b => b.addEventListener('click', () => saveFromFriend(items[Number(b.dataset.i)], { status: 'visited' })));
   list.querySelector('.ff-new-see')?.addEventListener('click', () => openFriendSpots(best.f.data));
 }
 
+// A friend's spot: you pick whether you've been there or want to try it.
+function friendSaveChoice (cls, i) {
+  return `<span class="friend-save-pair"><button type="button" class="btn-sm btn-secondary friend-been ${cls}-been" data-i="${i}">✓ Been there</button>`
+    + `<button type="button" class="btn-sm btn-orange ${cls}" data-i="${i}">＋ Want to try</button></span>`;
+}
+
 // `quiet`: no redraw or toast (adding several at once). Returns the new spot.
-function saveFromFriend (x, { quiet = false, bulk = false } = {}) {
+function saveFromFriend (x, { quiet = false, bulk = false, status = 'want-to-try' } = {}) {
   if (!x?.n) return null;
   if (onMyList(x.n)) return null;
   const atLimit = typeof isPremium === 'function' && !isPremium() && state.restaurants.length >= FREE_RESTAURANT_LIMIT;
@@ -534,7 +541,7 @@ function saveFromFriend (x, { quiet = false, bulk = false } = {}) {
     id: uid(), name: x.n.slice(0, 80), cuisine: x.c || '', priceRange: 0, address: x.a || '', lat: null, lng: null,
     website: '', photo: '', googleRating: 0, googleReviews: 0, myRating: 0,
     notes: `${x.who.name} recommended it.`, tags: ['From a friend'], collectionId: null, priority: '',
-    status: 'want-to-try', dateAdded: today, dateVisited: null, updatedAt: Date.now(), visits: [],
+    status: status === 'visited' ? 'visited' : 'want-to-try', dateAdded: today, dateVisited: null, updatedAt: Date.now(), visits: [],
   };
   if (atLimit) { holdSpotForGrizzly(r, x.d ? { name: x.d, verdict: 'want' } : null); return null; }
   state.restaurants.unshift(r);
@@ -544,7 +551,8 @@ function saveFromFriend (x, { quiet = false, bulk = false } = {}) {
   trackProductEvent('friend_spot_saved');
   if (quiet) return r;
   renderAll();
-  showToast(`${r.name} saved`, x.d ? `On your list, with the ${x.d} to try.` : 'On your Want to Try list.', 'success');
+  showToast(`${r.name} saved`, r.status === 'visited' ? 'On your Been There list. Tap it to add your rating.'
+    : x.d ? `On your list, with the ${x.d} to try.` : 'On your Want to Try list.', 'success');
   return r;
 }
 
@@ -1394,7 +1402,7 @@ function openFriendSpots (data, { invited = false } = {}) {
     document.getElementById('guest-profile-name').textContent = invited ? `${who} invited you 🐻` : `${who}'s spots`;
     document.getElementById('guest-profile-sub').textContent = (following
       ? (items.length
-        ? `You're following ${who}. Tap ＋ Add on any spot to put it on your Want to Try list.`
+        ? `You're following ${who}. Tap Been there or Want to try on any spot to save it.`
         : `You're following ${who}.`)
       : `Follow ${who} to see where they eat and what they order.`)
       + (invited && ref ? ' You also get 30 days of Grizzly free.' : '');
@@ -1412,11 +1420,12 @@ function openFriendSpots (data, { invited = false } = {}) {
           </div>
           ${have
             ? '<span class="guest-have">✓ On your list</span>'
-            : `<button type="button" class="btn-sm btn-orange guest-add" data-i="${i}">＋ Add</button>`}
+            : friendSaveChoice('guest-add', i)}
         </div>`;
       }).join('');
-    list.querySelectorAll('.guest-add').forEach(b => b.addEventListener('click', () => {
-      if (saveFromFriend({ ...items[Number(b.dataset.i)], who: { name: who } }, { quiet: true })) {
+    list.querySelectorAll('.guest-add, .guest-add-been').forEach(b => b.addEventListener('click', () => {
+      const status = b.classList.contains('guest-add-been') ? 'visited' : 'want-to-try';
+      if (saveFromFriend({ ...items[Number(b.dataset.i)], who: { name: who } }, { quiet: true, status })) {
         renderAll();
         draw();
       }
@@ -1533,7 +1542,7 @@ function friendsPulseHtml (feed) {
     return `<div class="ff-item"><span class="ff-avatar" aria-hidden="true">${avatarSvg(x.who.av)}</span>
       <span class="ff-text">${line}<span class="ff-meta">${escHtml([`${cuisineEmoji(x.c)} ${x.c || ''}`.trim(), feedAgo(x.at)].filter(Boolean).join(' · '))}</span></span>
       ${have ? `<button type="button" class="btn-ghost btn-sm fx-view" data-id="${escHtml(have.id)}">View</button>`
-        : `<button type="button" class="btn-sm btn-orange fx-save" data-i="${i}">＋ Save</button>`}</div>`;
+        : friendSaveChoice('fx-save', i)}</div>`;
   }).join('')}</div>` : '';
   const board = friendsBoard();
   const boardHtml = board.length > 1 ? `<div class="friends-section-title">Who ate out most · 30 days</div><ol class="fx-board">${board.map((r, i) => `
@@ -1664,6 +1673,7 @@ function renderFriendsList () {
     if (f) openFriendSpots(f.data);
   }));
   el.querySelectorAll('.fx-save').forEach(b => b.addEventListener('click', () => { saveFromFriend(feed[Number(b.dataset.i)]); renderFriendsList(); }));
+  el.querySelectorAll('.fx-save-been').forEach(b => b.addEventListener('click', () => { saveFromFriend(feed[Number(b.dataset.i)], { status: 'visited' }); renderFriendsList(); }));
   el.querySelectorAll('.fx-view').forEach(b => b.addEventListener('click', () => { closeFoodieFriends(); openDetailModal(b.dataset.id); }));
   el.querySelectorAll('.fx-plan').forEach(b => b.addEventListener('click', () => {
     const f = getFriends().find(x => x.key === b.dataset.key);

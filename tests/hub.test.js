@@ -1,4 +1,4 @@
-// Discover & Play: six favorites first, themed rows, utilities folded away, search finds everything.
+// Discover & Play: games first, then six favorites, themed rows, utilities folded away, search finds everything.
 const { BASE, check, launch, newPage, finish } = require('./lib');
 
 (async () => {
@@ -11,7 +11,9 @@ const { BASE, check, launch, newPage, finish } = require('./lib');
   await p.waitForTimeout(300);
 
   const first = await p.$$eval('#mobile-hub-body .hub-section:first-child .hub-card', els => els.map(e => e.dataset.tool));
-  check(JSON.stringify(first) === JSON.stringify(['just-ate', 'swipe', 'tonight', 'open-now', 'friends', 'spin']), `six favorites up top (${first})`);
+  check(JSON.stringify(first) === JSON.stringify(['foodfight', 'burgerbar', 'foodmatch', 'feedbear']), `the games up top (owner asked) (${first})`);
+  const second = await p.$$eval('#mobile-hub-body .hub-section:nth-child(2) .hub-card', els => els.map(e => e.dataset.tool));
+  check(JSON.stringify(second) === JSON.stringify(['just-ate', 'swipe', 'tonight', 'open-now', 'friends', 'spin']), `then the six favorites (${second})`);
   const visibleCards = await p.$$eval('#mobile-hub-body .hub-card', els => els.length);
   // 35: the Games section (Food Fight, Burger Bar, Food Match) added three.
   check(visibleCards <= 35, `not too many big cards (${visibleCards})`);
@@ -39,6 +41,8 @@ const { BASE, check, launch, newPage, finish } = require('./lib');
   check(missing.length === 0, `every hub tool has an action (${missing})`);
   check(new Set(allTools).size === allTools.length, 'no tool listed twice');
   check(p.errors.length === 0, `no page errors (${p.errors.slice(0, 2).join(' | ')})`);
+  check(await p.evaluate(() => { openMobileHub(); return document.querySelector('#mobile-hub-body .hub-section-title')?.textContent.trim(); }) === 'Games', 'Games are the first thing on Play');
+  check(await p.evaluate(() => ['foodfight', 'burgerbar', 'foodmatch', 'feedbear'].every(t => { const r = document.querySelector(`#mobile-hub-body [data-tool="${t}"]`)?.getBoundingClientRect(); return r && r.right <= innerWidth && r.left >= 0; })), 'all four games show without scrolling sideways');
   await browser.close();
   finish('hub');
 })();

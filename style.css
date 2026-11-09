@@ -9723,3 +9723,7 @@ body.light-mode .food-capture-buttons .food-capture-btn { background: rgba(var(-
   .chat-head-btn { width: 32px; height: 32px; }
   .chat-hide-cub { margin-right: 0; font-size: .7rem; }
 }
+
+/* Friend spots: Been there or Want to try (2026-11-09) */
+.friend-save-pair { display:flex; flex-direction:column; gap:6px; flex-shrink:0; }
+.friend-save-pair .btn-sm { min-height:32px; white-space:nowrap; }

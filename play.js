@@ -354,7 +354,7 @@ function _drawWheel (highlightIdx = -1) {
   ctx.fillStyle = '#E8B15A';
   ctx.font = 'bold 14px Poppins';
   ctx.textAlign = 'center';
-  ctx.fillText('', cx, cy + 5);
+  if (typeof _ftbBearFace === 'function') _ftbBearFace(ctx, cx, cy, 40);
 }
 
 function spinWheel () {
@@ -1055,12 +1055,35 @@ function _ftbDrawPopups() {
   }
 }
 
+// The Feed the Bear mascot's face, in a round frame (the game's bear and the wheel's hub).
+const _ftbBearImg = new Image();
+_ftbBearImg.src = 'feedbear-sm.jpg';
+_ftbBearImg.onload = () => { if (_FTB.ctx && _FTB.state === 'idle') _ftbDrawIdle(); if (!document.getElementById('spin-overlay')?.classList.contains('hidden')) try { _drawWheel(); } catch { /* wheel not open */ } };
+function _ftbBearFace (ctx, x, y, d) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, d / 2, 0, Math.PI * 2);
+  ctx.closePath();
+  if (_ftbBearImg.complete && _ftbBearImg.naturalWidth) {
+    ctx.save();
+    ctx.clip();
+    // Source crop: the face, top centre of the 560x306 mascot photo.
+    ctx.drawImage(_ftbBearImg, 150, 0, 250, 250, x - d / 2, y - d / 2, d, d);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = '#7a4a24';
+    ctx.fill();
+  }
+  ctx.lineWidth = Math.max(2, d * 0.06);
+  ctx.strokeStyle = '#ff6b35';
+  ctx.stroke();
+  ctx.restore();
+}
+
 function _ftbDrawBear() {
   const { ctx, canvas, bear } = _FTB;
-  const sz = Math.round(canvas.width * 0.17);
-  ctx.font = `${sz}px serif`;
-  ctx.textAlign = 'center';
-  ctx.fillText('', bear.x, bear.y);
+  const d = Math.round(canvas.width * 0.19);
+  _ftbBearFace(ctx, bear.x, bear.y - d * 0.3, d);
 }
 
 function _ftbDrawIdle() {
@@ -1070,10 +1093,8 @@ function _ftbDrawIdle() {
   _ftbBg();
 
   const W = canvas.width, H = canvas.height;
-  const bearSz = Math.round(W * 0.22);
-  ctx.font = `${bearSz}px serif`;
+  _ftbBearFace(ctx, W / 2, H * 0.49, Math.round(W * 0.3));
   ctx.textAlign = 'center';
-  ctx.fillText('', W / 2, H * 0.52);
 
   ctx.font = `bold ${Math.round(W * 0.088)}px sans-serif`;
   ctx.fillStyle = '#ff6b35';
