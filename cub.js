@@ -345,7 +345,7 @@ window.Cub = (() => {
     if (photo) a.photoReveal(photo, dish || r.name);
     a.showToast(status === 'visited' ? `${r.name} logged` : `${r.name} saved`, status === 'visited' ? 'Your visit is saved. Sharing is up to you.' : 'On your Want to Try list.', 'success');
     if (typeof a.celebrateMilestones === 'function') a.celebrateMilestones();
-    a.offerShareMeal({ r, dish, verdict: status === 'visited' ? verdict || 'ok' : '', photo, video, note: r.notes, rememberedVisit: visitChoice === 'visited-before' });
+    a.offerShareMeal({ r, dish, verdict: status === 'visited' ? verdict || 'ok' : '', photo, video, media: attachments, note: r.notes, rememberedVisit: visitChoice === 'visited-before' });
     if (welcomeActive) { resumeWelcome(true); return; }
     buddyTip(status === 'want-to-try' && !dish ? `Tip: open ${r.name} and add a must-try dish to your Crave List.` : '', true);
   }

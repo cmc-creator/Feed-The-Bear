@@ -4553,7 +4553,7 @@ function handleFormSubmit (e) {
   saveData();
   renderAll();
   closeModal();
-  if (isNew && typeof offerShareMeal === 'function') offerShareMeal({ r: state.restaurants.find(r => r.id === entry.id), photo: entry.photo, video: entry.video || '', note: entry.notes });
+  if (isNew && typeof offerShareMeal === 'function') offerShareMeal({ r: state.restaurants.find(r => r.id === entry.id), photo: entry.photo, video: entry.video || '', media: mediaOf(entry), note: entry.notes });
   _pendingAddPrefill = null;
   _formPlace = null;
 }
@@ -12611,7 +12611,7 @@ function saveJustAte () {
   [stars ? '★'.repeat(stars) : '', dishName ? `${DISH_VERDICT_LABEL[verdict]}: ${dishName}` : ''].filter(Boolean).join(' · ') || 'Find it any time under Lists.',
   'success');
   if (typeof celebrateMilestones === 'function') celebrateMilestones();
-  offerShareMeal({ r, dish: dishName, verdict: dishName ? verdict : '', photo, video: media[0]?.video || '', note });
+  offerShareMeal({ r, dish: dishName, verdict: dishName ? verdict : '', photo, video: media[0]?.video || '', media, note });
 }
 
 // "At The Mission get the guacamole, skip the churros" — the text a friend

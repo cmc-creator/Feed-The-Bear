@@ -1055,9 +1055,10 @@ function openFoodiePlan (restaurantId = '', friendKey = '') {
 }
 
 /* ── Share moments: right after you log a meal ── */
-function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', note = '', rememberedVisit = false }) {
+function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', note = '', media, rememberedVisit = false }) {
   if (!r || !window.StoryCard) return;
-  const momentMedia = mediaOf(r.visits?.at(-1) || r);
+  const momentMedia = media ?? mediaOf(r.visits?.at(-1) || r);
+  const momentPhotos = StoryCard.photosFor({ media: momentMedia }, photo);
   video = video || momentMedia.find(m => m.video)?.video || '';
   const generation = _dataGeneration;
   document.querySelector('.share-nudge')?.remove();
@@ -1065,7 +1066,7 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
   el.className = 'share-nudge';
   el.setAttribute('role', 'status');
   el.innerHTML = `${safeUrl(photo) ? `<img src="${escHtml(safeUrl(photo))}" alt="" />` : '<span class="sn-emoji" aria-hidden="true">📸</span>'}
-    <span class="sn-text"><strong>${r.status === 'visited' ? 'Share this meal?' : 'Share this spot?'}</strong><span>${StoryCard.photosFor(r, photo).length ? 'Your photos, your place. Preview your card before sharing.' : 'No personal photo yet. Your card uses text, never stock photos.'} Choose TikTok, Instagram, Facebook or a friend in your share sheet, when available.</span></span>
+    <span class="sn-text"><strong>${r.status === 'visited' ? 'Share this meal?' : 'Share this spot?'}</strong><span>${momentPhotos.length ? 'Your photos, your place. Preview your card before sharing.' : 'No personal photo yet. Your card uses text, never stock photos.'} Choose TikTok, Instagram, Facebook or a friend in your share sheet, when available.</span></span>
     <div class="sn-actions">
       <button type="button" class="btn-sm btn-primary sn-go">Share my place card</button>
       <button type="button" class="btn-sm sn-media" ${photo || video ? 'disabled' : ''}>${video ? 'Preparing video...' : photo ? 'Preparing photo...' : 'Share spot'}</button>
@@ -1171,8 +1172,8 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
     try {
       await StoryCard.openStory({
         kind: 'meal', kicker, title: dish || r.name, place: r.name, location: r.address || r.cuisine || '',
-        sub: dish ? `at ${r.name}` : (r.cuisine || ''), photo, photos: StoryCard.photosFor(r, photo),
-        media: mediaOf(r.visits?.at(-1) || r),
+        sub: dish ? `at ${r.name}` : (r.cuisine || ''), photo, photos: momentPhotos,
+        media: momentMedia,
         stars: r.myRating || 0,
         sections: note && el.querySelector('.sn-include-note')?.checked ? [{ label: 'My take', items: [note], tone: 'soft' }] : [],
       }, caption.value.trim(), `${r.name}-${dish || 'meal'}`);

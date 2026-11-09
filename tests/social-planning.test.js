@@ -112,6 +112,22 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
   check(await p.evaluate(() => window.__bucketStory.kind === 'spot'
     && window.__bucketStory.photos.join('|') === 'https://example.com/my-photo.jpg|https://example.com/my-second-photo.jpg'
     && window.__bucketStory.place === 'Tacos & Friends'), 'detail sharing uses the same personal-photo place card and excludes listing imagery');
+  await p.evaluate(() => {
+    const r = state.restaurants[0];
+    r.visits = [{ photo: 'https://example.com/old-meal.jpg', video: 'old-clip' }];
+    offerShareMeal({ r, media: [] });
+  });
+  check(await p.locator('.sn-media').innerText() === 'Share spot', 'a new photo-free moment does not prepare an old video');
+  await p.click('.sn-go');
+  check(await p.evaluate(() => __bucketStory.photos.length === 0 && __bucketStory.media.length === 0),
+    'a new meal without attachments never borrows pictures from restaurant history');
+  await p.evaluate(() => {
+    offerShareMeal({ r: state.restaurants[0], photo: 'https://example.com/current-meal.jpg',
+      media: [{ photo: 'https://example.com/current-meal.jpg' }] });
+  });
+  await p.click('.sn-go');
+  check(await p.evaluate(() => __bucketStory.photos.join('|') === 'https://example.com/current-meal.jpg'
+    && __bucketStory.media.length === 1), 'current moment cards and originals include only the explicitly saved meal media');
   await p.evaluate(() => { StoryCard.openStory = window.__realOpenStory; });
   await p.waitForTimeout(350);
   await p.evaluate(() => openFoodiePlan('tacos'));

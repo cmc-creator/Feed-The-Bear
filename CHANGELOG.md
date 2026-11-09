@@ -1,5 +1,13 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-08 (accurate meal sharing)
+
+- Pass the saved moment's media explicitly from Quick Add, full Add and Just Ate.
+  Use only those photos for its cover and original-file collection; do not borrow
+  photos or clips from previous visits when a new meal has no attachments.
+- Preserve place-detail sharing and existing capture options. Add current-media
+  and empty-moment sharing regressions.
+
 ## [Unreleased] - 2026-11-08 (existing-flow reliability)
 
 - Clear stale visit selections when searching for a replacement place and

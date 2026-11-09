@@ -16,6 +16,11 @@ Then open http://127.0.0.1:8765/app.html.
 
 ## Photos, videos, sharing and account privacy
 
+- Post-save meal cards and original-media collections use only that moment's
+  attachments. A meal without photos stays photo-free rather than borrowing
+  pictures or video from an earlier visit. Place-detail sharing still uses
+  the place's saved personal photos.
+
 - **Choose photos or video** selects existing media from your device.
   In Quick Add it is a prominent outlined button above Take photo and Record
   video. Existing selections are appended, not replaced.
