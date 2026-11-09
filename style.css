@@ -9692,3 +9692,34 @@ a.account-action-row { text-decoration: none; color: inherit; }
 
 .auth-try-first { display: none; text-align: center; margin: 6px 0 0; }
 #auth-overlay.auth-try .auth-try-first { display: block; }
+
+/* Polish pass (2026-11-09) */
+/* Photo / video buttons read as buttons, not loose text. */
+.food-capture-buttons .food-capture-btn {
+  flex: 1 1 auto; min-height: 44px; padding: 8px 14px; border-radius: 12px; gap: 6px;
+  border: 1px solid rgba(var(--primary-rgb), .45); background: rgba(var(--primary-rgb), .12);
+  color: var(--text); font-weight: 700; font-size: .84rem;
+}
+.food-capture-buttons .food-capture-btn:active { transform: scale(.97); }
+.food-capture-buttons .food-capture-btn:disabled { opacity: .55; }
+body.light-mode .food-capture-buttons .food-capture-btn { background: rgba(var(--primary-rgb), .1); color: #2a1a05; }
+/* Comfortable tap sizes for the small text-style buttons. */
+.chat-hide-cub { min-height: 36px; padding: 0 6px; }
+.yo-share { min-height: 30px; padding: 4px 12px; flex: none; }
+.auth-link-btn { min-height: 36px; padding: 0 4px; }
+.ai-quick-btn { min-height: 36px; }
+.yo-move, .yo-remove { min-height: 34px; }
+/* Padded cards: the title bar runs edge to edge like every other screen,
+   instead of floating inset as a card inside the card. */
+:is(.visitlog-card, .spend-card, .beenawhile-card, .mealplanner-card, .groupvote-card, .worldmap-card, .passport-card) > .modal-header {
+  margin: -20px -20px 14px; padding: 18px 20px 12px; top: -20px; border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+.feedbear-card > .modal-header { margin: -14px -14px 12px; padding: 16px 16px 10px; top: -14px; border-radius: var(--radius-xl) var(--radius-xl) 0 0; }
+/* Byte Cub's chat header fits a small phone on one line. */
+.chat-title, .chat-hide-cub { white-space: nowrap; }
+@media (max-width: 380px) {
+  .chat-header { gap: 6px; padding: 10px; }
+  .chat-avatar { width: 36px; height: 36px; }
+  .chat-head-btn { width: 32px; height: 32px; }
+  .chat-hide-cub { margin-right: 0; font-size: .7rem; }
+}

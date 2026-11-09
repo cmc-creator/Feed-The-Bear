@@ -772,6 +772,8 @@ function resetFriendsSession () {
 }
 function noteFriendsError (what, status, data) {
   _friendsErrors[what] = status === 401 ? 'your sign-in expired, so sign out and back in'
+    : status >= 200 && status < 300 ? 'the server sent back an empty answer'
+    : status === 429 ? 'too many tries, wait a minute'
     : status ? `${data?.error || 'server error'} (${status})` : 'no connection';
   renderFriendsStatus();
 }

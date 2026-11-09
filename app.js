@@ -919,9 +919,9 @@ function addFoodCaptureActions (anchor, onPick, { video = true } = {}) {
   const el = document.createElement('div');
   el.className = 'food-capture-actions';
   el.innerHTML = `<div class="food-capture-buttons">
-    <button type="button" class="btn-sm" data-source="photo">Take photo</button>
-    ${video ? '<button type="button" class="btn-sm" data-source="video">Record video</button>' : ''}
-    <button type="button" class="btn-sm" data-source="library">Choose photos or video</button>
+    <button type="button" class="btn-sm food-capture-btn" data-source="photo"><span aria-hidden="true">📷</span> Take photo</button>
+    ${video ? '<button type="button" class="btn-sm food-capture-btn" data-source="video"><span aria-hidden="true">🎥</span> Record video</button>' : ''}
+    <button type="button" class="btn-sm food-capture-btn" data-source="library"><span aria-hidden="true">🖼️</span> Choose photos or video</button>
     </div>${video ? '<small class="food-video-limits">Video: Grizzly, up to 15 seconds. Clips stay on this device.</small>' : ''}<span class="food-media-status" role="status"></span>`;
   anchor.insertAdjacentElement('afterend', el);
   el.addEventListener('click', e => {
