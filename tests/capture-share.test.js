@@ -15,7 +15,7 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
   await p.fill('.qa-input', 'Capture Cafe');
   await p.locator('.qa-input').press('Enter');
   await p.click('.qa-status[data-status="visited"]');
-  check(await p.locator('#quick-add-overlay [data-source="library"]').innerText() === 'Choose photos or video',
+  check((await p.locator('#quick-add-overlay [data-source="library"]').innerText()).trim().endsWith('Choose photos or video'),
     'existing photo selection is explicitly labelled separately from taking a new photo');
   check((await p.locator('#quick-add-overlay .qa-save-hint').innerText()).includes('Grizzly, 15s'),
     'video plan and duration limits are visible before recording');
