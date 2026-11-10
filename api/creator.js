@@ -43,6 +43,21 @@ const EMOJI_WORDS = [[/steak/, '🥩'], [/brew|pub|bar|beer/, '🍺'], [/sandwi
   [/taco|mexican|tex mex/, '🌮'], [/pizza/, '🍕'], [/burger|american|diner/, '🍔'], [/noodle|ramen|pho/, '🍜'], [/donut/, '🍩'], [/ice cream|gelato|frozen/, '🍦']];
 const emojiFor = c => { const k = String(c || '').toLowerCase().trim(); return EMOJI[k] || EMOJI_WORDS.find(([re]) => re.test(k))?.[1] || '🍽️'; };
 
+// Bear Cave decor: the same themes and decorations the app offers in
+// Username & public page (friends.js). The cave rides in the live profile
+// (profile.cave, short form {t, d}); anything unknown falls back to cozy.
+const CAVE_THEMES = { cozy: '🧸', forest: '🌲', neon: '⚡', pastel: '🌸' };
+const CAVE_DECOR = { lights: '✨', rug: '🧶', posters: '🖼️', plant: '🪴', trophy: '🏆', candle: '🕯️' };
+const CAVE_THEME_LABELS = { cozy: 'Cozy Den', forest: 'Forest', neon: 'Neon', pastel: 'Pastel' };
+function normalizeCave (raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const theme = CAVE_THEMES[src.theme || src.t] ? (src.theme || src.t) : 'cozy';
+  const list = Array.isArray(src.decor) ? src.decor : (Array.isArray(src.d) ? src.d : null);
+  const decor = list === null ? ['lights', 'plant']
+    : [...new Set(list.map(x => String(x)).filter(id => CAVE_DECOR[id]))].slice(0, 4);
+  return { theme, decor };
+}
+
 // The same shape the app's profile links use (friends.js sanitizeFriendData).
 function cleanPicks (raw) {
   const list = (v, n, len) => (Array.isArray(v) ? v : []).slice(0, n).map(x => str(x, len)).filter(Boolean);
@@ -53,7 +68,7 @@ function cleanPicks (raw) {
   })).filter(p => p.n);
 }
 
-function page (res, status, { title, description, body, url = SITE }) {
+function page (res, status, { title, description, body, url = SITE, theme = 'cozy' }) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');
   return res.status(status).send(`<!DOCTYPE html>
@@ -75,6 +90,10 @@ function page (res, status, { title, description, body, url = SITE }) {
   <link rel="icon" href="/feedbear-sm.jpg" />
   <style>
     :root { --bg: #1b241c; --card: #26322a; --text: #f6ecdc; --dim: #c9bfae; --accent: #ff8a3d; --gold: #ffd98a; }
+    body[data-cave-theme="cozy"] { --bg: #241a12; --card: #33261a; --accent: #ff8a3d; --gold: #ffd98a; }
+    body[data-cave-theme="forest"] { --bg: #122019; --card: #1d2f24; --accent: #7dd87d; --gold: #c9f2b0; }
+    body[data-cave-theme="neon"] { --bg: #1c1030; --card: #2a1848; --accent: #ff5da2; --gold: #ffd166; }
+    body[data-cave-theme="pastel"] { --bg: #2b2430; --card: #3a3040; --accent: #ffb3d9; --gold: #ffe3a3; }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); color: var(--text); font: 500 1rem/1.45 system-ui, -apple-system, sans-serif; }
     main { max-width: 520px; margin: 0 auto; padding: 28px 16px 120px; }
@@ -83,6 +102,11 @@ function page (res, status, { title, description, body, url = SITE }) {
     h1 { font-size: 1.6rem; line-height: 1.2; margin: 12px 0 4px; overflow-wrap: anywhere; }
     .handle { color: var(--gold); font-weight: 700; }
     .lead { color: var(--dim); margin: 6px 0 0; }
+    .cave-decor { text-align: center; font-size: 1.35rem; letter-spacing: 8px; margin-top: 12px; }
+    .cave-theme { text-align: center; color: var(--dim); font-size: .8rem; margin-top: 4px; }
+    .cave-vote { text-align: center; margin-top: 14px; }
+    .cave-vote button { border: 0; border-radius: 999px; padding: 10px 18px; background: var(--accent); color: #1b130b; font-weight: 800; font-size: .95rem; cursor: pointer; }
+    .cave-vote-count { color: var(--dim); font-size: .82rem; margin-top: 6px; }
     .spots { display: grid; gap: 10px; }
     .spot { display: flex; gap: 12px; align-items: center; background: var(--card); border-radius: 14px; padding: 12px; }
     .ph { width: 56px; height: 56px; flex-shrink: 0; border-radius: 10px; background: rgba(255,255,255,.06); display: grid; place-items: center; font-size: 1.6rem; overflow: hidden; }
@@ -101,7 +125,7 @@ function page (res, status, { title, description, body, url = SITE }) {
     .home { display: block; text-align: center; margin-top: 24px; color: var(--gold); }
   </style>
 </head>
-<body>
+<body data-cave-theme="${esc(theme)}">
 ${body}
 </body>
 </html>`);
@@ -139,6 +163,46 @@ module.exports = async function handler (req, res) {
     const name = str(profile.u || h.u || handle, 30);
     const picks = cleanPicks(profile.profile?.picks);
     const orders = picks.reduce((n, p) => n + p.g.length, 0);
+    // The cave (theme + decorations) rides in the live profile.
+    const cave = normalizeCave(profile.profile?.cave);
+    const decorRow = cave.decor.map(id => CAVE_DECOR[id]).join(' ');
+    const voteBox = `<div class="cave-vote">
+  <button type="button" id="cave-vote-btn" data-share="${esc(h.id)}">🐻 Love this cave?</button>
+  <div id="cave-vote-count" class="cave-vote-count"></div>
+</div>
+<script>
+(function () {
+  var btn = document.getElementById('cave-vote-btn');
+  var count = document.getElementById('cave-vote-count');
+  if (!btn || !count) return;
+  var share = btn.getAttribute('data-share');
+  var voter = 'anon';
+  try {
+    voter = localStorage.getItem('ftb_voter_id') || '';
+    if (!voter) {
+      voter = Array.from(crypto.getRandomValues(new Uint8Array(12)), function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+      localStorage.setItem('ftb_voter_id', voter);
+    }
+  } catch (e) { voter = 'anon'; }
+  var voted = false;
+  function render (state) {
+    voted = !!state.voted;
+    var n = Number(state.count) || 0;
+    count.textContent = n === 1 ? '❤️ 1 person loves this cave' : '❤️ ' + n + ' people love this cave';
+    btn.textContent = voted ? '❤️ You love this cave — tap to undo' : '🐻 Love this cave?';
+  }
+  function load () {
+    fetch('/api/cave-vote?share=' + encodeURIComponent(share) + '&voter=' + encodeURIComponent(voter))
+      .then(function (r) { return r.json(); }).then(render).catch(function () { count.textContent = ''; });
+  }
+  btn.addEventListener('click', function () {
+    fetch('/api/cave-vote', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: voted ? 'unvote' : 'vote', share: share, voter: voter }) })
+      .then(function (r) { return r.json(); }).then(render).catch(function () {});
+  });
+  load();
+})();
+</script>`;
     // The app's own profile-link format, so tapping Join follows them with these spots.
     const link = { v: 2, id: str(h.id, 40), u: name, picks, w: [], ts: Date.now() };
     const hash = Buffer.from(JSON.stringify(link), 'utf8').toString('base64');
@@ -164,13 +228,17 @@ module.exports = async function handler (req, res) {
       title: `${name}'s food spots`,
       description,
       url: `${SITE}/@${handle}`,
+      theme: cave.theme,
       body: `<main>
   <header>
     <img class="bear" src="/feedbear-sm.jpg" alt="" />
     <h1>${esc(name)}'s food spots</h1>
     <div class="handle">@${esc(handle)}</div>
+    <div class="cave-decor" aria-hidden="true">${decorRow}</div>
+    <div class="cave-theme">${CAVE_THEMES[cave.theme]} ${esc(CAVE_THEME_LABELS[cave.theme])} cave</div>
     <p class="lead">Where ${esc(name)} eats and exactly what to order.</p>
   </header>
+  ${voteBox}
   <section class="spots">${spots}</section>
   <a class="home" href="/">What is Feed The Bear?</a>
 </main>
