@@ -512,15 +512,26 @@ async function fbSaveRestaurants (uid, restaurants) {
     setTimeout(() => { if (generation === _authGeneration && uid === window._ftbUid) fbSaveRestaurants(uid, state.restaurants); }, 2000);
     return;
   }
+  // Spots go through the server (api/save-spots.js), which enforces the
+  // free 25-spot limit. Direct client writes to the restaurant collection
+  // are blocked by firestore.rules, so the limit can't be bypassed.
+  const user = _auth?.currentUser;
+  if (!user) return;
+  let token;
+  try { token = await user.getIdToken(); } catch { return; }
   try {
-    // Batch in chunks of 400 (Firestore limit is 500 per batch)
-    for (let i = 0; i < restaurants.length; i += 400) {
+    // Send in chunks of 50 so no request body gets huge (spots carry photos).
+    for (let i = 0; i < restaurants.length; i += 50) {
       if (generation !== _authGeneration || uid !== window._ftbUid || window._ftbAccountSwitching) return;
-      const batch = _db.batch();
-      restaurants.slice(i, i + 400).forEach(r => {
-        batch.set(_db.doc(`users/${uid}/restaurants/${r.id}`), cloudSafeRestaurant(r));
+      const chunk = restaurants.slice(i, i + 50).map(r => cloudSafeRestaurant(r));
+      const resp = await fetch('/api/save-spots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ spots: chunk }),
       });
-      await batch.commit();
+      if (!resp.ok) throw new Error(`save-spots ${resp.status}`);
+      const data = await resp.json().catch(() => ({}));
+      if (data.skipped > 0) console.warn('[FTB] Some spots were not saved (free limit):', data.skipped);
     }
     if (generation === _authGeneration && uid === window._ftbUid && window._ftbBackupStatus !== 'error') setBackupStatus('synced');
   } catch (err) {
@@ -602,14 +613,23 @@ function _mergeFriendsFromCloud (cloud) {
 
 // Delete restaurant docs from Firestore so deletions propagate across devices
 async function fbDeleteRestaurantsCloud (uid, ids) {
-  if (!uid || uid !== window._ftbUid || window._ftbSyncBlocked || !_db || !Array.isArray(ids) || !ids.length) return;
+  if (!uid || uid !== window._ftbUid || window._ftbSyncBlocked || !Array.isArray(ids) || !ids.length) return;
   const generation = _authGeneration;
+  // Deletions go through the server too (api/save-spots.js), since direct
+  // client writes to the restaurant collection are blocked by firestore.rules.
+  const user = _auth?.currentUser;
+  if (!user) return;
+  let token;
+  try { token = await user.getIdToken(); } catch { return; }
   try {
     for (let i = 0; i < ids.length; i += 400) {
       if (generation !== _authGeneration || uid !== window._ftbUid) return;
-      const batch = _db.batch();
-      ids.slice(i, i + 400).forEach(id => batch.delete(_db.doc(`users/${uid}/restaurants/${id}`)));
-      await batch.commit();
+      const resp = await fetch('/api/save-spots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ removeIds: ids.slice(i, i + 400) }),
+      });
+      if (!resp.ok) throw new Error(`save-spots ${resp.status}`);
     }
   } catch (err) {
     console.warn('[FTB] Firestore delete failed:', err);
@@ -1375,7 +1395,9 @@ function _authError (text, action = null) {
   if (text) box.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
 }
 
-// Which it was: no account, a Google account, or a wrong password (api/signin-help.js).
+// Sign-in help (api/signin-help.js) always answers 'unknown' now, so a
+// failed sign-in gets the one generic hint below instead of revealing
+// whether the email has an account or how it signs in.
 async function _signInHelp (email) {
   try {
     const resp = await fetch('/api/signin-help', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
@@ -1751,7 +1773,7 @@ async function _handleUpgradeClick () {
     if (playToken === false) { if (btn) { btn.disabled = false; btn.textContent = _upgradeLabel(); } return; }
     const resp = await fetch('/api/create-checkout', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
       body: JSON.stringify({ uid: user.uid, email: user.email, priceId, ref: _inviteRef(), ...(playToken ? { playToken } : {}), ...(_vipPromo() ? { promo: _vipPromo() } : {}) }),
     });
     const { url, error } = await resp.json();

@@ -79,9 +79,23 @@ module.exports = async function handler (req, res) {
     return;
   }
 
-  const { uid, email, priceId, ref, playToken, promo } = req.body || {};
-  if (!uid || !priceId) {
-    res.status(400).json({ error: 'Missing uid or priceId' });
+  // The caller must be signed in, and the checkout is always for their
+  // own account: the uid comes from their verified token, never the body,
+  // so nobody can start a checkout (or burn a free trial) for someone else.
+  let uid, tokenEmail;
+  try {
+    const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    const decoded = await getAdmin().auth().verifyIdToken(token);
+    uid = decoded.uid;
+    tokenEmail = decoded.email || '';
+  } catch {
+    res.status(401).json({ error: 'Sign in first' });
+    return;
+  }
+  const { priceId, ref, playToken, promo } = req.body || {};
+  const email = tokenEmail || String(req.body?.email || '');
+  if (!priceId) {
+    res.status(400).json({ error: 'Missing priceId' });
     return;
   }
   if (!ALLOWED_PRICES.includes(priceId)) {

@@ -27,8 +27,13 @@ service cloud.firestore {
     match /users/{userId} {
 
       // ── Personal restaurant list ──
+      // Reads are open to the owner. Writes go ONLY through the server
+      // (api/save-spots.js), which enforces the free 25-spot limit —
+      // direct client writes are blocked so the limit can't be bypassed
+      // from DevTools. The Admin SDK (server) bypasses these rules.
       match /restaurants/{restaurantId} {
-        allow read, write: if isOwner(userId);
+        allow read: if isOwner(userId);
+        allow write: if false;
       }
 
       // ── Profile (avatar, appearance, …) ──
@@ -56,14 +61,30 @@ service cloud.firestore {
     // Access model: the doc ID embeds a random secret token (capability
     // URL). Anyone who has the share link/ID may read and update; writes
     // must stamp the caller's uid in updatedBy (matches fbSharedListUpsert).
+    // createdBy is the list's creator (stamped once, never changed); only
+    // the creator may delete the list. Lists made before createdBy existed
+    // have none recorded, so anyone signed in may still delete those —
+    // they gain a creator the next time they're synced.
     match /sharedLists/{listId} {
       allow get: if request.auth != null;
       allow list: if false;
 
-      allow create, update: if request.auth != null
-        && request.resource.data.updatedBy == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.updatedBy == request.auth.uid
+        && (!('createdBy' in request.resource.data)
+            || request.resource.data.createdBy == request.auth.uid);
 
-      allow delete: if request.auth != null;
+      allow update: if request.auth != null
+        && request.resource.data.updatedBy == request.auth.uid
+        && (
+          resource.data.get('createdBy', null) == request.resource.data.get('createdBy', null)
+          || (resource.data.get('createdBy', null) == null
+              && request.resource.data.get('createdBy', null) == request.auth.uid)
+        );
+
+      allow delete: if request.auth != null
+        && (resource.data.get('createdBy', null) == request.auth.uid
+            || resource.data.get('createdBy', null) == null);
     }
 
     // ── Live friend profiles ──

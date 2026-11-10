@@ -9,7 +9,11 @@ const { ROOT, check, finish } = require('./lib');
   const fake = {
     apps: [1],
     auth: () => ({ verifyIdToken: async t => { if (!t.startsWith('token-')) throw new Error('bad'); return { uid: t.slice(6) }; } }),
-    firestore: () => ({ doc: p => ({ get: async () => ({ exists: !!docs[p], data: () => docs[p] }), set: async d => { docs[p] = d; } }) }),
+    firestore: () => ({
+      doc: p => ({ get: async () => ({ exists: !!docs[p], data: () => docs[p] }), set: async d => { docs[p] = d; } }),
+      // The real Admin SDK has runTransaction; the AI quota counter uses it.
+      runTransaction: async fn => fn({ get: ref => ref.get(), set: (ref, d) => ref.set(d) }),
+    }),
   };
   const orig = Module._load;
   Module._load = function (req, ...rest) { return req === 'firebase-admin' ? fake : orig.call(this, req, ...rest); };
