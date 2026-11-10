@@ -18,6 +18,7 @@ on:
       - 'native/capacitor.config.json'
       - '.github/workflows/ios.yml'
       - '.github/scripts/asc-check.js'
+      - '.github/scripts/asc-sign.js'
   workflow_dispatch:
 
 permissions:
@@ -61,28 +62,54 @@ jobs:
           KEY_OUT: ${{ runner.temp }}/AuthKey.p8
         run: node .github/scripts/asc-check.js
       - name: Sign and send to App Store Connect (TestFlight)
+        id: ship
         if: ${{ env.HAS_KEY == 'true' && github.ref == 'refs/heads/main' }}
         working-directory: native/ios/App
         env:
           KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
           ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
-          KEY_P8: ${{ secrets.APPSTORE_KEY_P8 }}
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -o pipefail
           KEY_ID=$(echo "$KEY_ID" | tr -d '[:space:]'); ISSUER_ID=$(echo "$ISSUER_ID" | tr -d '[:space:]'); TEAM_ID=$(echo "$TEAM_ID" | tr -d '[:space:]')
+          export KEY_ID ISSUER_ID TEAM_ID
           # The key check step saved a cleaned-up copy of the key.
           KEY="$RUNNER_TEMP/AuthKey_$KEY_ID.p8"
           mv "$RUNNER_TEMP/AuthKey.p8" "$KEY"
-          AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$KEY" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID")
-          # Each upload needs a higher build number; the run number always grows.
+          export KEY_FILE="$KEY"
+          SIGN="$RUNNER_TEMP/sign"; mkdir -p "$SIGN"
+
+          # 1. A distribution certificate and App Store profile just for this build.
+          /usr/bin/openssl genrsa -out "$SIGN/key.pem" 2048
+          /usr/bin/openssl req -new -key "$SIGN/key.pem" -out "$SIGN/csr.pem" -subj "/CN=FTB CI/O=$TEAM_ID/C=US"
+          node "$GITHUB_WORKSPACE/.github/scripts/asc-sign.js" setup "$SIGN" | tee "$SIGN/out.txt"
+          PROFILE_NAME=$(sed -n 's/^NAME=//p' "$SIGN/out.txt"); PROFILE_UUID=$(sed -n 's/^UUID=//p' "$SIGN/out.txt")
+          export PROFILE_NAME
+          echo "CERT_ID=$(sed -n 's/^CERT_ID=//p' "$SIGN/out.txt")" >> "$GITHUB_ENV"
+          echo "PROFILE_ID=$(sed -n 's/^PROFILE_ID=//p' "$SIGN/out.txt")" >> "$GITHUB_ENV"
+
+          # 2. Into a keychain and Xcode's profile folders.
+          /usr/bin/openssl pkcs12 -export -inkey "$SIGN/key.pem" -in "$SIGN/cert.pem" -out "$SIGN/cert.p12" -passout pass:ftbci
+          KC="$RUNNER_TEMP/ftb.keychain-db"
+          security create-keychain -p ftbci "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p ftbci "$KC"
+          security import "$SIGN/cert.p12" -k "$KC" -P ftbci -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k ftbci "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          for d in "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"; do
+            mkdir -p "$d"; cp "$SIGN/profile.mobileprovision" "$d/$PROFILE_UUID.mobileprovision"
+          done
+
+          # 3. The app target signs with them (release builds use production notifications).
+          perl -0pi -e 's/(504EC3181FED79650016851F \/\* Release \*\/ = \{.*?)CODE_SIGN_STYLE = Automatic;/$1CODE_SIGN_STYLE = Manual;\n\t\t\t\tCODE_SIGN_IDENTITY = "Apple Distribution";\n\t\t\t\tDEVELOPMENT_TEAM = $ENV{TEAM_ID};\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "$ENV{PROFILE_NAME}";/s' App.xcodeproj/project.pbxproj
+          sed -i '' 's#<string>development</string>#<string>production</string>#' App/App.entitlements
+
+          # 4. Build, sign and upload. Each upload needs a higher build number.
           BUILD=$((1000 + ${{ github.run_number }}))
           xcodebuild -project App.xcodeproj -scheme App -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
-            -derivedDataPath "$RUNNER_TEMP/dd" \
-            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic CURRENT_PROJECT_VERSION="$BUILD" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            "${AUTH[@]}" archive | tail -60
+            -derivedDataPath "$RUNNER_TEMP/dd" CURRENT_PROJECT_VERSION="$BUILD" archive | tail -60
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -90,13 +117,27 @@ jobs:
             <key>method</key><string>app-store-connect</string>
             <key>destination</key><string>upload</string>
             <key>teamID</key><string>$TEAM_ID</string>
-            <key>signingStyle</key><string>automatic</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>provisioningProfiles</key><dict><key>com.feedthebear.app</key><string>$PROFILE_NAME</string></dict>
             <key>uploadSymbols</key><true/>
             <key>manageAppVersionAndBuildNumber</key><false/>
           </dict></plist>
           EOF
           xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" \
-            "${AUTH[@]}" | tail -60
-          rm -f "$KEY"
+            -allowProvisioningUpdates -authenticationKeyPath "$KEY" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID" | tail -60
           echo "Sent build $BUILD to App Store Connect. It appears in TestFlight after Apple processes it (about 10-30 minutes)."
+      - name: Remove this build's certificate and profile
+        if: ${{ always() && env.CERT_ID != '' }}
+        working-directory: .
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          KEY_P8: ${{ secrets.APPSTORE_KEY_P8 }}
+          KEY_OUT: ${{ runner.temp }}/AuthKey-cleanup.p8
+        run: |
+          node .github/scripts/asc-check.js >/dev/null
+          KEY_FILE="$RUNNER_TEMP/AuthKey-cleanup.p8" node .github/scripts/asc-sign.js cleanup
+          security delete-keychain "$RUNNER_TEMP/ftb.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP"/AuthKey*.p8
