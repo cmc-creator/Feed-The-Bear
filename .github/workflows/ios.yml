@@ -7,6 +7,7 @@
 #   APPSTORE_KEY_P8      the downloaded AuthKey_XXXX.p8 file's text (the key needs Admin access)
 #   APPLE_TEAM_ID        developer.apple.com → Membership details → Team ID
 # Signing is automatic: Xcode makes the certificate and profile with that key.
+# Push changes under native/ios to send a new build; web changes need no new build.
 name: iPhone app
 
 on:
