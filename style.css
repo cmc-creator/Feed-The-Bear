@@ -8476,6 +8476,19 @@ body.light-mode .aar-icon {
 .auth-tab.active { background: var(--primary); color: #fff; }
 .auth-forgot { text-align: center; margin: 10px 0 0; }
 #auth-overlay[data-mode="signup"] .auth-forgot { display: none; }
+/* Verify mode: the sign-in form is hidden and the "check your email" panel shows. */
+#auth-overlay[data-mode="verify"] .auth-sub,
+#auth-overlay[data-mode="verify"] .auth-tabs,
+#auth-overlay[data-mode="verify"] #auth-google-btn,
+#auth-overlay[data-mode="verify"] .auth-divider,
+#auth-overlay[data-mode="verify"] .form-label,
+#auth-overlay[data-mode="verify"] .form-input,
+#auth-overlay[data-mode="verify"] #auth-submit-btn,
+#auth-overlay[data-mode="verify"] .auth-forgot,
+#auth-overlay[data-mode="verify"] #auth-toggle-text,
+#auth-overlay[data-mode="verify"] .auth-try-first,
+#auth-overlay[data-mode="verify"] .upgrade-legal { display: none; }
+#auth-verify p { font-size: .95rem; line-height: 1.5; margin: 4px 0 14px; }
 /* What went wrong signing in, inside the sheet, with the one button that fixes it. */
 .auth-error {
   margin-top: 12px; padding: 12px 14px; border-radius: 12px; display: grid; gap: 10px;

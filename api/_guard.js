@@ -9,6 +9,23 @@ const admin = require('firebase-admin');
 
 const DAILY_LOOKUPS = 400;
 
+// Email verification (2026-11-10): accounts created after this must confirm
+// their inbox before paid lookups. Same date as firebase.js EMAIL_VERIFY_CUTOFF;
+// accounts created before it never had verification, so they keep working.
+const EMAIL_VERIFY_CUTOFF = Date.parse('2026-11-10T21:00:00Z');
+
+// True when the account was created before email verification was added.
+async function _createdBeforeCutoff (uid) {
+  try {
+    const rec = await getAdmin().auth().getUser(uid);
+    const created = Date.parse(rec.metadata.creationTime || '') || 0;
+    return created < EMAIL_VERIFY_CUTOFF;
+  } catch {
+    // Can't tell: don't break the app for a signed-in member.
+    return true;
+  }
+}
+
 function getAdmin () {
   if (!admin.apps.length) {
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -18,15 +35,23 @@ function getAdmin () {
   return admin;
 }
 
-// The member's uid, or null after answering 401/429 for them.
+// The member's uid, or null after answering 401/403/429 for them.
 async function guard (req, res) {
   const token = String(req.headers?.['x-ftb-token'] || '');
-  let uid = null;
+  let decoded = null;
   try {
-    if (token) uid = (await getAdmin().auth().verifyIdToken(token)).uid;
-  } catch { uid = null; }
-  if (!uid) {
+    if (token) decoded = await getAdmin().auth().verifyIdToken(token);
+  } catch { decoded = null; }
+  if (!decoded) {
     res.status(401).json({ error: 'Sign in to look places up.' });
+    return null;
+  }
+  const uid = decoded.uid;
+  // Unverified email accounts created after verification was added can't use
+  // paid lookups. Google accounts and confirmed emails carry email_verified;
+  // older accounts are grandfathered by creation date.
+  if (decoded.email_verified === false && !(await _createdBeforeCutoff(uid))) {
+    res.status(403).json({ error: 'Verify your email to look places up. Check your inbox for the link.' });
     return null;
   }
   try {
