@@ -15,8 +15,8 @@ const { BASE, SHOTS, check, launch, newPage, closeAllDialogs, finish } = require
   const out = await p.evaluate(async () => {
     window._ftbUid = 'abcdefghij12345';
     let got = null;
-    navigator.canShare = () => true;
-    navigator.share = async d => { got = d; };
+    Object.defineProperty(navigator, 'canShare', { configurable: true, writable: true, value: () => true });
+    Object.defineProperty(navigator, 'share', { configurable: true, writable: true, value: async d => { got = d; } });
     openDetailModal('a');
     document.getElementById('detail-share-btn').click();
     // The card opens in the same preview as every story; Share sends it.

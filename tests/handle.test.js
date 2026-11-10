@@ -154,7 +154,11 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
   const joRow = p.locator('.friend-row', { hasText: 'Jo' }).last();
   check(!/Sent ·/.test(await joRow.innerText()), 'a friend who follows you back is not marked Sent');
   // Inviting: "Who's this for?", then a link with its own code.
-  await p.evaluate(() => { window._shared = null; navigator.share = async d => { window._shared = d; }; inviteFriend(); });
+  await p.evaluate(() => {
+    window._shared = null;
+    Object.defineProperty(navigator, 'share', { configurable: true, writable: true, value: async d => { window._shared = d; } });
+    inviteFriend();
+  });
   await p.waitForSelector('#invite-who', { timeout: 3000 });
   check(await p.locator('#invite-who .invite-who-name').isVisible(), 'Invite asks who it is for');
   await p.fill('#invite-who .invite-who-name', 'Mom');

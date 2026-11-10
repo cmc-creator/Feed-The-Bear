@@ -21,7 +21,7 @@ const OLD_LINK_FRIEND = { key: 'name:jo', name: 'Jo', savedAt: 1, data: { id: ''
   await e.waitForTimeout(1200);
   check(!(await e.locator('#friends-feed-home').isVisible()), 'no friends yet: no empty Friends\' Feed card');
   check(await e.locator('#header-invite-btn').isVisible(), 'a small Invite button sits in the header');
-  await e.evaluate(() => { navigator.share = undefined; });
+  await e.evaluate(() => { Object.defineProperty(navigator, 'share', { configurable: true, writable: true, value: undefined }); });
   await e.context().grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
   // No name yet: the invite asks for one so friends know who it's from.
   e.once('dialog', d => d.accept('Me'));

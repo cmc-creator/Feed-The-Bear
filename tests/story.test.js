@@ -79,7 +79,7 @@ const SEED = [
   check(picks.want[0] === 'Horchata' && picks.skip[0] === 'Fish taco', 'next time and skip sections are filled');
 
   // Long names, no photo, only "fine" dishes, no share sheet
-  await p.evaluate(() => { navigator.canShare = () => false; });
+  await p.evaluate(() => { Object.defineProperty(navigator, 'canShare', { configurable: true, writable: true, value: () => false }); });
   await p.evaluate(() => openDetailModal('r2'));
   await p.waitForSelector('#your-order-share:not(.hidden)');
   await p.click('#your-order-share');

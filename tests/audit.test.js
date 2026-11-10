@@ -118,7 +118,7 @@ async function scraperStaysPublic () {
   // Share text and social previews.
   const digestText = await p.evaluate(() => {
     let text = '';
-    navigator.share = d => { text = d.text; return Promise.resolve(); };
+    Object.defineProperty(navigator, 'share', { configurable: true, writable: true, value: d => { text = d.text; return Promise.resolve(); } });
     shareDigest();
     return text;
   });
