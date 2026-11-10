@@ -17,6 +17,7 @@ on:
       - 'native/package.json'
       - 'native/capacitor.config.json'
       - '.github/workflows/ios.yml'
+      - '.github/scripts/asc-check.js'
   workflow_dispatch:
 
 permissions:
@@ -50,6 +51,14 @@ jobs:
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/dd-sim" CODE_SIGNING_ALLOWED=NO build | tail -40
           test "${PIPESTATUS[0]}" -eq 0
+      - name: Check the App Store Connect key with Apple
+        if: ${{ env.HAS_KEY == 'true' && github.ref == 'refs/heads/main' }}
+        working-directory: .
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          KEY_P8: ${{ secrets.APPSTORE_KEY_P8 }}
+        run: node .github/scripts/asc-check.js
       - name: Sign and send to App Store Connect (TestFlight)
         if: ${{ env.HAS_KEY == 'true' && github.ref == 'refs/heads/main' }}
         working-directory: native/ios/App
@@ -60,6 +69,7 @@ jobs:
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -o pipefail
+          KEY_ID=$(echo "$KEY_ID" | tr -d '[:space:]'); ISSUER_ID=$(echo "$ISSUER_ID" | tr -d '[:space:]'); TEAM_ID=$(echo "$TEAM_ID" | tr -d '[:space:]')
           KEY="$RUNNER_TEMP/AuthKey_$KEY_ID.p8"
           printf '%s\n' "$KEY_P8" > "$KEY"
           AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$KEY" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID")
