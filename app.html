@@ -1065,6 +1065,8 @@
           <button class="home-mood-chip" data-mood="date" type="button">Date</button>
           <button class="home-mood-chip" data-mood="comfort" type="button">Comfort</button>
           <button class="home-mood-chip" data-mood="healthy" type="button">Light</button>
+          <button class="home-mood-chip" data-mood="adventurous" type="button">Adventurous</button>
+          <button class="home-mood-chip" data-mood="late-night" type="button">Late night</button>
         </div>
         <div id="mood-picks-list" class="mood-picks-list"></div>
       </div>
@@ -1143,6 +1145,8 @@
         <button class="mood-chip" data-mood="new">Try something new</button>
         <button class="mood-chip" data-mood="comfort">Comfort food</button>
         <button class="mood-chip" data-mood="healthy">Something light</button>
+        <button class="mood-chip" data-mood="adventurous">Adventurous</button>
+        <button class="mood-chip" data-mood="late-night">Late night</button>
         <button class="mood-chip" data-mood="surprise">Surprise me</button>
       </div>
       <div id="tonight-result" class="tonight-result hidden"></div>
@@ -2166,6 +2170,18 @@
       </div>
       <input id="dish-note-input" class="form-input dish-note-input" placeholder="Note (optional) — e.g. extra spicy, ask for no onions" maxlength="200" />
       <div id="dish-list" class="dish-list"></div>
+    </div>
+  </div>
+
+  <!-- ── Cook it at home: Byte Cub recipe ───────────────────── -->
+  <div id="recipe-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="recipe-title">
+    <div class="modal-card recipe-card">
+      <div class="modal-header">
+        <h2 id="recipe-title">🍳 Cook it at home</h2>
+        <button id="recipe-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p id="recipe-subtitle" class="dish-subtitle"></p>
+      <div id="recipe-body" class="recipe-body"></div>
     </div>
   </div>
 

@@ -9057,6 +9057,8 @@ function setupEvents () {
 
   // Phase 8 - Dish Tracker
   document.getElementById('dish-close-btn').addEventListener('click', closeDishTracker);
+  document.getElementById('recipe-close-btn').addEventListener('click', closeRecipeModal);
+  document.getElementById('recipe-overlay').addEventListener('click', e => { if (e.target.id === 'recipe-overlay') closeRecipeModal(); });
   document.getElementById('dish-overlay').addEventListener('click', e => { if (e.target === document.getElementById('dish-overlay')) closeDishTracker(); });
   document.getElementById('dish-add-btn').addEventListener('click', addDish);
   document.getElementById('dish-name-input').addEventListener('keydown', e => { if (e.key === 'Enter') addDish(); });
@@ -10094,6 +10096,8 @@ function scoreTonightDiscoveryCandidate (c, moods = []) {
   if (moods.includes('date') && Number(c.priceLevel || 0) >= 2) s += 1;
   if (moods.includes('comfort') && ['italian', 'american', 'mexican', 'japanese', 'chinese', 'indian'].some(x => cuisine.includes(x))) s += 1.7;
   if (moods.includes('healthy') && ['mediterranean', 'japanese', 'vietnamese', 'thai', 'greek', 'vegan'].some(x => cuisine.includes(x))) s += 1.8;
+  if (moods.includes('adventurous') && ['thai', 'indian', 'korean', 'ethiopian', 'vietnamese', 'peruvian', 'japanese', 'chinese'].some(x => cuisine.includes(x))) s += 1.7;
+  if (moods.includes('late-night') && ['mexican', 'pizza', 'american', 'thai', 'korean', 'bbq', 'chinese'].some(x => cuisine.includes(x))) s += 1.7;
   if (moods.includes('quick') && Number(c.priceLevel || 0) <= 2) s += 1.1;
   if (moods.includes('surprise')) s += Math.random() * 2;
 
@@ -10176,6 +10180,8 @@ async function runTonightsPick () {
   if (moods.includes('date')    && r.priceRange >= 2) s += 1;
   if (moods.includes('comfort') && ['Italian','American','Mexican','Japanese','Chinese','Indian'].includes(r.cuisine)) s += 2;
   if (moods.includes('healthy') && ['Mediterranean','Japanese','Vietnamese','Thai','Greek'].includes(r.cuisine)) s += 2;
+  if (moods.includes('adventurous') && ['Thai','Indian','Korean','Ethiopian','Vietnamese','Peruvian','Japanese','Chinese'].includes(r.cuisine)) s += 2;
+  if (moods.includes('late-night') && ['Mexican','Pizza','American','Thai','Korean','BBQ','Chinese'].includes(r.cuisine)) s += 2;
   if (moods.includes('quick')   && r.priceRange <= 2) s += 1;
   if (moods.includes('surprise')) s += Math.random() * 2;
   return { r, s };
@@ -12557,7 +12563,7 @@ function renderYourOrder (restaurantId) {
   // The single best dish at this spot, called out at the top so it's
   // unmissable: the top-rated "order again" dish, with its stars and note.
   const goTo = goToDishOf(r);
-  const topHtml = goTo ? `<div class="yo-top-dish"><span class="yo-top-dish-label">⭐ Order this again</span><strong>${escHtml(goTo.name)}</strong>${goTo.rating ? ` <span class="yo-dish-stars" aria-label="${goTo.rating} stars">${'★'.repeat(goTo.rating)}</span>` : ''}${goTo.note ? `<div class="yo-top-dish-note">${escHtml(goTo.note)}</div>` : ''}</div>` : '';
+  const topHtml = goTo ? `<div class="yo-top-dish"><span class="yo-top-dish-label">⭐ Order this again</span><strong>${escHtml(goTo.name)}</strong>${goTo.rating ? ` <span class="yo-dish-stars" aria-label="${goTo.rating} stars">${'★'.repeat(goTo.rating)}</span>` : ''}${goTo.note ? `<div class="yo-top-dish-note">${escHtml(goTo.note)}</div>` : ''}<button type="button" class="btn-sm btn-secondary yo-cook" onclick="cookDishAtHome('${r.id}','${goTo.id}')">🍳 Cook it at home</button></div>` : '';
   listEl.innerHTML = bestBetHtml(r) + topHtml + ['again', 'want', 'ok', 'skip'].filter(g => counts[g]).map(g => `
   <div class="yo-group yo-group-${g}">
     <div class="yo-group-label">${DISH_VERDICT_LABEL[g]}</div>
@@ -12907,6 +12913,36 @@ function closeDishTracker () {
   document.getElementById('dish-overlay').classList.add('hidden');
   maybeHideOverlay();
 }
+
+// "Cook it at home": Byte Cub writes a home-cook recipe for a dish you loved.
+// The button is visible to everyone; only the recipe itself is Grizzly —
+// it costs an AI call, and AI is a Grizzly perk.
+async function cookDishAtHome (restaurantId, dishId) {
+  const r = state.restaurants.find(x => x.id === restaurantId);
+  const d = r && dishesOf(r).find(x => x.id === dishId);
+  if (!r || !d) return;
+  if (!AI.hasAccess()) { showGrizzlyUpsell('recipe'); return; }
+  openRecipeModal(d, r);
+  const body = document.getElementById('recipe-body');
+  if (body) body.innerHTML = '<p class="recipe-loading">Byte Cub is writing your recipe… 🐻</p>';
+  try {
+    const prompt = `Write a practical home-cook recipe for "${d.name}", a ${r.cuisine || 'restaurant'} dish from ${r.name}${d.note ? ` (my note: ${d.note})` : ''}. Give ingredients with amounts, then numbered steps. Keep it doable in a home kitchen, under 300 words. Plain text, no markdown headings.`;
+    const text = await AI.call(prompt, '', { maxTokens: 700, temperature: 0.7 });
+    if (body) body.textContent = (text || '').trim() || 'Byte Cub came back empty-handed — try again in a moment.';
+  } catch (err) {
+    if (body) body.textContent = 'Could not fetch a recipe right now. Check your connection and try again.';
+  }
+}
+function openRecipeModal (d, r) {
+  document.getElementById('recipe-title').textContent = `🍳 ${d.name}`;
+  document.getElementById('recipe-subtitle').textContent = `Cook it at home · ${r.name}`;
+  document.getElementById('recipe-overlay').classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeRecipeModal () {
+  document.getElementById('recipe-overlay')?.classList.add('hidden');
+  maybeHideOverlay();
+}
 function _renderDishRatingPicker (val) {
   document.querySelectorAll('.spm').forEach((s, i) => {
   s.classList.toggle('on', i < val);
@@ -12947,6 +12983,7 @@ function renderDishList (restaurantId) {
     <div class="dish-item-top">
       <div class="dish-item-name">${escHtml(d.name)}${d.id === goTo?.id ? ' <span class="dish-badge dish-badge-again">★ Order again</span>' : ''}${d.verdict === 'skip' ? ' <span class="dish-badge dish-badge-skip">Skip this</span>' : ''}</div>
       <div class="dish-item-stars">${d.rating ? '★'.repeat(d.rating) + '☆'.repeat(5-d.rating) : '☆'}</div>
+      ${(d.verdict === 'again' || (d.rating || 0) >= 4) ? `<button class="dish-item-cook icon-btn" onclick="cookDishAtHome('${restaurantId}','${d.id}')" title="Cook it at home">🍳</button>` : ''}
       <button class="dish-item-delete icon-btn" onclick="deleteDish('${restaurantId}','${d.id}')" title="Remove">✕</button>
     </div>
     ${d.note ? `<div class="dish-item-note">${escHtml(d.note)}</div>` : ''}
@@ -13637,6 +13674,24 @@ function scoreMoodPick (r, mood) {
   } else if (mood === 'healthy') {
   if (['mediterranean', 'greek', 'japanese', 'vietnamese', 'thai', 'vegan'].some(c => cuisine.includes(c))) s += 1.8;
   if ((r.priceRange || 0) <= 3) s += 0.5;
+  } else if (mood === 'adventurous') {
+  if (['thai', 'indian', 'korean', 'ethiopian', 'vietnamese', 'peruvian', 'japanese', 'chinese', 'filipino', 'malaysian'].some(c => cuisine.includes(c))) s += 1.8;
+  if (r.status === 'want-to-try') s += 1.0;
+  if ((r.googleReviews || 0) > 0 && (r.googleReviews || 0) < 200) s += 0.6;
+  } else if (mood === 'late-night') {
+  if (['mexican', 'pizza', 'american', 'thai', 'korean', 'bbq', 'chinese', 'indian'].some(c => cuisine.includes(c))) s += 1.8;
+  if ((r.priceRange || 0) <= 2) s += 0.6;
+  } else if (mood === 'budget') {
+  if ((r.priceRange || 0) <= 2) s += 1.8;
+  if ((r.priceRange || 0) <= 1) s += 0.6;
+  } else if (mood === 'fancy') {
+  if ((r.priceRange || 0) >= 3) s += 1.6;
+  if ((r.googleRating || 0) >= 4.4) s += 1.2;
+  } else if (mood === 'new') {
+  if (r.status === 'want-to-try') s += 2.2;
+  if (!(r.visits || []).length) s += 0.8;
+  } else if (mood === 'surprise') {
+  s += Math.random() * 2;
   }
   return s;
 }
@@ -13672,12 +13727,14 @@ function renderMoodPicksHome (selectedMood = null) {
   const dist = distOf(r);
   const distMeta = Number.isFinite(dist) ? ` • ${fmtDist(dist)} away` : '';
   const moodFit = Math.max(40, Math.min(98, Math.round(r._moodScore * 9.5)));
+  const topDish = goToDishOf(r);
   return `<button class="mood-pick-card" type="button" data-id="${r.id}">
     <div class="mood-pick-top">
       <div class="mood-pick-name">${escHtml(r.name)}</div>
       <div class="mood-pick-fit">${moodFit}%</div>
     </div>
     <div class="mood-pick-meta">${meta}${distMeta}</div>
+    ${topDish ? `<div class="mood-pick-dish">Get the ${escHtml(topDish.name)}</div>` : ''}
     <div class="mood-pick-meter"><span style="width:${moodFit}%"></span></div>
   </button>`;
   }).join('');
@@ -13814,6 +13871,17 @@ function stageHomeModules () {
   setTimeout(() => home.classList.remove('staged'), 900);
 }
 
+// Dishes you rated 1-2 stars ("Skip") across every spot — the Never again list.
+function getNeverAgainDishes () {
+  const out = [];
+  (state.restaurants || []).forEach(r => {
+    dishesOf(r).forEach(d => {
+      if (d.verdict === 'skip') out.push({ r, d });
+    });
+  });
+  return out.sort((a, b) => String(b.d.date || '').localeCompare(String(a.d.date || '')));
+}
+
 function getDishLeaderboardData () {
   const map = {};
   const verdictScore = { again: 3, ok: 1, skip: -2 };
@@ -13861,6 +13929,23 @@ function openDishLeaderboard () {
       setTimeout(() => openDetailModal(btn.dataset.id), 120);
     });
   });
+  }
+
+  // Never again: every dish you rated 1-2 stars, with a way to take it off
+  // the list if you change your mind (it keeps the dish, just un-skips it).
+  const never = getNeverAgainDishes();
+  if (never.length) {
+  list.insertAdjacentHTML('beforeend', `<div class="dish-board-never"><div class="dish-board-never-title">🚫 Never again</div>${never.map(({ r, d }) => `
+    <div class="dish-board-never-row">
+      <div class="dish-board-never-main"><div class="dish-board-never-name">${escHtml(d.name)}</div><div class="dish-board-never-meta">${escHtml(r.name)}${d.rating ? ` · ${'★'.repeat(d.rating)}` : ''}${d.note ? ` · ${escHtml(d.note)}` : ''}</div></div>
+      <button type="button" class="btn-sm btn-ghost dish-board-never-remove" data-r="${escHtml(r.id)}" data-d="${escHtml(d.id)}">Remove</button>
+    </div>`).join('')}</div>`);
+  list.querySelectorAll('.dish-board-never-remove').forEach(b => b.addEventListener('click', () => {
+    const r = state.restaurants.find(x => x.id === b.dataset.r);
+    const d = r && dishesOf(r).find(x => x.id === b.dataset.d);
+    if (r && d) upsertDish(r, { name: d.name, verdict: 'ok' });
+    openDishLeaderboard();
+  }));
   }
 
   overlay.classList.remove('hidden');

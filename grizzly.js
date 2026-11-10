@@ -21,6 +21,7 @@ const GRIZZLY_PITCH = {
   summary:     { title: 'Byte Cub sums up every spot', body: 'One tap for the vibe, what to order, and the best time to go.' },
   menu:        { title: 'Snap the menu, get your order', body: 'Take a photo of any menu and Byte Cub picks the dishes that fit your taste, with a reason for each.' },
   dishes:      { title: 'Know what to order before you go', body: 'Byte Cub picks the dishes worth ordering at each spot, tuned to your taste.' },
+  recipe:      { title: 'Cook it at home with Byte Cub', body: 'Byte Cub writes a home-cook recipe for any dish you loved, with ingredients and steps. Recipes are a Grizzly perk.' },
   smartfill:   { title: 'Let the cub do the typing', body: 'Byte Cub fills in cuisine, price, tags, and a short description for every spot you add.' },
   video:       { title: 'Save food videos', body: 'Catch the cheese pull, the sizzle, the steam. Grizzly saves 15-second videos with every dish you log.' },
   review:      { title: 'Your foodie Year in Review', body: 'Your top spots, cuisines, and streaks, wrapped up and ready to share.' },

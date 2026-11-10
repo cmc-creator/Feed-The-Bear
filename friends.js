@@ -26,7 +26,9 @@ function buildProfileData () {
   const dishNames = (r, verdict, n) => dishesOf(r).filter(d => d.verdict === verdict).slice(0, n).map(d => String(d.name).slice(0, 40));
   const picks = [...state.restaurants]
     .filter(isAvailableSpot)
-    .filter(r => r.myRating > 0 || dishesOf(r).some(d => d.verdict === 'again'))
+    // Only places you've actually been to: a Want to Try spot — even one you
+    // gave stars in the detail view — is not a recommendation.
+    .filter(r => r.status === 'visited' && (r.myRating > 0 || dishesOf(r).some(d => d.verdict === 'again')))
     .sort((a, b) => (b.myRating || 0) - (a.myRating || 0))
     .slice(0, 15)
     .map(r => {
@@ -545,6 +547,16 @@ function friendSaveChoice (cls, i) {
     + `<button type="button" class="btn-sm btn-orange ${cls}" data-i="${i}">＋ Want to try</button></span>`;
 }
 
+// The note stamped on a spot you save from a friend must say what the friend
+// actually did. "Recommended" is only for a place they tried and liked; a
+// place they only want to try is never a recommendation.
+function friendNoteFor (x, whoName) {
+  if (x.k === 'save') return `${whoName} wants to try it.`;
+  if (x.k === 'dish') return `${whoName} recommended it.`;
+  const liked = (x.r || 0) >= 4 || (x.g && x.g.length > 0);
+  return liked ? `${whoName} recommended it.` : `${whoName} ate there.`;
+}
+
 // `quiet`: no redraw or toast (adding several at once). Returns the new spot.
 function saveFromFriend (x, { quiet = false, bulk = false, status = 'want-to-try' } = {}) {
   if (!x?.n) return null;
@@ -555,7 +567,7 @@ function saveFromFriend (x, { quiet = false, bulk = false, status = 'want-to-try
   const r = {
     id: uid(), name: x.n.slice(0, 80), cuisine: x.c || '', priceRange: 0, address: x.a || '', lat: null, lng: null,
     website: '', photo: '', googleRating: 0, googleReviews: 0, myRating: 0,
-    notes: `${x.who.name} recommended it.`, tags: ['From a friend'], collectionId: null, priority: '',
+    notes: friendNoteFor(x, x.who.name), tags: ['From a friend'], collectionId: null, priority: '',
     status: status === 'visited' ? 'visited' : 'want-to-try', dateAdded: today, dateVisited: null, updatedAt: Date.now(), visits: [],
   };
   if (atLimit) { holdSpotForGrizzly(r, x.d ? { name: x.d, verdict: 'want' } : null); return null; }
@@ -1386,8 +1398,8 @@ function friendSpotItems (data, recent = []) {
     seen.add(k);
     out.push(x);
   };
-  (data?.picks || []).forEach(p => add({ n: p.n, c: p.c, a: p.a, r: p.r, p: p.p, g: p.g || [], d: p.g?.[0] || '' }));
-  (recent || []).forEach(x => add({ n: x.n, c: x.c, a: x.a, r: x.r, p: '', g: x.d ? [x.d] : [], d: x.d || '' }));
+  (data?.picks || []).forEach(p => add({ n: p.n, c: p.c, a: p.a, r: p.r, p: p.p, g: p.g || [], d: p.g?.[0] || '', k: 'pick' }));
+  (recent || []).forEach(x => add({ n: x.n, c: x.c, a: x.a, r: x.r, p: '', g: x.d ? [x.d] : [], d: x.d || '', k: x.k || '' }));
   return out;
 }
 function onMyList (name) {
@@ -1430,7 +1442,7 @@ function openFriendSpots (data, { invited = false } = {}) {
           <div class="guest-item-photo">${/^https?:/i.test(photo) ? `<img src="${escHtml(photo)}" alt="" />` : (cuisineEmoji(p.c) || '🍽️')}</div>
           <div class="guest-item-body">
             <div class="guest-item-name">${medals[i] && p.r ? medals[i] + ' ' : ''}${escHtml(p.n)}</div>
-            <div class="guest-item-meta">${escHtml(p.c || 'Restaurant')}${p.a ? ' · ' + escHtml(p.a.slice(0, 40)) : ''}${p.r ? ` <span class="guest-item-stars">${'★'.repeat(p.r)}</span>` : ''}</div>
+            <div class="guest-item-meta">${escHtml(p.c || 'Restaurant')}${p.a ? ' · ' + escHtml(p.a.slice(0, 40)) : ''}${p.r ? ` <span class="guest-item-stars">${'★'.repeat(p.r)}</span>` : ''}${p.k === 'save' ? ' · <span class="guest-item-want">Wants to try</span>' : ''}</div>
             ${p.g.length ? `<div class="guest-item-order">Get: ${p.g.map(escHtml).join(', ')}</div>` : ''}
           </div>
           ${have

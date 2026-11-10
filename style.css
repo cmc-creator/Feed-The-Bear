@@ -4175,6 +4175,7 @@ body.light-mode #profile-btn {
 .guest-item-name { font-weight:700; font-size:.92rem; }
 .guest-item-meta { font-size:.74rem; color:var(--text-dim); margin-top:2px; }
 .guest-item-stars { color:var(--gold); font-size:.78rem; }
+.guest-item-want { color:var(--gold); font-weight:700; }
 .guest-item-photo img { width:100%; height:100%; object-fit:cover; border-radius:10px; }
 .guest-item-body { min-width:0; }
 .guest-item-order { font-size:.78rem; margin-top:3px; color:var(--text); }
@@ -4307,6 +4308,8 @@ body.guest-open #upgrade-overlay { z-index:7100; }
    PHASE 8 � DISH TRACKER
    ------------------------------------------------------------ */
 .dish-card { max-width: 500px; }
+.recipe-card { max-width: 500px; }
+.recipe-body { white-space: pre-wrap; font-size: .92rem; line-height: 1.55; color: var(--text); max-height: 55vh; overflow-y: auto; }
 .dish-subtitle { font-size: .85rem; color: var(--primary); font-weight: 700; margin: 0 0 12px; }
 .dish-add-row { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
 .star-picker-mini { display: flex; gap: 2px; }
@@ -6551,6 +6554,12 @@ body[data-view="visited"] .weekly-suggest-banner { display: none; }
   margin-top: 4px;
 }
 
+.mood-pick-dish {
+  font-size: .78rem;
+  color: #ffd166;
+  margin-top: 3px;
+}
+
 .mood-pick-meter {
   margin-top: 8px;
   width: 100%;
@@ -7055,6 +7064,12 @@ body[data-view="visited"] .weekly-suggest-banner { display: none; }
 .dish-board-name { font-size: .9rem; font-weight: 700; color: var(--text); }
 .dish-board-meta { font-size: .74rem; color: var(--text-dim); }
 .dish-board-score { font-size: 1rem; font-weight: 800; color: var(--green); }
+.dish-board-never { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
+.dish-board-never-title { font-weight: 800; font-size: .95rem; margin-bottom: 8px; }
+.dish-board-never-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.dish-board-never-main { flex: 1; min-width: 0; }
+.dish-board-never-name { font-weight: 700; font-size: .9rem; color: var(--text); }
+.dish-board-never-meta { font-size: .76rem; color: var(--text-dim); margin-top: 2px; }
 
 .shared-manage-card { max-width: 540px; }
 .shared-collab-list,
