@@ -117,6 +117,8 @@ window.StoryCard = (() => {
     ctx.font = `800 ${size}px ${font}`;
     while (ctx.measureText(link).width > w - bw - 30 * s && size > 20 * s) { size -= 2 * s; ctx.font = `800 ${size}px ${font}`; }
     ctx.fillText(link, x, y);
+    // No Google Play badge from the iPhone app (Apple's rules).
+    if (window.FTB_IOS_APP) { ctx.restore(); return; }
     // The badge
     const r = 16 * s;
     ctx.beginPath();

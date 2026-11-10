@@ -21,6 +21,7 @@
 const admin = require('firebase-admin');
 const { sendEmail, emailHtml, emailReady, esc } = require('./_email');
 const { bump } = require('./_count');
+const { sendMulticast } = require('./_push');
 
 const MAX_TOKENS = 5;
 const MAX_FOLLOWS = 50;
@@ -82,7 +83,7 @@ async function notify (db, fb, uid, id) {
 
   const who = String(profile.u || 'A friend').slice(0, 30);
   const { title, body } = messageFor(who, fresh[0], fresh.length - 1);
-  const res = await fb.messaging().sendEachForMulticast({
+  const res = await sendMulticast(fb, {
     tokens,
     notification: { title, body },
     data: { open: 'friends' },
@@ -127,7 +128,7 @@ async function joined (db, fb, uid) {
     const uids = (await Promise.all(OWNER_EMAILS().map(e => fb.auth().getUserByEmail(e).then(x => x.uid).catch(() => null)))).filter(Boolean);
     const tokens = uids.length ? (await db.getAll(...uids.map(x => db.doc(`pushTokens/${x}`)))).flatMap(s => s.data()?.tokens || []) : [];
     if (tokens.length) {
-      const r = await fb.messaging().sendEachForMulticast({
+      const r = await sendMulticast(fb, {
         tokens, notification: { title, body }, data: { open: 'owner' },
         android: { priority: 'high', notification: { tag: `signup-${uid}` } },
       });

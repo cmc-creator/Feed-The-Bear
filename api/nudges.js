@@ -17,6 +17,7 @@
 
 const admin = require('firebase-admin');
 const { bump } = require('./_count');
+const { sendMulticast } = require('./_push');
 const { nationalList } = require('./food-events');
 const { refreshGuides } = require('./guide');
 const { expireVips } = require('./owner');
@@ -90,7 +91,7 @@ async function welcomeNudges (db, fb) {
     const body = 'Save one spot you love. It takes ten seconds, and the bear starts learning your taste.';
     const tokens = (await db.doc(`pushTokens/${d.id}`).get()).data()?.tokens || [];
     if (tokens.length) {
-      const r = await fb.messaging().sendEachForMulticast({ tokens, notification: { title, body }, data: { open: 'add' }, android: { notification: { tag: 'welcome-nudge' } } });
+      const r = await sendMulticast(fb, { tokens, notification: { title, body }, data: { open: 'add' }, android: { notification: { tag: 'welcome-nudge' } } });
       if (r.successCount) { sent++; await bump(db, fb, 'welcome_nudge_push'); continue; }
     }
     if (s.email && emailReady()) {
@@ -127,7 +128,7 @@ module.exports = async function handler (req, res) {
     const tokens = (await db.doc(`pushTokens/${doc.id}`).get()).data()?.tokens || [];
     if (!tokens.length) continue;
     try {
-      const r = await fb.messaging().sendEachForMulticast({
+      const r = await sendMulticast(fb, {
         tokens, notification: { title: msg.title, body: msg.body }, data: msg.data,
         android: { notification: { tag: `nudge-${msg.kind}` } },
       });

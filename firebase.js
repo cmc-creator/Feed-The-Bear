@@ -127,7 +127,7 @@ function openDeleteAccount () {
   const user = _auth?.currentUser;
   if (!user) return;
   const el = id => document.getElementById(id);
-  const usesPassword = user.providerData.some(p => p.providerId === 'password') && !user.providerData.some(p => p.providerId === 'google.com');
+  const usesPassword = user.providerData.some(p => p.providerId === 'password') && !user.providerData.some(p => p.providerId === 'google.com' || p.providerId === 'apple.com');
   el('delete-account-password-wrap').classList.toggle('hidden', !usesPassword);
   el('delete-account-password').value = '';
   el('delete-account-confirm').value = '';
@@ -142,6 +142,13 @@ function closeDeleteAccount () {
 }
 
 async function _reauthForDelete (user) {
+  if (user.providerData.some(p => p.providerId === 'apple.com') && window.Capacitor?.Plugins?.AppleSignIn) {
+    const { credential, code } = await _appleCredential();
+    await user.reauthenticateWithCredential(credential);
+    // Apple asks apps to cut the Sign in with Apple link when the account goes.
+    if (code) { try { await _auth.revokeAccessToken?.(code); } catch (err) { console.warn('[FTB] Apple revoke failed:', err?.message); } }
+    return;
+  }
   if (user.providerData.some(p => p.providerId === 'google.com')) {
     await user.reauthenticateWithPopup(new firebase.auth.GoogleAuthProvider());
     return;
@@ -653,7 +660,9 @@ var FriendPings = (() => {
   function listen (p) {
     if (listening) return;
     listening = true;
-    p.addListener('registration', ({ value }) => { call('register', { token: value }); syncFollows(true); });
+    // iPhones hand over Apple's own token (api/_push.js sends those to Apple).
+    const tokenFor = value => (window.Capacitor?.getPlatform?.() === 'ios' ? `apns:${value}` : value);
+    p.addListener('registration', ({ value }) => { call('register', { token: tokenFor(value) }); syncFollows(true); });
     p.addListener('registrationError', err => console.warn('[FTB] push registration failed:', err?.error || err));
     // Tapping one opens what it's about: contests in Play, your Want to Try
     // list (api/nudges.js), or Friends.
@@ -1299,8 +1308,11 @@ async function _nativeGoogleSignIn () {
     throw new Error('Allow site storage for Feed The Bear, then try Google sign-in again.');
   }
   const url = `https://www.feed-the-bear.com/native-signin.html?c=${challenge}`;
+  // The iPhone app signs in with Google in Safari itself.
+  const safari = window.Capacitor?.Plugins?.ExternalLink;
   const browser = window.Capacitor?.Plugins?.Browser;
-  if (browser) await browser.open({ url });
+  if (safari) await safari.open({ url });
+  else if (browser) await browser.open({ url });
   else window.open(url, '_blank', 'noopener');
 }
 
@@ -1334,6 +1346,42 @@ async function _finishNativeSignInNow () {
     showToast('You are in', 'Your diary is opening. Backup status will appear if anything needs attention.', 'success');
   } catch (err) {
     showToast('Sign-in did not finish', err.message || 'Please try again.', 'error');
+  }
+}
+
+// ─── IPHONE APP: SIGN IN WITH APPLE ───────────────────────────
+// Apple's own sheet (native/ios FTBPlugins.swift), then Firebase with its token.
+// Firebase gets the raw nonce; Apple got its SHA-256, so the token can't be replayed.
+async function _appleCredential () {
+  const plugin = window.Capacitor?.Plugins?.AppleSignIn;
+  if (!plugin) throw new Error('Sign in with Apple works in the iPhone app.');
+  const raw = _b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw)))].map(b => b.toString(16).padStart(2, '0')).join('');
+  const res = await plugin.signIn({ nonce: hash });
+  const credential = new firebase.auth.OAuthProvider('apple.com').credential({ idToken: res.idToken, rawNonce: raw });
+  return { credential, code: res.authorizationCode || '', name: res.name || '' };
+}
+
+async function _handleAppleAuth () {
+  const btn = document.getElementById('auth-apple-btn');
+  if (btn) btn.disabled = true;
+  try {
+    await ensureAuthPersistence();
+    const { credential, name } = await _appleCredential();
+    const cred = await _auth.signInWithCredential(credential);
+    // Apple only shares the name the very first time.
+    if (name && !cred.user.displayName) await cred.user.updateProfile({ displayName: name }).catch(() => {});
+    closeAuthModal();
+    showToast('You are in', 'Your diary is opening. Backup status will appear if anything needs attention.', 'success');
+  } catch (err) {
+    if (err?.code === 'canceled' || /cancel/i.test(err?.message || '')) return;
+    const msg = err?.code === 'auth/account-exists-with-different-credential'
+      ? 'That email already has a Feed The Bear account. Sign in with Google or your email and password instead.'
+      : err?.code === 'auth/operation-not-allowed' ? 'Sign in with Apple is not switched on yet. Please use Google or email for now.'
+      : (err?.message || 'Please try again.');
+    showToast('Apple sign-in did not finish', msg, 'error');
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -1610,7 +1658,7 @@ async function openBilling () {
     let { ok, status, data } = await _accountAction('portal');
     // No subscription linked here yet: look for one under this email, then try again.
     if (status === 404 && await _restoreGrizzly(_auth?.currentUser, { quiet: 'force' })) ({ ok, status, data } = await _accountAction('portal'));
-    if (ok && data.url) { window.location.href = data.url; return; }
+    if (ok && data.url) { _openPaymentPage(data.url); return; }
     if (status !== 404) { showToast('Could not open billing', data.error || 'Please try again.', 'error'); return; }
     // Say which account this is and why there's no bill, so a paid account
     // signed in under another email is easy to spot.
@@ -1626,6 +1674,15 @@ async function openBilling () {
   } finally {
     if (btn) btn.disabled = false;
   }
+}
+
+// The iPhone app: Stripe pages open in Safari (Apple's rules for paying
+// outside the app); everywhere else they open right here.
+function _openPaymentPage (url) {
+  const safari = window.Capacitor?.getPlatform?.() === 'ios' ? window.Capacitor.Plugins?.ExternalLink : null;
+  if (!safari) { window.location.href = url; return false; }
+  safari.open({ url }).catch(() => { window.location.href = url; });
+  return true;
 }
 
 async function _handleUpgradeClick () {
@@ -1648,11 +1705,15 @@ async function _handleUpgradeClick () {
     const resp = await fetch('/api/create-checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid: user.uid, email: user.email, priceId, ref: _inviteRef(), ...(playToken ? { playToken } : {}), ...(_vipPromo() ? { promo: _vipPromo() } : {}) }),
+      body: JSON.stringify({ uid: user.uid, email: user.email, priceId, ref: _inviteRef(), ...(playToken ? { playToken } : {}), ...(_vipPromo() ? { promo: _vipPromo() } : {}), ...(window.FTB_IOS_APP ? { ios: true } : {}) }),
     });
     const { url, error } = await resp.json();
     if (error) throw new Error(error);
-    window.location.href = url;
+    if (_openPaymentPage(url)) {
+      if (btn) { btn.disabled = false; btn.textContent = _upgradeLabel(); }
+      closeUpgradeModal();
+      showToast('Finish in Safari', 'Checkout opened in Safari. When you are done, tap Back to Feed The Bear.', 'info');
+    }
   } catch (err) {
     showToast('Checkout failed', err.message || 'Please try again.', 'error');
     if (btn) { btn.disabled = false; btn.textContent = _upgradeLabel(); }
@@ -1707,6 +1768,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof onboardingAfterSignIn === 'function') onboardingAfterSignIn(false);
   });
   document.getElementById('auth-google-btn')?.addEventListener('click', _handleGoogleAuth);
+  // Apple requires Sign in with Apple next to Google in the iPhone app.
+  const appleBtn = document.getElementById('auth-apple-btn');
+  if (appleBtn && window.Capacitor?.Plugins?.AppleSignIn) appleBtn.classList.remove('hidden');
+  appleBtn?.addEventListener('click', _handleAppleAuth);
   document.getElementById('auth-submit-btn')?.addEventListener('click', _handleAuthSubmit);
   document.getElementById('auth-forgot-btn')?.addEventListener('click', _handleForgotPassword);
   document.getElementById('auth-password')?.addEventListener('keydown', e => { if (e.key === 'Enter') _handleAuthSubmit(); });

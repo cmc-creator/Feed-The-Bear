@@ -9809,3 +9809,8 @@ body:has(.share-nudge, #save-diary-nudge, #rate-prompt, .photo-reveal) #toast-co
 .fft-home-emoji { font-size: 1.8rem; line-height: 1; flex: none; }
 .fft-home-text { flex: 1; min-width: 0; }
 .fft-home-text small { display: block; opacity: .8; font-size: .8rem; margin-top: 2px; }
+
+/* ── Sign in with Apple (iPhone app) ── */
+.auth-apple-btn { width: 100%; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 8px; background: #fff; color: #000; border: 1px solid #fff; border-radius: var(--radius); font-family: var(--font); font-size: .92rem; font-weight: 600; cursor: pointer; margin-bottom: 8px; min-height: 44px; }
+.auth-apple-btn.hidden { display: none; }
+.auth-apple-btn:active { opacity: .85; }

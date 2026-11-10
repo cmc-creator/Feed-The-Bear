@@ -16,6 +16,7 @@
 
 const admin = require('firebase-admin');
 const { bump } = require('./_count');
+const { sendMulticast } = require('./_push');
 
 const FOODS = {
   pie: ['🥧', 'a pie'], taco: ['🌮', 'a taco'], spaghetti: ['🍝', 'spaghetti'],
@@ -43,7 +44,7 @@ async function pushTo (db, fb, uid, title, body) {
   const tokens = (await db.doc(`pushTokens/${uid}`).get()).data()?.tokens || [];
   if (!tokens.length) return 0;
   try {
-    const r = await fb.messaging().sendEachForMulticast({ tokens, notification: { title, body }, data: { open: 'foodfight' } });
+    const r = await sendMulticast(fb, { tokens, notification: { title, body }, data: { open: 'foodfight' } });
     return r.successCount || 0;
   } catch (err) { console.warn('[FTB] food fight push failed:', err.message); return 0; }
 }

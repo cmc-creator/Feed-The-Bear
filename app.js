@@ -11,6 +11,15 @@
 const FREE_RESTAURANT_LIMIT = 25;
 const FREE_FRIENDS = 1;
 
+/* ── Which app is this? ──────────────────────────────────────
+   The iPhone app (native/ios) and the Android app (native/android) both load
+   this site. Google Play things (ratings, updates, badges) are Android only;
+   Apple rejects iPhone apps that mention Google Play. */
+const IS_IOS_APP = window.Capacitor?.getPlatform?.() === 'ios';
+const IS_ANDROID_APP = !!window.Capacitor?.isNativePlatform?.() && !IS_IOS_APP;
+window.FTB_IOS_APP = IS_IOS_APP;
+if (IS_IOS_APP) document.documentElement.classList.add('ios-app');
+
 /* ── Defensive AI stub - if ai.js failed to load (old SW cache,
    offline, etc.) replace window.AI with a no-op stub so the app
    still boots instead of throwing ReferenceError on first call. */
@@ -2732,7 +2741,7 @@ const ANDROID_APP_NEEDS = ['PushNotifications'];
 
 function checkAndroidAppVersion () {
   const cap = window.Capacitor;
-  if (!cap?.isNativePlatform?.()) return;
+  if (!IS_ANDROID_APP) return;
   const has = name => (typeof cap.isPluginAvailable === 'function' ? cap.isPluginAvailable(name) : !!cap.Plugins?.[name]);
   if (ANDROID_APP_NEEDS.every(has) || document.getElementById('app-update-banner')) return;
   try { if (localStorage.getItem('ftb_app_update_later') === new Date().toDateString()) return; } catch { /* private mode */ }
@@ -3711,7 +3720,7 @@ const PLAY_URL = 'https://play.google.com/store/apps/details?id=com.feedthebear.
    back to it never reloads. When a newer version is live (sw.js names it),
    refresh: quietly if nothing is open, else Byte Cub offers an Update button.
    APP_BUILD must match CACHE in sw.js (tests/version.test.js checks). */
-const APP_BUILD = 'ftb-v186';
+const APP_BUILD = 'ftb-v187';
 let _freshCheckedAt = 0;
 async function checkForNewBuild () {
   if (Date.now() - _freshCheckedAt < 5 * 60 * 1000 || !navigator.onLine) return;
@@ -3772,14 +3781,23 @@ function showRatePrompt () {
     <div class="rate-actions"><button type="button" class="btn-primary rate-love">Love it 🐻</button><button type="button" class="btn-ghost rate-meh">Not really</button></div>`);
   box.querySelector('.rate-love').onclick = () => {
     answer('love');
-    const inApp = !!window.Capacitor?.isNativePlatform?.();
-    step(inApp
+    const inApp = IS_ANDROID_APP;
+    step(IS_IOS_APP
+      ? `<div class="rate-title">That makes the bear happy!</div>
+      <p class="rate-sub">Would you give us a quick rating on the App Store? It's the biggest help a small app can get.</p>
+      <div class="rate-actions"><button type="button" class="btn-primary rate-ios">★ Rate Feed The Bear</button><button type="button" class="btn-ghost rate-share">Share instead</button></div>`
+      : inApp
       ? `<div class="rate-title">That makes the bear happy!</div>
       <p class="rate-sub">Would you give us a quick rating on Google Play? It's the biggest help a small app can get.</p>
       <div class="rate-actions"><button type="button" class="btn-primary rate-play">★ Rate on Google Play</button><button type="button" class="btn-ghost rate-share">Share instead</button></div>`
       : `<div class="rate-title">That makes the bear happy!</div>
       <p class="rate-sub">Know someone who'd love it too? Sharing is the best thank-you.</p>
       <div class="rate-actions"><button type="button" class="btn-primary rate-share">Share Feed The Bear</button></div>`);
+    box.querySelector('.rate-ios')?.addEventListener('click', () => {
+      trackProductEvent('rate_app_store_opened');
+      window.Capacitor?.Plugins?.ExternalLink?.requestReview?.().catch(() => {});
+      close();
+    });
     box.querySelector('.rate-play')?.addEventListener('click', () => {
       trackProductEvent('rate_play_opened');
       window.open(PLAY_URL, '_blank');

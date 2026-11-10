@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Back to Feed The Bear</title>
+  <link rel="icon" href="favicon-48.png" />
+  <link rel="stylesheet" href="vote.css" />
+</head>
+<body>
+  <!-- Stripe sends iPhone app buyers here (api/create-checkout.js, ios): checkout
+       ran in Safari, so this button reopens the app, which finishes the upgrade
+       (app.html?upgrade=success&session_id=…, routed by FTBPlugins.swift). -->
+  <main class="vote">
+    <a class="vote-brand" href="index.html"><img src="feedbear.jpg" alt="" /> Feed The Bear</a>
+    <h1 id="nr-title">You're a Grizzly! 🐻</h1>
+    <p id="nr-sub" class="vote-muted">Tap below to go back to the app.</p>
+    <a id="nr-back" class="vote-btn" href="com.feedthebear.app://upgrade">Back to Feed The Bear</a>
+  </main>
+  <script>
+    (() => {
+      const q = new URLSearchParams(location.search);
+      const ok = q.get('upgrade') === 'success';
+      const session = q.get('session_id') || '';
+      const back = new URLSearchParams({ status: ok ? 'success' : 'cancel' });
+      if (ok && /^cs_[A-Za-z0-9_]+$/.test(session)) back.set('session_id', session);
+      const link = `com.feedthebear.app://upgrade?${back}`;
+      const btn = document.getElementById('nr-back');
+      btn.href = link;
+      if (!ok) {
+        document.getElementById('nr-title').textContent = 'No charge made';
+        document.getElementById('nr-sub').textContent = 'Checkout was cancelled. Tap below to go back to the app.';
+      }
+      setTimeout(() => { location.href = link; }, 400);
+    })();
+  </script>
+</body>
+</html>

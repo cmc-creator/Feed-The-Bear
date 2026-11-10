@@ -280,3 +280,9 @@ jobs:
       - name: Rate limits survive restarts; plan checks on the server
         working-directory: tests
         run: node limits.test.js
+      - name: iPhone app (Sign in with Apple, Safari checkout, no Google Play)
+        working-directory: tests
+        run: node iosapp.test.js
+      - name: iPhone notifications through Apple
+        working-directory: tests
+        run: node apns.test.js

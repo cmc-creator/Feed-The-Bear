@@ -6,6 +6,8 @@
    promo: a discount code from an owner's VIP link (owner.js); applied for them.
    ref is the uid from a friend's invite link: 30 days instead of 7.
    playToken: from Google in the Play app, so the sale is reported to Google (_play.js).
+   ios: true from the iPhone app, which opens checkout in Safari; Stripe then
+   sends them to native-return.html, whose button reopens the app.
 
    Environment variables required (set in Vercel dashboard):
      STRIPE_SECRET_KEY        - Stripe secret key (sk_live_… or sk_test_…)
@@ -79,7 +81,7 @@ module.exports = async function handler (req, res) {
     return;
   }
 
-  const { uid, email, priceId, ref, playToken, promo } = req.body || {};
+  const { uid, email, priceId, ref, playToken, promo, ios } = req.body || {};
   if (!uid || !priceId) {
     res.status(400).json({ error: 'Missing uid or priceId' });
     return;
@@ -115,8 +117,8 @@ module.exports = async function handler (req, res) {
         // A card is still collected; the first charge comes when the trial ends.
         ...(trial ? { trial_period_days: days } : {}),
       },
-      success_url:          `${appUrl}/app.html?upgrade=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url:           `${appUrl}/app.html?upgrade=cancel`,
+      success_url:          ios ? `${appUrl}/native-return.html?upgrade=success&session_id={CHECKOUT_SESSION_ID}` : `${appUrl}/app.html?upgrade=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url:           ios ? `${appUrl}/native-return.html?upgrade=cancel` : `${appUrl}/app.html?upgrade=cancel`,
       ...(promoId ? { discounts: [{ promotion_code: promoId }] } : { allow_promotion_codes: true }),
     });
 

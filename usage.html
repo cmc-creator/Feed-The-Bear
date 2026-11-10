@@ -121,7 +121,7 @@ const LABELS = {
   account_created: 'Account created', first_spot_saved: 'First spot saved', bear_swipe_first_round: 'First Bear Swipe round',
   free_limit_hit: 'Hit the free spot limit', trial_started: 'Grizzly trial started', paid_signup: 'Paid Grizzly (no trial)', first_payment: 'First payment',
   trial_reminder_manage: 'Trial reminder: Manage tapped',
-  rate_prompt_shown: 'Rate prompt shown', rate_play_opened: 'Rate on Google Play tapped',
+  rate_prompt_shown: 'Rate prompt shown', rate_play_opened: 'Rate on Google Play tapped', rate_app_store_opened: 'Rate on the App Store tapped',
   food_fight_throw: 'Food thrown at a friend', food_fight_hit: 'Got hit with food', food_fight_push_sent: 'Food fight push sent',
   add_choice_place: '+ button: Add a place', add_choice_ate: '+ button: I just ate',
   welcome_email_sent: 'Welcome email sent', welcome_nudge_push: 'Next-day nudge (push)', welcome_nudge_email: 'Next-day nudge (email)',
@@ -216,9 +216,10 @@ function render (list) {
     ['Finished it', t('welcome_done')],
     ['Skipped it', t('welcome_skipped')],
   ]);
-  funnel('funnel-rating', 'Google Play ratings', [
+  funnel('funnel-rating', 'App ratings', [
     ['Asked to rate', t('rate_prompt_shown')],
     ['Tapped Rate on Google Play', t('rate_play_opened')],
+    ['Tapped Rate on the App Store', t('rate_app_store_opened')],
   ]);
   countList('funnel-new', 'New features', [
     ['Bear Swipe rounds played', t('bear_swipe_round_done')],

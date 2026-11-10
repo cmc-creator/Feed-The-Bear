@@ -19,6 +19,7 @@ on:
   push:
     paths:
       - 'native/**'
+      - '!native/ios/**'
       - '.github/workflows/android.yml'
   workflow_dispatch:
 
