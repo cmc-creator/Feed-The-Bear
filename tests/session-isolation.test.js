@@ -7,7 +7,16 @@ const spot = (id, name) => ({ id, name, status: 'visited', tags: [], dishes: [],
   const p = await newPage(browser, { seed: [spot('guest', 'Guest spot')] });
   await p.route('https://www.gstatic.com/firebasejs/**', r => r.fulfill({ contentType: 'text/javascript', body: '' }));
   await p.route(/overpass|nominatim|open-meteo/, r => r.abort());
-  await p.route('**/api/**', r => r.fulfill({ json: { plan: 'free', following: [], followers: [] } }));
+  // Spots now save through the server (api/save-spots.js), not a direct
+  // Firestore batch, so record those calls here to tell a save happened.
+  const saveSpotsCalls = [];
+  await p.route('**/api/**', r => {
+    if (r.request().url().includes('/api/save-spots')) {
+      saveSpotsCalls.push(1);
+      return r.fulfill({ json: { saved: 1, skipped: 0, removed: 0, limit: 25, plan: 'free' } });
+    }
+    return r.fulfill({ json: { plan: 'free', following: [], followers: [] } });
+  });
   await p.route('**/api/delete-account', r => r.fulfill({ json: { deleted: true } }));
   await p.addInitScript(() => {
     window.__cloud = {};
@@ -155,13 +164,10 @@ const spot = (id, name) => ({ id, name, status: 'visited', tags: [], dishes: [],
   await p.evaluate(() => _sessionTask);
   check(await p.evaluate(() => !window._ftbSyncBlocked && window._ftbUid === 'accountA'), 'retry restores backup for the current account');
   check(await p.evaluate(() => loadUserProfile()?.name === 'New local profile'), 'retry does not replace a newer unsynced profile with an older cloud copy');
-  const writes = await p.evaluate(async () => {
-    await hydrateStoredPhotos();
-    const before = window.__writes.length;
-    await fbSaveRestaurants(window._ftbUid, state.restaurants);
-    return window.__writes.length - before;
-  });
-  check(writes > 0, 'a successfully restored current account still uploads its diary');
+  await p.evaluate(async () => { await hydrateStoredPhotos(); });
+  const beforeSaves = saveSpotsCalls.length;
+  await p.evaluate(async () => { await fbSaveRestaurants(window._ftbUid, state.restaurants); });
+  check(saveSpotsCalls.length - beforeSaves > 0, 'a successfully restored current account still uploads its diary');
 
   // Pending debounce must not write the next account's in-memory list.
   const delayed = await p.evaluate(async () => {

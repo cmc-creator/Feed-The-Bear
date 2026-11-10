@@ -57,13 +57,19 @@ async function guard (req, res) {
   try {
     const day = new Date().toISOString().slice(0, 10);
     const ref = getAdmin().firestore().doc(`apiQuota/${uid}`);
-    const q = (await ref.get()).data() || {};
-    const used = q.day === day ? Number(q.n) || 0 : 0;
-    if (used >= DAILY_LOOKUPS) {
+    // Counted in a transaction: parallel requests serialize, so one
+    // account can't blow past the cap by firing many at once.
+    const over = await getAdmin().firestore().runTransaction(async tx => {
+      const q = (await tx.get(ref)).data() || {};
+      const used = q.day === day ? Number(q.n) || 0 : 0;
+      if (used >= DAILY_LOOKUPS) return true;
+      tx.set(ref, { day, n: used + 1 });
+      return false;
+    });
+    if (over) {
       res.status(429).json({ error: "That's a lot of lookups today. Try again tomorrow." });
       return null;
     }
-    await ref.set({ day, n: used + 1 });
   } catch (err) {
     // A database hiccup shouldn't break the app for a signed-in member.
     console.warn('[FTB] lookup quota check failed:', err.message);

@@ -100,6 +100,12 @@ async function notify (db, fb, uid, id) {
   return { sent: res.successCount };
 }
 
+// Email verification (2026-11-10): accounts created after this must confirm
+// their inbox before the owner is told about them. Same date as
+// firebase.js EMAIL_VERIFY_CUTOFF and api/_guard.js; Google accounts are
+// verified by Google, and older accounts never had verification.
+const EMAIL_VERIFY_CUTOFF = Date.parse('2026-11-10T21:00:00Z');
+
 // A brand-new account (made in the last 30 minutes) tells the owner once:
 // a push to the owner's phones and/or an email, as set in the owner portal
 // (config/ownerAlerts). signups/{uid} is the record, and stops repeats.
@@ -110,6 +116,13 @@ async function joined (db, fb, uid) {
   const born = Date.parse(u.metadata?.creationTime || '');
   if (!born || Date.now() - born > 30 * 60 * 1000) return { told: false, reason: 'not new' };
   if (OWNER_EMAILS().includes(String(u.email || '').toLowerCase())) return { told: false, reason: 'owner' };
+  // Unverified email accounts created after verification was added don't
+  // get the owner told about them: a bot with a fresh token can't spam
+  // the owner's inbox by calling this endpoint directly.
+  const isGoogle = (u.providerData || []).some(p => p.providerId === 'google.com');
+  if (!isGoogle && u.emailVerified !== true && born >= EMAIL_VERIFY_CUTOFF) {
+    return { told: false, reason: 'unverified' };
+  }
   const ref = db.doc(`signups/${uid}`);
   const via = (u.providerData || []).some(p => p.providerId === 'google.com') ? 'Google' : 'email';
   const fresh = await db.runTransaction(async t => {

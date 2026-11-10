@@ -7261,12 +7261,18 @@ function ensureSharedMeta (collectionId) {
     collaborators: [],
     activity: [],
     updatedAt: Date.now(),
+    // The list's creator (firestore.rules: only the creator may delete
+    // the list). Stamped once here and never changed afterwards.
+    createdBy: window._ftbUid || null,
   };
   }
   const meta = map[collectionId];
   if (!Array.isArray(meta.collaborators)) meta.collaborators = [];
   if (!Array.isArray(meta.activity)) meta.activity = [];
   if (!meta.ownerName) meta.ownerName = getActorName();
+  // Lists shared before createdBy existed gain a creator the next time
+  // their owner syncs (the meta lives in the owner's own settings).
+  if (!meta.createdBy && window._ftbUid) meta.createdBy = window._ftbUid;
   return meta;
 }
 
@@ -7291,6 +7297,7 @@ function syncSharedMetaToCloud (collectionId) {
   color: col.color,
   token: meta.token,
   ownerName: meta.ownerName,
+  createdBy: meta.createdBy || undefined,
   collaborators: meta.collaborators || [],
   activity: meta.activity || [],
   updatedAt: Date.now(),

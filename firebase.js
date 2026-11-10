@@ -88,11 +88,13 @@ function requiresPremium (featureName, fn) {
 }
 
 // ─── AUTH FUNCTIONS ───────────────────────────────────────────
-// Email verification (2026-11-10): a new email/password account must confirm
-// its inbox before the diary opens — bots were signing up with random emails
-// and each one could burn paid place lookups. Google accounts are verified
-// by Google. Accounts created before the cutoff never had verification, so
-// they keep working exactly as before.
+// Email verification (2026-11-10): a new email/password account confirms its
+// inbox, but the diary opens right away — verification happens in the
+// background. Bots were signing up with random emails and each one could burn
+// paid place lookups, so paid lookups and cloud sync stay gated until the
+// inbox is confirmed (api/_guard.js, api/save-spots.js). Google accounts are
+// verified by Google. Accounts created before the cutoff never had
+// verification, so they keep working exactly as before.
 const EMAIL_VERIFY_CUTOFF = Date.parse('2026-11-10T21:00:00Z');
 
 function _needsEmailVerification (user) {
@@ -102,8 +104,9 @@ function _needsEmailVerification (user) {
   return created >= EMAIL_VERIFY_CUTOFF;
 }
 
-// Show the sign-in sheet in "check your email" mode and lock the diary
-// until the inbox is confirmed.
+// Show the sign-in sheet in "check your email" mode. It's a reminder, not a
+// wall: the diary is open behind it, and the member can continue into it and
+// verify later ("Continue to my diary").
 function _showVerifyEmail (user) {
   window._ftbNeedsVerification = true;
   const overlay = document.getElementById('auth-overlay');
@@ -114,6 +117,27 @@ function _showVerifyEmail (user) {
   overlay.classList.add('auth-required');
   overlay.classList.remove('hidden');
   document.body.classList.add('overlay-open');
+}
+
+// The verify screen is a reminder, not a wall: let them into the diary and
+// verify in the background. Paid lookups and cloud sync stay gated until they
+// confirm. The reminder shows again on the next sign-in until then.
+function _continueToDiaryUnverified () {
+  window._ftbVerifyDismissed = true;
+  closeAuthModal();
+  showToast('Verify your email when you can', 'Confirm your inbox to back up your spots and unlock place lookups.', 'info');
+}
+
+// Tell the owner a real member joined — once per account, and only once the
+// inbox is confirmed, so bot signups never spam it.
+function _sendJoinedEmail (user) {
+  if (!user) return;
+  try {
+    const key = 'ftb_joined_' + user.uid;
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, '1');
+  } catch { /* storage unavailable: send anyway */ }
+  user.getIdToken().then(t => fetch('/api/push', { method: 'POST', headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'joined' }) })).catch(() => {});
 }
 
 // "I've verified — continue": reload the account and open the diary if confirmed.
@@ -128,6 +152,9 @@ async function _checkVerification () {
       _authError('Not verified yet — tap the link in the email we sent (check spam too), then try again.');
     } else {
       window._ftbNeedsVerification = false;
+      window._ftbVerifyDismissed = false;
+      // They confirmed after signing up: tell the owner they joined.
+      _sendJoinedEmail(user);
       closeAuthModal();
       _sessionTask = handleFirebaseUser(user);
     }
@@ -176,14 +203,16 @@ async function fbSignInEmail (email, password) {
 async function fbSignUpEmail (email, password) {
   await ensureAuthPersistence();
   const cred = await _auth.createUserWithEmailAndPassword(email, password);
-  // New accounts confirm their inbox before the diary opens. If the email
-  // can't be sent, the verify screen lets them resend it.
+  // New accounts confirm their inbox in the background — the diary opens
+  // right away. If the email can't be sent, the verify screen lets them
+  // resend it.
   try { await cred.user.sendEmailVerification(); } catch (err) { console.warn('[FTB] Verification email failed:', err.message); }
   return cred;
 }
 
 async function fbSignOut () {
   _signingOut = true;
+  window._ftbVerifyDismissed = false;
   try {
     await _auth.signOut();
     if (window._ftbUid) _sessionTask = handleFirebaseUser(null);
@@ -511,6 +540,19 @@ function restoreTrimmedPhotos (cloud, local) {
   }
 }
 
+// The server dropping over-limit saves gets an upsell, not just a console
+// line — but only once per over-limit episode, not on every background sync
+// while the list stays over the limit.
+let _limitUpsellShown = false;
+function _showLimitUpsell (limit) {
+  if (_limitUpsellShown) return;
+  _limitUpsellShown = true;
+  const n = Number(limit) || 25;
+  showToast('Cub limit reached', `Cub includes up to ${n} spots. Upgrade to Grizzly for unlimited saves.`, 'info');
+  if (typeof showGrizzlyUpsell === 'function') showGrizzlyUpsell('limit');
+  else if (typeof openUpgradeModal === 'function') openUpgradeModal({ key: 'limit', title: 'Save every spot you love', body: `Cub holds ${n} spots (backed up and synced on every device). Grizzly is unlimited.` });
+}
+
 async function fbSaveRestaurants (uid, restaurants) {
   const generation = _authGeneration;
   if (!uid || uid !== window._ftbUid || window._ftbAccountSwitching || window._ftbSyncBlocked || !restaurants?.length) return;
@@ -519,16 +561,40 @@ async function fbSaveRestaurants (uid, restaurants) {
     setTimeout(() => { if (generation === _authGeneration && uid === window._ftbUid) fbSaveRestaurants(uid, state.restaurants); }, 2000);
     return;
   }
+  // Spots go through the server (api/save-spots.js), which enforces the
+  // free 25-spot limit. Direct client writes to the restaurant collection
+  // are blocked by firestore.rules, so the limit can't be bypassed.
+  const user = _auth?.currentUser;
+  if (!user) return;
+  // Unverified accounts keep spots on this device only — cloud sync waits
+  // until the inbox is confirmed (api/save-spots.js refuses them too).
+  // Local saves still work, and the next sync after verification pushes them.
+  if (_needsEmailVerification(user)) return;
+  let token;
+  try { token = await user.getIdToken(); } catch { return; }
+  let totalSkipped = 0;
+  let lastLimit = null;
   try {
-    // Batch in chunks of 400 (Firestore limit is 500 per batch)
-    for (let i = 0; i < restaurants.length; i += 400) {
+    // Send in chunks of 50 so no request body gets huge (spots carry photos).
+    for (let i = 0; i < restaurants.length; i += 50) {
       if (generation !== _authGeneration || uid !== window._ftbUid || window._ftbAccountSwitching) return;
-      const batch = _db.batch();
-      restaurants.slice(i, i + 400).forEach(r => {
-        batch.set(_db.doc(`users/${uid}/restaurants/${r.id}`), cloudSafeRestaurant(r));
+      const chunk = restaurants.slice(i, i + 50).map(r => cloudSafeRestaurant(r));
+      const resp = await fetch('/api/save-spots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ spots: chunk }),
       });
-      await batch.commit();
+      if (!resp.ok) throw new Error(`save-spots ${resp.status}`);
+      const data = await resp.json().catch(() => ({}));
+      if (data.skipped > 0) {
+        totalSkipped += data.skipped;
+        if (data.limit) lastLimit = data.limit;
+        console.warn('[FTB] Some spots were not saved (free limit):', data.skipped);
+      }
     }
+    // Over-limit saves the client check missed get an upsell, not silence.
+    if (totalSkipped > 0) _showLimitUpsell(lastLimit);
+    else _limitUpsellShown = false;
     if (generation === _authGeneration && uid === window._ftbUid && window._ftbBackupStatus !== 'error') setBackupStatus('synced');
   } catch (err) {
     console.warn('[FTB] Firestore save failed:', err);
@@ -609,14 +675,26 @@ function _mergeFriendsFromCloud (cloud) {
 
 // Delete restaurant docs from Firestore so deletions propagate across devices
 async function fbDeleteRestaurantsCloud (uid, ids) {
-  if (!uid || uid !== window._ftbUid || window._ftbSyncBlocked || !_db || !Array.isArray(ids) || !ids.length) return;
+  if (!uid || uid !== window._ftbUid || window._ftbSyncBlocked || !Array.isArray(ids) || !ids.length) return;
   const generation = _authGeneration;
+  // Deletions go through the server too (api/save-spots.js), since direct
+  // client writes to the restaurant collection are blocked by firestore.rules.
+  const user = _auth?.currentUser;
+  if (!user) return;
+  // Unverified accounts keep deletions on this device only — the tombstones
+  // in localStorage are retried after verification.
+  if (_needsEmailVerification(user)) return;
+  let token;
+  try { token = await user.getIdToken(); } catch { return; }
   try {
     for (let i = 0; i < ids.length; i += 400) {
       if (generation !== _authGeneration || uid !== window._ftbUid) return;
-      const batch = _db.batch();
-      ids.slice(i, i + 400).forEach(id => batch.delete(_db.doc(`users/${uid}/restaurants/${id}`)));
-      await batch.commit();
+      const resp = await fetch('/api/save-spots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ removeIds: ids.slice(i, i + 400) }),
+      });
+      if (!resp.ok) throw new Error(`save-spots ${resp.status}`);
     }
   } catch (err) {
     console.warn('[FTB] Firestore delete failed:', err);
@@ -910,13 +988,19 @@ async function handleFirebaseUser (user) {
       window._ftbUserEmail = user.email;
       // Next time this phone is signed out, the sheet opens on Sign in with the email filled.
       try { localStorage.setItem(LAST_ACCOUNT_KEY, user.email || '1'); } catch { /* private mode */ }
-      // A new email account that hasn't confirmed its inbox doesn't get the
-      // diary — or the "joined" email to the owner — until it verifies.
+      // A new email account that hasn't confirmed its inbox can still use
+      // the diary — verification happens in the background. The verify
+      // screen appears as a reminder on each sign-in until they confirm,
+      // and the "joined" email to the owner waits until then too.
       if (_needsEmailVerification(user)) {
-        _showVerifyEmail(user);
-        return;
+        window._ftbNeedsVerification = true;
+        // The reminder shows once per sign-in; dismissing it ("Continue to
+        // my diary") keeps it away until the next sign-in.
+        if (!window._ftbVerifyDismissed) _showVerifyEmail(user);
+      } else {
+        window._ftbNeedsVerification = false;
+        window._ftbVerifyDismissed = false;
       }
-      window._ftbNeedsVerification = false;
       // A brand-new account (signed in for the first time just now), counted once for the funnel.
       try {
         const m = user.metadata || {};
@@ -924,8 +1008,10 @@ async function handleFirebaseUser (user) {
         if (fresh && localStorage.getItem('ftb_counted_signup') !== user.uid) {
           localStorage.setItem('ftb_counted_signup', user.uid);
           if (typeof trackProductEvent === 'function') trackProductEvent('account_created');
-          // Tells the owner (push and/or email, api/push.js 'joined').
-          user.getIdToken().then(t => fetch('/api/push', { method: 'POST', headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'joined' }) })).catch(() => {});
+          // Tells the owner (push and/or email, api/push.js 'joined') — only
+          // once the inbox is confirmed. _checkVerification sends it for
+          // members who verify after signing up.
+          if (!_needsEmailVerification(user)) _sendJoinedEmail(user);
         }
       } catch { /* analytics only */ }
 
@@ -969,7 +1055,10 @@ async function handleFirebaseUser (user) {
       const { restaurants, cloudProfile } = await fbLoadUserData(user.uid);
       if (!isCurrent()) return;
       window._ftbSyncBlocked = false;
-      setBackupStatus('synced');
+      // Unverified: nothing has synced yet (cloud sync waits for
+      // verification), so don't claim it has.
+      if (_needsEmailVerification(user)) setBackupStatus('idle');
+      else setBackupStatus('synced');
       {
         let local = state.restaurants || [];
         if (!local.length) {
@@ -1255,9 +1344,10 @@ async function _handleForgotPassword () {
 
 function closeAuthModal () {
   const overlay = document.getElementById('auth-overlay');
-  // An unverified account stays on the verify screen (sign out from there
-  // to use a different account).
-  if (window._ftbNeedsVerification) return;
+  // An unverified account stays on the verify screen unless they chose
+  // "Continue to my diary" — then the reminder is dismissed for this
+  // sign-in (it shows again next time until they verify).
+  if (window._ftbNeedsVerification && !window._ftbVerifyDismissed) return;
   if (overlay?.classList.contains('auth-required') && _signInRequired()) return;
   overlay?.classList.remove('auth-required');
   overlay?.classList.add('hidden');
@@ -1384,7 +1474,9 @@ function _authError (text, action = null) {
   if (text) box.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
 }
 
-// Which it was: no account, a Google account, or a wrong password (api/signin-help.js).
+// Sign-in help (api/signin-help.js) always answers 'unknown' now, so a
+// failed sign-in gets the one generic hint below instead of revealing
+// whether the email has an account or how it signs in.
 async function _signInHelp (email) {
   try {
     const resp = await fetch('/api/signin-help', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
@@ -1808,7 +1900,7 @@ async function _handleUpgradeClick () {
     if (playToken === false) { if (btn) { btn.disabled = false; btn.textContent = _upgradeLabel(); } return; }
     const resp = await fetch('/api/create-checkout', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
       body: JSON.stringify({ uid: user.uid, email: user.email, priceId, ref: _inviteRef(), ...(playToken ? { playToken } : {}), ...(_vipPromo() ? { promo: _vipPromo() } : {}), ...(window.FTB_IOS_APP ? { ios: true } : {}) }),
     });
     const { url, error } = await resp.json();
@@ -1880,6 +1972,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('auth-forgot-btn')?.addEventListener('click', _handleForgotPassword);
   document.getElementById('auth-verify-resend')?.addEventListener('click', _resendVerification);
   document.getElementById('auth-verify-check')?.addEventListener('click', _checkVerification);
+  document.getElementById('auth-verify-later')?.addEventListener('click', _continueToDiaryUnverified);
   document.getElementById('auth-verify-signout')?.addEventListener('click', _signOutFromVerify);
   document.getElementById('auth-password')?.addEventListener('keydown', e => { if (e.key === 'Enter') _handleAuthSubmit(); });
 

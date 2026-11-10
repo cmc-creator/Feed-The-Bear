@@ -35,17 +35,21 @@ function getAdmin () {
   return admin;
 }
 
-// Requests per member per day (UTC). Counted in aiQuota/{uid}; a database
+// Requests per member per day (UTC). Counted in aiQuota/{uid} in a
+// transaction, so parallel requests can't blow past the cap; a database
 // hiccup lets the request through rather than blocking a paying member.
 const DAILY_AI = 300;
 async function overDailyAi (uid) {
   try {
     const day = new Date().toISOString().slice(0, 10);
     const ref = getAdmin().firestore().doc(`aiQuota/${uid}`);
-    const q = (await ref.get()).data() || {};
-    const used = q.day === day ? Number(q.n) || 0 : 0;
-    if (used >= DAILY_AI) return true;
-    await ref.set({ day, n: used + 1 });
+    return await getAdmin().firestore().runTransaction(async tx => {
+      const q = (await tx.get(ref)).data() || {};
+      const used = q.day === day ? Number(q.n) || 0 : 0;
+      if (used >= DAILY_AI) return true;
+      tx.set(ref, { day, n: used + 1 });
+      return false;
+    });
   } catch (err) { console.warn('[FTB] AI quota check failed:', err.message); }
   return false;
 }

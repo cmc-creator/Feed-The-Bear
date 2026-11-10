@@ -11,7 +11,8 @@ const { check, finish } = require('./lib');
 const docs = {};
 const fakeAdmin = {
   apps: [1],
-  auth: () => ({ getUser: async uid => ({ uid, email: `${uid}@example.com` }) }),
+  // A checkout needs a signed-in caller; the fake ID token is just the uid.
+  auth: () => ({ getUser: async uid => ({ uid, email: `${uid}@example.com` }), verifyIdToken: async t => ({ uid: t, email: `${t}@example.com` }) }),
   firestore: () => ({
     doc: p => ({
       set: async (data, opts) => { docs[p] = opts?.merge ? { ...(docs[p] || {}), ...data } : data; },
@@ -69,7 +70,7 @@ global.fetch = async (url, opts) => {
 function call (fn, body) {
   return new Promise(resolve => {
     let status = 200;
-    fn({ method: 'POST', query: {}, body, headers: {} }, { status (s) { status = s; return this; }, json (data) { resolve({ status, data }); return this; }, setHeader () {} });
+    fn({ method: 'POST', query: {}, body, headers: body?.uid ? { authorization: `Bearer ${body.uid}` } : {} }, { status (s) { status = s; return this; }, json (data) { resolve({ status, data }); return this; }, setHeader () {} });
   });
 }
 async function hook (event) {
