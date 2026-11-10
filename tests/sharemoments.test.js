@@ -39,7 +39,7 @@ const SEED = [
   check(/Sam.*has been here/.test(await p.locator('#detail-friends').innerText()), "a spot shows which friends have been");
   const goText = await p.evaluate(async () => {
     let got = '';
-    navigator.share = async d => { got = d.text; };
+    Object.defineProperty(navigator, 'share', { configurable: true, writable: true, value: async d => { got = d.text; } });
     document.querySelector('#detail-friends .df-go').click();
     await new Promise(r => setTimeout(r, 100));
     return got;

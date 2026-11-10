@@ -87,7 +87,7 @@ const call = (method, { query = {}, body = {}, as = body.action === 'create' ? '
   check((await p.locator('#dv-start').innerText()) === 'Start the vote (2 spots)', 'tapping a spot unpicks it');
   const shared = await p.evaluate(async () => {
     let got = null;
-    navigator.share = async d => { got = d; };
+    Object.defineProperty(navigator, 'share', { configurable: true, writable: true, value: async d => { got = d; } });
     await startDinnerVote();
     return got;
   });

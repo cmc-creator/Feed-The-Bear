@@ -15,7 +15,7 @@ asGrizzly(); // uses Grizzly-only features
   me.once('dialog', d => d.accept('Connie'));
   const linking = me.evaluate(async () => {
     let shared = '';
-    navigator.share = async ({ text, url }) => { shared = url; };
+    Object.defineProperty(navigator, 'share', { configurable: true, writable: true, value: async ({ text, url }) => { shared = url; } });
     await inviteFriend();
     return shared;
   });
@@ -28,7 +28,7 @@ asGrizzly(); // uses Grizzly-only features
   // Account menu invite sends the same link.
   const viaAccountP = me.evaluate(async () => {
     let shared = '';
-    navigator.share = async ({ url }) => { shared = url; };
+    Object.defineProperty(navigator, 'share', { configurable: true, writable: true, value: async ({ url }) => { shared = url; } });
     _auth = { currentUser: { uid: 'inviterUid1234567890' } };
     await shareInvite();
     return shared;
