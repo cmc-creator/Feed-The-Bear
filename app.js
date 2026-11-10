@@ -3706,6 +3706,28 @@ window.addEventListener('online', () => {
    answer. Happy: rate it on Google Play (in the Android app), or share it.
    Not happy: a private note to the owner (api/feedback.js), not a public review. */
 const PLAY_URL = 'https://play.google.com/store/apps/details?id=com.feedthebear.app';
+
+/* Stay current: the Android app keeps running in the background, so coming
+   back to it never reloads. When a newer version is live (sw.js names it),
+   refresh: quietly if nothing is open, else Byte Cub offers an Update button.
+   APP_BUILD must match CACHE in sw.js (tests/version.test.js checks). */
+const APP_BUILD = 'ftb-v185';
+let _freshCheckedAt = 0;
+async function checkForNewBuild () {
+  if (Date.now() - _freshCheckedAt < 5 * 60 * 1000 || !navigator.onLine) return;
+  _freshCheckedAt = Date.now();
+  let live = '';
+  try { live = ((await (await fetch(`/sw.js?v=${Date.now()}`, { cache: 'no-store' })).text()).match(/ftb-v\d+/) || [''])[0]; } catch { return; }
+  if (!live || live === APP_BUILD) return;
+  try { if (sessionStorage.getItem('ftb_reloaded_for') === live) return; sessionStorage.setItem('ftb_reloaded_for', live); } catch { /* private mode */ }
+  try { (await navigator.serviceWorker?.getRegistration())?.update(); } catch { /* fine */ }
+  const busy = document.body.classList.contains('overlay-open') || document.querySelector('[role="dialog"]:not(.hidden), .fft-overlay, input:focus, textarea:focus');
+  if (!busy) { location.reload(); return; }
+  showToast('A fresh version is ready', 'Tap Update to get the latest.', 'info', { label: 'Update', run: () => location.reload() });
+}
+window.checkForNewBuild = checkForNewBuild;
+setTimeout(checkForNewBuild, 4000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForNewBuild(); });
 const RATE_ASK_KEY = 'ftb_rate_ask_v1';
 const RATE_ASK_EVERY = 120 * 864e5;
 
