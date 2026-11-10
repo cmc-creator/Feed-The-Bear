@@ -77,7 +77,14 @@ const call = (body, headers = {}) => new Promise(resolve => {
     const body = JSON.parse(rt.request().postData() || '{}');
     return rt.fulfill({ json: body.action === 'native-finish' ? { token: 'custom-abc' } : {} });
   });
+  // First launch of an app that can alert when closed: it explains and offers it once.
   await p.goto(`${BASE}/app.html`);
+  await p.waitForTimeout(3500);
+  check(await p.locator('#bg-location-overlay').isVisible(), 'alerts on: the app offers "even when closed" once, explained first');
+  await p.evaluate(() => closeBgLocation());
+  await p.reload();
+  await p.waitForTimeout(3500);
+  check(await p.locator('#bg-location-overlay').isHidden(), 'and only once');
   await p.waitForFunction(() => window.__native.setSpots.length > 0, null, { timeout: 10000 }).catch(() => {});
   const first = await p.evaluate(() => window.__native.setSpots.at(-1));
   check(first?.enabled === true && first.radiusMeters === 16093, `Android gets alerts on, at 10 miles (${JSON.stringify(first && { enabled: first.enabled, r: first.radiusMeters })})`);
@@ -150,6 +157,16 @@ const call = (body, headers = {}) => new Promise(resolve => {
   // The sign-in page refuses to run without a challenge.
   await w.goto(`${BASE}/native-signin.html`);
   check(/Open this from the app/.test(await w.locator('#ns-title').innerText()), 'the Chrome sign-in page only works when opened from the app');
+
+  // A nearby alert while the app is open is a real Android notification.
+  const posted = await p.evaluate(async () => {
+    const got = [];
+    window.Capacitor.isPluginAvailable = n => n === 'NearbyAlerts';
+    window.Capacitor.Plugins.NearbyAlerts.notify = async o => { got.push(o); };
+    await sendBrowserNotification(state.restaurants.find(r => r.id === 'near'), 800);
+    return got;
+  });
+  check(posted.length === 1 && posted[0].id === 'near' && /away/.test(posted[0].title) && /Want to Try/.test(posted[0].text), `the open app's nearby alert goes to Android notifications (${JSON.stringify(posted)})`);
 
   await browser.close();
   finish('native');

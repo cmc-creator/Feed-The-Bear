@@ -26,6 +26,7 @@ asGrizzly(); // uses Grizzly-only features
   const everyday = deck.filter(d => staples.includes(d)).length;
   check(deck.length === 20 && everyday >= 15, `a round is mostly everyday food (${everyday}/20: ${deck.slice(0, 6).join(', ')}...)`);
   const photos = require('../data/food-photos.json').photos;
+  check(new Set(photos.map(x => x.dish)).size === photos.length, 'one checked photo per dish, never a random one');
   check(!photos.some(x => /syringe|needle/i.test(x.page)), 'no syringe photos in the set');
 
   // Wikimedia sometimes throttles data-centre traffic (CI); the app swaps in
@@ -47,7 +48,7 @@ asGrizzly(); // uses Grizzly-only features
   });
   check(swapped, 'a broken photo is swapped for another');
   const photoCount = await p.evaluate(async () => (await BearSwipe.loadPhotos()).length);
-  check(photoCount > 1000, `the full photo set loads (${photoCount} photos)`);
+  check(photoCount > 300, `the checked photo set loads (${photoCount} photos)`);
   const first = await p.evaluate(() => { const d = BearSwipe._state().deck; return { n: d.length, dishes: new Set(d.map(x => x.dish)).size, credit: document.querySelector('.bs-top .bs-credit')?.textContent }; });
   check(first.n === 20 && first.dishes === 20, `a round is 20 different dishes (${first.n}, ${first.dishes} unique)`);
   check(/^Photo: .+ · .+/.test(first.credit || ''), `each card credits the photo ("${first.credit}")`);

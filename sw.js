@@ -3,7 +3,7 @@
    Offline-first cache strategy
    ════════════════════════════════════════════════════════════ */
 
-const CACHE  = 'ftb-v129';
+const CACHE = 'ftb-v186';
 const ASSETS = [
   './',
   './index.html',
@@ -14,6 +14,7 @@ const ASSETS = [
   './friends.js',
   './insights.js',
   './play.js',
+  './games.js',
   './bear-swipe.js',
   './bear-swipe.css',
   './cub.js',
@@ -99,9 +100,10 @@ self.addEventListener('fetch', e => {
   }
 
   // Network-first for our own app files (JS, HTML, CSS) so updates always land
-  const isAppFile = url.includes(self.location.origin) &&
-    (url.endsWith('.js') || url.endsWith('.html') || url.endsWith('.css') ||
-     url.endsWith('.json') || url.endsWith('.svg') || url === self.location.origin + '/');
+  // By path, so app.html?text=… (a share) and ?ref=… (an invite) are fresh too.
+  const path = reqUrl.pathname;
+  const isAppFile = reqUrl.origin === self.location.origin &&
+    (e.request.mode === 'navigate' || /\.(js|html|css|json|svg)$/.test(path) || path === '/');
 
   if (isAppFile) {
     const fromCache = () => caches.match(e.request, { ignoreSearch: e.request.mode === 'navigate' }).then(cached => {
@@ -171,7 +173,3 @@ self.addEventListener('message', e => {
     }, delay);
   }
 });
-
-
-
-

@@ -57,9 +57,18 @@ const SEED = [
     Object.defineProperty(navigator, 'canShare', { configurable: true, writable: true, value: () => true });
     Object.defineProperty(navigator, 'share', { configurable: true, writable: true, value: async d => { window._shared = d; } });
   });
+  await p.click('.story-caption summary');
+  await p.fill('.story-caption-text', 'Birria tacos: my new favorite bite!');
   await p.click('.story-share');
   const shared = await p.evaluate(() => window._shared && { name: window._shared.files?.[0]?.name, text: window._shared.text });
   check(shared?.name === 'taqueria-el-sol-what-to-order.png' && /Birria tacos/.test(shared.text), `Share sends the image and the text (${shared?.name})`);
+  check(shared.text === 'Birria tacos: my new favorite bite!', 'card preview shares the edited caption, not the original generated text');
+  await p.evaluate(() => { navigator.clipboard.writeText = async () => { throw new DOMException('Blocked', 'NotAllowedError'); }; });
+  await p.click('.story-copy');
+  check(await p.locator('.story-caption-text').isVisible()
+    && (await p.locator('.story-caption-status').innerText()).includes('manually')
+    && await p.locator('.story-caption-text').inputValue() === shared.text,
+    'blocked clipboard reveals the exact edited caption for manual copying');
 
   await p.click('.story-x');
   check(await p.locator('#story-card-overlay').isHidden(), 'the ✕ closes it');
@@ -85,9 +94,14 @@ const SEED = [
   await p.click('#your-order-share');
   await p.waitForSelector('#story-card-overlay:not(.hidden)', { timeout: 6000 });
   check(await p.locator('#story-card-overlay').isVisible(), 'a long name with no photo still makes a card');
-  check(await p.locator('.story-share').innerText() === 'Download image' && await p.locator('.story-save').isHidden(), 'with no share sheet, the main button downloads');
-  const dl = p.waitForEvent('download', { timeout: 4000 }).catch(() => null);
+  check(await p.locator('.story-share').innerText() === 'Share card' && await p.locator('.story-save').isVisible(), 'Share card stays the primary action with Save image separate');
+  let downloads = 0;
+  p.on('download', () => { downloads++; });
   await p.click('.story-share');
+  check(await p.locator('.story-share-help').isVisible() && downloads === 0,
+    'unsupported image sharing opens clear social instructions without silently downloading');
+  const dl = p.waitForEvent('download', { timeout: 4000 }).catch(() => null);
+  await p.click('.story-save');
   const file = await dl;
   check(/what-to-order\.png$/.test(file?.suggestedFilename() || ''), `and the image downloads (${file?.suggestedFilename()})`);
   await p.$eval('.story-img', i => i.src).then(async src => {
@@ -96,6 +110,40 @@ const SEED = [
   });
   await p.keyboard.press('Escape');
   check(await p.locator('#story-card-overlay').isHidden(), 'Escape closes it');
+  check(await p.evaluate(() => StoryCard.photosFor({ placePhoto: 'https://example.com/stock.jpg', visits: [], dishes: [] }).length === 0),
+    'place listing and stock fallback photos never become personal share photos');
+  check(await p.evaluate(() => {
+    const r = { photo: 'https://example.com/one.jpg', media: [{ photo: 'https://example.com/two.jpg' }],
+      visits: [{ photo: 'https://example.com/three.jpg' }], dishes: [{ photo: 'https://example.com/four.jpg' }] };
+    return JSON.stringify(StoryCard.photosFor(r, 'https://example.com/two.jpg'))
+      === '["https://example.com/two.jpg","https://example.com/one.jpg","https://example.com/three.jpg"]';
+  }), 'personal photo selection prioritizes the current photo, deduplicates, and limits the collage to three');
+  check(await p.evaluate(async () => {
+    const solid = color => {
+      const c = document.createElement('canvas'); c.width = c.height = 20;
+      const g = c.getContext('2d'); g.fillStyle = color; g.fillRect(0, 0, 20, 20);
+      return c.toDataURL();
+    };
+    const text = [];
+    const original = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (...args) { text.push(args[0]); return original.apply(this, args); };
+    let blob;
+    try {
+      blob = await StoryCard.drawStory({ kind: 'meal', place: 'My Taco Cafe', location: '123 Taco St', title: 'Birria',
+        photos: [solid('#ff0000'), solid('#00ff00'), solid('#0000ff')] });
+    } finally { CanvasRenderingContext2D.prototype.fillText = original; }
+    const image = await createImageBitmap(blob);
+    const c = new OffscreenCanvas(1080, 1920); const g = c.getContext('2d'); g.drawImage(image, 0, 0);
+    const pixel = (x, y) => [...g.getImageData(x, y, 1, 1).data].slice(0, 3).join(',');
+    return image.width === 1080 && image.height === 1920 && pixel(540, 600) === '255,0,0'
+      && pixel(250, 1300) === '0,255,0' && pixel(800, 1300) === '0,0,255'
+      && text.includes('My Taco Cafe') && text.includes('123 Taco St') && text.includes('Birria')
+      && !text.includes('Google Play');
+  }), 'clean story card renders all three actual photos, restaurant, location and dish with understated branding');
+  check(await p.evaluate(async () => {
+    try { await StoryCard.drawStory({ kind: 'spot', title: 'Broken photo', photo: 'data:image/png;base64,broken' }); return false; }
+    catch (err) { return err.message.includes('Your photo could not load'); }
+  }), 'an unreadable personal photo fails explicitly instead of replacing it with stock imagery');
   check(p.errors.length === 0, `no page errors (${p.errors.slice(0, 2).join(' | ')})`);
 
   await browser.close();

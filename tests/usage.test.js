@@ -57,6 +57,8 @@ async function call (handler, { token, days } = {}) {
   await p.goto(`${BASE}/usage.html?demo`);
   await p.waitForSelector('#board:not([hidden])');
   check(await p.locator('#gate').isHidden(), 'demo mode skips sign-in');
+  await p.waitForTimeout(300);
+  check(/Food thrown at friends/.test(await p.locator('#funnel-new').innerText()) && /Tapped Rate on Google Play/.test(await p.locator('#funnel-rating').innerText()), 'new features and Google Play ratings are on the dashboard');
   const tiles = await p.$$eval('.tile span', s => s.map(x => x.textContent));
   check(tiles.includes('App opens') && tiles.includes('Trials started') && tiles.includes('First payments'), `headline numbers show (${tiles.join(', ')})`);
   check(await p.locator('#chart path').count() === 30, 'a bar for each of 30 days');

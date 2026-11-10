@@ -45,7 +45,13 @@ window.StoryCard = (() => {
 
   function heroPhotoFor (r, picks) {
     const withPhoto = [...picks.get, ...picks.want].find(d => d.photo);
-    return withPhoto?.photo || r.photo || r.placePhoto || '';
+    return withPhoto?.photo || photosFor(r)[0] || '';
+  }
+
+  function photosFor (r, preferred = '') {
+    const media = obj => window.mediaOf ? window.mediaOf(obj) : [{ photo: obj?.photo }, ...(obj?.media || [])];
+    const sources = [preferred, ...[r, ...(r.visits || []), ...(r.dishes || [])].flatMap(obj => media(obj).map(m => m.photo))];
+    return [...new Set(sources.filter(src => src && (!window.safeUrl || window.safeUrl(src))))].slice(0, 3);
   }
 
   function cover (ctx, img, x, y, w, h) {
@@ -91,6 +97,46 @@ window.StoryCard = (() => {
 
   function stars (n) { return n ? '★'.repeat(n) + '☆'.repeat(5 - n) : ''; }
 
+  // Your link (feed-the-bear.com/@you when your page is public), never more than 2s to find.
+  function shareLink () {
+    const site = 'feed-the-bear.com';
+    const ask = window.myShareLink ? window.myShareLink().catch(() => site) : Promise.resolve(site);
+    return Promise.race([ask, new Promise(r => setTimeout(() => r(site), 2000))]);
+  }
+
+  // Bottom of every share image: your link on the left, a "Get it on Google
+  // Play" badge on the right, so each share works as a small ad for the app.
+  // `s` scales it (1 on the 1080-wide cards).
+  function brand (ctx, { x, y, w, link, s = 1, font = FONT, gold = GOLD }) {
+    const bw = 292 * s, bh = 86 * s, bx = x + w - bw, by = y - bh / 2;
+    ctx.save();
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = gold;
+    let size = 38 * s;
+    ctx.font = `800 ${size}px ${font}`;
+    while (ctx.measureText(link).width > w - bw - 30 * s && size > 20 * s) { size -= 2 * s; ctx.font = `800 ${size}px ${font}`; }
+    ctx.fillText(link, x, y);
+    // The badge
+    const r = 16 * s;
+    ctx.beginPath();
+    ctx.moveTo(bx + r, by); ctx.arcTo(bx + bw, by, bx + bw, by + bh, r); ctx.arcTo(bx + bw, by + bh, bx, by + bh, r);
+    ctx.arcTo(bx, by + bh, bx, by, r); ctx.arcTo(bx, by, bx + bw, by, r); ctx.closePath();
+    ctx.fillStyle = '#000'; ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, .45)'; ctx.lineWidth = 2 * s; ctx.stroke();
+    const tx = bx + 26 * s, ty = y;
+    ctx.beginPath(); ctx.moveTo(tx, ty - 22 * s); ctx.lineTo(tx + 34 * s, ty); ctx.lineTo(tx, ty + 22 * s); ctx.closePath();
+    const g = ctx.createLinearGradient(tx, ty - 22 * s, tx + 34 * s, ty + 22 * s);
+    g.addColorStop(0, '#00d7fe'); g.addColorStop(0.4, '#00f076'); g.addColorStop(0.7, '#ffd400'); g.addColorStop(1, '#ff3a44');
+    ctx.fillStyle = g; ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = `600 ${17 * s}px ${font}`;
+    ctx.fillText('GET IT ON', tx + 52 * s, ty - 15 * s);
+    ctx.font = `700 ${32 * s}px ${font}`;
+    ctx.fillText('Google Play', tx + 52 * s, ty + 14 * s);
+    ctx.restore();
+  }
+
   async function draw (r) {
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
@@ -99,6 +145,7 @@ window.StoryCard = (() => {
 
     const picks = pickDishes(r);
     const [hero, cub] = await Promise.all([loadImage(heroPhotoFor(r, picks)), loadImage('assets/cub-avatar.jpg')]);
+    if (heroPhotoFor(r, picks) && !hero) throw new Error('Your photo could not load. Reattach it before sharing.');
 
     // Background: the food photo fading into warm brown, or just the brown.
     const BASE = '#1c120b';
@@ -177,9 +224,8 @@ window.StoryCard = (() => {
     // Footer
     ctx.fillStyle = 'rgba(255, 246, 230, .14)'; ctx.fillRect(PAD, H - 196, W - PAD * 2, 2);
     ctx.fillStyle = DIM; ctx.font = `700 34px ${FONT}`;
-    ctx.fillText('Remember every great bite', PAD, H - 128);
-    ctx.fillStyle = GOLD; ctx.font = `800 38px ${FONT}`;
-    ctx.fillText(location.host || 'feed-the-bear.vercel.app', PAD, H - 76);
+    ctx.fillText('Remember every great bite', PAD, H - 140);
+    brand(ctx, { x: PAD, y: H - 82, w: W - PAD * 2, link: await shareLink() });
 
     return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
   }
@@ -200,6 +246,21 @@ window.StoryCard = (() => {
           <button type="button" class="story-save">Save image</button>
           <button type="button" class="story-copy">Copy text</button>
         </div>
+        <details class="story-caption"><summary>Edit caption</summary>
+          <label>Your social caption<textarea class="form-input story-caption-text" rows="3" maxlength="2000"></textarea></label>
+          <span class="story-caption-status" role="status"></span>
+        </details>
+        <div class="story-share-help hidden" role="status">
+          <strong>Post your card to TikTok, Instagram or Facebook</strong>
+          <p class="story-share-message"></p>
+          <p>Choose Save image, open your social app and upload the card as a post or Story. Use Copy text to paste your caption. Nothing posts automatically.</p>
+        </div>
+        <details class="story-collection hidden"><summary>Your original photos &amp; video</summary>
+          <p>Share the cover and originals together when supported, or save individual files to upload in your social app. Apps decide what they accept.</p>
+          <button type="button" class="btn-primary story-share-all">Share card + originals</button>
+          <div class="story-files"></div>
+          <span class="story-collection-status" role="status"></span>
+        </details>
       </div>`;
     document.body.appendChild(el);
     el.addEventListener('click', e => { if (e.target === el) close(); });
@@ -207,6 +268,29 @@ window.StoryCard = (() => {
     el.querySelector('.story-share').addEventListener('click', shareNow);
     el.querySelector('.story-save').addEventListener('click', save);
     el.querySelector('.story-copy').addEventListener('click', copy);
+    el.querySelector('.story-caption-text').addEventListener('input', e => {
+      if (current) current.text = e.target.value;
+    });
+    el.querySelector('.story-share-all').addEventListener('click', async () => {
+      if (!current) return;
+      const snapshot = current;
+      try { await navigator.share({ title: snapshot.name, text: snapshot.text, files: [snapshot.file, ...snapshot.originals] }); }
+      catch (err) {
+        if (err?.name === 'AbortError' || current !== snapshot || el.classList.contains('hidden')) return;
+        console.warn('[FTB] Collection sharing failed:', err);
+        el.querySelector('.story-collection-status').textContent = 'Sharing was blocked. Save the individual files below and upload them in your social app.';
+      }
+    });
+    el.querySelector('.story-files').addEventListener('click', e => {
+      const button = e.target.closest('[data-file]');
+      const file = button && current?.originals[Number(button.dataset.file)];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      const a = document.createElement('a'); a.href = url; a.download = file.name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      el.querySelector('.story-collection-status').textContent = 'Download requested. Upload this file in your social app.';
+    });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && !el.classList.contains('hidden')) close(); });
     return el;
   }
@@ -215,17 +299,34 @@ window.StoryCard = (() => {
     overlay?.classList.add('hidden');
     const img = overlay?.querySelector('.story-img');
     if (img?.src) { URL.revokeObjectURL(img.src); img.removeAttribute('src'); }
+    current = null;
     if (typeof window.maybeHideOverlay === 'function') window.maybeHideOverlay();
   }
 
   async function shareNow () {
     if (!current) return;
+    const snapshot = current;
+    overlay.querySelector('.story-share-help').classList.add('hidden');
     track('story_card_shared', {});
     const data = { title: current.name, text: current.text, files: [current.file] };
     if (navigator.share && navigator.canShare?.({ files: [current.file] })) {
-      try { await navigator.share(data); return; } catch (err) { if (err?.name === 'AbortError') return; }
+      try { await navigator.share(data); return; }
+      catch (err) {
+        if (err?.name === 'AbortError') return;
+        if (current !== snapshot || overlay.classList.contains('hidden')) return;
+        console.warn('[FTB] Story sharing failed:', err);
+        showShareHelp('Your browser blocked image sharing. Your card is still ready to save and post.');
+        return;
+      }
     }
-    save();
+    showShareHelp('This browser cannot open a share sheet for image files. You can still post your card using the steps below.');
+  }
+
+  function showShareHelp (message) {
+    const help = overlay.querySelector('.story-share-help');
+    help.querySelector('.story-share-message').textContent = message;
+    help.classList.remove('hidden');
+    help.scrollIntoView({ block: 'nearest' });
   }
 
   function save () {
@@ -236,16 +337,25 @@ window.StoryCard = (() => {
     a.href = url; a.download = current.file.name;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
-    window.showToast?.('Saved!', 'Post it to your story or send it to a friend.', 'success');
+    window.showToast?.('Download requested', 'Once saved, upload it in your social app or send it to a friend.', 'info');
   }
 
   async function copy () {
     if (!current) return;
+    const snapshot = current;
+    const status = overlay.querySelector('.story-caption-status');
+    status.textContent = '';
     try {
-      await navigator.clipboard.writeText(current.text);
+      await navigator.clipboard.writeText(snapshot.text);
+      if (current !== snapshot || overlay.classList.contains('hidden')) return;
       window.showToast?.('Copied!', 'Paste it to a friend who is going.', 'success');
-    } catch {
-      window.showToast?.('Could not copy', 'Your browser blocked the clipboard here.', 'error');
+    } catch (err) {
+      if (current !== snapshot || overlay.classList.contains('hidden')) return;
+      console.warn('[FTB] Story caption copy failed:', err);
+      overlay.querySelector('.story-caption').open = true;
+      const caption = overlay.querySelector('.story-caption-text');
+      caption.focus(); caption.select();
+      status.textContent = 'Copying was blocked. Select the caption above and copy it manually.';
     }
   }
 
@@ -253,6 +363,7 @@ window.StoryCard = (() => {
      spec: { kicker, title, sub, stars, photo, stats: [{ n, label }],
              sections: [{ label, items: [text], tone: 'gold'|'soft'|'skip' }] } */
   async function drawStory (spec) {
+    if (spec.kind === 'meal' || spec.kind === 'spot') return drawPlaceStory(spec);
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
@@ -332,38 +443,140 @@ window.StoryCard = (() => {
 
     ctx.fillStyle = 'rgba(255, 246, 230, .14)'; ctx.fillRect(PAD, H - 196, W - PAD * 2, 2);
     ctx.fillStyle = DIM; ctx.font = `700 34px ${FONT}`;
-    ctx.fillText(spec.footer || 'Remember every great bite', PAD, H - 128);
-    ctx.fillStyle = GOLD; ctx.font = `800 38px ${FONT}`;
-    ctx.fillText(location.host || 'www.feed-the-bear.com', PAD, H - 76);
+    ctx.fillText(spec.footer || 'Remember every great bite', PAD, H - 140);
+    brand(ctx, { x: PAD, y: H - 82, w: W - PAD * 2, link: await shareLink() });
     return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
   }
 
-  function showCard (blob, text, title, fileBase) {
+  async function drawPlaceStory (spec) {
+    const sources = [...new Set([...(spec.photos || []), spec.photo].filter(Boolean))].slice(0, 3);
+    const images = await Promise.all(sources.map(loadImage));
+    if (images.some(img => !img)) throw new Error('Your photo could not load. Reattach it or choose another photo before sharing.');
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    try { await document.fonts?.load(`800 64px Manrope`); } catch { /* system font is fine */ }
+    ctx.fillStyle = '#fff6e6'; ctx.fillRect(0, 0, W, H);
+    const photo = (img, x, y, w, h) => {
+      ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, w, h, 32); ctx.clip();
+      cover(ctx, img, x, y, w, h); ctx.restore();
+    };
+    ctx.fillStyle = '#79542d'; ctx.font = `800 30px ${FONT}`;
+    ctx.fillText(wrap(ctx, String(spec.kicker || 'My food find').toUpperCase(), W - PAD * 2, 1)[0], PAD, 130);
+    ctx.fillStyle = '#21170f'; ctx.font = `800 76px ${FONT}`;
+    let y = 158;
+    wrap(ctx, spec.place || spec.title || '', W - PAD * 2, 2).forEach(line => { y += 86; ctx.fillText(line, PAD, y); });
+    ctx.fillStyle = '#79542d'; ctx.font = `600 32px ${FONT}`;
+    wrap(ctx, spec.location || spec.sub || '', W - PAD * 2, 1).forEach(line => { y += 48; ctx.fillText(line, PAD, y); });
+    const top = y + 40;
+    const bottom = 1450;
+    if (images.length) {
+      const extras = images.length - 1;
+      const heroH = bottom - top - (extras ? 290 : 0);
+      photo(images[0], PAD, top, W - PAD * 2, heroH);
+      if (extras) {
+        const gap = 20, width = (W - PAD * 2 - gap * (extras - 1)) / extras;
+        images.slice(1).forEach((img, i) => photo(img, PAD + i * (width + gap), top + heroH + gap, width, 270));
+      }
+    } else {
+      ctx.fillStyle = '#efe1ca'; ctx.beginPath(); ctx.roundRect(PAD, top, W - PAD * 2, bottom - top, 32); ctx.fill();
+      ctx.fillStyle = '#79542d'; ctx.font = `700 40px ${FONT}`;
+      ctx.fillText('A place on my food map', PAD + 40, top + 100);
+    }
+    y = 1520;
+    ctx.fillStyle = '#21170f'; ctx.font = `800 46px ${FONT}`;
+    if (spec.place && spec.title !== spec.place) {
+      wrap(ctx, spec.title, W - PAD * 2, 1).forEach(line => ctx.fillText(line, PAD, y));
+      y += 64;
+    }
+    if (spec.stars) { ctx.fillStyle = '#79542d'; ctx.fillText(stars(spec.stars), PAD, y); y += 64; }
+    for (const section of spec.sections || []) {
+      for (const item of section.items || []) {
+        if (!item || y > 1740) continue;
+        ctx.fillStyle = '#79542d'; ctx.font = `600 34px ${FONT}`;
+        wrap(ctx, item, W - PAD * 2, 2).forEach(line => { if (y <= 1740) { ctx.fillText(line, PAD, y); y += 46; } });
+      }
+    }
+    ctx.fillStyle = '#d7c2a1'; ctx.fillRect(PAD, 1800, W - PAD * 2, 2);
+    ctx.fillStyle = '#79542d'; ctx.font = `700 26px ${FONT}`;
+    ctx.fillText('FEED THE BEAR', PAD, 1850);
+    ctx.textAlign = 'right';
+    ctx.fillText(wrap(ctx, await shareLink(), 560, 1)[0], W - PAD, 1850);
+    return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+  }
+
+  function showCard (blob, text, title, fileBase, originals = [], collectionError = '') {
     overlay = overlay || buildOverlay();
     if (!blob) throw new Error('Could not draw the card');
     const name = `${String(fileBase || 'feed-the-bear').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'feed-the-bear'}.png`;
-    current = { blob, file: new File([blob], name, { type: 'image/png' }), text, name: title };
+    current = { blob, file: new File([blob], name, { type: 'image/png' }), text, name: title, originals };
     const img = overlay.querySelector('.story-img');
     if (img.src) URL.revokeObjectURL(img.src);
     img.src = URL.createObjectURL(blob);
     img.alt = title;
-    const canShare = !!navigator.canShare?.({ files: [current.file] });
-    overlay.querySelector('.story-share').textContent = canShare ? 'Share to Stories & more' : 'Download image';
-    overlay.querySelector('.story-save').classList.toggle('hidden', !canShare);
+    overlay.querySelector('.story-share').textContent = 'Share card';
+    overlay.querySelector('.story-save').classList.remove('hidden');
+    overlay.querySelector('.story-share-help').classList.add('hidden');
+    overlay.querySelector('.story-caption').open = false;
+    overlay.querySelector('.story-caption-text').value = text || '';
+    overlay.querySelector('.story-caption-status').textContent = '';
+    const collection = overlay.querySelector('.story-collection');
+    collection.classList.toggle('hidden', !originals.length && !collectionError);
+    collection.open = false;
+    overlay.querySelector('.story-collection-status').textContent = collectionError;
+    overlay.querySelector('.story-files').replaceChildren();
+    originals.forEach((file, i) => {
+      const button = document.createElement('button'); button.type = 'button'; button.dataset.file = i;
+      button.textContent = file.type.startsWith('video/') ? 'Save video clip' : `Save photo ${i + 1}`;
+      overlay.querySelector('.story-files').appendChild(button);
+    });
+    const shareAll = overlay.querySelector('.story-share-all');
+    shareAll.disabled = !navigator.share || !navigator.canShare?.({ files: [current.file, ...originals] });
+    if (shareAll.disabled && !collectionError && originals.length) {
+      overlay.querySelector('.story-collection-status').textContent = 'This device cannot share the whole collection at once. Save individual files below.';
+    }
     overlay.classList.remove('hidden');
     document.body.classList.add('overlay-open');
   }
 
   // Draws the card for restaurant `r` and opens the preview.
   async function open (r, text) {
-    showCard(await draw(r), text, `What to order at ${r.name}`, `${r.name}-what-to-order`);
+    const generation = _dataGeneration;
+    const blob = await draw(r);
+    if (generation !== _dataGeneration) return;
+    showCard(blob, text, `What to order at ${r.name}`, `${r.name}-what-to-order`);
     track('story_card_opened', { kind: 'order' });
   }
 
   async function openStory (spec, text, fileBase) {
-    showCard(await drawStory(spec), text, spec.title || 'Feed The Bear', fileBase || spec.title);
+    const generation = _dataGeneration;
+    const blob = await drawStory(spec);
+    const originals = [];
+    let collectionError = '';
+    const sources = window.mergeFoodMedia ? window.mergeFoodMedia([], spec.media || [], { notify: false }) : [];
+    for (const [i, item] of sources.entries()) {
+      try {
+        const response = await fetch(item.photo);
+        if (!response.ok) throw new Error(`Photo ${i + 1} could not load`);
+        const photo = await response.blob();
+        if (!photo.type.startsWith('image/')) throw new Error(`Photo ${i + 1} is not a readable image`);
+        // A video's poster is used on the cover; the original clip is a separate file.
+        if (!item.video) originals.push(new File([photo], `food-photo-${i + 1}.${photo.type.includes('png') ? 'png' : 'jpg'}`, { type: photo.type }));
+        if (item.video) {
+          const video = await window.getFoodVideo(item.video);
+          if (!video) throw new Error('The video clip is not on this device');
+          originals.push(new File([video], `food-video.${video.type.includes('mp4') ? 'mp4' : video.type.includes('quicktime') ? 'mov' : 'webm'}`, { type: video.type }));
+        }
+      } catch (err) {
+        console.warn('[FTB] Original media preparation failed:', err);
+        collectionError = `${err.message}. Your cover is ready; unavailable originals cannot be shared.`;
+      }
+      if (generation !== _dataGeneration) return;
+    }
+    if (generation !== _dataGeneration) return;
+    showCard(blob, text, spec.title || 'Feed The Bear', fileBase || spec.title, originals, collectionError);
     track('story_card_opened', { kind: spec.kind || 'story' });
   }
 
-  return { open, openStory, draw, drawStory, close, pickDishes };
+  return { open, openStory, draw, drawStory, close, pickDishes, photosFor, brand, shareLink };
 })();

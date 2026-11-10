@@ -63,6 +63,15 @@ jobs:
       - name: Quick Add and the cub
         working-directory: tests
         run: node cub.test.js
+      - name: Simple Add and optional social posting
+        working-directory: tests
+        run: node simple-add.test.js
+      - name: Ten-photo media collection and advanced options
+        working-directory: tests
+        run: node media-collection.test.js
+      - name: Profile photo persistence across logins
+        working-directory: tests
+        run: node profile-persistence.test.js
 
       - name: Food videos
         working-directory: tests
@@ -85,6 +94,15 @@ jobs:
       - name: Free accounts
         working-directory: tests
         run: node account.test.js
+      - name: Account session isolation
+        working-directory: tests
+        run: node session-isolation.test.js
+      - name: Capture and immediate sharing
+        working-directory: tests
+        run: node capture-share.test.js
+      - name: Social food dates and sharing privacy
+        working-directory: tests
+        run: node social-planning.test.js
       - name: Place info
         working-directory: tests
         run: node placeinfo.test.js
@@ -148,6 +166,42 @@ jobs:
       - name: Best bet, Explorer, smarter Decision Mode
         working-directory: tests
         run: node foodie.test.js
+      - name: Eating contests in Play; updates never reload the page
+        working-directory: tests
+        run: node foodevents.test.js
+      - name: Accepting an invite makes you friends both ways; real names
+        working-directory: tests
+        run: node followback.test.js
+      - name: Reinstalling never repeats first-time setup
+        working-directory: tests
+        run: node reinstall.test.js
+      - name: Personal share cards carry your link with subtle branding
+        working-directory: tests
+        run: node brand.test.js
+      - name: City guides at /eat, with Save buttons
+        working-directory: tests
+        run: node guide.test.js
+      - name: Owner portal (VIP Grizzly, discount codes)
+        working-directory: tests
+        run: node owner.test.js
+      - name: Friends screen and Bear Cave invites
+        working-directory: tests
+        run: node friendscreen.test.js
+      - name: Arcade games and photo bear avatars
+        working-directory: tests
+        run: node games.test.js
+      - name: Gift Grizzly
+        working-directory: tests
+        run: node gift.test.js
+      - name: Featured restaurants on city guides
+        working-directory: tests
+        run: node featured.test.js
+      - name: Creator payouts (20%)
+        working-directory: tests
+        run: node creators.test.js
+      - name: Owner portal page opens signed in from the app
+        working-directory: tests
+        run: node ownerpage.test.js
       - name: Several photos and videos at once
         working-directory: tests
         run: node multiphoto.test.js

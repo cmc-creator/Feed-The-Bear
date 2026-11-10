@@ -1,42 +1,24 @@
-name: Deploy to GitHub Pages
+name: Browser tests (main)
 
+# The site is served by Vercel (it deploys every push to main on its own).
+# This only runs the browser tests on main; the old GitHub Pages copy of the
+# site was never used and is no longer published from here.
 on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'native/**'      # the Android app has its own workflow
+      - '**/*.md'
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: tests-main
+  cancel-in-progress: true   # a newer push replaces a run still going
 
 jobs:
   test:
     uses: ./.github/workflows/test.yml
-
-  deploy:
-    needs: test
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: '.'
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4

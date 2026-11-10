@@ -93,13 +93,16 @@ public final class GeofenceStore {
                     .setRequestId(s.optString("id"))
                     .setCircularRegion(s.optDouble("lat"), s.optDouble("lng"), radius)
                     .setExpirationDuration(Geofence.NEVER_EXPIRE)
-                    .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER)
+                    // Dwell too: with a wide radius you're usually already inside, so
+                    // you'd never "enter". The receiver's cooldowns keep it to a few a day.
+                    .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER | Geofence.GEOFENCE_TRANSITION_DWELL)
+                    .setLoiteringDelay(5 * 60 * 1000)
                     .setNotificationResponsiveness(5 * 60 * 1000) // battery-friendly
                     .build());
             }
             if (fences.isEmpty()) { p.edit().putInt("registered", 0).apply(); return; }
-            // No initial trigger: setting this up while already near a spot shouldn't ping.
-            GeofencingRequest request = new GeofencingRequest.Builder().setInitialTrigger(0).addGeofences(fences).build();
+            // Already inside one counts once you've stayed 5 minutes (the open app alerts on its own).
+            GeofencingRequest request = new GeofencingRequest.Builder().setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_DWELL).addGeofences(fences).build();
             client.addGeofences(request, pi)
                 .addOnSuccessListener(v -> p.edit().putInt("registered", fences.size()).apply())
                 .addOnFailureListener(e -> p.edit().putInt("registered", 0).apply());

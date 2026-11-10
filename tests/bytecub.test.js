@@ -66,8 +66,8 @@ const say = async (p, text) => {
   check(!(await p.locator('#cub-buddy').isVisible()), 'the floating cub does not hang over the page');
   await closeAllDialogs(p);
 
-  // Header invite.
-  check(await p.locator('#header-invite-btn').isVisible(), 'a small Invite button in the header');
+  // Header Friends (on phones it takes the Invite button's spot; Invite is first inside).
+  check(await p.locator('#header-friends-btn').isVisible(), 'a moss Friends button in the header');
 
   // "places to get subs near me" searches real places, not just saved ones.
   const asked = [];

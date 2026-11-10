@@ -81,6 +81,7 @@ const call = (method, { query = {}, body = {}, as = body.action === 'create' ? '
   await p.fill('#chat-input', 'start a dinner vote');
   await p.press('#chat-input', 'Enter');
   await p.waitForTimeout(300);
+  check(await p.locator('#dinner-rooms-overlay').isVisible(), 'Enter opens Dinner Vote without activating its Close button');
   check(await p.locator('.dv-pick.on').count() === 3, 'the best 3 spots are picked to start');
   await p.locator('.dv-pick.on').first().click();
   check((await p.locator('#dv-start').innerText()) === 'Start the vote (2 spots)', 'tapping a spot unpicks it');

@@ -34,6 +34,8 @@ const lightText = el => {
   await one.close();
 
   const three = await at(3);
+  check(await three.locator('#for-you-home').isHidden(), 'the lean home leaves For You off');
+  await three.evaluate(() => document.body.classList.add('home-full'));
   check(await three.locator('#for-you-home').isVisible() && await three.locator('#mood-picks-home').isVisible(), 'three spots: For You and Mood Picks appear');
   check(await three.locator('.for-you-home-title').evaluate(lightText) && await three.locator('.mood-picks-home-title').evaluate(lightText), 'their titles are readable');
   const recap = await three.locator('#week-recap-text').innerText();

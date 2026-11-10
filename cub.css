@@ -51,14 +51,15 @@
   font: inherit; font-size: .82rem; color: var(--text); background: var(--surface2); border: 1px dashed var(--border);
 }
 .qa-import strong { color: var(--primary); }
+.qa-import-options summary { min-height: 44px; padding: 12px 0; box-sizing: border-box; color: var(--text-dim); font-size: .8rem; cursor: pointer; }
 .qa-change {justify-self: start; background: none; border: 0; padding: 0; font: inherit; font-size: .74rem; color: var(--text-dim); text-decoration: underline; cursor: pointer; }
-.qa-statuses { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.qa-statuses { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .qa-status {
-  font: inherit; font-size: .95rem; font-weight: 800; cursor: pointer; min-height: 52px; border-radius: var(--radius);
+  font: inherit; font-size: .85rem; font-weight: 800; cursor: pointer; min-height: 52px; padding: 8px 6px; white-space: normal; overflow-wrap: anywhere; border-radius: var(--radius);
   border: 2px solid var(--border); background: var(--surface2); color: var(--text); transition: transform .12s ease;
 }
 .qa-status:active { transform: scale(.96); }
-.qa-status.active[data-status="visited"] { border-color: var(--primary); background: rgba(var(--primary-rgb), .18); }
+.qa-status.active[data-status="visited"], .qa-status.active[data-status="visited-before"] { border-color: var(--primary); background: rgba(var(--primary-rgb), .18); }
 .qa-status.active[data-status="want-to-try"] { border-color: #e0a85a; background: rgba(224, 168, 90, .18); }
 .qa-stars { display: flex; justify-content: center; gap: 8px; }
 .qa-star { font-size: 2rem; line-height: 1; background: none; border: 0; cursor: pointer; color: var(--border); transition: transform .15s ease, color .15s ease; }
@@ -69,9 +70,60 @@
 }
 .qa-photo-preview { display: block; width: 120px; height: 120px; object-fit: cover; margin: 10px auto 0; border: 6px solid #fffdf8; border-bottom-width: 18px; border-radius: 3px; transform: rotate(-3deg); box-shadow: 0 8px 18px rgba(0, 0, 0, .3); }
 .qa-photo-preview.hidden { display: none; }
-.qa-save { width: 100%; min-height: 50px; font-size: 1rem; }
+.qa-media:has(.pm-strip) .qa-photo-preview { display: none; }
+.qa-media-list .pm-strip { max-height: 220px; overflow-y: auto; padding: 8px 4px; gap: 12px; }
+.qa-cover-pick { display: grid; gap: 4px; padding: 4px; border: 2px solid transparent; border-radius: 10px; background: var(--surface2); color: var(--text); font: inherit; font-size: .7rem; cursor: pointer; }
+.qa-cover-pick[aria-pressed="true"] { border-color: var(--primary); }
+.qa-cover-pick img { display: block; width: 64px; height: 64px; object-fit: cover; border-radius: 6px; }
+.qa-media-list .pm-remove { top: -4px; right: -4px; width: 44px; height: 44px; font-size: .85rem; }
+.qa-card .qa-save { position: sticky; bottom: 0; z-index: 2; width: 100%; min-height: 50px; font-size: 1rem; box-shadow: 0 0 0 6px var(--surface); }
 .qa-save:disabled { opacity: .5; cursor: not-allowed; }
 .qa-more { margin: 2px auto 0; background: none; border: 0; font: inherit; font-size: .8rem; color: var(--text-dim); text-decoration: underline; cursor: pointer; }
+.qa-details { border-top: 1px solid var(--border); min-width: 0; }
+.qa-details summary { padding: 12px 0; min-height: 44px; box-sizing: border-box; cursor: pointer; font-size: .9rem; font-weight: 700; }
+.qa-details summary span { color: var(--text-dim); font-size: .75rem; font-weight: 400; margin-left: 6px; }
+.qa-details-body { display: grid; gap: 14px; padding: 4px 0 12px; }
+.qa-details-body .qa-row { flex-wrap: wrap; }
+.qa-details-body .qa-cuisine { flex: 1 1 150px; }
+.qa-visit-date-wrap { display: none; }
+#quick-add-overlay.went-before .qa-visit-date-wrap { display: grid; gap: 6px; font-size: .85rem; }
+.qa-media-label, .qa-field-label { display: block; color: var(--text-dim); font-size: .82rem; margin-bottom: 6px; }
+.qa-save-hint { text-align: center; font-size: .78rem; color: var(--text-dim); margin: 0; line-height: 1.5; }
+.qa-card .food-capture-actions { margin: 0; }
+.qa-card .food-capture-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.qa-card .food-capture-buttons .qa-photo, .qa-card .food-capture-buttons .qa-video {
+  grid-column: 1 / -1; width: 100%; height: auto; min-height: 60px; padding: 12px 16px;
+  display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 1rem; font-weight: 800;
+  color: var(--on-primary); background: var(--primary); border: 2px solid var(--primary); border-radius: var(--radius-sm);
+  animation: qa-camera-glow 2.4s ease-in-out 3;
+}
+.qa-card .food-capture-buttons [data-source="library"] {
+  grid-column: 1 / -1; grid-row: 1; width: 100%; min-height: 52px; padding: 8px 12px;
+  border: 2px solid var(--primary); border-radius: var(--radius-sm);
+  background: var(--surface2); color: var(--text); font-size: .95rem; font-weight: 800;
+}
+.qa-photo svg, .qa-video svg { flex-shrink: 0; }
+.qa-photo span, .qa-video span { min-width: 0; }
+.qa-card .qa-photo:disabled, .qa-card .qa-video:disabled { animation: none; opacity: .65; }
+@keyframes qa-camera-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--primary-rgb), 0); }
+  50% { box-shadow: 0 0 0 5px rgba(var(--primary-rgb), .25), 0 0 20px rgba(var(--primary-rgb), .3); }
+}
+@media (prefers-reduced-motion: reduce) { .qa-card .food-capture-buttons .qa-photo, .qa-card .food-capture-buttons .qa-video { animation: none; } }
+body[data-ui-motion='reduced'] .qa-card .food-capture-buttons .qa-photo,
+body[data-ui-motion='reduced'] .qa-card .food-capture-buttons .qa-video { animation: none; }
+.qa-card .qa-change, .qa-card .qa-more { min-height: 44px; }
+@media (max-width: 480px) {
+  #quick-add-overlay.step-2 .qa-avatar { display: none; }
+  #quick-add-overlay.step-2 .qa-step-2 { gap: 8px; }
+  #quick-add-overlay.step-2 .qa-place { padding: 8px 12px; gap: 2px; }
+}
+@media (max-width: 360px) {
+  #quick-add-overlay.step-2 .qa-step-2 { gap: 6px; }
+  #quick-add-overlay.step-2 .qa-title { margin: 4px 0; }
+  .qa-card { padding: 14px 16px; }
+  .qa-place { padding: 8px 12px; gap: 2px; }
+}
 
 /* ── Buddy ── */
 .cub-buddy { position: fixed; right: 14px; bottom: 24px; z-index: 250; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }

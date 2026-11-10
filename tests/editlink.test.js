@@ -18,9 +18,9 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
   await p.waitForTimeout(1500);
   await closeAllDialogs(p);
 
-  // The default look is warm (Honey by day, gold-on-dark at night), never the greens.
+  // The dark default stays readable at every hour; system matching is opt-in.
   const looks = await p.evaluate(() => [8, 13, 19, 23].map(h => getAutoThemePresetByHour(h).accent));
-  check(JSON.stringify(looks) === '["honey","honey","midnight","midnight"]', `default themes are warm (${looks})`);
+  check(JSON.stringify(looks) === '["midnight","midnight","midnight","midnight"]', `default themes stay dark (${looks})`);
 
   await p.evaluate(() => openEditModal('b'));
   check(await p.locator('#form-collection-group').isHidden(), 'no "add to a list" question when you have no lists');

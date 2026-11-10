@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Feed The Bear Owner</title>
+  <link rel="icon" href="favicon-48.png?v=bear3" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #101712; --surface: #17221b; --surface2: #1f2c24; --border: rgba(255,255,255,.09);
+      --text: #eaf0f7; --text-muted: #b1bdce; --text-dim: #8b99ae; --gold: #c8a26a; --ok: #6fcf97; --bad: #ef8a7a;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: Manrope, system-ui, sans-serif; }
+    main { max-width: 820px; margin: 0 auto; padding: 20px 16px 48px; }
+    header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+    h1 { margin: 0; font-size: 1.4rem; }
+    h1 small { display: block; font-size: .8rem; font-weight: 600; color: var(--text-dim); margin-top: 2px; }
+    h2 { font-size: 1.1rem; margin: 0 0 4px; }
+    .lead { color: var(--text-muted); font-size: .88rem; margin: 0 0 14px; }
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 16px; }
+    form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: end; }
+    label { display: grid; gap: 4px; font-size: .78rem; font-weight: 700; color: var(--text-dim); }
+    input, select { font: inherit; font-size: .95rem; color: var(--text); background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 10px; min-width: 0; }
+    .wide { grid-column: 1 / -1; }
+    .btn { font: inherit; font-weight: 800; background: var(--gold); color: #1b130b; border: 0; border-radius: 12px; padding: 11px 18px; cursor: pointer; }
+    .btn.ghost { background: none; color: var(--text-muted); border: 1px solid var(--border); padding: 6px 12px; font-size: .8rem; border-radius: 999px; }
+    .msg { min-height: 1.2em; font-size: .88rem; margin: 10px 0 0; font-weight: 700; }
+    .msg.ok { color: var(--ok); } .msg.bad { color: var(--bad); }
+    .rows { display: grid; gap: 8px; margin-top: 14px; }
+    .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; background: var(--surface2); border-radius: 12px; padding: 10px 12px; }
+    .row .who { flex: 1; min-width: 180px; }
+    .row b { overflow-wrap: anywhere; }
+    .row small { display: block; color: var(--text-dim); font-size: .78rem; overflow-wrap: anywhere; }
+    .pill { font-size: .7rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: rgba(111,207,151,.15); color: var(--ok); }
+    .pill.off { background: rgba(255,255,255,.06); color: var(--text-dim); }
+    .pill.wait { background: rgba(200,162,106,.18); color: var(--gold); }
+    .empty { color: var(--text-dim); font-size: .88rem; }
+    .gate { text-align: center; padding: 48px 16px; }
+    .gate p { color: var(--text-muted); }
+    a { color: var(--gold); }
+    [hidden] { display: none !important; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 4px 0 12px; }
+    .stat { background: var(--surface2); border-radius: 12px; padding: 10px 6px; text-align: center; }
+    .stat b { display: block; font-size: 1.35rem; }
+    .stat span { font-size: .72rem; font-weight: 700; color: var(--text-dim); }
+    .alerts { display: grid; gap: 8px; margin: 0 0 6px; }
+    .alerts label { display: flex; gap: 10px; align-items: flex-start; font-size: .9rem; color: var(--text); font-weight: 600; }
+    .alerts input { width: 20px; height: 20px; margin: 2px 0 0; padding: 0; flex: none; accent-color: var(--gold); }
+    .alerts small { display: block; color: var(--text-dim); font-weight: 600; font-size: .78rem; }
+    .pill.new { background: rgba(200,162,106,.25); color: var(--gold); }
+    #signup-more { margin-top: 10px; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Feed The Bear owner <small id="who">VIP access and discounts</small></h1>
+    <span style="display:flex;gap:14px;flex-wrap:wrap"><a href="/app.html">← Back to the app</a><a href="/usage.html">Usage dashboard</a></span>
+  </header>
+
+  <section id="gate" class="panel gate">
+    <p id="gate-msg">Sign in with your owner account.</p>
+    <button type="button" class="btn" id="sign-in">Sign in with Google</button>
+    <button type="button" class="btn ghost" id="sign-out" hidden>Sign out and use another account</button>
+    <p class="lead" style="margin-top:14px">Or <a href="/app.html">sign in on the app</a> as cmc@conniemichelleconsulting.com, then come back here.</p>
+  </section>
+
+  <div id="portal" hidden>
+    <section class="panel">
+      <h2>New sign-ups <span class="pill new" id="signup-new" hidden></span></h2>
+      <p class="lead">Everyone who made an account, newest first.</p>
+      <div class="stats">
+        <div class="stat"><b id="su-today">-</b><span>Today</span></div>
+        <div class="stat"><b id="su-week">-</b><span>7 days</span></div>
+        <div class="stat"><b id="su-month">-</b><span>30 days</span></div>
+        <div class="stat"><b id="su-total">-</b><span>All time</span></div>
+      </div>
+      <div class="alerts">
+        <label><input type="checkbox" id="alert-push" /> <span>Notify my phone for each new sign-up<small id="alert-push-note"></small></span></label>
+        <label><input type="checkbox" id="alert-email" /> <span>Email me for each new sign-up<small id="alert-email-note"></small></span></label>
+      </div>
+      <p class="msg" id="alert-msg" role="status"></p>
+      <div class="rows" id="signup-list"><p class="empty">Loading…</p></div>
+      <button type="button" class="btn ghost" id="signup-more" hidden>Show more</button>
+    </section>
+
+    <section class="panel">
+      <h2>Give free Grizzly</h2>
+      <p class="lead">Type their email. If they already have an account it turns on now; if not, it turns on the first time they sign in with that email.</p>
+      <form id="vip-form">
+        <label class="wide">Email<input id="vip-email" type="email" required placeholder="friend@example.com" autocomplete="off" /></label>
+        <label>How long<select id="vip-months">
+          <option value="0">For good</option><option value="1">1 month</option><option value="3">3 months</option>
+          <option value="6">6 months</option><option value="12">1 year</option>
+        </select></label>
+        <label>Note (only you see it)<input id="vip-note" maxlength="120" placeholder="Food blogger, family…" /></label>
+        <button class="btn" type="submit">Give Grizzly</button>
+      </form>
+      <p class="msg" id="vip-msg" role="status"></p>
+      <div class="rows" id="vip-list"><p class="empty">Loading…</p></div>
+    </section>
+
+    <section class="panel">
+      <h2>VIP discount codes</h2>
+      <p class="lead">People type the code at checkout, or you send them the link and it's applied for them. Works on the website and in the Android app.</p>
+      <form id="code-form">
+        <label>Code<input id="code-code" required maxlength="30" placeholder="BEARVIP" autocomplete="off" style="text-transform:uppercase" /></label>
+        <label>Percent off<input id="code-percent" type="number" min="1" max="100" value="50" required /></label>
+        <label>For<select id="code-duration">
+          <option value="once">The first payment</option><option value="repeating">A few months</option><option value="forever">Every payment</option>
+        </select></label>
+        <label id="code-months-wrap" hidden>Months<input id="code-months" type="number" min="1" max="36" value="3" /></label>
+        <label>Max uses (blank = no limit)<input id="code-max" type="number" min="1" placeholder="No limit" /></label>
+        <label>Ends after (days, blank = never)<input id="code-days" type="number" min="1" placeholder="Never" /></label>
+        <button class="btn" type="submit">Create code</button>
+      </form>
+      <p class="msg" id="code-msg" role="status"></p>
+      <div class="rows" id="code-list"><p class="empty">Loading…</p></div>
+    </section>
+
+    <section class="panel">
+      <h2>Creator payouts (20%)</h2>
+      <p class="lead">When someone joins from a creator's link and pays for Grizzly, 20% of each payment (before tax) is owed to that creator. Pay them however you like (Venmo, PayPal, Zelle), then tap Mark paid.</p>
+      <div class="rows" id="creator-list"><p class="empty">Loading…</p></div>
+      <p class="msg" id="creator-msg" role="status"></p>
+    </section>
+
+    <section class="panel">
+      <h2>Featured restaurants</h2>
+      <p class="lead">Restaurants pay $29/month on <a href="/advertise.html">feed-the-bear.com/advertise.html</a> to be first on a city guide. Approve each one before it shows. You get an email when a new one signs up.</p>
+      <div class="rows" id="featured-list"><p class="empty">Loading…</p></div>
+      <p class="msg" id="featured-msg" role="status"></p>
+    </section>
+
+    <section class="panel">
+      <h2>Affiliate codes (Book a table, Order delivery)</h2>
+      <p class="lead">Join each company's affiliate program (search "DoorDash affiliate program" and so on). Paste what they give you: a tracking link with <b>{url}</b> where the restaurant's page goes, or a code like <b>ref=feedthebear</b>. Leave a box empty and that button links normally. You earn on every booking or order made through the app, free users included.</p>
+      <form id="partner-form">
+        <label>OpenTable<input id="p-opentable" autocomplete="off" placeholder="https://…?u={url}" /></label>
+        <label>Resy<input id="p-resy" autocomplete="off" /></label>
+        <label>Yelp<input id="p-yelp" autocomplete="off" /></label>
+        <label>DoorDash<input id="p-doordash" autocomplete="off" /></label>
+        <label>Uber Eats<input id="p-ubereats" autocomplete="off" /></label>
+        <label>Grubhub<input id="p-grubhub" autocomplete="off" /></label>
+        <label class="wide">Your merch shop link (Printful store; shows "Bear Shop" in the app and on the website)<input id="p-shop" autocomplete="off" placeholder="https://yourstore.printful.me" /></label>
+        <button class="btn" type="submit">Save codes</button>
+      </form>
+      <p class="msg" id="partner-msg" role="status"></p>
+    </section>
+  </div>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script>
+'use strict';
+// Sign-in only works on the real address (and shares the app's sign-in there),
+// so a Vercel deployment link or the bare domain moves to www.
+if (/\.vercel\.app$/.test(location.hostname) || location.hostname === 'feed-the-bear.com') {
+  location.replace('https://www.feed-the-bear.com/owner.html' + location.search);
+}
+// Same public web config as firebase.js.
+const FB_CONFIG = {
+  apiKey: 'AIzaSyCqWTvEFYCEVjooO_eCVGNFsIeya17q3WQ',
+  authDomain: 'feed-the-bear-app-2-102926.firebaseapp.com',
+  projectId: 'feed-the-bear-app-2-102926',
+  appId: '1:565915716798:web:1b40da485d3d59c54622ef',
+};
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const day = iso => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
+let user = null;
+// Opened from the app (app.js): its sign-in, good for about an hour.
+let handoff = null;
+try {
+  handoff = JSON.parse(sessionStorage.getItem('ftb_owner_handoff') || 'null');
+  if (!handoff?.token || Date.now() - handoff.at > 50 * 60 * 1000) handoff = null;
+} catch { handoff = null; }
+const handoffUser = handoff && { email: handoff.email, getIdToken: async () => handoff.token, fromApp: true };
+
+async function api (method, body) {
+  const token = await user.getIdToken();
+  const res = await fetch('/api/owner', { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+  return data;
+}
+function say (id, text, ok = true) { const el = $(id); el.textContent = text; el.className = `msg ${ok ? 'ok' : 'bad'}`; }
+function showGate (text) { $('gate').hidden = false; $('portal').hidden = true; $('gate-msg').textContent = text; }
+
+const SEEN_KEY = 'ftb_owner_signups_seen';
+let signupShown = 15;
+let signupData = null;
+function renderSignups (s, alerts) {
+  if (s) signupData = s;
+  s = signupData;
+  const el = $('signup-list');
+  if (!s || s.error) { el.innerHTML = `<p class="empty">Sign-ups didn't load${s?.error ? `: ${esc(s.error)}` : ''}.</p>`; return; }
+  $('su-today').textContent = s.today; $('su-week').textContent = s.week; $('su-month').textContent = s.month; $('su-total').textContent = s.total;
+  let seen = 0;
+  try { seen = Number(localStorage.getItem(SEEN_KEY)) || 0; } catch { /* private mode */ }
+  const isNew = u => seen && Date.parse(u.at) > seen;
+  const fresh = s.recent.filter(isNew).length;
+  $('signup-new').hidden = !fresh;
+  $('signup-new').textContent = `${fresh} new since your last look`;
+  const when = iso => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  el.innerHTML = s.recent.length ? s.recent.slice(0, signupShown).map(u => `<div class="row"><div class="who"><b>${esc(u.name || u.email || 'No name')}</b>
+    <small>${u.name ? `${esc(u.email)} · ` : ''}joined ${esc(when(u.at))} with ${esc(u.via)}${u.lastAt && u.lastAt !== u.at ? ` · last in ${esc(day(u.lastAt))}` : ''}</small></div>
+    ${isNew(u) ? '<span class="pill new">New</span>' : ''}</div>`).join('') : '<p class="empty">No sign-ups yet.</p>';
+  $('signup-more').hidden = s.recent.length <= signupShown;
+  try { localStorage.setItem(SEEN_KEY, String(Date.now())); } catch { /* private mode */ }
+  if (alerts) {
+    $('alert-push').checked = alerts.push; $('alert-email').checked = alerts.email;
+    $('alert-push-note').textContent = alerts.phone ? 'Your phone is set up for notifications.'
+      : 'Your phone is not set up yet: open the Feed The Bear app, sign in as this account and allow notifications.';
+    $('alert-email-note').textContent = alerts.emailReady ? 'Sent to your owner email.' : 'Email sending is not set up yet (Brevo), so these wait until it is.';
+  }
+}
+
+function renderVips (vips) {
+  const el = $('vip-list');
+  if (!vips.length) { el.innerHTML = '<p class="empty">No VIPs yet.</p>'; return; }
+  el.innerHTML = vips.map(v => `<div class="row"><div class="who"><b>${esc(v.email)}</b>
+    <small>${v.live ? (v.until ? `Until ${day(v.until)}` : 'For good') : `Ended ${day(v.endedAt)}`}${v.note ? ` · ${esc(v.note)}` : ''} · added ${day(v.at)}</small></div>
+    ${!v.live ? '<span class="pill off">Ended</span>' : v.pending ? '<span class="pill wait">Waiting for sign-in</span>' : '<span class="pill">Grizzly on</span>'}
+    ${v.live ? `<button type="button" class="btn ghost" data-revoke="${esc(v.email)}">End</button>` : ''}</div>`).join('');
+}
+function renderCreators (list) {
+  const el = $('creator-list');
+  const money = c => `$${(c / 100).toFixed(2)}`;
+  if (!list.length) { el.innerHTML = '<p class="empty">No creator earnings yet. They start when someone who joined from a creator link pays.</p>'; return; }
+  el.innerHTML = list.map(c => `<div class="row"><div class="who"><b>${esc(c.handle ? '@' + c.handle : c.email || c.uid)}</b>
+    <small>${esc(c.email)} · ${c.payments} payment${c.payments === 1 ? '' : 's'} · earned ${money(c.earnedCents)} · paid ${money(c.paidCents)}</small></div>
+    ${c.owedCents ? `<span class="pill wait">Owed ${money(c.owedCents)}</span><button type="button" class="btn ghost" data-paid="${esc(c.uid)}">Mark paid</button>` : '<span class="pill off">All paid</span>'}</div>`).join('');
+}
+function renderFeatured (list) {
+  const el = $('featured-list');
+  if (!list.length) { el.innerHTML = '<p class="empty">No restaurants yet. Share the advertise page with local spots.</p>'; return; }
+  const pill = s => s === 'live' ? '<span class="pill">Live</span>' : s === 'pending' ? '<span class="pill wait">Needs your OK</span>' : `<span class="pill off">${esc(s)}</span>`;
+  el.innerHTML = list.map(f => `<div class="row"><div class="who"><b>${esc(f.name)}</b>
+    <small>${esc(f.food)} in ${esc(f.city)} · ${esc(f.email)}${f.website ? ` · ${esc(f.website)}` : ''}</small>
+    ${f.blurb ? `<small>"${esc(f.blurb)}"</small>` : ''}</div>
+    ${pill(f.status)}
+    ${f.status !== 'live' && f.status !== 'ended' ? `<button type="button" class="btn ghost" data-feat="${esc(f.id)}" data-to="live">Approve</button>` : ''}
+    ${f.status === 'live' ? `<button type="button" class="btn ghost" data-feat="${esc(f.id)}" data-to="hidden">Hide</button>` : ''}
+    <a class="btn ghost" href="/eat/${esc(f.city)}/${esc(f.food)}" target="_blank" rel="noopener">View guide</a></div>`).join('');
+}
+function renderCodes (codes, error) {
+  const el = $('code-list');
+  if (error) { el.innerHTML = `<p class="empty">Codes didn't load: ${esc(error)}</p>`; return; }
+  if (!codes.length) { el.innerHTML = '<p class="empty">No codes yet.</p>'; return; }
+  const what = c => `${c.percent ? `${c.percent}% off` : 'Discount'} ${c.duration === 'once' ? 'the first payment' : c.duration === 'forever' ? 'every payment' : `for ${c.months} months`}`;
+  el.innerHTML = codes.map(c => `<div class="row"><div class="who"><b>${esc(c.code)}</b>
+    <small>${esc(what(c))} · used ${c.used}${c.maxUses ? ` of ${c.maxUses}` : ''}${c.expires ? ` · ends ${day(c.expires)}` : ''}</small>
+    <small>${esc(c.link)}</small></div>
+    ${c.active ? '<span class="pill">On</span>' : '<span class="pill off">Off</span>'}
+    <button type="button" class="btn ghost" data-copy="${esc(c.link)}">Copy link</button>
+    ${c.active ? `<button type="button" class="btn ghost" data-off="${esc(c.id)}">Switch off</button>` : ''}</div>`).join('');
+}
+async function load () {
+  try {
+    const data = await api('GET');
+    $('gate').hidden = true; $('portal').hidden = false;
+    $('who').textContent = `Signed in as ${data.me}`;
+    try { renderSignups(data.signups, data.alerts); } catch (err) { console.warn(err); }
+    renderVips(data.vips || []);
+    renderFeatured(data.featured || []);
+    renderCreators(data.creators || []);
+    Object.entries(data.partners || {}).forEach(([k, v]) => { const el = $(`p-${k}`); if (el && document.activeElement !== el) el.value = v; });
+    renderCodes(data.codes || [], data.codesError);
+  } catch (err) {
+    showGate(user?.email ? `${err.message} You're signed in as ${user.email}.` : err.message);
+    $('sign-in').hidden = false;
+    $('sign-out').hidden = !user;
+  }
+}
+
+$('vip-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  say('vip-msg', 'Saving…');
+  try {
+    const r = await api('POST', { action: 'grant', email: $('vip-email').value, months: Number($('vip-months').value), note: $('vip-note').value });
+    say('vip-msg', r.message); $('vip-email').value = ''; $('vip-note').value = ''; load();
+  } catch (err) { say('vip-msg', err.message, false); }
+});
+$('partner-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  say('partner-msg', 'Saving…');
+  const partners = Object.fromEntries(['opentable', 'resy', 'yelp', 'doordash', 'ubereats', 'grubhub', 'shop'].map(k => [k, $(`p-${k}`).value.trim()]));
+  try { say('partner-msg', (await api('POST', { action: 'partners', partners })).message); } catch (err) { say('partner-msg', err.message, false); }
+});
+$('code-duration').addEventListener('change', () => { $('code-months-wrap').hidden = $('code-duration').value !== 'repeating'; });
+$('code-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  say('code-msg', 'Creating…');
+  try {
+    const r = await api('POST', { action: 'code', code: $('code-code').value, percent: Number($('code-percent').value), duration: $('code-duration').value,
+      months: Number($('code-months').value), maxUses: Number($('code-max').value) || 0, expiresDays: Number($('code-days').value) || 0 });
+    say('code-msg', `${r.message} Link: ${r.link}`); $('code-code').value = ''; load();
+  } catch (err) { say('code-msg', err.message, false); }
+});
+$('signup-more').addEventListener('click', () => { signupShown += 30; renderSignups(); });
+['push', 'email'].forEach(k => $(`alert-${k}`).addEventListener('change', async e => {
+  say('alert-msg', 'Saving…');
+  try { await api('POST', { action: 'alerts', [k]: e.target.checked }); say('alert-msg', e.target.checked ? 'On.' : 'Off.'); }
+  catch (err) { e.target.checked = !e.target.checked; say('alert-msg', err.message, false); }
+}));
+
+document.addEventListener('click', async e => {
+  const revoke = e.target.closest('[data-revoke]');
+  const off = e.target.closest('[data-off]');
+  const copy = e.target.closest('[data-copy]');
+  const feat = e.target.closest('[data-feat]');
+  const paidBtn = e.target.closest('[data-paid]');
+  if (paidBtn) {
+    if (paidBtn.dataset.sure !== '1') { paidBtn.dataset.sure = '1'; paidBtn.textContent = 'Tap again once paid'; return; }
+    try { say('creator-msg', (await api('POST', { action: 'creatorPaid', uid: paidBtn.dataset.paid })).message); load(); } catch (err) { say('creator-msg', err.message, false); }
+    return;
+  }
+  if (feat) {
+    try { say('featured-msg', (await api('POST', { action: 'featured', id: feat.dataset.feat, status: feat.dataset.to })).message); load(); } catch (err) { say('featured-msg', err.message, false); }
+    return;
+  }
+  if (revoke) {
+    if (revoke.dataset.sure !== '1') { revoke.dataset.sure = '1'; revoke.textContent = 'Tap again to end'; return; }
+    try { say('vip-msg', (await api('POST', { action: 'revoke', email: revoke.dataset.revoke })).message); load(); } catch (err) { say('vip-msg', err.message, false); }
+  } else if (off) {
+    if (off.dataset.sure !== '1') { off.dataset.sure = '1'; off.textContent = 'Tap again'; return; }
+    try { say('code-msg', (await api('POST', { action: 'codeOff', id: off.dataset.off })).message); load(); } catch (err) { say('code-msg', err.message, false); }
+  } else if (copy) {
+    try { await navigator.clipboard.writeText(copy.dataset.copy); copy.textContent = 'Copied'; } catch { copy.textContent = copy.dataset.copy; }
+    setTimeout(() => { copy.textContent = 'Copy link'; }, 2000);
+  }
+});
+
+try {
+  firebase.initializeApp(FB_CONFIG);
+  const auth = firebase.auth();
+  const google = new firebase.auth.GoogleAuthProvider();
+  google.setCustomParameters({ prompt: 'select_account' });
+  // Signed in to the app in this browser already: no sign-in needed here.
+  // A pop-up that fails (Google's "Something went wrong", a blocked window)
+  // falls back to signing in on a full page.
+  auth.getRedirectResult().catch(e => showGate(e.message));
+  $('sign-in').addEventListener('click', () => {
+    auth.signInWithPopup(google).catch(e => {
+      if (e && e.code === 'auth/popup-closed-by-user') { showGate('Sign in with your owner account.'); return; }
+      showGate('Opening Google sign-in…');
+      auth.signInWithRedirect(google).catch(err => showGate(err.message));
+    });
+  });
+  $('sign-out').addEventListener('click', () => auth.signOut());
+  if (handoffUser) { user = handoffUser; $('sign-in').hidden = true; load(); }
+  auth.onAuthStateChanged(u => {
+    if (!u && handoffUser) return; // signed in through the app
+    user = u;
+    $('sign-in').hidden = !!u;
+    $('sign-out').hidden = true;
+    if (u) load(); else showGate('Sign in with your owner account.');
+  });
+} catch (err) {
+  showGate('Sign-in could not load. Check your connection and refresh.');
+}
+</script>
+</body>
+</html>

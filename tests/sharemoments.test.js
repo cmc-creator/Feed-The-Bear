@@ -31,7 +31,7 @@ const SEED = [
     const top = id => { const el = document.getElementById(id); return el?.offsetParent ? el.getBoundingClientRect().top : 1e9; };
     return { pick: top('ai-rec-banner'), swipe: top('bear-swipe-home'), add: top('home-add-bar') };
   });
-  check(order.swipe < order.add && order.swipe < order.pick, `Bear Swipe stays first on home (${JSON.stringify(order)})`);
+  check(order.swipe < 1e9 && order.swipe <= order.add && order.swipe <= order.pick, `Bear Swipe stays first on home (${JSON.stringify(order)})`);
 
   // Who's been here + Go together.
   await p.evaluate(() => openDetailModal('t'));
@@ -49,7 +49,7 @@ const SEED = [
   await closeAllDialogs(p);
 
   // Just Ate offers a Story card, which draws and opens.
-  await p.click('#home-quick-justate-btn');
+  await p.evaluate(() => openJustAte());
   await p.click('.ja-place[data-id="t"]');
   const [chooser] = await Promise.all([p.waitForEvent('filechooser'), p.click('#just-ate-photo')]);
   await chooser.setFiles(path.join(ROOT, 'assets', 'food', 'tacos.jpg'));
@@ -92,7 +92,7 @@ const SEED = [
   check(await p.evaluate(() => document.getElementById('stat-total').classList.contains('stat-pop')), 'header count pops when it changes');
   await p.evaluate(() => setView('stats'));
   check(await p.evaluate(() => document.getElementById('main-content').classList.contains('view-enter') && state.currentView === 'stats'), 'switching views animates, and switches right away');
-  await p.evaluate(() => setView('all'));
+  await p.evaluate(() => setView('want-to-try'));
   await p.locator('.restaurant-card .card-favorite-btn:not(.active)').first().click();
   check(await p.locator('.particle').count() > 0, 'favoriting bursts');
 

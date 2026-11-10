@@ -71,6 +71,8 @@ const spot = (id, name, extra) => ({ id, name, cuisine: 'Mexican', tags: [], vis
   const saved = await p.evaluate(() => { const r = state.restaurants.find(x => x.name === 'Bacanora'); return r && { s: r.status, my: r.myRating, g: r.googleRating, addr: r.address, cuisine: r.cuisine, links: (r.links || []).length, visit: r.visits[0]?.rating }; });
   check(saved && saved.s === 'visited' && saved.my === 4 && saved.visit === 4, `rated and on Been There (${JSON.stringify(saved)})`);
   check(saved && saved.g === 4.6 && saved.addr === '1301 Grand Ave, Phoenix' && saved.cuisine === 'Mexican' && saved.links === 1, 'with the real address, cuisine, Google rating and link');
+  await p.evaluate(() => document.querySelectorAll('.share-nudge, .photo-reveal, #save-diary-nudge').forEach(e => e.remove()));
+  await p.waitForFunction(() => /on your Been There list/.test(document.querySelector('#toast-container')?.innerText || ''), null, { timeout: 12000 }).catch(() => {});
   check(/on your Been There list/.test(await p.locator('#toast-container').innerText()), 'and it says where it went');
 
   // Empty lists explain themselves.

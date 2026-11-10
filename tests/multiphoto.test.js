@@ -13,14 +13,14 @@ const FOOD = n => path.join(ROOT, 'assets', 'food', n);
   await p.waitForTimeout(1500);
 
   // Just Ate: pick three photos in one go, remove one, add one more.
-  await p.click('#home-quick-justate-btn');
+  await p.evaluate(() => openJustAte());
   await p.click('.ja-place[data-id="r1"]');
   let [chooser] = await Promise.all([p.waitForEvent('filechooser'), p.click('#just-ate-photo')]);
   check(chooser.isMultiple(), 'the picker allows several files');
   await chooser.setFiles([FOOD('tacos.jpg'), FOOD('dumplings.jpg'), FOOD('gnocchi.jpg')]);
   await p.waitForFunction(() => document.querySelectorAll('#just-ate-photo-preview .pm-item').length === 3, null, { timeout: 5000 }).catch(() => {});
   check(await p.locator('#just-ate-photo-preview .pm-item').count() === 3, 'all three show in the preview');
-  check((await p.locator('#just-ate-photo-label').innerText()) === 'Add more (3/6)', 'the button counts them');
+  check((await p.locator('#just-ate-photo-label').innerText()) === 'Add more (3/11)', 'the button counts them');
   await p.click('#just-ate-photo-preview .pm-remove[data-idx="1"]');
   check(await p.locator('#just-ate-photo-preview .pm-item').count() === 2, 'one can be removed');
   [chooser] = await Promise.all([p.waitForEvent('filechooser'), p.click('#just-ate-photo')]);

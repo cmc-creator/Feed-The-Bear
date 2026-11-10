@@ -1,6 +1,6 @@
 // Home screen order and layout.
 const path = require('path');
-const { BASE, SHOTS, check, launch, newPage, finish, asGrizzly } = require('./lib');
+const { BASE, SHOTS, check, launch, newPage, closeAllDialogs, finish, asGrizzly } = require('./lib');
 asGrizzly(); // uses Grizzly-only features
 
 (async () => {
@@ -10,15 +10,29 @@ asGrizzly(); // uses Grizzly-only features
   await p.goto(`${BASE}/app.html`);
   await p.waitForTimeout(2000);
 
-  const order = await p.$$eval('#home-discovery > [id], #home-discovery > .nearby-home-header', els => els.map(e => e.id || 'nearby'));
-  const at = id => order.indexOf(id);
-  check(at('home-quick-actions') < at('nearby') && at('nearby') < at('crave-home') && at('crave-home') < at('for-you-home'), `act now, then near you, then your lists (${order.join(' > ')})`);
-  check(at('bear-swipe-home') === 0 && at('home-add-bar') === 1 && at('grizzly-home') > at('for-you-home'), 'Bear Swipe leads the home screen, then Add a place; the Grizzly card comes after the useful stuff');
-  check(order[order.length - 1] === 'today-status-row', 'the stats row sits at the bottom');
-
-  const qa = await p.$$eval('#home-quick-actions .home-quick-btn', bs => bs.filter(b => b.offsetHeight).map(b => b.getBoundingClientRect().top));
-  check(qa.length === 3 && new Set(qa.map(Math.round)).size === 1, 'three quick actions in one row on a phone');
-  check(await p.locator('#home-quick-actions').evaluate(e => e.offsetHeight) < 130, 'the quick actions stay compact');
+  // The lean home: Bear Swipe, Near You Now and Bear Challenges (owner's MVPs), nothing else piled on.
+  const shown = await p.$$eval('#home-discovery > [id], #home-discovery > .nearby-home-header', els => els.filter(e => e.offsetHeight > 0).map(e => e.id || 'nearby'));
+  const at = id => shown.indexOf(id);
+  check(at('bear-swipe-home') === 0 && at('nearby') > 0, `Bear Swipe leads, then Near You Now (${shown.join(' > ')})`);
+  check(['home-add-bar', 'home-quick-actions', 'ai-rec-banner', 'for-you-home', 'mood-picks-home', 'today-status-row', 'week-recap-home'].every(id => at(id) < 0), `the extras are off the home screen (${shown.join(' > ')})`);
+  check(await p.locator('#restaurant-grid').isHidden(), 'your saved cards live in Lists, not on home');
+  await p.fill('#search-input', 'mission').catch(() => {});
+  await p.waitForTimeout(400);
+  const searching = await p.evaluate(() => document.body.classList.contains('home-filtering'));
+  if (searching) check(await p.locator('#restaurant-grid').isVisible(), 'searching from home shows your matching spots');
+  await p.fill('#search-input', '').catch(() => {});
+  await closeAllDialogs(p);
+  for (const width of [320, 390]) {
+    await p.setViewportSize({ width, height: 740 });
+    await p.evaluate(() => { setView('all'); window.scrollTo(0, 0); });
+    check(await p.evaluate(() => {
+      const swipe = document.querySelector('#bear-swipe-home');
+      const nav = document.querySelector('#mobile-add-btn').getBoundingClientRect();
+      return swipe.offsetHeight > 0 && swipe.getBoundingClientRect().top < nav.top - 150;
+    }), `Bear Swipe is on the first ${width}px phone screen`);
+  }
+  await p.setViewportSize({ width: 390, height: 844 });
+  check(await p.evaluate(() => document.documentElement.scrollHeight) < 3200, `home is short (${await p.evaluate(() => document.documentElement.scrollHeight)}px)`);
   check(await p.locator('#location-banner').isHidden(), 'only one "enable location" ask shows');
   check(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no sideways scroll');
   check(p.errors.length === 0, `no page errors (${p.errors.slice(0, 2).join(' | ')})`);
@@ -27,22 +41,24 @@ asGrizzly(); // uses Grizzly-only features
   const cut = await p.evaluate(() => [wholeSentences('Head to The Mission tonight! Their mole is'), wholeSentences('Try the tacos at'), wholeSentences('Go to The Mission tonight!')]);
   check(cut[0] === 'Head to The Mission tonight!' && cut[1] === '' && cut[2] === 'Go to The Mission tonight!', `cut-off AI replies are trimmed to whole sentences (${JSON.stringify(cut)})`);
   await p.evaluate(() => {
+    document.body.classList.add('home-full');
     const b = document.getElementById('ai-rec-banner');
     b.classList.remove('hidden');
     document.getElementById('ai-rec-text').textContent = 'The Mission is calling your name tonight!';
   });
   await p.click('#ai-rec-text');
   check(await p.locator('#detail-overlay').isVisible(), "tapping Byte Cub's pick opens the place it names");
-  await p.evaluate(() => closeDetailModal?.());
+  await p.evaluate(() => { closeDetailModal?.(); document.body.classList.remove('home-full'); });
   await p.evaluate(() => {
     state.restaurants.push({ id: 'w1', name: 'Nobu', cuisine: 'Japanese', status: 'want-to-try', tags: [], visits: [] });
     state.settings.lastWeeklySuggest = 0;
     checkWeeklySuggestion();
   });
-  const pickText = await p.locator('.weekly-suggest-banner .wsb-text').innerText();
-  check(/^Try Nobu this week\. .+[.!]$/.test(pickText), `Pick of the Week is a full sentence ("${pickText}")`);
-  await p.click('.weekly-suggest-banner .wsb-text');
-  check(await p.locator('#detail-overlay').isVisible(), 'tapping anywhere on Pick of the Week opens it');
+  await p.waitForFunction(() => /Nobu/.test(document.getElementById('toast-container')?.innerText || ''), null, { timeout: 12000 }).catch(() => {});
+  const pickText = await p.locator('#toast-container .toast-msg').innerText().catch(() => '');
+  check(/^Try Nobu this week\. .+[.!]$/.test(pickText), `Byte Cub says the Pick of the Week as a full sentence ("${pickText}")`);
+  await p.click('#toast-container .cub-say-act');
+  check(await p.locator('#detail-overlay').isVisible(), 'See it opens the spot');
   await p.screenshot({ path: path.join(SHOTS, 'home.png') }).catch(() => {});
 
   // Desktop keeps the wider layout working.

@@ -4,6 +4,13 @@
 
 'use strict';
 
+/* ── Free (Cub) plan limits ──────────────────────────────────
+   Declared in the first app script so grizzly.js, friends.js and cub.js can
+   never run before they exist (timers can fire while the parser waits on the
+   external Firebase scripts, which used to make renderGrizzlyUi throw). */
+const FREE_RESTAURANT_LIMIT = 25;
+const FREE_FRIENDS = 1;
+
 /* ── Defensive AI stub - if ai.js failed to load (old SW cache,
    offline, etc.) replace window.AI with a no-op stub so the app
    still boots instead of throwing ReferenceError on first call. */
@@ -47,16 +54,17 @@ const _blobToBase64 = blob => new Promise((resolve, reject) => {
     // Share: text and links, or an image/file (the first one).
     if (!navigator.share || !sheet.shareFile) {
       Object.defineProperty(navigator, 'share', {
-        configurable: true,
+        configurable: true, writable: true,
         value: ({ title = '', text = '', url = '', files } = {}) => {
+          if (files?.length > 1) return Promise.reject(new DOMException('Share these files individually', 'NotAllowedError'));
           if (files?.length && sheet.shareFile) return shareFile(files[0], { title, text: [text, url].filter(Boolean).join(' ') });
           if (files?.length && !text && !url) return Promise.reject(new DOMException('Files not supported', 'NotAllowedError'));
           return sheet.share({ title: String(title), text: String(text), url: String(url) });
         },
       });
       Object.defineProperty(navigator, 'canShare', {
-        configurable: true,
-        value: (data = {}) => !data.files?.length || !!sheet.shareFile,
+        configurable: true, writable: true,
+        value: (data = {}) => !data.files?.length || (data.files.length === 1 && !!sheet.shareFile),
       });
     }
     if (!sheet.shareFile) return;
@@ -88,56 +96,64 @@ const _blobToBase64 = blob => new Promise((resolve, reject) => {
   } catch { /* leave the browser's own behaviour */ }
 })();
 
-/* ── Share menu when there's no share sheet ───────────────────
-   The Android app before 2.2.0 (and some desktop browsers) have no
-   navigator.share, so Share buttons did nothing. This menu sends the text
-   by Messages, WhatsApp or Email, or copies it. Those open as links, which
-   the app hands to the phone. */
-(function shareMenuFallback () {
-  if (navigator.share) return;
+/* Also used when a browser exposes Web Share but refuses to open it. */
+function shareWithMenu ({ title = '', text = '', url = '', files } = {}) {
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const go = url => { location.href = url; };
-  try {
-    Object.defineProperty(navigator, 'share', {
-      configurable: true,
-      value: ({ title = '', text = '', url = '', files } = {}) => new Promise((resolve, reject) => {
-        const body = [text, url].filter(Boolean).join(' ').trim();
-        if (!body) { reject(new DOMException(files?.length ? 'Files not supported' : 'Nothing to share', 'NotAllowedError')); return; }
-        document.getElementById('share-menu')?.remove();
-        const el = document.createElement('div');
-        el.id = 'share-menu';
-        el.className = 'modal-overlay share-menu';
-        el.setAttribute('role', 'dialog');
-        el.setAttribute('aria-modal', 'true');
-        el.setAttribute('aria-label', 'Share');
-        el.innerHTML = `<div class="share-menu-card">
-          <h3>${esc(title || 'Share')}</h3>
-          <button type="button" class="btn-primary" data-via="sms">💬 Text message</button>
-          <button type="button" class="btn-secondary" data-via="whatsapp">🟢 WhatsApp</button>
-          <button type="button" class="btn-secondary" data-via="email">✉️ Email</button>
-          <button type="button" class="btn-secondary" data-via="copy">📋 Copy</button>
-          <button type="button" class="share-menu-cancel">Cancel</button>
-        </div>`;
-        document.body.appendChild(el);
-        const close = ok => { el.remove(); ok ? resolve() : reject(new DOMException('Share canceled', 'AbortError')); };
-        el.addEventListener('click', async e => {
-          if (e.target === el || e.target.closest('.share-menu-cancel')) { close(false); return; }
-          const via = e.target.closest('[data-via]')?.dataset.via;
-          if (!via) return;
-          if (via === 'sms') go(`sms:?&body=${encodeURIComponent(body)}`);
-          if (via === 'whatsapp') go(`https://wa.me/?text=${encodeURIComponent(body)}`);
-          if (via === 'email') go(`mailto:?subject=${encodeURIComponent(title || 'Feed The Bear')}&body=${encodeURIComponent(body)}`);
-          if (via === 'copy') {
-            try { await navigator.clipboard.writeText(body); showToast('Copied', 'Paste it to a friend.', 'success'); }
-            catch { window.prompt('Copy this and send it to a friend:', body); }
-          }
-          close(true);
-        });
-        el.addEventListener('keydown', e => { if (e.key === 'Escape') close(false); });
-        el.querySelector('[data-via="sms"]').focus();
-      }),
+  return new Promise((resolve, reject) => {
+    const body = [text, url].filter(Boolean).join(' ').trim();
+    if (!body) { reject(new DOMException(files?.length ? 'Files not supported' : 'Nothing to share', 'NotAllowedError')); return; }
+    document.getElementById('share-menu')?.remove();
+    const el = document.createElement('div');
+    el.id = 'share-menu';
+    el.className = 'modal-overlay share-menu';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-label', 'Share');
+    el.innerHTML = `<div class="share-menu-card">
+      <h3>${esc(title || 'Share')}</h3>
+      <button type="button" class="btn-primary" data-via="sms">💬 Text message</button>
+      <button type="button" class="btn-secondary" data-via="whatsapp">🟢 WhatsApp</button>
+      <button type="button" class="btn-secondary" data-via="email">✉️ Email</button>
+      <button type="button" class="btn-secondary" data-via="copy">📋 Copy</button>
+      <div class="share-menu-manual hidden">
+        <p>Copying was blocked. Touch and hold the text below, then choose Copy and paste it to your friend.</p>
+        <textarea class="form-input share-menu-text" readonly aria-label="Text and link to share">${esc(body)}</textarea>
+        <button type="button" class="btn-secondary" data-via="done">I've copied it</button>
+      </div>
+      <button type="button" class="share-menu-cancel">Cancel</button>
+    </div>`;
+    document.body.appendChild(el);
+    const close = ok => { el.remove(); ok ? resolve() : reject(new DOMException('Share canceled', 'AbortError')); };
+    el.addEventListener('click', async e => {
+      if (e.target === el || e.target.closest('.share-menu-cancel')) { close(false); return; }
+      const via = e.target.closest('[data-via]')?.dataset.via;
+      if (!via) return;
+      if (via === 'sms') {
+        const apple = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        go(`sms:${apple ? '&' : '?'}body=${encodeURIComponent(body)}`);
+      }
+      if (via === 'whatsapp') go(`https://wa.me/?text=${encodeURIComponent(body)}`);
+      if (via === 'email') go(`mailto:?subject=${encodeURIComponent(title || 'Feed The Bear')}&body=${encodeURIComponent(body)}`);
+      if (via === 'copy') {
+        try { await navigator.clipboard.writeText(body); showToast('Copied', 'Paste it to a friend.', 'success'); }
+        catch (err) {
+          el.querySelector('.share-menu-manual').classList.remove('hidden');
+          const field = el.querySelector('.share-menu-text');
+          field.focus();
+          field.select();
+          return;
+        }
+      }
+      close(true);
     });
-  } catch { /* leave Share buttons as they were */ }
+    el.addEventListener('keydown', e => { if (e.key === 'Escape') close(false); });
+    el.querySelector('[data-via="sms"]').focus();
+  });
+}
+(function shareMenuFallback () {
+  if (navigator.share) return;
+  Object.defineProperty(navigator, 'share', { configurable: true, writable: true, value: shareWithMenu });
 })();
 
 /* ── Constants ───────────────────────────────────────────── */
@@ -163,7 +179,7 @@ const CUISINE_EMOJI = {
   chinese: '🥡', desserts: '🍰', dessert: '🍰', bakery: '🥐', french: '🥐', greek: '🥙', indian: '🍛', italian: '🍝',
   japanese: '🍱', korean: '🍲', mediterranean: '🫒', mexican: '🌮', pizza: '🍕', seafood: '🦞', steakhouse: '🥩',
   steak: '🥩', sushi: '🍣', thai: '🍜', vegan: '🥗', vegetarian: '🥗', vietnamese: '🍜', ramen: '🍜', irish: '☘️',
-  pub: '🍺', bar: '🍺', sandwiches: '🥪', deli: '🥪', chicken: '🍗', wings: '🍗', 'fast food': '🍟', southern: '🍗',
+  pub: '🍺', bar: '🍺', sandwiches: '🥪', sandwich: '🥪', deli: '🥪', brewery: '🍺', 'tex mex': '🌮', noodle: '🍜', donut: '🍩', burger: '🍔', chicken: '🍗', wings: '🍗', 'fast food': '🍟', southern: '🍗',
   'middle eastern': '🧆', spanish: '🥘', german: '🥨', caribbean: '🍹', ethiopian: '🍲', peruvian: '🐟', 'ice cream': '🍦',
   'dim sum': '🥟', pasta: '🍝', 'pub/bar': '🍺', 'salad/healthy': '🥗', 'bakery/cafe': '🥐', 'korean bbq': '🥩',
   donuts: '🍩', healthy: '🥗', salad: '🥗', soul_food: '🍗', 'soul food': '🍗', turkish: '🥙', filipino: '🍢', hawaiian: '🍍',
@@ -661,6 +677,14 @@ const BEAR_REACTION_COPY = {
    STORAGE
    ════════════════════════════════════════════════════════════ */
 function loadData () {
+  const owner = localStorage.getItem('ftb_data_owner_v1') || localStorage.getItem('ftb_uid_v1');
+  const legacy = !owner && !!localStorage.getItem('ftb_last_account_v1') && window._ftbDataOwner === undefined;
+  if (window._ftbAccountSwitching || legacy || (owner && owner !== window._ftbUid)) {
+    state.restaurants = [];
+    state.settings = deviceAppearance();
+    return;
+  }
+  window._ftbDataOwner = owner || '';
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : seedData();
@@ -691,10 +715,12 @@ function loadData () {
     }
     if ('visitLog' in r) { delete r.visitLog; _vlMigrated = true; }
   });
+  if (tidyCuisines()) _vlMigrated = true;
   if (_vlMigrated) saveData();
   if (mergeLegacyDishStores()) saveData();
   // Restore photos kept in IndexedDB, then move any still stored inline there.
-  hydrateStoredPhotos().then(() => { if (_photoDbReady && localStorage.getItem(STORAGE_KEY)?.includes('"data:image/')) saveData(); });
+  const generation = _dataGeneration;
+  hydrateStoredPhotos().then(() => { if (generation === _dataGeneration && _photoDbReady && localStorage.getItem(STORAGE_KEY)?.includes('"data:image/')) saveData(); });
 
   try {
     const s = localStorage.getItem(SETTINGS_KEY);
@@ -814,13 +840,29 @@ function getFoodVideo (ref) {
     .catch(() => null);
 }
 
-// Most photos and clips one meal or dish keeps. Each photo is ~80 KB and
-// synced docs cap near 1 MB, so this leaves room for the rest of the spot.
-const FOOD_MEDIA_MAX = 6;
+const FOOD_MEDIA_MAX = 11;
+const FOOD_PHOTO_MAX = 10;
+
+function mergeFoodMedia (existing, added, { notify = true } = {}) {
+  const out = [];
+  let photos = 0, videos = 0, omitted = 0;
+  for (const item of [...existing, ...added]) {
+    if (!item?.photo) continue;
+    if (item.video ? videos >= 1 : photos >= FOOD_PHOTO_MAX) { omitted++; continue; }
+    if (item.video) videos++; else photos++;
+    out.push(item);
+  }
+  if (omitted && notify) showToast('10 photos and one video per moment', 'Some media was not added. Remove an item to make room.', 'info');
+  return out;
+}
 
 // One picked file to { photo } or { photo: poster, video }, or null.
 // Videos are Grizzly; `quiet` skips the upsell (already shown this batch).
 async function mediaFromFile (file, { quiet = false } = {}) {
+  if (!/^(image|video)\//.test(file.type)) {
+    showToast('Unsupported file', 'Choose a photo or a video file.', 'error');
+    return null;
+  }
   if (!file.type.startsWith('video/')) {
     try { return { photo: await readImageFileCompressed(file, FOOD_PHOTO_MAX_DIM, FOOD_PHOTO_QUALITY) }; }
     catch { showToast('Photo Error', `Could not load ${file.name || 'that image'}.`, 'error'); return null; }
@@ -832,13 +874,18 @@ async function mediaFromFile (file, { quiet = false } = {}) {
   if (file.size > FOOD_VIDEO_MAX_BYTES) { showToast('Video too big', 'Try a shorter clip (up to 15 seconds).', 'error'); return null; }
   try {
     const { duration, poster } = await readVideoPoster(file);
+    if (!Number.isFinite(duration) || duration <= 0) {
+      showToast('Could not read video length', 'Choose a clip with a readable duration, up to 15 seconds.', 'error');
+      return null;
+    }
     if (duration > FOOD_VIDEO_MAX_SECONDS + 0.5) {
       showToast('Keep it to 15 seconds', `That clip is ${Math.round(duration)}s. Trim it in your camera app, then add it again.`, 'info');
       return null;
     }
+    if (!poster) throw new Error('No video poster');
     const video = await storeFoodVideo(file);
     trackProductEvent('video_added', { seconds: Math.round(duration) });
-    return { photo: poster || 'assets/food/pizza.jpg', video };
+    return { photo: poster, video };
   } catch {
     showToast('Video Error', 'Could not read that video. Try one from your camera.', 'error');
     return null;
@@ -847,32 +894,110 @@ async function mediaFromFile (file, { quiet = false } = {}) {
 
 // Photo and video picker, several at a time. Resolves an array (empty if
 // nothing usable was picked), at most `max` items.
-function pickFoodMediaList (max = FOOD_MEDIA_MAX) {
+let _foodMediaJobs = 0;
+let _mediaContext = 0;
+function foodMediaBusy () { return _foodMediaJobs > 0; }
+function invalidateFoodMedia () {
+  _mediaContext++;
+  document.querySelector('.share-nudge')?.remove();
+}
+
+function refreshMediaBusy () {
+  const busy = foodMediaBusy();
+  document.querySelectorAll('#modal-save-btn, #just-ate-save, .your-order-verdicts button').forEach(btn => {
+    btn.disabled = busy;
+    btn.setAttribute('aria-busy', String(busy));
+  });
+  syncJustAteSave();
+  window.Cub?.syncSave();
+  document.querySelectorAll('.food-capture-actions').forEach(el => {
+    el.querySelectorAll('button').forEach(btn => { btn.disabled = busy; });
+    el.querySelector('.food-media-status').textContent = busy ? 'Adding media... Please wait before saving.' : '';
+  });
+}
+
+function addFoodCaptureActions (anchor, onPick, { video = true } = {}) {
+  const el = document.createElement('div');
+  el.className = 'food-capture-actions';
+  el.innerHTML = `<div class="food-capture-buttons">
+    <button type="button" class="btn-sm food-capture-btn" data-source="photo"><span aria-hidden="true">📷</span> Take photo</button>
+    ${video ? '<button type="button" class="btn-sm food-capture-btn" data-source="video"><span aria-hidden="true">🎥</span> Record video</button>' : ''}
+    <button type="button" class="btn-sm food-capture-btn" data-source="library"><span aria-hidden="true">🖼️</span> Choose photos or video</button>
+    </div>${video ? '<small class="food-video-limits">Video: Grizzly, up to 15 seconds. Clips stay on this device.</small>' : ''}<span class="food-media-status" role="status"></span>`;
+  anchor.insertAdjacentElement('afterend', el);
+  el.addEventListener('click', e => {
+    const button = e.target.closest('button[data-source]');
+    if (button) onPick(button.dataset.source);
+  });
+  return el;
+}
+
+function pickFoodFiles ({ max = FOOD_MEDIA_MAX, source = 'library', accept = 'image/*,video/*' } = {}) {
   return new Promise(resolve => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*,video/*';
-    input.multiple = max > 1;
-    input.onchange = async () => {
-      const files = [...(input.files || [])];
+    input.accept = source === 'photo' ? 'image/*' : source === 'video' ? 'video/*' : accept;
+    input.multiple = source === 'library' && max > 1;
+    if (source !== 'library') input.setAttribute('capture', 'environment');
+    input.hidden = true;
+    document.body.appendChild(input);
+    let settled = false;
+    let focusTimer;
+    const finish = files => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(focusTimer);
+      window.removeEventListener('focus', onFocus);
+      input.remove();
+      resolve(files);
+    };
+    const onFocus = () => {
+      if (!('oncancel' in input)) focusTimer = setTimeout(() => { if (!input.files?.length) finish([]); }, 1000);
+    };
+    input.onchange = () => finish([...(input.files || [])]);
+    input.addEventListener('cancel', () => finish([]), { once: true });
+    window.addEventListener('focus', onFocus);
+    try { input.click(); }
+    catch (err) {
+      console.error('[FTB] Media picker failed:', err);
+      showToast('Could not open media picker', 'Allow camera access in device settings, or tap Choose photos or video.', 'error');
+      finish([]);
+    }
+  });
+}
+
+async function pickFoodMediaList (max = FOOD_MEDIA_MAX, source = 'library') {
+  if (max <= 0) { showToast('Your media collection is full', 'Remove an item to add another.', 'info'); return []; }
+  if (source === 'video' && !hasGrizzly()) { showGrizzlyUpsell('video'); return []; }
+  if (foodMediaBusy()) return [];
+  const context = _mediaContext;
+  const generation = _dataGeneration;
+  _foodMediaJobs++;
+  refreshMediaBusy();
+  try {
+      const files = await pickFoodFiles({ max, source });
+      if (context !== _mediaContext || generation !== _dataGeneration) return [];
       if (files.length > max) showToast(`Up to ${max} at a time`, `Added the first ${max}.`, 'info');
       const out = [];
       let upsold = false;
       for (const file of files.slice(0, max)) {
         const isVideo = file.type.startsWith('video/');
         const m = await mediaFromFile(file, { quiet: upsold });
+        if (context !== _mediaContext || generation !== _dataGeneration) return [];
         if (isVideo && !m && !hasGrizzly()) upsold = true;
         if (m) out.push(m);
       }
-      resolve(out);
-    };
-    input.click();
-  });
+      if (!files.length && source !== 'library') showToast('No media added', 'If camera access is blocked, allow it in device settings or tap Choose photos or video.', 'info');
+      return mergeFoodMedia([], out);
+  } finally {
+    _foodMediaJobs--;
+    refreshMediaBusy();
+  }
 }
 
 // Single-item picker kept for callers that hold one photo.
-async function pickFoodMedia () {
-  return (await pickFoodMediaList(1))[0] || null;
+async function pickFoodMedia (source = 'library') {
+  return (await pickFoodMediaList(1, source))[0] || null;
 }
 
 // Every photo/clip on a dish or visit: the main one (photo/video) first,
@@ -885,7 +1010,7 @@ function mediaOf (obj) {
 }
 
 function setMediaOn (obj, list) {
-  const items = (list || []).filter(m => m && m.photo).slice(0, FOOD_MEDIA_MAX);
+  const items = mergeFoodMedia([], list || []);
   if (items[0]) obj.photo = items[0].photo; else delete obj.photo;
   if (items[0]?.video) obj.video = items[0].video; else delete obj.video;
   if (items.length > 1) obj.media = items.slice(1).map(m => ({ photo: m.photo, ...(m.video ? { video: m.video } : {}) }));
@@ -941,14 +1066,18 @@ function openPhotoDb () {
   if (_photoDb) return _photoDb;
   _photoDb = new Promise(resolve => {
     try {
-      // v2 adds the videos store; v1 databases keep their photos.
-      const req = indexedDB.open(PHOTO_DB, 2);
+      const req = indexedDB.open(PHOTO_DB, 3);
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains(PHOTO_STORE)) db.createObjectStore(PHOTO_STORE);
         if (!db.objectStoreNames.contains(VIDEO_STORE)) db.createObjectStore(VIDEO_STORE);
+        if (!db.objectStoreNames.contains('accounts')) db.createObjectStore('accounts');
       };
-      req.onsuccess = () => { _photoDbReady = true; resolve(req.result); };
+      req.onsuccess = () => {
+        req.result.onversionchange = () => { req.result.close(); _photoDb = null; };
+        _photoDbReady = true;
+        resolve(req.result);
+      };
       req.onerror = () => resolve(null);
       req.onblocked = () => resolve(null);
     } catch { resolve(null); }
@@ -982,9 +1111,9 @@ function photoRefFor (dataUrl) {
 }
 
 // The saved copy of the list, plus any photos that still need writing.
-function serializeRestaurants (offload) {
+function serializeRestaurants (offload, restaurants = state.restaurants) {
   const pending = new Map();
-  const json = JSON.stringify(state.restaurants, (key, value) => {
+  const json = JSON.stringify(restaurants, (key, value) => {
     if (offload && key === 'photo' && typeof value === 'string' && value.startsWith('data:image/')) {
       const ref = photoRefFor(value);
       if (!_storedPhotoRefs.has(ref)) pending.set(ref, value);
@@ -1004,8 +1133,9 @@ function writeRestaurantsToLocalStorage (json) {
   }
 }
 
-async function persistRestaurants () {
+async function persistRestaurants (generation = _dataGeneration) {
   const db = await openPhotoDb();
+  if (generation !== _dataGeneration || window._ftbAccountSwitching) return;
   // Until stored photos are back in memory, the list still holds references;
   // saving them as-is is fine, but new data URLs must be offloaded too.
   const { json, pending } = serializeRestaurants(!!db);
@@ -1015,16 +1145,18 @@ async function persistRestaurants () {
       pending.forEach((_, k) => _storedPhotoRefs.add(k));
     } catch (err) {
       console.warn('[FTB] photo store write failed, keeping photos inline:', err);
-      writeRestaurantsToLocalStorage(serializeRestaurants(false).json);
+      if (generation === _dataGeneration && !window._ftbAccountSwitching) writeRestaurantsToLocalStorage(serializeRestaurants(false).json);
       return;
     }
   }
-  writeRestaurantsToLocalStorage(json);
+  if (generation === _dataGeneration && !window._ftbAccountSwitching) writeRestaurantsToLocalStorage(json);
 }
 
 // Put stored photos back into the in-memory restaurants.
 async function hydrateStoredPhotos () {
+  const generation = _dataGeneration;
   const db = await openPhotoDb(); // also lets later saves offload photos
+  if (generation !== _dataGeneration) return;
   const holders = [];
   const visit = obj => {
     if (obj && typeof obj.photo === 'string' && obj.photo.startsWith(PHOTO_REF)) holders.push(obj);
@@ -1047,6 +1179,7 @@ async function hydrateStoredPhotos () {
   } catch (err) {
     console.warn('[FTB] photo store read failed:', err);
   }
+  if (generation !== _dataGeneration) return;
   holders.forEach(h => {
     const data = found.get(h.photo);
     if (data) {
@@ -1063,8 +1196,163 @@ function photosReadyForSync () { return _photosHydrated; }
 
 let _photoDbReady = false;
 let _queuedSaves = 0;
+let _dataGeneration = 0;
+
+const ACCOUNT_LOCAL_KEYS = [
+  STORAGE_KEY, SETTINGS_KEY, USER_KEY, 'ftb_deleted_v1', 'ftb_dishes_v1', 'ftb_menu_notes_v1',
+  'ftb_dishes_merged_v1', 'ftb_friends_v1', 'ftb_friends_at_v1', 'ftb_friends_uid_v1',
+  'ftb_invites_sent_v1', 'ftb_invite_code_v1', 'ftb_follow_noted_v1', 'ftb_followed_back_v1',
+  'ftb_cub_chats_v1', 'ftb_cub_ask_skip_v1', 'ftb_waiting_spot_v1', SWIPE_PREFS_KEY,
+  'ftb_bear_swipe_v2', DAILY_QUEST_KEY, 'ftb_challenges_v1', 'ftb_reminders', 'ftb_travel_v1',
+  'ftb_crave_alerts_v1', 'ftb_near_alerts_v1', 'ftb_dinner_votes_v1', 'ftb_area_sent_v1',
+  'ftb_collab_id_v1',
+];
+const APPEARANCE_KEYS = ['theme', 'themeChoice', 'themeManual', 'uiDensity', 'uiCorners', 'uiMotion',
+  'onboardingDone', 'profileSetupDone', 'locationBannerDismissed', 'locationEnabled'];
+// Belong to the phone, not the account: switching accounts never asks for location again.
+const DEVICE_SETTING_KEYS = ['locationEnabled', 'locationBannerDismissed'];
+
+function deviceAppearance () {
+  let settings;
+  try { settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); }
+  catch (err) {
+    console.warn('[FTB] Saved appearance could not be read:', err);
+    showToast('Settings need attention', 'Saved appearance settings could not be read. Your diary has not been deleted.', 'error');
+    return {};
+  }
+  if (!settings || typeof settings !== 'object') return {};
+  return Object.fromEntries(APPEARANCE_KEYS.filter(k => k in settings).map(k => [k, settings[k]]));
+}
+
+function captureAccountData () {
+  flushDetailNotes();
+  const owner = localStorage.getItem('ftb_data_owner_v1') || localStorage.getItem('ftb_uid_v1') || '';
+  const legacy = !owner && !!localStorage.getItem('ftb_last_account_v1') && window._ftbDataOwner === undefined;
+  const snapshotOwner = owner || (legacy ? `legacy:${localStorage.getItem('ftb_last_account_v1').trim().toLowerCase()}` : '');
+  const snapshot = Object.fromEntries(ACCOUNT_LOCAL_KEYS.map(k => [k, localStorage.getItem(k)]));
+  const diskSnapshot = { ...snapshot };
+  if (window._ftbDataOwner === owner) {
+    snapshot[STORAGE_KEY] = serializeRestaurants(false).json;
+    snapshot[SETTINGS_KEY] = JSON.stringify(state.settings);
+  }
+  const appearance = deviceAppearance();
+  return { owner, snapshotOwner, snapshot, diskSnapshot, appearance };
+}
+
+function clearAccountUI (appearance) {
+  _dataGeneration++;
+  Object.keys(sessionStorage).filter(k => k.startsWith('ftb_airec_') || k === 'ftb_owner_handoff')
+    .forEach(k => sessionStorage.removeItem(k));
+  window._ftbAccountSwitching = true;
+  window._ftbDataOwner = null;
+  state.restaurants = [];
+  state.settings = appearance;
+  state.detailId = state.editingId = null;
+  state.dinnerRooms = {};
+  state.activeDinnerRoomCode = '';
+  state.swipeDeck = []; state.swipeLikes = [];
+  state.selectedIds.clear();
+  state.bulkMode = false;
+  state.filter = { search: '', cuisine: '', price: '', sort: 'date-desc', tag: '', collection: '' };
+  window.resetFriendsSession?.();
+  setYourOrderPending([]);
+  CubChats.resetSession();
+  closeChat();
+  _aiHistory.length = 0;
+  document.getElementById('ai-chat-history')?.replaceChildren();
+  setFormMedia([]);
+  closeJustAte();
+  window.Cub?.resetSession();
+  window.StoryCard?.close();
+  document.querySelector('#video-viewer .video-viewer-close')?.click();
+  document.querySelectorAll('[role="dialog"]:not(#auth-overlay), .share-nudge, .photo-reveal, #save-diary-nudge')
+    .forEach(el => el.classList.add('hidden'));
+  updateProfileVisuals({ name: 'Foodie', avatar: DEFAULT_AVATAR });
+  renderAll();
+  NativeAlerts?.clear();
+}
+
+async function switchAccountData (uid, isCurrent, captured = captureAccountData(), email = '') {
+  const { owner, snapshotOwner, snapshot, diskSnapshot, appearance } = captured;
+
+  if (snapshotOwner) {
+    const stored = await photoDbOp('readwrite', store => store.put(snapshot, snapshotOwner), 'accounts');
+    if (!stored) throw new Error('Device storage is unavailable. Your saved diary was kept; reload to try again.');
+  }
+  if (!isCurrent()) return;
+  let restored = uid && uid === owner ? snapshot : null;
+  if (uid && uid !== owner) {
+    let request;
+    await photoDbOp('readonly', store => { request = store.get(uid); return request; }, 'accounts');
+    restored = request?.result || null;
+  }
+  if (uid && !restored && email) {
+    const legacyKey = `legacy:${email.trim().toLowerCase()}`;
+    let request;
+    await photoDbOp('readonly', store => { request = store.get(legacyKey); return request; }, 'accounts');
+    restored = request?.result || null;
+    if (restored && isCurrent()) {
+      const saved = await photoDbOp('readwrite', store => { store.put(restored, uid); return store.delete(legacyKey); }, 'accounts');
+      if (!saved) throw new Error('Could not migrate your saved diary. Reload to try again.');
+    }
+  }
+  if (!isCurrent()) return;
+  // Only a never-signed-in guest diary may be adopted by a new account.
+  if (uid && !snapshotOwner && !restored && !localStorage.getItem('ftb_last_account_v1')) restored = snapshot;
+  if (restored?.[STORAGE_KEY] && await openPhotoDb()) {
+    const { json, pending } = serializeRestaurants(true, JSON.parse(restored[STORAGE_KEY]));
+    if (pending.size) {
+      await photoDbOp('readwrite', store => pending.forEach((value, ref) => store.put(value, ref)));
+      pending.forEach((_, ref) => _storedPhotoRefs.add(ref));
+    }
+    restored = { ...restored, [STORAGE_KEY]: json };
+  }
+  if (!isCurrent()) return;
+  const diskOwner = localStorage.getItem('ftb_data_owner_v1');
+  try {
+    ACCOUNT_LOCAL_KEYS.forEach(k => localStorage.removeItem(k));
+    if (restored) Object.entries(restored).forEach(([k, value]) => { if (ACCOUNT_LOCAL_KEYS.includes(k) && value !== null) localStorage.setItem(k, value); });
+    if (!restored) localStorage.setItem(SETTINGS_KEY, JSON.stringify(appearance));
+    else {
+      let s = {};
+      try { s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') || {}; } catch { s = {}; }
+      DEVICE_SETTING_KEYS.forEach(k => { if (k in appearance) s[k] = appearance[k]; });
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    }
+    localStorage.setItem('ftb_data_owner_v1', uid || '');
+  } catch (err) {
+    ACCOUNT_LOCAL_KEYS.forEach(k => localStorage.removeItem(k));
+    Object.entries(diskSnapshot).forEach(([k, value]) => { if (value !== null) localStorage.setItem(k, value); });
+    if (diskOwner === null) localStorage.removeItem('ftb_data_owner_v1');
+    else localStorage.setItem('ftb_data_owner_v1', diskOwner);
+    throw err;
+  }
+  window._ftbUid = uid || null;
+  window._ftbDataOwner = uid || '';
+  window._ftbAccountSwitching = false;
+  window.resetFriendsSession?.();
+  loadData();
+  updateProfileVisuals(loadUserProfile() || { name: 'Foodie', avatar: DEFAULT_AVATAR });
+  renderAll();
+}
+
+// Map tags saved from Discover ("steak_house", "mexican;pizza", "regional") read like a person wrote them.
+function tidyCuisine (raw) {
+  const s = String(raw ?? '').trim();
+  if (!/[_;]/.test(s) && !/^[a-z]/.test(s) && !/^(regional|yes|restaurant)$/i.test(s)) return s;
+  const first = s.split(';')[0].replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  if (['regional', 'yes', 'restaurant', 'food'].includes(first)) return '';
+  return ({ 'steak house': 'steakhouse', 'coffee shop': 'coffee' }[first] || first).replace(/\b\w/g, c => c.toUpperCase());
+}
+function tidyCuisines () {
+  let changed = false;
+  (state.restaurants || []).forEach(r => { if (r && r.cuisine) { const c = tidyCuisine(r.cuisine); if (c !== r.cuisine) { r.cuisine = c; changed = true; } } });
+  return changed;
+}
 
 function saveData () {
+  if (window._ftbAccountSwitching) return;
+  tidyCuisines();
   // Most saves have no new photo: write now, as before. A save with a new
   // photo, or any save while one is queued, goes through the chain in order
   // (each run re-reads the latest state).
@@ -1073,10 +1361,13 @@ function saveData () {
     writeRestaurantsToLocalStorage(json);
   } else {
     _queuedSaves++;
-    _saveChain = _saveChain.then(persistRestaurants, persistRestaurants).finally(() => { _queuedSaves--; });
+    const generation = _dataGeneration;
+    const persist = () => persistRestaurants(generation);
+    _saveChain = _saveChain.then(persist, persist).finally(() => { _queuedSaves--; });
   }
   updateTagSuggestions();
   NativeAlerts?.schedule();
+  window.ftbAfterSave?.();
   setTimeout(checkAchievements, 0);
   setTimeout(renderWeeklyGoal, 0);
   setTimeout(maybeAskToSaveDiary, 1800);
@@ -1157,20 +1448,9 @@ const FOOD_PHOTO_QUALITY = 0.7;
 // Opens the camera/library picker and resolves with a compressed data URL,
 // or '' if nothing was picked. No `capture` attribute, so phones offer both
 // "Take Photo" and "Photo Library".
-function pickFoodPhoto () {
-  return new Promise(resolve => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = () => {
-      const file = input.files?.[0];
-      if (!file) { resolve(''); return; }
-      readImageFileCompressed(file, FOOD_PHOTO_MAX_DIM, FOOD_PHOTO_QUALITY)
-        .then(resolve)
-        .catch(() => { showToast('Photo Error', 'Could not load that image.', 'error'); resolve(''); });
-    };
-    input.click();
-  });
+async function pickFoodPhoto (source = 'library') {
+  const media = await pickFoodMedia(source);
+  return media?.photo || '';
 }
 
 function readImageFileCompressed (file, maxDim = 1280, quality = 0.8) {
@@ -1520,12 +1800,16 @@ const BEAR_AVATARS = {
   'panda':       { fur: '#f4f1ec', ear: '#2b2b2b', muzzle: '#ffffff', bg: '#6aa26b', acc: 'panda' },
   'polar':       { fur: '#f3eee6', ear: '#d9cfc1', muzzle: '#ffffff', bg: '#4a90b8', acc: 'scarf' },
 };
-const AVATAR_OPTIONS = Object.keys(BEAR_AVATARS);
+// Photo bears eating, in the logo's style (assets/avatars, made with Gemini).
+const PHOTO_AVATARS = ['tacos', 'pizza', 'burger', 'sushi', 'ramen', 'bbq', 'donut', 'icecream', 'pancakes', 'hotdog', 'wings', 'honey', 'popcorn', 'croissant', 'salmon', 'birthday'];
+const photoAvatarSrc = id => `assets/avatars/bear-${String(id).slice(4)}.jpg`;
+const AVATAR_OPTIONS = [...PHOTO_AVATARS.map(f => `pic-${f}`), ...Object.keys(BEAR_AVATARS)];
 const DEFAULT_AVATAR = 'bear-chef';
 const LEGACY_AVATARS = { FTB: 'bear-chef', VIP: 'bear-crown', DINE: 'bear-pizza', CHEF: 'bear-chef', TABLE: 'bear-taco', CITY: 'bear-shades', DATE: 'bear-bow', GOLD: 'bear-crown', CLUB: 'bear-party', FINE: 'bear-donut', PLUS: 'bear-beanie', NYX: 'bear-phones' };
 
 function normalizeAvatar (id) {
   if (BEAR_AVATARS[id]) return id;
+  if (typeof id === 'string' && id.startsWith('pic-') && PHOTO_AVATARS.includes(id.slice(4))) return id;
   return LEGACY_AVATARS[id] || DEFAULT_AVATAR;
 }
 
@@ -1548,7 +1832,9 @@ function bearAccessory (a) {
 }
 
 function avatarSvg (id) {
-  const a = BEAR_AVATARS[normalizeAvatar(id)];
+  const key = normalizeAvatar(id);
+  if (key.startsWith('pic-')) return `<img class="bear-avatar bear-avatar-pic" src="${photoAvatarSrc(key)}" alt="Bear avatar" loading="lazy" decoding="async" />`;
+  const a = BEAR_AVATARS[key];
   const dark = '#2a1d16';
   const panda = a.acc === 'panda';
   const earOuter = panda ? a.ear : a.fur;
@@ -1587,6 +1873,9 @@ const UI_CORNERS = new Set(['rounded', 'sharp']);
 const UI_MOTION = new Set(['playful', 'reduced']);
 
 function loadUserProfile () {
+  if (window._ftbAccountSwitching) return null;
+  const owner = localStorage.getItem('ftb_data_owner_v1') || localStorage.getItem('ftb_uid_v1');
+  if (owner && owner !== window._ftbUid) return null;
   try {
     const profile = JSON.parse(localStorage.getItem(USER_KEY)) || null;
     if (!profile) return null;
@@ -1596,10 +1885,12 @@ function loadUserProfile () {
     return null;
   }
 }
-function saveUserProfile (profile) {
-  localStorage.setItem(USER_KEY, JSON.stringify(profile));
-  if (window._ftbUid && typeof fbSaveProfileCloud === 'function') {
-    fbSaveProfileCloud(window._ftbUid, profile);
+function saveUserProfile (profile, { fromCloud = false } = {}) {
+  if (window._ftbAccountSwitching) return;
+  const saved = fromCloud ? profile : { ...profile, updatedAt: Date.now() };
+  localStorage.setItem(USER_KEY, JSON.stringify(saved));
+  if (!fromCloud && window._ftbUid && typeof fbSaveProfileCloud === 'function') {
+    fbSaveProfileCloud(window._ftbUid, saved);
   }
 }
 
@@ -1608,11 +1899,12 @@ function persistAppearanceProfile () {
   const appearance = {
     themeChoice: state.settings.themeChoice || 'dark',
     themeMode: state.settings.theme || 'dark',
+    themeManual: state.settings.themeManual === true,
     uiDensity: UI_DENSITY.has(state.settings.uiDensity) ? state.settings.uiDensity : 'cozy',
     uiCorners: UI_CORNERS.has(state.settings.uiCorners) ? state.settings.uiCorners : 'rounded',
     uiMotion: UI_MOTION.has(state.settings.uiMotion) ? state.settings.uiMotion : 'playful',
   };
-  saveUserProfile({ ...base, appearance });
+  saveUserProfile({ ...base, visualUpdatedAt: base.visualUpdatedAt ?? base.updatedAt ?? 0, appearance });
 }
 
 function initUserProfile () {
@@ -1672,13 +1964,21 @@ function updateProfileVisuals (profile = null) {
 }
 
 function applyThemeChoice (choice = 'dark', opts = {}) {
+  if (choice === 'auto') {
+    state.settings.themeManual = false;
+    state.settings.themeChoice = 'auto';
+    applyAutoThemeByClock({ persist: opts.persist !== false });
+    scheduleNextAutoThemeTick();
+    if (opts.persist !== false) persistAppearanceProfile();
+    return;
+  }
   const markManual = opts.manual !== false;
   const shouldPersist = opts.persist !== false;
   const preset = THEME_PRESETS[choice] || THEME_PRESETS.dark;
   document.body.classList.toggle('light-mode', preset.mode === 'light');
   document.body.dataset.themeAccent = preset.accent;
   state.settings.theme = preset.mode;
-  state.settings.themeChoice = choice;
+  state.settings.themeChoice = THEME_PRESETS[choice] ? choice : 'dark';
   if (markManual) state.settings.themeManual = true;
   if (shouldPersist) {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
@@ -1688,10 +1988,19 @@ function applyThemeChoice (choice = 'dark', opts = {}) {
 }
 
 function syncThemeMetaColor () {
+  const light = document.body.classList.contains('light-mode');
+  document.documentElement.style.colorScheme = light ? 'light' : 'dark';
+  const toggle = document.getElementById('theme-toggle-btn');
+  if (toggle) {
+    const label = light ? 'Switch to dark theme' : 'Switch to light theme';
+    toggle.setAttribute('aria-label', label);
+    toggle.title = label;
+    toggle.setAttribute('aria-pressed', String(!light));
+  }
   const meta = document.querySelector('meta[name="theme-color"]');
   if (!meta) return;
-  const primary = getComputedStyle(document.body).getPropertyValue('--primary').trim();
-  if (primary) meta.setAttribute('content', primary);
+  const background = getComputedStyle(document.body).getPropertyValue('--bg').trim();
+  if (background) meta.setAttribute('content', background);
 }
 
 function applyPersonalizationSettings () {
@@ -1742,7 +2051,7 @@ function openProfileSetup () {
 
   const doSave = () => {
     const name = (document.getElementById('setup-name')?.value || '').trim() || 'Foodie';
-    const profile = { name, avatar: chosenAvatar, joinDate: new Date().toISOString() };
+    const profile = { name, avatar: chosenAvatar, joinDate: new Date().toISOString(), visualUpdatedAt: Date.now() };
     saveUserProfile(profile);
     updateHeaderAvatar(profile.avatar);
     overlay.classList.add('hidden');
@@ -1767,9 +2076,30 @@ function openProfileSetup () {
   if (skipBtn) skipBtn.onclick = doSkip;
 }
 
+// The owner's own account sees a way into the owner portal (owner.html; the server checks too).
+const OWNER_EMAIL = 'cmc@conniemichelleconsulting.com';
+// Opening it from the app hands over this sign-in, so the portal never asks again.
+async function openOwnerPortal () {
+  try {
+    const user = typeof _auth !== 'undefined' ? _auth?.currentUser : null;
+    if (user) sessionStorage.setItem('ftb_owner_handoff', JSON.stringify({ token: await user.getIdToken(true), email: user.email, at: Date.now() }));
+  } catch { /* the portal can still sign in itself */ }
+  location.href = '/owner.html';
+}
+window.openOwnerPortal = openOwnerPortal;
+document.addEventListener('click', e => {
+  const link = e.target.closest('#account-owner-row, #settings-owner-row');
+  if (!link) return;
+  e.preventDefault();
+  openOwnerPortal();
+});
+
 function openAccountModal () {
   const overlay = document.getElementById('account-overlay');
   if (!overlay) return;
+  document.getElementById('account-owner-row')?.classList.toggle('hidden', String(window._ftbUserEmail || '').toLowerCase() !== OWNER_EMAIL);
+  // Gifts are sold on the website only (the Android app follows Google Play's billing rules).
+  document.getElementById('account-gift-row')?.classList.toggle('hidden', !!window.Capacitor?.isNativePlatform?.());
   const profile = loadUserProfile() || { name: 'Foodie', avatar: DEFAULT_AVATAR, joinDate: new Date().toISOString() };
   const normalizedAvatar = profile.avatar === '' ? DEFAULT_AVATAR : (profile.avatar || DEFAULT_AVATAR);
 
@@ -1837,6 +2167,7 @@ function closeAccountModal () {
   maybeHideOverlay();
 }
 
+let _profileEditSession = 0;
 function openEditProfile () {
   closeAccountModal();
   const overlay = document.getElementById('edit-profile-overlay');
@@ -1844,6 +2175,14 @@ function openEditProfile () {
   const profile = loadUserProfile() || { name: 'Foodie', avatar: DEFAULT_AVATAR };
   let chosenAvatar = normalizeAvatar(profile.avatar);
   let chosenPhoto = profile.photo || '';
+  const generation = _dataGeneration;
+  const editSession = ++_profileEditSession;
+  const uid = window._ftbUid;
+  const isCurrent = () => generation === _dataGeneration && uid === window._ftbUid
+    && editSession === _profileEditSession && !window._ftbAccountSwitching;
+  let photoBusy = false;
+  const saveButton = document.getElementById('edit-profile-save-btn');
+  saveButton.disabled = false;
   document.getElementById('edit-name').value = profile.name || '';
 
   const setEditPhotoState = () => {
@@ -1877,6 +2216,7 @@ function openEditProfile () {
     photoUploadBtn.onclick = () => photoInput.click();
   }
   if (photoRemoveBtn) {
+    photoRemoveBtn.disabled = false;
     photoRemoveBtn.onclick = () => {
       chosenPhoto = '';
       if (photoInput) photoInput.value = '';
@@ -1884,6 +2224,7 @@ function openEditProfile () {
     };
   }
   if (photoInput) {
+    if (photoUploadBtn) photoUploadBtn.disabled = false;
     photoInput.onchange = async e => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -1895,22 +2236,37 @@ function openEditProfile () {
         showToast('Photo too large', 'Please choose an image under 2 MB.', 'error');
         return;
       }
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      chosenPhoto = String(dataUrl);
-      setEditPhotoState();
+      photoBusy = true;
+      saveButton.disabled = true;
+      if (photoUploadBtn) photoUploadBtn.disabled = true;
+      if (photoRemoveBtn) photoRemoveBtn.disabled = true;
+      try {
+        const dataUrl = await readImageFileCompressed(file, 512, .85);
+        if (!isCurrent() || overlay.classList.contains('hidden')) return;
+        chosenPhoto = dataUrl;
+        setEditPhotoState();
+      } catch (err) {
+        if (isCurrent()) {
+          console.warn('[FTB] Profile photo processing failed:', err);
+          showToast('Could not load profile photo', 'Your previous photo is unchanged. Try another image.', 'error');
+        }
+      } finally {
+        photoBusy = false;
+        if (isCurrent()) {
+          saveButton.disabled = false;
+          if (photoUploadBtn) photoUploadBtn.disabled = false;
+          if (photoRemoveBtn) photoRemoveBtn.disabled = false;
+        }
+      }
     };
   }
 
   overlay.classList.remove('hidden');
   document.body.classList.add('overlay-open');
   document.getElementById('edit-profile-save-btn').onclick = () => {
+    if (!isCurrent() || photoBusy) return;
     const name = document.getElementById('edit-name').value.trim() || profile.name || 'Foodie';
-    const updated = { ...profile, name, avatar: chosenAvatar, photo: chosenPhoto || '' };
+    const updated = { ...(loadUserProfile() || profile), name, avatar: chosenAvatar, photo: chosenPhoto || '', visualUpdatedAt: Date.now() };
     saveUserProfile(updated);
     updateProfileVisuals(updated);
     overlay.classList.add('hidden');
@@ -1922,6 +2278,7 @@ function openEditProfile () {
 function openPersonalizeSettings () {
   const overlay = document.getElementById('personalize-overlay');
   if (!overlay) return;
+  document.getElementById('settings-owner-row')?.classList.toggle('hidden', String(window._ftbUserEmail || '').toLowerCase() !== OWNER_EMAIL);
 
   const themeSel = document.getElementById('personalize-theme-select');
   const densitySel = document.getElementById('personalize-density-select');
@@ -1936,7 +2293,7 @@ function openPersonalizeSettings () {
   const resetTasteBtn = document.getElementById('taste-learning-reset-btn');
 
   if (themeSel) {
-    if (!state.settings.themeManual) {
+    if (state.settings.themeChoice === 'auto') {
       themeSel.value = 'auto';
     } else {
       themeSel.value = state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark');
@@ -2143,7 +2500,7 @@ function findNearbyCraving () {
   const log = getCraveAlertLog();
   let best = null;
   state.restaurants.forEach(r => {
-    if (!r.lat || !r.lng || log[r.id] === today) return;
+    if (!isAvailableSpot(r) || !r.lat || !r.lng || log[r.id] === today) return;
     const crave = dishesOf(r).find(d => d.verdict === 'want');
     if (!crave) return;
     const d = haversine(state.userLat, state.userLng, r.lat, r.lng);
@@ -2201,7 +2558,7 @@ function checkProximity () {
   let near = null;
   const better = (a, b) => !b || (a.want !== b.want ? a.want : a.d < b.d);
   state.restaurants.forEach(r => {
-    if (!r.lat || !r.lng || (quietUntil[r.id] || 0) > now || (state.notifiedAt[r.id] || 0) > now - NOTIFY_COOLDOWN) return;
+    if (!isAvailableSpot(r) || !r.lat || !r.lng || (quietUntil[r.id] || 0) > now || (state.notifiedAt[r.id] || 0) > now - NOTIFY_COOLDOWN) return;
     const d = haversine(state.userLat, state.userLng, r.lat, r.lng);
     const cand = { r, d, want: r.status === 'want-to-try' };
     if (d <= (cand.want ? wantRadius : NOTIFY_RADIUS) && better(cand, near)) near = cand;
@@ -2238,6 +2595,13 @@ function showProximityAlert (r, distM, crave = null) {
 // Phones only show notifications through the service worker: on Android
 // `new Notification()` throws, so that path is just the desktop fallback.
 async function sendBrowserNotification (r, distM, crave = null) {
+  // The Android app (2.3.0+) posts a real Android notification; the web view can't.
+  const nativeNotify = window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins?.NearbyAlerts?.notify : null;
+  if (nativeNotify && window.Capacitor.isPluginAvailable?.('NearbyAlerts')) {
+    const title = crave ? `${crave.name} is ${fmtDist(distM)} away` : `${r.name} is ${fmtDist(distM)} away`;
+    const text = crave ? `At ${r.name}. It's on your Crave List.` : r.status === 'want-to-try' ? "It's on your Want to Try list. Tap to see it." : 'You have been here before.';
+    try { await window.Capacitor.Plugins.NearbyAlerts.notify({ id: r.id, title, text }); return; } catch { /* an older app: no notify */ }
+  }
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   const tag = `ftb-${r.id}`;
   // The old GitHub bear-icon.png doesn't exist; use the bundled icon.
@@ -2415,6 +2779,7 @@ var NativeAlerts = (() => {
     const here = Number.isFinite(state.userLat) && Number.isFinite(state.userLng);
     // Android allows 100 geofences: keep the closest Want to Try spots.
     const spots = state.restaurants
+      .filter(isAvailableSpot)
       .filter(r => r.status === 'want-to-try' && r.lat != null && r.lng != null && Number.isFinite(Number(r.lat)) && Number.isFinite(Number(r.lng)))
       .map(r => ({ id: r.id, name: String(r.name || '').slice(0, 80), lat: Number(r.lat), lng: Number(r.lng), d: here ? haversine(state.userLat, state.userLng, Number(r.lat), Number(r.lng)) : 0 }))
       .sort((a, b) => a.d - b.d)
@@ -2434,6 +2799,13 @@ var NativeAlerts = (() => {
       const st = await p.status();
       background = !!st.background;
       supported = st.backgroundSupported !== false;
+      // An app that can now alert when closed (2.3.0): offer it once to anyone
+      // who has alerts on, unless they chose "only while open".
+      if (supported && !background && nearAlertsOn() && state.settings.locationEnabled && state.settings.nearAlertsClosed !== false) {
+        let asked = false;
+        try { asked = !!localStorage.getItem('ftb_bg_asked_v1'); localStorage.setItem('ftb_bg_asked_v1', '1'); } catch { asked = true; }
+        if (!asked) setTimeout(() => NativeAlerts.askBackground(), 2500);
+      }
     } catch { /* plugin missing */ }
     renderNearAlertsRow();
   }
@@ -2446,6 +2818,14 @@ var NativeAlerts = (() => {
       if (!plugin()) return;
       clearTimeout(timer);
       timer = setTimeout(sync, 1500);
+    },
+    async clear () {
+      clearTimeout(timer);
+      lastSig = '';
+      const p = plugin();
+      if (!p) return;
+      try { await p.setSpots({ enabled: false, radiusMeters: 1609, spots: [] }); }
+      catch (err) { console.warn('[FTB] Could not clear account location alerts:', err); }
     },
     refresh,
     // Explain first (Google Play requires it), then ask for "Allow all the time".
@@ -2474,6 +2854,23 @@ var NativeAlerts = (() => {
   };
 })();
 
+// Android app: roughly where you are and your Want to Try pins, once a day,
+// so the server can send the weekly "near you" nudge and contests in your
+// state (api/nudges.js) when the app is closed.
+async function shareNudgeArea () {
+  if (!window.FriendPings?.area || !Number.isFinite(state.userLat) || !window._ftbUid) return;
+  const today = new Date().toDateString();
+  try { if (localStorage.getItem('ftb_area_sent_v1') === today) return; } catch { return; }
+  const st = typeof myStateCode === 'function' ? await myStateCode().catch(() => '') : '';
+  const want = state.restaurants
+    .filter(isAvailableSpot)
+    .filter(r => r.status === 'want-to-try' && Number.isFinite(Number(r.lat)) && Number.isFinite(Number(r.lng)) && r.lat !== null)
+    .slice(0, 100).map(r => ({ n: String(r.name || '').slice(0, 60), lat: Number(r.lat), lng: Number(r.lng) }));
+  if (await window.FriendPings.area({ lat: state.userLat, lng: state.userLng, state: st, miles: nearAlertMiles(), want })) {
+    try { localStorage.setItem('ftb_area_sent_v1', today); } catch { /* storage full */ }
+  }
+}
+
 function closeBgLocation () {
   document.getElementById('bg-location-overlay')?.classList.add('hidden');
   maybeHideOverlay();
@@ -2487,6 +2884,15 @@ function openSpotFromLink (id) {
 /* ════════════════════════════════════════════════════════════
    RENDERING
    ════════════════════════════════════════════════════════════ */
+function matchesRestaurantSearch (restaurant, query) {
+  const normalize = value => String(value || '').normalize('NFKD').replace(/\p{M}/gu, '')
+    .toLowerCase().replace(/['’]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const terms = normalize(query).split(/\s+/).filter(Boolean);
+  const fields = [restaurant.name, restaurant.cuisine, restaurant.notes, restaurant.address,
+    ...(restaurant.tags || []), ...dishesOf(restaurant).map(d => d.name)].map(normalize);
+  return terms.length > 0 && terms.every(term => fields.some(field => field.includes(term)));
+}
+
 function getFiltered () {
   let list = [...state.restaurants];
 
@@ -2497,15 +2903,7 @@ function getFiltered () {
   }
   // Search
   if (state.filter.search) {
-    const q = state.filter.search.toLowerCase();
-    list = list.filter(r =>
-      (r.name||'').toLowerCase().includes(q) ||
-      (r.cuisine||'').toLowerCase().includes(q) ||
-      (r.notes||'').toLowerCase().includes(q) ||
-      (r.address||'').toLowerCase().includes(q) ||
-      (r.tags||[]).some(t => String(t).toLowerCase().includes(q)) ||
-      dishesOf(r).some(d => dishKey(d.name).includes(q))
-    );
+    list = list.filter(r => matchesRestaurantSearch(r, state.filter.search));
   }
   // Cuisine
   if (state.filter.cuisine) {
@@ -2575,7 +2973,12 @@ function distOf (r) {
 // Suggestions (For You, Open Now, picks) skip spots too far to go to today,
 // like a place you tried once on a trip. Lists and the diary still show them.
 const SUGGEST_MAX_METERS = 30 * 1609.344;
+function isAvailableSpot (r) {
+  return !!r && r.permanentlyClosed !== true;
+}
+
 function nearEnoughToSuggest (r) {
+  if (!isAvailableSpot(r)) return false;
   if (!state.locationEnabled || !r.lat || !r.lng) return true; // distance unknown
   return distOf(r) <= SUGGEST_MAX_METERS;
 }
@@ -2666,6 +3069,10 @@ function renderCards () {
   const empty  = document.getElementById('empty-state');
   const noRes  = document.getElementById('no-results');
   const list   = getFiltered();
+  // Home shows your saved cards only while you search or filter (Lists has them all).
+  const f = state.filter || {};
+  document.body.dataset.view = state.currentView;
+  document.body.classList.toggle('home-filtering', !!(f.search || f.cuisine || f.price || f.tag || f.collection));
 
   grid.innerHTML = '';
   grid.classList.add('restaurant-grid-single');
@@ -2839,6 +3246,10 @@ function buildCard (r) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
           Edit
         </button>
+        <button class="card-action-btn delete-card" data-action="delete" type="button" aria-label="Delete ${escHtml(r.name)}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" aria-hidden="true"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6"/></svg>
+          Delete
+        </button>
       </div>
     </div>`;
 
@@ -2882,13 +3293,14 @@ function buildCard (r) {
     if (action === 'directions')   { e.stopPropagation(); openDirections(r);      return; }
     if (action === 'website')       { e.stopPropagation(); openWebsite(r);         return; }
     if (action === 'edit')          { e.stopPropagation(); openEditModal(r.id);    return; }
+    if (action === 'delete')        { e.stopPropagation(); deleteSavedRestaurant(r.id); return; }
     if (action === 'open')          { e.stopPropagation(); openDetailModal(r.id);  return; }
     if (action === 'mark-visited')  { e.stopPropagation(); markVisited(r.id);      return; }
     hapticTap('light');
     openDetailModal(r.id);
   });
   card.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetailModal(r.id); }
+    if (e.target === card && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openDetailModal(r.id); }
   });
   return card;
 }
@@ -3070,6 +3482,7 @@ function fmtClock ({ hour = 0, minute = 0 } = {}) {
 
 // Open or closed right now, from Google's weekly periods (day 0 = Sunday).
 function openStatus (r, now = new Date()) {
+  if (r?.permanentlyClosed === true) return { open: false, permanent: true, text: 'Permanently closed' };
   const periods = Array.isArray(r?.periods) ? r.periods.filter(p => p && p.open) : [];
   if (!periods.length) return null;
   if (periods.length === 1 && !periods[0].close) return { open: true, text: 'Open 24 hours' };
@@ -3135,7 +3548,7 @@ function fillDetailFacts (r) {
   box.innerHTML = `
     ${st ? `<details class="detail-hours-toggle">
       <summary><span class="detail-open-dot ${st.open ? (st.soon ? 'soon' : 'open') : 'closed'}" aria-hidden="true"></span>${escHtml(st.text)}</summary>
-      <ul>${(r.hours || []).map((h, i) => `<li class="${i === today ? 'today' : ''}">${escHtml(h)}</li>`).join('')}</ul>
+      ${st.permanent ? '<p>Your visits, ratings and photos are kept. This place is excluded from suggestions.</p>' : `<ul>${(r.hours || []).map((h, i) => `<li class="${i === today ? 'today' : ''}">${escHtml(h)}</li>`).join('')}</ul>`}
     </details>` : ''}
     ${links ? `<div class="detail-hours-links">${links}</div>` : ''}`;
 }
@@ -3287,11 +3700,34 @@ window.addEventListener('online', () => {
 });
 
 /* ── "Enjoying Feed The Bear?" ───────────────────────────────
-   Asked right after someone logs a new 5-star visit, once they've opened
-   the app a few times and saved a few spots; at most every 4 months, and
-   never again after they answer. Happy: share it with a friend (Google Play
-   review once the app is listed there). Not happy: a private note that goes
-   to the owner (api/feedback.js) instead of a public review. */
+   Asked right after a good moment (a new 5-star visit, a 4-5 star Just Ate,
+   a finished Bear Swipe round), once they've opened the app a few times and
+   saved a few spots; at most every 4 months, and never again after they
+   answer. Happy: rate it on Google Play (in the Android app), or share it.
+   Not happy: a private note to the owner (api/feedback.js), not a public review. */
+const PLAY_URL = 'https://play.google.com/store/apps/details?id=com.feedthebear.app';
+
+/* Stay current: the Android app keeps running in the background, so coming
+   back to it never reloads. When a newer version is live (sw.js names it),
+   refresh: quietly if nothing is open, else Byte Cub offers an Update button.
+   APP_BUILD must match CACHE in sw.js (tests/version.test.js checks). */
+const APP_BUILD = 'ftb-v186';
+let _freshCheckedAt = 0;
+async function checkForNewBuild () {
+  if (Date.now() - _freshCheckedAt < 5 * 60 * 1000 || !navigator.onLine) return;
+  _freshCheckedAt = Date.now();
+  let live = '';
+  try { live = ((await (await fetch(`/sw.js?v=${Date.now()}`, { cache: 'no-store' })).text()).match(/ftb-v\d+/) || [''])[0]; } catch { return; }
+  if (!live || live === APP_BUILD) return;
+  try { if (sessionStorage.getItem('ftb_reloaded_for') === live) return; sessionStorage.setItem('ftb_reloaded_for', live); } catch { /* private mode */ }
+  try { (await navigator.serviceWorker?.getRegistration())?.update(); } catch { /* fine */ }
+  const busy = document.body.classList.contains('overlay-open') || document.querySelector('[role="dialog"]:not(.hidden), .fft-overlay, input:focus, textarea:focus');
+  if (!busy) { location.reload(); return; }
+  showToast('A fresh version is ready', 'Tap Update to get the latest.', 'info', { label: 'Update', run: () => location.reload() });
+}
+window.checkForNewBuild = checkForNewBuild;
+setTimeout(checkForNewBuild, 4000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForNewBuild(); });
 const RATE_ASK_KEY = 'ftb_rate_ask_v1';
 const RATE_ASK_EVERY = 120 * 864e5;
 
@@ -3306,12 +3742,21 @@ function maybeAskForRating () {
   if (s.five === undefined || five < s.five) { s.five = five; saveRateAsk(s); return; }
   if (five === s.five) return;
   s.five = five;
+  saveRateAsk(s);
+  noteGoodMoment();
+}
+// Something went well: ask now, if it's time.
+function noteGoodMoment () {
+  const s = loadRateAsk();
   const ready = !s.answered && !(s.at && Date.now() - s.at < RATE_ASK_EVERY)
     && (loadProductEvents().counts.app_opened || 0) >= 3 && (state.restaurants || []).length >= 3;
-  if (ready) s.at = Date.now();
+  if (!ready) return false;
+  s.at = Date.now();
   saveRateAsk(s);
-  if (ready) setTimeout(showRatePrompt, 1200);
+  setTimeout(() => whenCubQuiet(showRatePrompt), 1200);
+  return true;
 }
+window.noteGoodMoment = noteGoodMoment;
 
 function showRatePrompt () {
   if (document.getElementById('rate-prompt')) return;
@@ -3327,9 +3772,19 @@ function showRatePrompt () {
     <div class="rate-actions"><button type="button" class="btn-primary rate-love">Love it 🐻</button><button type="button" class="btn-ghost rate-meh">Not really</button></div>`);
   box.querySelector('.rate-love').onclick = () => {
     answer('love');
-    step(`<div class="rate-title">That makes the bear happy!</div>
+    const inApp = !!window.Capacitor?.isNativePlatform?.();
+    step(inApp
+      ? `<div class="rate-title">That makes the bear happy!</div>
+      <p class="rate-sub">Would you give us a quick rating on Google Play? It's the biggest help a small app can get.</p>
+      <div class="rate-actions"><button type="button" class="btn-primary rate-play">★ Rate on Google Play</button><button type="button" class="btn-ghost rate-share">Share instead</button></div>`
+      : `<div class="rate-title">That makes the bear happy!</div>
       <p class="rate-sub">Know someone who'd love it too? Sharing is the best thank-you.</p>
       <div class="rate-actions"><button type="button" class="btn-primary rate-share">Share Feed The Bear</button></div>`);
+    box.querySelector('.rate-play')?.addEventListener('click', () => {
+      trackProductEvent('rate_play_opened');
+      window.open(PLAY_URL, '_blank');
+      close();
+    });
     box.querySelector('.rate-share').onclick = async () => {
       const data = { title: 'Feed The Bear', text: 'I keep every restaurant I want to try in Feed The Bear. You should too:', url: 'https://www.feed-the-bear.com' };
       try { if (navigator.share) await navigator.share(data); else { await navigator.clipboard.writeText(`${data.text} ${data.url}`); showToast('Link copied', 'Paste it to a friend.', 'success'); } } catch { /* closed the share sheet */ }
@@ -3486,7 +3941,24 @@ async function fillMissingPlaceInfo () {
 window.addEventListener('load', () => setTimeout(fillMissingPlaceInfo, 5000));
 
 /* ── Detail Modal ─────────────────────────────────────────── */
+function deleteSavedRestaurant (id) {
+  const r = state.restaurants.find(x => x.id === id);
+  if (!r) {
+    showToast('Place no longer saved', 'Refresh your list before trying again.', 'info');
+    return;
+  }
+  if (!confirm(`Delete "${r.name}"? This cannot be undone.`)) return;
+  state.restaurants = state.restaurants.filter(x => x.id !== id);
+  state.selectedIds.delete(id);
+  recordRestaurantDeletion([id]);
+  saveData();
+  renderAll();
+  if (state.detailId === id) closeDetailModal();
+  showToast('Deleted', `"${r.name}" removed from your list.`, 'info');
+}
+
 function openDetailModal (id) {
+  flushDetailNotes();
   const r = state.restaurants.find(x => x.id === id);
   if (!r) return;
   state.detailId = id;
@@ -3568,7 +4040,7 @@ function openDetailModal (id) {
   logList.innerHTML = visits.length
     ? visits.slice().reverse().map(v => `
         <div class="visit-log-item">
-          <span class="visit-date">${fmtDate(v.date)}</span>
+          <span class="visit-date">${v.date ? fmtDate(v.date) : 'Date not recorded'}</span>
           ${v.rating ? `<span class="visit-stars">${'\u2605'.repeat(v.rating)}</span>` : ''}
           ${v.note ? `<span class="visit-note">${escHtml(v.note)}</span>` : ''}
         </div>`).join('')
@@ -3597,6 +4069,8 @@ function openDetailModal (id) {
       state.restaurants[idx].status = 'visited';
       state.restaurants[idx].dateVisited = state.restaurants[idx].dateVisited || iso();
       if (rating) state.restaurants[idx].myRating = rating;
+      state.restaurants[idx].updatedAt = Date.now();
+      form.classList.add('hidden');
       saveData();
       renderAll();
       openDetailModal(id);
@@ -3634,16 +4108,24 @@ function openDetailModal (id) {
   document.getElementById('detail-book-btn').onclick = () => openPartnerSheet('book', r);
   document.getElementById('detail-order-btn').onclick = () => openPartnerSheet('order', r);
   document.getElementById('detail-edit-btn').onclick = () => { closeDetailModal(); openEditModal(r.id); };
-  document.getElementById('detail-delete-btn').onclick = () => {
-    if (confirm(`Delete "${r.name}"? This cannot be undone.`)) {
-      state.restaurants = state.restaurants.filter(x => x.id !== id);
-      recordRestaurantDeletion([id]);
-      saveData();
-      renderAll();
-      closeDetailModal();
-      showToast('Deleted', `"${r.name}" removed from your list.`, 'info');
-    }
+  const closedBtn = document.getElementById('detail-closed-btn');
+  closedBtn.textContent = isAvailableSpot(r) ? 'Mark permanently closed' : 'Mark reopened';
+  closedBtn.setAttribute('aria-pressed', String(!isAvailableSpot(r)));
+  closedBtn.onclick = () => {
+    const closed = isAvailableSpot(r);
+    if (closed && !confirm(`Mark "${r.name}" permanently closed? Your visits, ratings and photos stay saved, but it will no longer be suggested.`)) return;
+    r.permanentlyClosed = closed;
+    r.updatedAt = Date.now();
+    localStorage.removeItem('ftb_area_sent_v1');
+    saveData();
+    NativeAlerts.schedule();
+    shareNudgeArea();
+    renderAll();
+    openDetailModal(id);
+    showToast(closed ? 'Marked permanently closed' : 'Marked reopened',
+      closed ? 'Your history is kept. This place will not be suggested.' : 'This place can appear in suggestions again.', 'info');
   };
+  document.getElementById('detail-delete-btn').onclick = () => deleteSavedRestaurant(id);
 
   const yoInput = document.getElementById('your-order-input');
   if (yoInput) yoInput.value = '';
@@ -3668,6 +4150,7 @@ function openDetailModal (id) {
 }
 
 function closeDetailModal () {
+  flushDetailNotes();
   document.getElementById('detail-overlay').classList.add('hidden');
   maybeHideOverlay();
 }
@@ -3675,19 +4158,29 @@ function closeDetailModal () {
 /* ── Detail Quick Capture: set rating / status / price inline ── */
 function renderDetailQuickCapture (r) {
   const stars = document.querySelectorAll('#dq-stars .dq-star');
-  stars.forEach(b => b.classList.toggle('on', parseInt(b.dataset.val) <= (r.myRating || 0)));
-  document.querySelectorAll('#dq-status .dq-seg-btn').forEach(b =>
-    b.classList.toggle('active', b.dataset.status === r.status));
-  document.querySelectorAll('#dq-price .dq-seg-btn').forEach(b =>
-    b.classList.toggle('active', parseInt(b.dataset.price) === (r.priceRange || 0)));
+  stars.forEach(b => {
+    b.classList.toggle('on', parseInt(b.dataset.val) <= (r.myRating || 0));
+    b.setAttribute('aria-pressed', String(parseInt(b.dataset.val) === (r.myRating || 0)));
+  });
+  document.querySelectorAll('#dq-status .dq-seg-btn').forEach(b => {
+    const selected = b.dataset.status === r.status;
+    b.classList.toggle('active', selected);
+    b.setAttribute('aria-pressed', String(selected));
+  });
+  document.querySelectorAll('#dq-price .dq-seg-btn').forEach(b => {
+    const selected = parseInt(b.dataset.price) === (r.priceRange || 0);
+    b.classList.toggle('active', selected);
+    b.setAttribute('aria-pressed', String(selected));
+  });
 }
 
 /* Patch a restaurant in place, persist, and refresh the open detail + lists
    without closing the modal. */
 function patchRestaurant (id, patch) {
+  if (window._ftbAccountSwitching) return null;
   const i = state.restaurants.findIndex(x => x.id === id);
   if (i === -1) return null;
-  Object.assign(state.restaurants[i], patch);
+  Object.assign(state.restaurants[i], patch, { updatedAt: Date.now() });
   saveData();
   return state.restaurants[i];
 }
@@ -3705,7 +4198,7 @@ function initDetailQuickCapture () {
       renderDetailQuickCapture(r);
       stars.classList.remove('just-set'); void stars.offsetWidth; stars.classList.add('just-set');
       if (val === 5) launchConfetti(1200);
-      renderStats();
+      renderAll();
     });
   }
 
@@ -3715,6 +4208,7 @@ function initDetailQuickCapture () {
       const btn = e.target.closest('[data-status]');
       if (!btn || !state.detailId) return;
       const status = btn.dataset.status;
+      if (state.restaurants.find(x => x.id === state.detailId)?.status === status) return;
       const patch = { status };
       if (status === 'visited') {
         const cur = state.restaurants.find(x => x.id === state.detailId);
@@ -3744,6 +4238,7 @@ function initDetailQuickCapture () {
       renderDetailQuickCapture(r);
       document.getElementById('detail-price').innerHTML =
         `<label>Price Range</label><div style="font-size:1.2rem;color:var(--gold);font-weight:700">${priceDollars(r.priceRange)||'<span style="color:var(--text-dim);font-size:.85rem">Unknown</span>'}</div>`;
+      renderAll();
     });
   }
 
@@ -3751,16 +4246,32 @@ function initDetailQuickCapture () {
   const notes = document.getElementById('detail-notes-edit');
   if (notes) {
     let t = null;
-    const save = () => {
-      if (!state.detailId) return;
-      patchRestaurant(state.detailId, { notes: notes.value.trim() });
-      const saved = document.getElementById('detail-notes-saved');
-      if (saved) { saved.textContent = 'Saved ✓'; clearTimeout(t); t = setTimeout(() => saved.textContent = '', 1600); }
-    };
-    let dt = null;
-    notes.addEventListener('input', () => { clearTimeout(dt); dt = setTimeout(save, 600); });
-    notes.addEventListener('blur', save);
+    notes.addEventListener('input', () => {
+      if (!state.detailId || window._ftbAccountSwitching) return;
+      _pendingDetailNotes = { id: state.detailId, value: notes.value.trim(), generation: _dataGeneration };
+      clearTimeout(_detailNotesTimer);
+      _detailNotesTimer = setTimeout(() => {
+        const id = _pendingDetailNotes?.id;
+        if (!flushDetailNotes() || state.detailId !== id) return;
+        const saved = document.getElementById('detail-notes-saved');
+        if (saved) {
+          saved.textContent = 'Saved ✓'; clearTimeout(t);
+          t = setTimeout(() => { if (state.detailId === id) saved.textContent = ''; }, 1600);
+        }
+      }, 600);
+    });
+    notes.addEventListener('blur', flushDetailNotes);
   }
+}
+
+let _pendingDetailNotes = null;
+let _detailNotesTimer = null;
+function flushDetailNotes () {
+  clearTimeout(_detailNotesTimer);
+  const pending = _pendingDetailNotes;
+  _pendingDetailNotes = null;
+  if (!pending || pending.generation !== _dataGeneration || window._ftbAccountSwitching) return false;
+  return !!patchRestaurant(pending.id, { notes: pending.value });
 }
 
 /* ── Celebration / milestone helpers (delight) ───────────────── */
@@ -3864,6 +4375,18 @@ let _formPlace = null;
 let _formPlaceTimer = null;
 let _formPlaceSeq = 0;
 let _formPlaceResults = [];
+let _formMedia = [];
+
+function setFormMedia (media = []) {
+  media = mergeFoodMedia([], media);
+  _formMedia = media;
+  const preview = document.getElementById('form-media-preview');
+  if (preview) {
+    preview.classList.toggle('hidden', !media.length);
+    preview.innerHTML = media.length ? pendingMediaHtml(media) : '';
+  }
+  if (media.length) document.getElementById('form-photo').value = media[0].photo;
+}
 
 function clearFormPlaceSearch () {
   clearTimeout(_formPlaceTimer);
@@ -3916,6 +4439,8 @@ function pickFormPlace (p) {
 }
 
 function openAddModal () {
+  invalidateFoodMedia();
+  setFormMedia([]);
   state.editingId = null;
   _pendingAddPrefill = null;
   _formPlace = null;
@@ -3939,6 +4464,8 @@ function openAddModal () {
 }
 
 function openEditModal (id) {
+  invalidateFoodMedia();
+  setFormMedia([]);
   const r = state.restaurants.find(x => x.id === id);
   if (!r) return;
   state.editingId = id;
@@ -3987,6 +4514,7 @@ function openEditModal (id) {
 }
 
 function closeModal () {
+  invalidateFoodMedia();
   clearFormPlaceSearch();
   document.getElementById('modal-overlay').classList.add('hidden');
   maybeHideOverlay();
@@ -4021,6 +4549,7 @@ function setCheckinStars (n) {
 
 function handleFormSubmit (e) {
   e.preventDefault();
+  if (foodMediaBusy() || window._ftbAccountSwitching) { showToast('Please wait', 'Finish adding media before saving.', 'info'); return; }
   const name = document.getElementById('form-name').value.trim();
   if (!name) { showToast('Missing Name', 'Please enter a restaurant name.', 'error'); return; }
 
@@ -4060,11 +4589,15 @@ function handleFormSubmit (e) {
     updatedAt:     Date.now(),
     dateVisited:   status === 'visited'
       ? (document.getElementById('form-date-visited').value ||
-         state.restaurants.find(r => r.id === state.editingId)?.dateVisited || now)
+         state.restaurants.find(r => r.id === state.editingId)?.dateVisited || (isNew && _pendingAddPrefill?.quickUnknownDate ? null : now))
       : null,
   };
+  if (_formMedia.length) setMediaOn(entry, _formMedia);
 
   if (isNew && _pendingAddPrefill && normalizeName(_pendingAddPrefill.name || name) === normalizeName(name)) {
+    if (_pendingAddPrefill.sourceUrl && safeUrl(_pendingAddPrefill.sourceUrl)) {
+      entry.links = [{ url: String(_pendingAddPrefill.sourceUrl).slice(0, 500), added: now }];
+    }
     if (!entry.website && _pendingAddPrefill.website) entry.website = String(_pendingAddPrefill.website || '').trim();
     if (!entry.address && _pendingAddPrefill.address) entry.address = String(_pendingAddPrefill.address || '').trim();
     if (!entry.photo && _pendingAddPrefill.photo) entry.photo = String(_pendingAddPrefill.photo || '').trim();
@@ -4102,8 +4635,20 @@ function handleFormSubmit (e) {
     showToast('Updated', `"${name}" was refreshed in your list.`, 'success');
   } else {
     entry.visits = [];
+    if (status === 'visited' && _formMedia.length) {
+      const visit = { date: entry.dateVisited, rating: entry.myRating, dish: '', note: '' };
+      setMediaOn(visit, _formMedia);
+      entry.visits.push(visit);
+    }
     state.restaurants.unshift(entry);
     showToast('Saved', `"${name}" is now on your list.`, 'success');
+  }
+
+  if (isNew && _pendingAddPrefill?.quickDish) {
+    upsertDish(entry, { name: _pendingAddPrefill.quickDish,
+      verdict: status === 'visited' ? _pendingAddPrefill.quickVerdict : 'want',
+      media: _formMedia, date: status === 'visited' ? entry.dateVisited || '' : iso() });
+    if (entry.visits[0]) entry.visits[0].dish = _pendingAddPrefill.quickDish;
   }
 
   // Geocode in background if address provided
@@ -4115,6 +4660,7 @@ function handleFormSubmit (e) {
   saveData();
   renderAll();
   closeModal();
+  if (isNew && typeof offerShareMeal === 'function') offerShareMeal({ r: state.restaurants.find(r => r.id === entry.id), photo: entry.photo, video: entry.video || '', media: mediaOf(entry), note: entry.notes });
   _pendingAddPrefill = null;
   _formPlace = null;
 }
@@ -4198,7 +4744,27 @@ function openMapsSearch (r) {
 //   - a tracking link with {url} where the page goes (Impact, CJ, Partnerize):
 //       'https://ubereats.example-network.com/c/123/456?u={url}'
 //   - extra query text added to the page's own link: 'ref=feedthebear'
-const PARTNER_REFS = { opentable: '', resy: '', yelp: '', doordash: '', ubereats: '', grubhub: '' };
+// Set in the owner portal (owner.js 'partners'), fetched at most every few hours.
+const PARTNER_REFS = { opentable: '', resy: '', yelp: '', doordash: '', ubereats: '', grubhub: '', shop: '' };
+(function loadPartnerRefs () {
+  const KEY = 'ftb_partner_refs_v1';
+  const apply = refs => {
+    Object.keys(PARTNER_REFS).forEach(k => { if (typeof refs?.[k] === 'string') PARTNER_REFS[k] = refs[k]; });
+    // The merch shop (owner portal): a Bear Shop row in Account once it's set.
+    const row = document.getElementById('account-shop-row');
+    if (row) { row.classList.toggle('hidden', !/^https:\/\//.test(PARTNER_REFS.shop)); if (PARTNER_REFS.shop) row.href = PARTNER_REFS.shop; }
+  };
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (saved) apply(saved.refs);
+    if (saved && Date.now() - saved.at < 6 * 3600 * 1000) return;
+  } catch { /* bad value */ }
+  setTimeout(() => fetch('/api/owner?partners=1').then(r => (r.ok ? r.json() : null)).then(d => {
+    if (!d?.partners) return;
+    apply(d.partners);
+    try { localStorage.setItem(KEY, JSON.stringify({ at: Date.now(), refs: d.partners })); } catch { /* storage full */ }
+  }).catch(() => {}), 4000);
+})();
 function partnerUrl (key, url) {
   const code = String(PARTNER_REFS[key] || '').trim();
   if (!code) return url;
@@ -4566,6 +5132,34 @@ function openAddPlace () {
   if (window.Cub) window.Cub.openAdd(); else openAddModal();
 }
 
+// The gold + button: save a place, or log a meal you just had (Just Ate is
+// off the lean home, so it lives here, one tap away).
+function closeAddChoice () {
+  const el = document.getElementById('add-choice');
+  if (!el) return;
+  el.classList.add('closing');
+  setTimeout(() => el.remove(), 180);
+}
+function openAddChoice () {
+  if (document.getElementById('add-choice')) { closeAddChoice(); return; }
+  const el = document.createElement('div');
+  el.id = 'add-choice';
+  el.className = 'add-choice';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-modal', 'true');
+  el.setAttribute('aria-label', 'Add');
+  el.innerHTML = `<div class="add-choice-sheet">
+    <button type="button" class="add-choice-btn add-choice-place"><span class="add-choice-icon" aria-hidden="true">📍</span><span><strong>Add a place</strong><small>Somewhere to try, or one you love</small></span></button>
+    <button type="button" class="add-choice-btn add-choice-ate"><span class="add-choice-icon" aria-hidden="true">🍽️</span><span><strong>I just ate</strong><small>Log it in 10 seconds</small></span></button>
+  </div>`;
+  document.body.appendChild(el);
+  el.addEventListener('click', e => { if (e.target === el) closeAddChoice(); });
+  el.querySelector('.add-choice-place').addEventListener('click', () => { el.remove(); trackProductEvent('add_choice_place'); openAddPlace(); });
+  el.querySelector('.add-choice-ate').addEventListener('click', () => { el.remove(); trackProductEvent('add_choice_ate'); openJustAte(); });
+  el.querySelector('.add-choice-place').focus();
+}
+window.openAddChoice = openAddChoice;
+
 function renderAll () {
   // A soft ring on the Add button until someone has saved a few places.
   const spotCount = (state.restaurants || []).length;
@@ -4586,7 +5180,8 @@ function renderAll () {
   updateLocationBanner();
   // Home sections are isolated: a failure in one must never cascade and
   // abort renderAll (which would leave later init wiring unattached).
-  [renderGrizzlyUi, maybeAskForRating, renderTodayStatusRow, renderWeeklyGoal, renderOpenNowHome, renderCraveHome, renderFriendsFeedHome, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
+  // grizzly.js can still be loading on a slow connection.
+  [function renderGrizzlyUi () { window.renderGrizzlyUi?.(); }, function renderBearChallenges () { window.renderFoodChallengesHome?.(); }, maybeAskForRating, renderTodayStatusRow, renderWeeklyGoal, renderOpenNowHome, renderCraveHome, renderFriendsFeedHome, renderForYouHome, renderWeeklyRecapHome, renderMoodPicksHome]
   .forEach(fn => { try { fn(); } catch (err) { console.error(`${fn.name} failed:`, err); window.ftbReportError?.(err?.message || err, fn.name); } });
 }
 
@@ -4621,34 +5216,77 @@ function isLocationBannerSnoozed () {
 /* ════════════════════════════════════════════════════════════
    TOAST NOTIFICATIONS
    ════════════════════════════════════════════════════════════ */
-function showToast (title, msg, type = 'default') {
-  const safeTitle = String(title || '').replace(/\s+/g, ' ').trim();
-  const safeMsg = String(msg || '').replace(/\s+/g, ' ').trim();
+/* Every message comes from Byte Cub: one speech bubble with his face, one at
+   a time. A burst waits its turn (errors go first, repeats are dropped); a new
+   one cuts the current short once it has been up a moment, so nothing piles
+   up on screen. Optional `action` = { label, run } adds a button. */
+const _cubSay = { queue: [], el: null, shownAt: 0, timer: null };
+function showToast (title, msg, type = 'default', action = null) {
+  const item = { title: String(title || '').replace(/\s+/g, ' ').trim(), msg: String(msg || '').replace(/\s+/g, ' ').trim(), type, action };
+  if (!item.title && !item.msg) return;
+  const same = x => x && x.title === item.title && x.msg === item.msg;
+  if ((_cubSay.el?.isConnected && same(_cubSay.el._item)) || _cubSay.queue.some(same)) return;
+  if (type === 'error') _cubSay.queue.unshift(item); else _cubSay.queue.push(item);
+  if (_cubSay.queue.length > 4) _cubSay.queue.splice(_cubSay.queue.findIndex(x => x.type !== 'error'), 1);
+  if (!_cubSay.el?.isConnected) { _nextCubSay(); return; }
+  // Something is up: let it stay a moment, then make room.
+  clearTimeout(_cubSay.timer);
+  _cubSay.timer = setTimeout(_dismissCubSay, type === 'error' ? 0 : Math.max(0, 1100 - (Date.now() - _cubSay.shownAt)));
+}
+function _dismissCubSay () {
+  clearTimeout(_cubSay.timer);
+  const el = _cubSay.el;
+  _cubSay.el = null;
+  if (el?.isConnected) { el.classList.add('removing'); setTimeout(() => el.remove(), 220); }
+  setTimeout(_nextCubSay, el?.isConnected ? 160 : 0);
+}
+function _nextCubSay () {
+  if (_cubSay.el?.isConnected) return;
+  const item = _cubSay.queue.shift();
   const container = document.getElementById('toast-container');
-  const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
-  toast.innerHTML = `
+  document.body.classList.toggle('cub-talking', !!item);
+  if (!item || !container) return;
+  const el = document.createElement('div');
+  el.className = `toast cub-say ${item.type}`;
+  el.setAttribute('role', item.type === 'error' ? 'alert' : 'status');
+  el.innerHTML = `<img class="cub-say-face" src="assets/cub-avatar.jpg" alt="" aria-hidden="true" />
   <div class="toast-body">
-    <div class="toast-title">${escHtml(safeTitle)}</div>
-    ${safeMsg ? `<div class="toast-msg">${escHtml(safeMsg)}</div>` : ''}
+    ${item.title ? `<div class="toast-title">${escHtml(item.title)}</div>` : ''}
+    ${item.msg ? `<div class="toast-msg">${escHtml(item.msg)}</div>` : ''}
+    ${item.action?.label ? `<button type="button" class="btn-sm btn-orange cub-say-act">${escHtml(item.action.label)}</button>` : ''}
   </div>
   <button class="toast-close" aria-label="Dismiss">✕</button>`;
-
-  const dismiss = () => {
-  toast.classList.add('removing');
-  setTimeout(() => toast.remove(), 300);
-  };
-  toast.querySelector('.toast-close').onclick = dismiss;
-  // Tapping anywhere on it dismisses it too (phones show them over the header).
-  toast.addEventListener('click', e => { if (!e.target.closest('a, button:not(.toast-close)')) dismiss(); });
-  // Two at most: a burst of messages shouldn't bury the screen.
-  [...container.querySelectorAll('.toast:not(.removing)')].slice(0, -1).forEach(old => {
-  old.classList.add('removing');
-  setTimeout(() => old.remove(), 300);
-  });
-  container.appendChild(toast);
-  setTimeout(dismiss, type === 'error' ? 6000 : 4000);
+  el._item = item;
+  el.querySelector('.toast-close').onclick = e => { e.stopPropagation(); _dismissCubSay(); };
+  el.querySelector('.cub-say-act')?.addEventListener('click', e => { e.stopPropagation(); _dismissCubSay(); try { item.action.run(); } catch (err) { console.warn(err); } });
+  // Tapping the bubble itself dismisses it.
+  el.addEventListener('click', e => { if (!e.target.closest('a, button')) _dismissCubSay(); });
+  container.replaceChildren(el);
+  _cubSay.el = el;
+  _cubSay.shownAt = Date.now();
+  const read = Math.min(4000, (item.title.length + item.msg.length) * 35);
+  _cubSay.timer = setTimeout(_cubSayTimeUp, (item.type === 'error' ? 5000 : 3000) + read + (item.action ? 4000 : 0));
 }
+// A share card or rate prompt hides Byte Cub's bubble; keep it until that
+// closes, then give it a few seconds so the message is actually seen.
+const CUB_HUSH = '#rate-prompt, .share-nudge, #save-diary-nudge, .photo-reveal, .ff-overlay';
+function _cubSayTimeUp () {
+  const el = _cubSay.el;
+  if (el?.isConnected && !el.classList.contains('error') && document.querySelector(CUB_HUSH)) {
+    el._held = true;
+    _cubSay.timer = setTimeout(_cubSayTimeUp, 700);
+    return;
+  }
+  if (el?._held) { el._held = false; _cubSay.shownAt = Date.now(); _cubSay.timer = setTimeout(_dismissCubSay, 3500); return; }
+  _dismissCubSay();
+}
+// Floating prompts (rate us, share nudges) wait until Byte Cub is quiet.
+function whenCubQuiet (fn, tries = 20) {
+  const busy = _cubSay.el?.isConnected || _cubSay.queue.length || document.querySelector(CUB_HUSH);
+  if (!busy || tries <= 0) { fn(); return; }
+  setTimeout(() => whenCubQuiet(fn, tries - 1), 1500);
+}
+window.whenCubQuiet = whenCubQuiet;
 
 /* ════════════════════════════════════════════════════════════
    CHAT BUDDY - BYTE CUB
@@ -4764,6 +5402,7 @@ function nearbyResponse () {
   return `Enable location tracking first (click the location button in the header) and I will show what is nearby right now.`;
   }
   const nearby = state.restaurants
+  .filter(isAvailableSpot)
   .filter(r => r.lat && r.lng)
   .map(r => ({ ...r, dist: haversine(state.userLat, state.userLng, r.lat, r.lng) }))
   .filter(r => r.dist < 5000)
@@ -4783,9 +5422,9 @@ function nearbyResponse () {
 }
 
 function recommendResponse () {
-  const unvisited = state.restaurants.filter(r => r.status === 'want-to-try' && r.googleRating > 0);
+  const unvisited = state.restaurants.filter(r => isAvailableSpot(r) && r.status === 'want-to-try' && r.googleRating > 0);
   if (!unvisited.length) {
-  const top = [...state.restaurants].sort((a,b) => (b.googleRating||0) - (a.googleRating||0)).slice(0,3);
+  const top = state.restaurants.filter(isAvailableSpot).sort((a,b) => (b.googleRating||0) - (a.googleRating||0)).slice(0,3);
   if (!top.length) {
     const nearby = getNearbyDiscoveryRows(3);
     if (!nearby.length) return `Your saved list is empty, and I do not have live nearby data yet. Open Discover, run a scan, and I will recommend from nearby immediately.`;
@@ -4828,7 +5467,7 @@ function notesResponse () {
 }
 
 function budgetResponse () {
-  const cheap = state.restaurants.filter(r => r.priceRange === 1);
+  const cheap = state.restaurants.filter(r => isAvailableSpot(r) && r.priceRange === 1);
   if (!cheap.length) return `No budget spots on your list yet. Add some $ restaurants and I'll help you find a bargain! `;
   const items = cheap.slice(0,4).map(r =>
   `<span class="chip-link" data-id="${r.id}">${cuisineEmoji(r.cuisine)} ${r.name} ($)</span>`
@@ -4837,7 +5476,7 @@ function budgetResponse () {
 }
 
 function fancyResponse () {
-  const fancy = state.restaurants.filter(r => r.priceRange >= 3);
+  const fancy = state.restaurants.filter(r => isAvailableSpot(r) && r.priceRange >= 3);
   if (!fancy.length) return `No fine dining spots on your list yet. Time to live a little! `;
   const items = fancy.slice(0,4).map(r =>
   `<span class="chip-link" data-id="${r.id}">${cuisineEmoji(r.cuisine)} ${r.name} (${priceDollars(r.priceRange)})</span>`
@@ -4852,7 +5491,7 @@ function cuisineFromQuery (q) {
 
 function cuisineResponse (cuisine) {
   const list = state.restaurants.filter(r =>
-  (r.cuisine||'').toLowerCase() === cuisine.toLowerCase()
+  isAvailableSpot(r) && (r.cuisine||'').toLowerCase() === cuisine.toLowerCase()
   );
   if (!list.length) return `No ${cuisine} restaurants on your list yet! Add one `;
   const items = list.slice(0,5).map(r =>
@@ -4865,6 +5504,7 @@ function restaurantDetailResponse (r) {
   const dist = distOf(r);
   const distStr = dist < Infinity ? ` - ${fmtDist(dist)} away` : '';
   return `Here's what I know about **${r.name}**:\n\n` +
+  (!isAvailableSpot(r) ? 'Permanently closed. Your history is kept.\n' : '') +
   (r.googleRating ? `⭐ Google: ${r.googleRating}/5\n` : '') +
   (r.myRating ? `⭐ Your rating: ${r.myRating}/5\n` : '') +
   (r.address ? ` ${r.address}${distStr}\n` : '') +
@@ -4875,8 +5515,9 @@ function restaurantDetailResponse (r) {
 }
 
 function surpriseMeResponse () {
-  const unvisited = state.restaurants.filter(r => r.status === 'want-to-try');
-  const pool = unvisited.length ? unvisited : state.restaurants;
+  const available = state.restaurants.filter(isAvailableSpot);
+  const unvisited = available.filter(r => r.status === 'want-to-try');
+  const pool = unvisited.length ? unvisited : available;
   if (!pool.length) return `Your list is empty! Add some restaurants first.`;
   const r = randomFrom(pool);
   return ` How about… **${r.name}**? ${r.cuisine ? `${cuisineEmoji(r.cuisine)} ${r.cuisine} vibes.` : ''} ${r.googleRating ? `Rated ⭐${r.googleRating}.` : ''} ${r.address ? ` ${r.address}` : ''}\n\n<span class="chip-link" data-id="${r.id}">View details</span>`;
@@ -5010,6 +5651,7 @@ let _cubChatHistory = [];
 function cubSay (text, buttons = []) {
   addChatMsg(text, 'bot');
   _cubChatHistory.push({ role: 'assistant', text });
+  CubChats.record('b', text);
   if (!buttons.length) return;
   const row = document.createElement('div');
   row.className = 'chat-actions';
@@ -5064,20 +5706,29 @@ function dishFromText (t) {
 function parseCubCommand (text) {
   const t = text.trim();
   const low = t.toLowerCase();
+  if (/\b(?:eating|food|bear)\s+(?:contests?|competitions?|challenges?)\b/.test(low)) return { kind: 'contests' };
   if (/\b(show|open|see|view|go to|pull up)\b.*\b(want[- ]to[- ]try|wish ?list|to[- ]try)\b/.test(low)) return { kind: 'list', view: 'want-to-try' };
   if (/\b(show|open|see|view|pull up)\b.*\b(been there|visited|places i('ve| have) (been|eaten)|where i('ve| have) (been|eaten))\b/.test(low)) return { kind: 'list', view: 'visited' };
   if (/\b(show|open|see)\b.*\bmy lists?\b/.test(low)) return { kind: 'list', view: 'lists' };
-  let m = t.match(/\b(?:went to|ate at|eaten at|been to|visited|tried|stopped at|stopped by|had (?:breakfast|brunch|lunch|dinner|drinks|dessert|coffee) at|grabbed (?:breakfast|brunch|lunch|dinner|food|a bite) at)\s+(.+)/i)
-  || t.match(/\blog\s+(?:(?:a\s+)?(?:visit|meal)\s+(?:to|at|for)\s+)?(.+)/i);
+  const noteMatch = t.match(/\b(?:and\s+)?(?:note|remember)(?:\s+that)?\s+(.+)$/i);
+  const note = noteMatch ? noteMatch[1].trim() : '';
+  const request = noteMatch ? t.slice(0, noteMatch.index).replace(/[,\s]+$/, '') : t;
+  let m = request.match(/\b(?:add|save|put|move|mark)\s+(.+?)\s+(?:to|on|in|as)\s+(?:my\s+)?(?:visited|visitied|been[- ]there)(?:\s+list)?[.!]?\s*$/i);
   if (m) {
-  const name = placeFromText(m[1]);
-  if (name.length >= 2) return { kind: 'log', name, dish: dishFromText(t), stars: starsFromText(t) };
+    const name = placeFromText(m[1]).replace(/^the\s+/i, '');
+    if (name.length >= 2) return { kind: 'log', name, dish: dishFromText(request), stars: starsFromText(request), note };
   }
-  m = t.match(/\b(?:add|save|put)\s+(.+?)\s+(?:to|on|in)\s+(?:my\s+)?(?:want[- ]to[- ]try|list|wish ?list|to[- ]try)/i)
-  || t.match(/\bi\s+want to try\s+(.+)/i) || t.match(/^(?:add|save)\s+(.+)/i);
+  m = request.match(/\b(?:went to|ate at|eaten at|been to|visited|tried|stopped at|stopped by|had (?:breakfast|brunch|lunch|dinner|drinks|dessert|coffee) at|grabbed (?:breakfast|brunch|lunch|dinner|food|a bite) at)\s+(.+)/i)
+  || request.match(/\blog\s+(?:(?:a\s+)?(?:visit|meal)\s+(?:to|at|for)\s+)?(.+)/i);
   if (m) {
   const name = placeFromText(m[1]);
-  if (name.length >= 2) return { kind: 'want', name };
+  if (name.length >= 2) return { kind: 'log', name, dish: dishFromText(request), stars: starsFromText(request), note };
+  }
+  m = request.match(/\b(?:add|save|put)\s+(.+?)\s+(?:to|on|in)\s+(?:my\s+)?(?:want[- ]to[- ]try|list|wish ?list|to[- ]try)/i)
+  || request.match(/\bi\s+want to try\s+(.+)/i) || request.match(/^(?:can you\s+)?(?:please\s+)?(?:add|save)\s+(.+)/i);
+  if (m) {
+  const name = placeFromText(m[1]);
+  if (name.length >= 2) return { kind: 'want', name, note };
   }
   const food = foodToFind(t);
   if (food) return { kind: 'find', food };
@@ -5141,16 +5792,22 @@ async function cubFindNearby (food) {
   });
   cubSay(`Closest spots for ${food} near you:\n${lines.join('\n')}\n\nTap one to save it to Want to Try.`,
     places.slice(0, 4).map((p, i) => ({ label: `🔖 ${p.name}`, primary: i === 0, run: () => {
-      const r = savedSpotNamed(p.name);
+      const r = savedSpotNamed(p.name, p);
       if (r) { cubSay(`**${r.name}** is already saved.`, [{ label: 'Open it', primary: true, run: () => { closeChat(); openDetailModal(r.id); } }]); return; }
       const spot = createSpotFrom({ found: p, status: 'want-to-try' });
       if (spot) { saveData(); renderAll(); cubAddWant(spot); }
     } })));
 }
 
-function savedSpotNamed (name) {
+function savedSpotNamed (name, place = null) {
   const key = normalizeName(name);
-  return state.restaurants.find(r => normalizeName(r.name) === key) || findDuplicates(name)[0] || null;
+  const matches = state.restaurants.filter(r => normalizeName(r.name) === key);
+  if (place?.placeId) {
+    const exact = matches.find(r => r.placeId === place.placeId);
+    if (exact) return exact;
+  }
+  if (place?.address) return matches.find(r => normalizeName(r.address) === normalizeName(place.address)) || null;
+  return matches.length === 1 ? matches[0] : null;
 }
 
 // Creates a spot from a real place (or just a name). Respects the Cub limit.
@@ -5161,7 +5818,7 @@ function createSpotFrom ({ found = null, name = '', status = 'want-to-try' }) {
   const r = {
   id: uid(), name: String(found?.name || name).slice(0, 80), cuisine: kind.slice(0, 40), priceRange: found?.priceLevel || 0,
   address: found?.address || '', lat: Number.isFinite(found?.lat) ? found.lat : null, lng: Number.isFinite(found?.lng) ? found.lng : null,
-  website: '', photo: '', googleRating: found?.rating || 0, googleReviews: found?.reviews || 0, myRating: 0, notes: '', tags: [],
+  placeId: found?.placeId || '', website: '', photo: '', googleRating: found?.rating || 0, googleReviews: found?.reviews || 0, myRating: 0, notes: '', tags: [],
   collectionId: null, priority: '', status, dateAdded: today, dateVisited: status === 'visited' ? today : null,
   updatedAt: Date.now(), visits: [], links: [],
   };
@@ -5171,19 +5828,25 @@ function createSpotFrom ({ found = null, name = '', status = 'want-to-try' }) {
   return r;
 }
 
-function cubLogVisit (r, { dish = '', stars = 0 } = {}) {
+function cubSaveNote (r, note = '') {
+  if (!note) return;
+  r.notes = [r.notes, note].filter(Boolean).join('\n');
+}
+
+function cubLogVisit (r, { dish = '', stars = 0, note = '' } = {}) {
   if (!Array.isArray(r.visits)) r.visits = [];
-  r.visits.push({ date: iso(), note: '', rating: stars, dish, photo: '' });
+  r.visits.push({ date: iso(), note, rating: stars, dish, photo: '' });
+  cubSaveNote(r, note);
   r.status = 'visited';
   r.dateVisited = r.dateVisited || iso();
   if (stars) r.myRating = stars;
   r.updatedAt = Date.now();
   if (dish) upsertDish(r, { name: dish, verdict: stars >= 4 ? 'again' : stars && stars <= 2 ? 'skip' : 'ok', rating: stars || undefined });
-  else saveData();
+  saveData();
   renderAll();
   trackProductEvent('cub_logged_visit', { hasDish: !!dish, stars });
   const bits = [stars ? '★'.repeat(stars) : '', dish ? `the ${dish}` : ''].filter(Boolean).join(' and ');
-  cubSay(`Done! **${r.name}** is on your Been There list${bits ? ` with ${bits}` : ''}. 🐻`, [
+  cubSay(`Done! **${r.name}**${r.address ? ` (${r.address})` : ''} is on your Been There list${bits ? ` with ${bits}` : ''}.${note ? `\nSaved note: ${note}` : ''} 🐻`, [
   { label: '📸 Add photos', primary: true, run: () => { closeChat(); openDetailModal(r.id); } },
   ...(stars ? [] : [{ label: '⭐ Rate it', run: () => cubAskStars(r) }]),
   { label: 'See Been There', run: () => { closeChat(); setView('visited'); } },
@@ -5214,21 +5877,40 @@ function cubAddWant (r) {
 
 // Finds the place you mean: one of yours, or real ones to choose from.
 async function cubResolve (name, onPick) {
-  const saved = savedSpotNamed(name);
-  if (saved) { onPick({ r: saved }); return; }
+  const generation = _dataGeneration;
+  const choose = onPick;
+  onPick = value => { if (generation === _dataGeneration && !window._ftbAccountSwitching) choose(value); };
+  const query = name.replace(/^the\s+/i, '').trim();
+  const branch = query.match(/^(.+?)\s+(?:on|at|in|near)\s+(.+)$/i);
+  const key = normalizeName(branch ? branch[1] : query);
+  const locationKey = branch ? normalizeName(branch[2]) : '';
+  const matchesBranch = p => !locationKey || normalizeName(`${p.name} ${p.address || ''}`).includes(locationKey);
+  const saved = state.restaurants.filter(r => normalizeName(r.name) === key && matchesBranch(r));
+  if (saved.length === 1) { onPick({ r: saved[0] }); return; }
+  if (saved.length > 1) {
+    cubSay('You have more than one saved location. Which one?', saved.map(r => ({
+      label: `${r.name}${r.address ? ` · ${r.address}` : ' · address not saved'}`,
+      run: () => onPick({ r }),
+    })));
+    return;
+  }
   showTyping();
-  const found = await searchRealPlaces(name);
+  const found = (await searchRealPlaces(query)).filter(p => normalizeName(p.name).includes(key) && matchesBranch(p));
+  if (generation !== _dataGeneration) return;
   hideTyping();
   if (!found.length) {
-  cubSay(`I couldn't find "${name}" on the map. Want me to save it with just the name?`, [
+  cubSay(`I couldn't verify "${name}" on the map. I won't substitute another location. Want me to save it with just the name?`, [
     { label: `Yes, use "${name}"`, primary: true, run: () => onPick({ name }) },
   ]);
   return;
   }
-  if (found.length === 1 || normalizeName(found[0].name) === normalizeName(name)) {
+  if (found.length === 1) {
   const f = found[0];
   cubSay(`Is it **${f.name}**${f.address ? `, ${f.address}` : ''}?`, [
-    { label: 'Yes', primary: true, run: () => onPick({ found: f }) },
+    { label: 'Yes', primary: true, run: () => {
+      const r = savedSpotNamed(f.name, f);
+      onPick(r ? { r } : { found: f });
+    } },
     ...(found.length > 1 ? [{ label: 'No, show others', run: () => cubChoose(found.slice(1), name, onPick) }] : [{ label: `No, just "${name}"`, run: () => onPick({ name }) }]),
   ]);
   return;
@@ -5238,12 +5920,21 @@ async function cubResolve (name, onPick) {
 
 function cubChoose (found, name, onPick) {
   cubSay('Which one?', [
-  ...found.slice(0, 4).map(f => ({ label: `${f.name}${f.address ? ` · ${f.address.split(',')[0]}` : ''}`, run: () => onPick({ found: f }) })),
+  ...found.slice(0, 4).map(f => ({ label: `${f.name}${f.address ? ` · ${f.address}` : ''}`, run: () => {
+    const r = savedSpotNamed(f.name, f);
+    onPick(r ? { r } : { found: f });
+  } })),
   { label: `Just "${name}"`, run: () => onPick({ name }) },
   ]);
 }
 
 async function handleCubCommand (cmd) {
+  if (cmd.kind === 'contests') {
+    cubSay('Open Bear Challenges on Home, or its shortcut in Play / Discover. You can browse restaurant challenges, upcoming competitions, source links and your saved events, or filter by state and city.', [
+      { label: 'Open eating competitions', primary: true, run: () => { closeChat(); openFoodEvents(); } },
+    ]);
+    return;
+  }
   if (cmd.kind === 'list') {
   cubSay(cmd.view === 'visited' ? 'Here are the places you have been.' : cmd.view === 'want-to-try' ? 'Here is your Want to Try list.' : 'Here are your lists.');
   setTimeout(() => { closeChat(); setView(cmd.view); }, 500);
@@ -5259,13 +5950,14 @@ async function handleCubCommand (cmd) {
   if (cmd.kind === 'want') {
   await cubResolve(cmd.name, ({ r, found, name }) => {
     if (r) {
-      cubSay(r.status === 'visited' ? `You've already been to **${r.name}**! It's on your Been There list.` : `**${r.name}** is already on your Want to Try list.`, [
+      if (cmd.note) { cubSaveNote(r, cmd.note); r.updatedAt = Date.now(); saveData(); renderAll(); }
+      cubSay((r.status === 'visited' ? `You've already been to **${r.name}**! It's on your Been There list.` : `**${r.name}** is already on your Want to Try list.`) + (cmd.note ? `\nSaved note: ${cmd.note}` : ''), [
         { label: 'Open it', primary: true, run: () => { closeChat(); openDetailModal(r.id); } },
       ]);
       return;
     }
     const spot = createSpotFrom({ found, name, status: 'want-to-try' });
-    if (spot) { saveData(); renderAll(); cubAddWant(spot); }
+    if (spot) { cubSaveNote(spot, cmd.note); saveData(); renderAll(); cubAddWant(spot); }
   });
   return;
   }
@@ -5349,13 +6041,16 @@ function answerCubQuestion (text) {
   return true;
 }
 
-async function sendChat () {
+async function sendChat (message) {
+  if (window._ftbAccountSwitching) return;
+  const generation = _dataGeneration;
   const input = document.getElementById('chat-input');
-  const text = input.value.trim();
+  const text = (typeof message === 'string' ? message : input.value).trim();
   if (!text) return;
   input.value = '';
   addChatMsg(text, 'user');
   _cubChatHistory.push({ role: 'user', text });
+  CubChats.record('u', text);
 
   // An answer to Byte Cub's question, unless it's clearly a new question or request.
   if (_cubAwaiting) {
@@ -5367,8 +6062,8 @@ async function sendChat () {
   if (cmd) { trackProductEvent('cub_command', { kind: cmd.kind }); await handleCubCommand(cmd); return; }
 
   // A place you saved, by name: open it.
-  const named = state.restaurants.find(r => r.name && text.toLowerCase().includes(r.name.toLowerCase()));
-  if (named && !/\?$/.test(text)) {
+  const named = savedSpotNamed(text);
+  if (named) {
   cubSay(restaurantDetailResponse(named), [{ label: `Open ${named.name}`, primary: true, run: () => { closeChat(); openDetailModal(named.id); } }]);
   return;
   }
@@ -5376,16 +6071,26 @@ async function sendChat () {
   showTyping();
   if (window.AI?.hasAccess?.()) {
     try {
-      const reply = await AI.chat(text, _cubChatHistory.slice(-12), state.restaurants, await userAreaName());
+      const area = await userAreaName();
+      if (generation !== _dataGeneration) return;
+      const reply = await AI.chat(text, _cubChatHistory.slice(-12), state.restaurants, area);
+      if (generation !== _dataGeneration) return;
       hideTyping();
       // He asks the app to search real places near you rather than asking where you are.
       const find = String(reply).match(/\[\[\s*FIND:\s*([^\]]{2,60})\]\]/i);
       if (find) { await cubFindNearby(find[1].trim().toLowerCase()); return; }
+      if (!String(reply).trim()) throw new Error('Byte Cub returned an empty answer.');
       cubSay(reply);
       return;
-    } catch { /* fall through to the built-in answers */ }
+    } catch (err) {
+      if (generation !== _dataGeneration) return;
+      console.warn('[FTB] Byte Cub chat failed:', err);
+      hideTyping();
+      cubSay("I couldn't reach the AI just now. Here's what I can tell from your saved list:\n\n" + chatResponse(text));
+      return;
+    }
   }
-  setTimeout(() => { hideTyping(); cubSay(chatResponse(text)); }, 350);
+  setTimeout(() => { if (generation === _dataGeneration) { hideTyping(); cubSay(chatResponse(text)); } }, 350);
 }
 
 function openChat () {
@@ -5394,13 +6099,219 @@ function openChat () {
   document.body.classList.add('chat-open');
   document.getElementById('chat-input').focus();
 
-  // Show welcome message if first time
+  // Your last conversation is still here; otherwise a fresh hello.
   const messages = document.getElementById('chat-messages');
-  if (!messages.children.length) {
+  if (!messages.children.length && !CubChats.restore()) {
   addChatMsg(randomFrom(GREETINGS), 'bot');
   renderQuickReplies();
   }
 }
+
+/* ── Byte Cub chat history ──────────────────────────────────────
+   Every chat is kept: on this phone (the newest 10 in full) and, signed in,
+   on your account (api/chats.js, the newest 30), so "Past chats" can pick
+   any of them up again on any device and Byte Cub remembers what was said. */
+const CubChats = (() => {
+  const KEY = 'ftb_cub_chats_v1';
+  const LOCAL_FULL = 10, KEEP = 30, MAX_MSGS = 80, MAX_TEXT = 1500;
+  let saveTimer = null;
+
+  function load () {
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { d = null; }
+    if (!d || typeof d !== 'object' || !d.chats || typeof d.chats !== 'object') d = { uid: '', current: '', chats: {} };
+    // Chats from a different account on this phone aren't yours.
+    if (d.uid && window._ftbUid && d.uid !== window._ftbUid) d = { uid: window._ftbUid, current: '', chats: {} };
+    return d;
+  }
+  function store (d) {
+    d.uid = window._ftbUid || d.uid || '';
+    const list = Object.values(d.chats).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, KEEP);
+    d.chats = {};
+    list.forEach((c, i) => { d.chats[c.id] = i < LOCAL_FULL || c.id === d.current ? c : { ...c, messages: null }; });
+    try { localStorage.setItem(KEY, JSON.stringify(d)); } catch { /* storage full: the account copy still has it */ }
+  }
+  const newId = () => Array.from(crypto.getRandomValues(new Uint8Array(10)), b => (b % 36).toString(36)).join('') + Date.now().toString(36);
+  const titleOf = c => (c.messages || []).find(m => m.r === 'u')?.t.slice(0, 60) || 'Chat with Byte Cub';
+
+  async function api (method, { query = '', body = null } = {}) {
+    if (!window._ftbUid) return null;
+    const headers = { 'Content-Type': 'application/json', ...(typeof ftbApiHeaders === 'function' ? await ftbApiHeaders() : {}) };
+    const resp = await fetch(`/api/chats${query}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    return resp.ok ? resp.json().catch(() => ({})) : null;
+  }
+
+  function record (r, t) {
+    const text = String(t ?? '').trim().slice(0, MAX_TEXT);
+    if (!text) return;
+    const d = load();
+    let c = d.current && d.chats[d.current];
+    if (!c || !Array.isArray(c.messages)) { c = { id: newId(), title: '', updatedAt: 0, messages: [] }; d.current = c.id; }
+    c.messages = [...c.messages, { r, t: text, at: Date.now() }].slice(-MAX_MSGS);
+    c.updatedAt = Date.now();
+    c.title = titleOf(c);
+    c.count = c.messages.length;
+    d.chats[c.id] = c;
+    store(d);
+    // A chat with only Byte Cub talking isn't worth keeping on the account yet.
+    if (c.messages.some(m => m.r === 'u')) {
+      clearTimeout(saveTimer);
+      const generation = _dataGeneration;
+      saveTimer = setTimeout(() => {
+        if (generation !== _dataGeneration) return;
+        api('POST', { body: { id: c.id, title: c.title, messages: c.messages } })
+          .catch(err => console.warn('[FTB] Chat backup failed:', err));
+      }, 1500);
+    }
+  }
+
+  function show (c) {
+    const box = document.getElementById('chat-messages');
+    box.innerHTML = '';
+    document.getElementById('chat-suggestions').innerHTML = '';
+    _cubChatHistory = [];
+    _cubAwaiting = null;
+    (c.messages || []).forEach(m => {
+      addChatMsg(m.t, m.r === 'u' ? 'user' : 'bot');
+      _cubChatHistory.push({ role: m.r === 'u' ? 'user' : 'assistant', text: m.t });
+    });
+  }
+
+  // Opening the chat: your last conversation, if there is one.
+  function restore () {
+    const d = load();
+    const c = d.current && d.chats[d.current];
+    if (!c || !Array.isArray(c.messages) || !c.messages.some(m => m.r === 'u')) return false;
+    show(c);
+    return true;
+  }
+
+  function startNew () {
+    const d = load();
+    d.current = '';
+    store(d);
+    closeHistory();
+    document.getElementById('chat-messages').innerHTML = '';
+    _cubChatHistory = [];
+    _cubAwaiting = null;
+    addChatMsg(randomFrom(GREETINGS), 'bot');
+    renderQuickReplies();
+    document.getElementById('chat-input')?.focus();
+  }
+
+  function when (ms) {
+    const d = new Date(ms);
+    const days = Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(ms).setHours(0, 0, 0, 0)) / 86400000);
+    if (days <= 0) return `Today, ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+    if (days === 1) return 'Yesterday';
+    if (days < 7) return d.toLocaleDateString(undefined, { weekday: 'long' });
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  function drawList (note = '') {
+    const d = load();
+    const el = document.getElementById('chat-history-list');
+    const list = Object.values(d.chats).filter(c => (c.count || c.messages?.length)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    el.innerHTML = list.length
+      ? list.map(c => `<div class="chat-history-row${c.id === d.current ? ' current' : ''}">
+          <button type="button" class="chat-history-open" data-id="${escHtml(c.id)}">
+            <strong>${escHtml(c.title || 'Chat with Byte Cub')}</strong>
+            <span>${escHtml(when(c.updatedAt || 0))} · ${c.count || c.messages?.length || 0} messages${c.id === d.current ? ' · open now' : ''}</span>
+          </button>
+          <button type="button" class="icon-btn chat-history-del" data-id="${escHtml(c.id)}" aria-label="Delete this chat">✕</button>
+        </div>`).join('')
+      : `<div class="chat-history-empty">${note || 'No past chats yet. Tell Byte Cub where you ate, or ask him anything, and the chat is kept here.'}</div>`;
+  }
+
+  async function showHistory () {
+    const generation = _dataGeneration;
+    document.getElementById('chat-history').classList.remove('hidden');
+    document.getElementById('chat-panel').classList.add('history-open');
+    drawList(window._ftbUid ? 'Looking for your chats…' : '');
+    try {
+      const data = await api('GET');
+      if (generation !== _dataGeneration) return;
+      if (Array.isArray(data?.chats)) {
+        const d = load();
+        data.chats.forEach(s => {
+          if (!/^[a-z0-9]{8,32}$/.test(s.id || '')) return;
+          const mine = d.chats[s.id];
+          if (!mine || (s.updatedAt || 0) > (mine.updatedAt || 0)) d.chats[s.id] = { id: s.id, title: String(s.title || ''), updatedAt: Number(s.updatedAt) || 0, count: Number(s.count) || 0, messages: null };
+        });
+        store(d);
+      }
+    } catch { /* show what this phone has */ }
+    if (!document.getElementById('chat-history').classList.contains('hidden')) drawList();
+  }
+  function closeHistory () {
+    document.getElementById('chat-history')?.classList.add('hidden');
+    document.getElementById('chat-panel')?.classList.remove('history-open');
+  }
+
+  async function openById (id) {
+    const generation = _dataGeneration;
+    const d = load();
+    let c = d.chats[id];
+    if (!c) return;
+    if (!Array.isArray(c.messages)) {
+      const data = await api('GET', { query: `?id=${encodeURIComponent(id)}` }).catch(() => null);
+      if (generation !== _dataGeneration) return;
+      if (!data?.chat) { showToast("Couldn't open that chat", 'Check your connection and try again.', 'error'); return; }
+      c = { ...c, ...data.chat, count: data.chat.messages.length };
+    }
+    const fresh = load();
+    fresh.chats[id] = c;
+    fresh.current = id;
+    store(fresh);
+    closeHistory();
+    show(c);
+    cubSayQuiet('Picking up where we left off. What else?');
+    document.getElementById('chat-input')?.focus();
+  }
+  // A note from Byte Cub that isn't saved into the chat itself.
+  function cubSayQuiet (text) { addChatMsg(text, 'bot'); }
+
+  function remove (id) {
+    const d = load();
+    delete d.chats[id];
+    const wasCurrent = d.current === id;
+    if (wasCurrent) d.current = '';
+    store(d);
+    api('POST', { body: { action: 'delete', id } }).catch(() => {});
+    drawList();
+    if (wasCurrent) document.getElementById('chat-messages').innerHTML = '';
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('chat-history-btn')?.addEventListener('click', () => {
+      if (document.getElementById('chat-history').classList.contains('hidden')) showHistory(); else closeHistory();
+    });
+    document.getElementById('chat-history-back')?.addEventListener('click', () => {
+      closeHistory();
+      if (!document.getElementById('chat-messages').children.length && !restore()) startNew();
+    });
+    document.getElementById('chat-new-btn')?.addEventListener('click', startNew);
+    document.getElementById('chat-history-list')?.addEventListener('click', e => {
+      const del = e.target.closest('.chat-history-del');
+      if (del) { remove(del.dataset.id); return; }
+      const open = e.target.closest('.chat-history-open');
+      if (open) openById(open.dataset.id);
+    });
+  });
+
+  function resetSession () {
+    clearTimeout(saveTimer);
+    _cubChatHistory = [];
+    _cubAwaiting = null;
+    closeHistory();
+    document.getElementById('chat-messages')?.replaceChildren();
+    document.getElementById('chat-history-list')?.replaceChildren();
+    document.getElementById('chat-suggestions')?.replaceChildren();
+  }
+
+  return { record, restore, startNew, showHistory, closeHistory, openById, resetSession };
+})();
+window.CubChats = CubChats;
 
 function closeChat () {
   document.getElementById('chat-panel').classList.add('hidden');
@@ -5485,7 +6396,7 @@ function renderSearchMode () {
   const on = !!q && !['map', 'stats'].includes(state.currentView);
   main.classList.toggle('is-searching', on);
   let bar = document.getElementById('search-summary');
-  if (!on) { bar?.remove(); BackNav.layer('search', false); return; }
+  if (!on) { bar?.remove(); document.getElementById('search-nearby-results')?.remove(); BackNav.layer('search', false); return; }
   if (!bar) {
   bar = document.createElement('div');
   bar.id = 'search-summary';
@@ -5493,7 +6404,15 @@ function renderSearchMode () {
   main.prepend(bar);
   }
   const n = getFiltered().length;
-  bar.innerHTML = `<span>${n ? `${n} spot${n === 1 ? '' : 's'} match` : 'Nothing matches'} “${escHtml(q)}”</span>
+  const nearby = _nearbyCards.filter(card => !card.isSaved && matchesRestaurantSearch(card, q)
+    && (!state.filter.cuisine || cuisineFilterKey(card.cuisine) === cuisineFilterKey(state.filter.cuisine)));
+  let results = document.getElementById('search-nearby-results');
+  if (nearby.length) {
+    if (!results) { results = document.createElement('section'); results.id = 'search-nearby-results'; bar.after(results); }
+    results.innerHTML = `<h2>Nearby matches · not saved</h2><div class="search-nearby-grid">${nearby.map(renderNearbyVisualCard).join('')}</div>`;
+    wireNearbyCardLinks(results);
+  } else { results?.remove(); }
+  bar.innerHTML = `<span>${n ? `${n} spot${n === 1 ? '' : 's'} match` : nearby.length ? `${nearby.length} nearby spot${nearby.length === 1 ? '' : 's'} match` : 'Nothing matches'} “${escHtml(q)}”</span>
   ${n ? '' : `<button type="button" class="btn-ghost btn-sm" data-act="nearby">Search nearby</button>`}
   <button type="button" class="btn-ghost btn-sm" data-act="clear">Clear</button>`;
   bar.querySelector('[data-act=clear]').onclick = () => { clearSearch(); };
@@ -5514,13 +6433,51 @@ function clearSearch () {
 
 // Discover with the search box filled in (for spots you haven't saved).
 function openDiscoverSearch (term) {
-  discoverNearby();
-  setTimeout(() => {
-  const box = document.getElementById('disc-search');
-  if (!box) return;
-  box.value = term;
-  box.dispatchEvent(new Event('input', { bubbles: true }));
-  }, 300);
+  return discoverNearby({ query: term });
+}
+
+function initDialogFocus () {
+  const origins = new Map();
+  let top = null;
+  let lastFocused = document.activeElement;
+  const visible = el => el.isConnected && el.getClientRects().length && !el.closest('.hidden') && getComputedStyle(el).visibility !== 'hidden';
+  const controls = dialog => [...dialog.querySelectorAll('button, a[href], input, select, textarea, [tabindex]')]
+    .filter(el => !el.matches(':disabled') && el.tabIndex >= 0 && visible(el));
+  const refresh = (origin = document.activeElement) => {
+    const dialogs = [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].filter(visible)
+      .sort((a, b) => (parseInt(getComputedStyle(a).zIndex) || 0) - (parseInt(getComputedStyle(b).zIndex) || 0));
+    dialogs.forEach(dialog => { if (!origins.has(dialog)) origins.set(dialog, origin); });
+    const next = dialogs.at(-1) || null;
+    if (next !== top) {
+      const previous = top;
+      top = next;
+      if (top) top.tabIndex = -1;
+      const trigger = previous && !dialogs.includes(previous) ? origins.get(previous) : null;
+      if (trigger && visible(trigger) && (!top || top.contains(trigger))) trigger.focus({ preventScroll: true });
+      else if (top && !top.contains(document.activeElement)) {
+        (controls(top)[0] || top).focus({ preventScroll: true });
+      }
+    }
+    for (const dialog of origins.keys()) if (!dialogs.includes(dialog)) origins.delete(dialog);
+  };
+  new MutationObserver(() => refresh()).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+  document.addEventListener('focusin', e => {
+    const previous = lastFocused;
+    lastFocused = e.target;
+    refresh(previous);
+    if (top && visible(top) && !top.contains(document.activeElement)) (controls(top)[0] || top).focus({ preventScroll: true });
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Tab' || e.defaultPrevented || !top || !visible(top)) return;
+    const items = controls(top);
+    if (!items.length) { e.preventDefault(); top.focus(); return; }
+    if (!top.contains(document.activeElement) || (e.shiftKey && document.activeElement === items[0])) {
+      e.preventDefault(); items[e.shiftKey ? items.length - 1 : 0].focus();
+    } else if (!e.shiftKey && document.activeElement === items.at(-1)) {
+      e.preventDefault(); items[0].focus();
+    }
+  });
+  refresh();
 }
 
 /* ── Phone Back button ────────────────────────────────────────
@@ -5642,17 +6599,18 @@ window.addEventListener('beforeinstallprompt', e => {
    ════════════════════════════════════════════════════════════ */
 function initTheme () {
   const appearance = loadUserProfile()?.appearance || {};
+  const hasLocalChoice = !!state.settings.themeChoice;
   if (!state.settings.themeChoice && appearance.themeChoice) state.settings.themeChoice = appearance.themeChoice;
   if (!state.settings.theme && appearance.themeMode) state.settings.theme = appearance.themeMode;
   if (!state.settings.uiDensity && appearance.uiDensity) state.settings.uiDensity = appearance.uiDensity;
   if (!state.settings.uiCorners && appearance.uiCorners) state.settings.uiCorners = appearance.uiCorners;
   if (!state.settings.uiMotion && appearance.uiMotion) state.settings.uiMotion = appearance.uiMotion;
 
-  if (state.settings.themeChoice === 'auto') state.settings.themeManual = false;
-  const initialChoice = state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark');
-  if (initialChoice !== 'auto') {
-  applyThemeChoice(initialChoice, { manual: !!state.settings.themeManual, persist: true });
-  }
+  // Older automatic themes saved "light" without a manual choice. Only an
+  // explicit Auto or chosen theme may override the dark first-run default.
+  const manualChoice = state.settings.themeManual === true || (!hasLocalChoice && !!appearance.themeChoice && appearance.themeManual !== false);
+  const initialChoice = state.settings.themeChoice === 'auto' ? 'auto' : manualChoice ? (state.settings.themeChoice || (state.settings.theme === 'light' ? 'light' : 'dark')) : 'dark';
+  applyThemeChoice(initialChoice, { manual: true, persist: true });
   applyPersonalizationSettings();
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
   document.getElementById('theme-toggle-btn').addEventListener('click', () => {
@@ -5684,8 +6642,17 @@ const ONBOARDING_STEPS = [
   { title: 'Let Byte Cub Curate', desc: 'Ask for smart recommendations, tie breakers, and refined shareable cards.' },
 ];
 let _onboardingStep = 0;
+let _onboardingAfterSignIn = false;
 function showOnboarding () {
   if (state.settings.onboardingDone) return;
+  // Not over a shared spot or a link that opened something (it asks next time).
+  const q = new URLSearchParams(location.search);
+  if (['text', 'title', 'url', 'spot', 'action', 'share-target'].some(k => q.has(k))) return;
+  // Not before sign-in: an account signing in on a new phone already set up.
+  // Not before we know who's here (sign-in restoring), and not under the sign-in sheet.
+  if (typeof _gateOn === 'function' && _gateOn() && !window._ftbUid && (!window._ftbAuthReady || _signInRequired())) { _onboardingAfterSignIn = true; return; }
+  // The sign-in sheet is up (a new phone): setup waits for "Try it first" or sign-in.
+  if (!document.getElementById('auth-overlay')?.classList.contains('hidden')) { _onboardingAfterSignIn = true; return; }
   // The cub's hands-on welcome; the old slides stay as a fallback.
   if (window.Cub?.welcome?.()) return;
   _onboardingStep = 0;
@@ -5706,6 +6673,18 @@ function dismissOnboarding () {
   document.getElementById('onboarding-overlay').classList.add('hidden');
   state.settings.onboardingDone = true;
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+}
+// Signed in (firebase.js): an account that already has spots or a profile
+// skips setup; a new one gets it now if it was waiting for sign-in.
+function onboardingAfterSignIn (existing) {
+  if (state.settings.onboardingDone) return;
+  if (existing) {
+    window.Cub?.endWelcome?.();
+    dismissOnboarding();
+    maybeHideOverlay();
+    return;
+  }
+  if (_onboardingAfterSignIn) { _onboardingAfterSignIn = false; setTimeout(showOnboarding, 400); }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -5744,12 +6723,13 @@ let _discSort = 'distance';
 let _discRenderLimit = 24;   // how many of the filtered results are currently shown ("Load More" bumps this)
 const DISC_PAGE_SIZE = 24;
 
-async function discoverNearby () {
+async function discoverNearby ({ query = '' } = {}) {
   if (!(await ensureLocationForDiscovery())) return;
 
   const overlay = document.getElementById('nearby-overlay');
   overlay.classList.remove('hidden');
   document.body.classList.add('overlay-open');
+  document.getElementById('disc-search').value = query;
 
   // Update location label
   const locLabel = document.getElementById('disc-location-label');
@@ -5911,12 +6891,41 @@ async function _discFetch () {
   _discRenderLimit = DISC_PAGE_SIZE;
   _discApplyFilters();
 
+    // Track successful nearby search
+    if (window.Analytics) {
+      Analytics.track('nearby_search_success', {
+        resultCount: _discAllResults.length,
+        radius,
+        lat,
+        lng
+      });
+    }
+
   } catch (err) {
-  resultsEl.innerHTML = `<div class="disc-empty">
-    <div class="disc-empty-icon" aria-hidden="true">🐻</div>
-    <div class="disc-empty-title">${err?.name === 'AbortError' ? 'Took too long' : 'Connection error'}</div>
-    <div class="disc-empty-sub">Check your connection and tap the refresh button.</div>
-  </div>`;
+    console.error('[Nearby] Error fetching restaurants:', err);
+
+    // Track error in analytics
+    if (window.Analytics) {
+      Analytics.track('nearby_search_error', {
+        error: err?.message || 'Unknown error',
+        errorType: err?.name || 'Error',
+        lat,
+        lng,
+        radius
+      });
+    }
+
+    resultsEl.innerHTML = `<div class="disc-empty">
+      <div class="disc-empty-icon" aria-hidden="true">🐻</div>
+      <div class="disc-empty-title">${err?.name === 'AbortError' ? 'Search took too long' : 'Could not find nearby restaurants'}</div>
+      <div class="disc-empty-sub">The bear is having trouble sniffing out restaurants. Check your connection and try again!</div>
+      <button class="btn-primary" style="margin-top:16px" onclick="_discFetch()">Try Again</button>
+    </div>`;
+
+    // Show toast for better visibility
+    if (window.showToast) {
+      showToast('Nearby Search', err?.name === 'AbortError' ? 'Search timeout - try a smaller radius' : 'Could not load restaurants. Try again!', 'error');
+    }
   }
 }
 
@@ -5953,7 +6962,7 @@ function _discApplyFilters () {
   let results = _discAllResults.filter(r => {
   if (cuisine !== 'all' && r.cuisine !== cuisine && r.amenity !== cuisine) return false;
   if (craving && craving.test(`${r.cuisine} ${r.name}`.toLowerCase())) return true;
-  if (query && !r.name.toLowerCase().includes(query) && !r.cuisine.toLowerCase().includes(query)) return false;
+  if (query && !matchesRestaurantSearch({ ...r, address: `${r.street || ''} ${r.city || ''}` }, query)) return false;
   return true;
   });
 
@@ -6090,7 +7099,7 @@ async function shareCard (r) {
   const uidRef = window._ftbUid && /^[A-Za-z0-9]{10,64}$/.test(window._ftbUid) ? window._ftbUid : '';
   const link = uidRef ? `https://www.feed-the-bear.com/app.html?ref=${uidRef}` : 'https://www.feed-the-bear.com';
   const text = `${visited ? 'Eating at' : 'Next up:'} ${r.name}${goTo ? ` (the ${goTo.name}!)` : ''}. I keep all my spots on Feed The Bear: ${link}`;
-  trackProductEvent('spot_card_shared', { photo: !!(r.photo || r.placePhoto) });
+  trackProductEvent('spot_card_shared', { photo: !!window.StoryCard?.photosFor(r).length });
   if (window.StoryCard?.openStory) {
   try {
     await StoryCard.openStory({
@@ -6099,12 +7108,20 @@ async function shareCard (r) {
       title: r.name,
       sub: [r.cuisine, priceDollars(r.priceRange), area].filter(Boolean).join(' · '),
       stars: r.myRating || 0,
-      photo: safeUrl(r.photo || r.placePhoto || ''),
+      photo: StoryCard.photosFor(r)[0] || '',
+      photos: StoryCard.photosFor(r),
+      media: mediaOf(r),
+      place: r.name,
+      location: r.address || area,
       sections: goTo ? [{ label: goTo.verdict === 'want' ? 'Dying to try' : 'Get the', items: [goTo.name], tone: 'gold' }] : [],
       footer: visited ? 'Remember every great bite' : 'Never lose a place to try',
     }, text, `${r.name}-feed-the-bear`);
     return;
-  } catch (err) { console.warn('[FTB] spot story failed:', err); }
+  } catch (err) {
+    console.warn('[FTB] spot story failed:', err);
+    showToast('Could not make place card', err.message || 'Try attaching your photo again.', 'error');
+    return;
+  }
   }
   try {
   if (navigator.share) await navigator.share({ title: r.name, text });
@@ -6295,11 +7312,13 @@ function refreshSharedRealtimeSubscriptions () {
   Object.values(_sharedRealtimeUnsubs).forEach(unsub => { try { unsub(); } catch {} });
   Object.keys(_sharedRealtimeUnsubs).forEach(k => delete _sharedRealtimeUnsubs[k]);
   if (!window._ftbUid || typeof fbSharedListSubscribe !== 'function') return;
+  const uid = window._ftbUid;
+  const generation = _dataGeneration;
 
   Object.entries(getSharedListsMap()).forEach(([cid, meta]) => {
   const cloudId = getSharedCloudId(cid);
   _sharedRealtimeUnsubs[cid] = fbSharedListSubscribe(cloudId, data => {
-    if (!data) return;
+    if (!data || uid !== window._ftbUid || generation !== _dataGeneration) return;
     applySharedCloudData(cid, { ...data, cloudId });
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
     renderCollectionsList();
@@ -6847,7 +7866,7 @@ function buildDecisionModeShortlist () {
 
   const swipe = swipeCraving();
 
-  const scored = state.restaurants.map(r => {
+  const scored = state.restaurants.filter(isAvailableSpot).map(r => {
   const distance = distOf(r);
   let score = scoreMoodPick(r, mood);
   const cuisineLc = String(r.cuisine || '').toLowerCase();
@@ -7074,7 +8093,8 @@ function runSmartPlanner () {
   if (!out) return;
 
   const nearbyFallback = getNearbyDiscoveryRows(16);
-  const plannerPool = state.restaurants.length ? [...state.restaurants] : nearbyFallback;
+  const available = state.restaurants.filter(isAvailableSpot);
+  const plannerPool = available.length ? available : nearbyFallback;
 
   const picks = plannerPool.map(r => {
   if (budget && (r.priceRange || 0) > budget) return { r, s: -999 };
@@ -7159,7 +8179,7 @@ function buildSmartItinerary () {
   };
   const w = styleWeights[style] || styleWeights.balanced;
 
-  const pool = [...state.restaurants]
+  const pool = state.restaurants.filter(isAvailableSpot)
   .map(r => {
     const d = distOf(r);
     const moodScore = scoreMoodPick(r, style === 'balanced' ? 'quick' : style);
@@ -7233,7 +8253,7 @@ function _dvCandidates () {
 function openDinnerRooms (presetIds = null) {
   if (grizzlyLocked('vote')) return;
   _dvSelected.clear();
-  const preset = Array.isArray(presetIds) ? presetIds.filter(id => state.restaurants.some(r => r.id === id)).slice(0, DV_MAX) : [];
+  const preset = Array.isArray(presetIds) ? presetIds.filter(id => state.restaurants.some(r => r.id === id && isAvailableSpot(r))).slice(0, DV_MAX) : [];
   if (preset.length) preset.forEach(id => _dvSelected.add(id));
   else _dvCandidates().slice(0, 3).forEach(r => _dvSelected.add(r.id));
   renderDinnerVote();
@@ -7338,7 +8358,7 @@ function closeShareHighlights () {
   maybeHideOverlay();
 }
 
-function exportHighlightCard (kind = 'weekly') {
+async function exportHighlightCard (kind = 'weekly') {
   const canvas = document.getElementById('share-canvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -7406,7 +8426,7 @@ function exportHighlightCard (kind = 'weekly') {
   ];
   } else if (kind === 'mood') {
   const mood = document.querySelector('.home-mood-chip.active')?.dataset.mood || 'quick';
-  const picks = [...state.restaurants]
+  const picks = state.restaurants.filter(isAvailableSpot)
     .map(r => ({ ...r, s: scoreMoodPick(r, mood) }))
     .sort((a, b) => b.s - a.s)
     .slice(0, 3);
@@ -7429,12 +8449,17 @@ function exportHighlightCard (kind = 'weekly') {
   ctx.fillText(line, 126, y + 8);
   });
 
-  ctx.fillStyle = '#FFD166';
-  ctx.font = '600 30px Poppins, system-ui';
-  ctx.fillText('feed the bear', 92, H - 128);
   ctx.fillStyle = 'rgba(255,255,255,.72)';
   ctx.font = '500 24px Poppins, system-ui';
-  ctx.fillText(new Date().toLocaleDateString(), 92, H - 88);
+  ctx.fillText(`Feed The Bear · ${new Date().toLocaleDateString()}`, 92, H - 178);
+  // Your link and a Google Play badge (story-card.js), so the card brings people in.
+  if (window.StoryCard?.brand) {
+    window.StoryCard.brand(ctx, { x: 92, y: H - 112, w: W - 184, link: await window.StoryCard.shareLink(), s: 0.85, font: 'Poppins, system-ui', gold: '#FFD166' });
+  } else {
+    ctx.fillStyle = '#FFD166';
+    ctx.font = '600 30px Poppins, system-ui';
+    ctx.fillText('feed-the-bear.com', 92, H - 112);
+  }
 
   canvas.toBlob(blob => {
   if (!blob) {
@@ -7509,6 +8534,7 @@ function setupEvents () {
   document.getElementById('empty-add-btn')?.addEventListener('click', openQuickAdd);
   document.getElementById('empty-import-btn')?.addEventListener('click', () => showImportBookmarks());
   document.getElementById('header-invite-btn')?.addEventListener('click', () => { hapticTap('light'); inviteFriend(); });
+  document.getElementById('header-friends-btn')?.addEventListener('click', () => { hapticTap('light'); openFoodieFriends(); });
   document.getElementById('chat-hide-cub-btn')?.addEventListener('click', () => { closeChat(); window.Cub?.hide?.(); });
   // Links on a spot (detail page)
   const addDetailLink = () => {
@@ -7653,7 +8679,7 @@ function setupEvents () {
   document.getElementById('chat-close-btn').addEventListener('click', closeChat);
   document.getElementById('chat-send-btn').addEventListener('click', sendChat);
   document.getElementById('chat-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') sendChat();
+  if (e.key === 'Enter') { e.preventDefault(); sendChat(); }
   });
   initChatMic();
 
@@ -7673,18 +8699,35 @@ function setupEvents () {
   });
   });
 
-  // Photo file upload → read as data URL into URL field
-  document.getElementById('form-photo-file').addEventListener('change', e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  if (!file.type.startsWith('image/')) {
-    showToast('Invalid File', 'Please select an image file.', 'error');
-    return;
-  }
-  readImageFileCompressed(file, FOOD_PHOTO_MAX_DIM, FOOD_PHOTO_QUALITY).then(dataUrl => {
-    document.getElementById('form-photo').value = dataUrl;
-    showToast('Photo Added ', 'Image loaded successfully.', 'success');
-  }).catch(() => showToast('Photo Error', 'Could not load that image.', 'error'));
+  const attachFormMedia = async (source = 'library') => {
+    const media = await pickFoodMediaList(FOOD_MEDIA_MAX - _formMedia.length, source);
+    if (media.length) setFormMedia(mergeFoodMedia(_formMedia, media));
+  };
+  addFoodCaptureActions(document.getElementById('form-media-preview'), attachFormMedia);
+  document.getElementById('form-photo-file').addEventListener('change', async e => {
+    const files = [...(e.target.files || [])].slice(0, FOOD_MEDIA_MAX);
+    if (!files.length) return;
+    const context = _mediaContext;
+    _foodMediaJobs++;
+    refreshMediaBusy();
+    try {
+      const media = [];
+      for (const file of files) {
+        const item = await mediaFromFile(file);
+        if (item) media.push(item);
+      }
+      if (context === _mediaContext && media.length) setFormMedia(mergeFoodMedia(_formMedia, media));
+    } finally { _foodMediaJobs--; refreshMediaBusy(); e.target.value = ''; }
+  });
+  document.getElementById('form-photo').addEventListener('input', () => {
+    if (_formMedia.length && document.getElementById('form-photo').value !== _formMedia[0].photo) setFormMedia([]);
+  });
+  document.getElementById('form-media-preview').addEventListener('click', e => {
+    const rm = e.target.closest('.pm-remove');
+    if (!rm) return;
+    const media = _formMedia.filter((_, i) => i !== Number(rm.dataset.idx));
+    if (!media.length) document.getElementById('form-photo').value = '';
+    setFormMedia(media);
   });
 
   // Export / Import
@@ -7698,7 +8741,7 @@ function setupEvents () {
   document.getElementById('mobile-bottom-nav').addEventListener('click', e => {
   const btn = e.target.closest('.mobile-nav-btn, .mobile-nav-fab');
   if (!btn) return;
-  if (btn.id === 'mobile-add-btn')  { hapticTap('medium'); openAddPlace(); return; }
+  if (btn.id === 'mobile-add-btn')  { hapticTap('medium'); openAddChoice(); return; }
   if (btn.id === 'mobile-play-btn') { openMobileHub(); return; }
   if (!btn.dataset.view) return;
   hapticTap('light');
@@ -7793,6 +8836,7 @@ function setupEvents () {
   // Keyboard: Escape
   document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
+    if (window.closeTopFoodChallenge?.(e)) return;
     closeMobileHub();
     closeJustAte();
     closeModal();
@@ -8066,12 +9110,14 @@ function setupEvents () {
   if (e.key === 'Enter') { e.preventDefault(); if (!document.getElementById('just-ate-save').disabled) saveJustAte(); }
   });
   document.getElementById('just-ate-save')?.addEventListener('click', saveJustAte);
-  document.getElementById('just-ate-photo')?.addEventListener('click', async () => {
+  const attachJustAteMedia = async (source = 'library') => {
   const room = FOOD_MEDIA_MAX - _justAte.media.length;
   if (room <= 0) { showToast(`Up to ${FOOD_MEDIA_MAX} per meal`, 'Remove one to add another.', 'info'); return; }
-  const picked = await pickFoodMediaList(room);
-  if (picked.length) setJustAteMedia([..._justAte.media, ...picked]);
-  });
+  const picked = await pickFoodMediaList(room, source);
+  if (picked.length) setJustAteMedia(mergeFoodMedia(_justAte.media, picked));
+  };
+  document.getElementById('just-ate-photo')?.addEventListener('click', () => attachJustAteMedia());
+  addFoodCaptureActions(document.getElementById('just-ate-photo'), attachJustAteMedia);
   document.getElementById('just-ate-photo-preview')?.addEventListener('click', e => {
   const rm = e.target.closest('.pm-remove');
   if (rm) setJustAteMedia(_justAte.media.filter((_, i) => i !== Number(rm.dataset.idx)));
@@ -8083,14 +9129,16 @@ function setupEvents () {
   const r = state.restaurants.find(x => x.id === state.detailId);
   logYourOrder(r?.status === 'want-to-try' ? 'want' : 'ok');
   });
-  document.getElementById('your-order-photo')?.addEventListener('click', async () => {
+  const attachOrderMedia = async (source = 'library') => {
   const room = FOOD_MEDIA_MAX - _yoPendingMedia.length;
   if (room <= 0) { showToast(`Up to ${FOOD_MEDIA_MAX} per dish`, 'Remove one to add another.', 'info'); return; }
-  const picked = await pickFoodMediaList(room);
+  const picked = await pickFoodMediaList(room, source);
   if (!picked.length) return;
-  setYourOrderPending([..._yoPendingMedia, ...picked]);
+  setYourOrderPending(mergeFoodMedia(_yoPendingMedia, picked));
   document.getElementById('your-order-input')?.focus();
-  });
+  };
+  document.getElementById('your-order-photo')?.addEventListener('click', () => attachOrderMedia());
+  addFoodCaptureActions(document.getElementById('your-order-pending'), attachOrderMedia);
   document.getElementById('your-order-pending')?.addEventListener('click', e => {
   const rm = e.target.closest('.pm-remove');
   if (rm) setYourOrderPending(_yoPendingMedia.filter((_, i) => i !== Number(rm.dataset.idx)));
@@ -8110,7 +9158,7 @@ function setupEvents () {
   if (photoFor) {
     // Adds to the dish's photos; the oldest drop off past the limit.
     const d = dishesOf(r).find(x => x.id === photoFor.dataset.photoFor);
-    const picked = d ? await pickFoodMediaList() : [];
+    const picked = d ? await pickFoodMediaList(FOOD_MEDIA_MAX, photoFor.dataset.source || 'library') : [];
     if (!picked.length) return;
     setMediaOn(d, [...picked, ...mediaOf(d)]);
     r.updatedAt = Date.now();
@@ -8174,6 +9222,7 @@ function setupEvents () {
   });
   document.getElementById('friends-invite-btn')?.addEventListener('click', inviteFriend);
   document.getElementById('ff-open-friends')?.addEventListener('click', openFoodieFriends);
+  document.getElementById('ff-plan-date')?.addEventListener('click', () => openFoodiePlan());
 
   // Phase 8 - Smart Discovery
   document.getElementById('discover-close-btn').addEventListener('click', closeDiscover);
@@ -8654,6 +9703,16 @@ document.addEventListener('DOMContentLoaded', () => {
   initReminders();
   initInstallPrompt();
   BackNav.init();
+  initDialogFocus();
+  const layoutOffsets = new Map([
+    ['.app-header', '--header-offset'],
+    ['#stats-bar', '--stats-offset'],
+    ['.filter-bar', '--filter-offset'],
+  ].map(([selector, name]) => [document.querySelector(selector), name]));
+  const layoutObserver = new ResizeObserver(entries => {
+    entries.forEach(({ target }) => document.documentElement.style.setProperty(layoutOffsets.get(target), `${target.getBoundingClientRect().height}px`));
+  });
+  layoutOffsets.forEach((name, element) => layoutObserver.observe(element));
   if (NativeAlerts.available()) {
   NativeAlerts.refresh();
   NativeAlerts.schedule();
@@ -8693,6 +9752,8 @@ document.addEventListener('DOMContentLoaded', () => {
       startWatching();
       renderCards();
       loadHomeDiscovery();
+      // After sign-in has settled: contests coming up, and the daily nudges' area.
+      setTimeout(() => { window.checkFoodEventHeadsUp?.(); shareNudgeArea(); }, 6000);
     },
     err => {
       state.locationEnabled = false;
@@ -8784,6 +9845,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (e.target === document.getElementById('account-overlay')) closeAccountModal();
   });
   document.getElementById('account-edit-btn')?.addEventListener('click', openEditProfile);
+  // Username & public page live in Settings too (friends.js renders them).
+  document.getElementById('account-handle-row')?.addEventListener('click', () => { closeAccountModal(); setTimeout(openHandleSettings, 150); });
+  document.getElementById('handle-close-btn')?.addEventListener('click', closeHandleSettings);
+  document.getElementById('handle-overlay')?.addEventListener('click', e => { if (e.target.id === 'handle-overlay') closeHandleSettings(); });
   document.getElementById('edit-profile-close-btn')?.addEventListener('click', () => {
   document.getElementById('edit-profile-overlay').classList.add('hidden'); maybeHideOverlay();
   });
@@ -9068,7 +10133,7 @@ async function runTonightsPick () {
   return;
   }
 
-  const all = state.restaurants;
+  const all = state.restaurants.filter(isAvailableSpot);
   if (!all.length) {
   document.getElementById('tonight-result').innerHTML = state.userLat && state.userLng
     ? '<p style="text-align:center;color:var(--text-dim)">No nearby foodie finds right now. Try Discover Nearby for a wider scan.</p>'
@@ -9382,19 +10447,10 @@ function checkConfettiMilestones (prev, next) {
 
 let _autoThemeTimer = null;
 
-// The default look follows the clock: warm Honey by day, gold-on-dark at night
-// (the greens, Mint and Neon, are still in settings for anyone who wants them).
+// Dark is the default at every hour. Following the phone is opt-in.
 function getAutoThemePresetByHour (hour = new Date().getHours()) {
-  if (hour >= 6 && hour < 11) {
-  return { mode: 'light', accent: 'honey', part: 'morning' };
-  }
-  if (hour >= 11 && hour < 17) {
-  return { mode: 'light', accent: 'honey', part: 'day' };
-  }
-  if (hour >= 17 && hour < 22) {
-  return { mode: 'dark', accent: 'midnight', part: 'evening' };
-  }
-  return { mode: 'dark', accent: 'midnight', part: 'late-night' };
+  const part = hour >= 6 && hour < 11 ? 'morning' : hour >= 11 && hour < 17 ? 'day' : hour >= 17 && hour < 22 ? 'evening' : 'late-night';
+  return { mode: 'dark', accent: 'midnight', part };
 }
 
 // Auto follows the phone's light/dark setting: warm Honey in light mode,
@@ -9408,7 +10464,7 @@ function getAutoThemePreset () {
 }
 
 function applyAutoThemeByClock (opts = {}) {
-  if (state.settings.themeManual) return;
+  if (state.settings.themeManual || state.settings.themeChoice !== 'auto') return;
   const preset = getAutoThemePreset();
   const partChanged = state.settings.theme !== preset.mode;
 
@@ -9417,7 +10473,7 @@ function applyAutoThemeByClock (opts = {}) {
   syncThemeMetaColor();
 
   state.settings.theme = preset.mode;
-  state.settings.themeChoice = preset.mode === 'light' ? 'light' : 'dark';
+  state.settings.themeChoice = 'auto';
   state.settings.autoThemePart = preset.part;
 
   if (opts.persist) {
@@ -9430,7 +10486,7 @@ function applyAutoThemeByClock (opts = {}) {
 
 // Switch the moment the phone flips between light and dark.
 _darkSchemeQuery?.addEventListener?.('change', () => {
-  if (!state.settings.themeManual) applyAutoThemeByClock({ persist: true, announce: false });
+  if (state.settings.themeChoice === 'auto') applyAutoThemeByClock({ persist: true, announce: false });
 });
 
 function scheduleNextAutoThemeTick () {
@@ -9447,8 +10503,7 @@ function scheduleNextAutoThemeTick () {
 }
 
 function initAutoTheme () {
-  // Only apply auto if no manual preference saved yet
-  if (!state.settings.themeManual) {
+  if (state.settings.themeChoice === 'auto') {
   applyAutoThemeByClock({ persist: true, announce: false });
   scheduleNextAutoThemeTick();
   }
@@ -9933,7 +10988,10 @@ function checkWeeklySuggestion () {
   banner.remove();
   if (!e.target.closest('.wsb-dismiss')) openDetailModal(suggestion.id);
   });
-  main.prepend(banner);
+  // Byte Cub says it, instead of another banner on the screen.
+  const plain = document.createElement('div');
+  plain.innerHTML = weeklyPickSentence(suggestion, favCuisine);
+  whenCubQuiet(() => showToast("Byte Cub's pick of the week", plain.textContent, 'info', { label: 'See it', run: () => openDetailModal(suggestion.id) }));
 }
 
 function weeklyPickSentence (pick, favCuisine) {
@@ -10113,7 +11171,7 @@ function parseVoiceInput (text) {
   if (!addMatch) {
   // Anything else is a search, same as typing it.
   const search = document.getElementById('search-input');
-  search.value = text;
+  search.value = text.replace(/^(?:please\s+)?(?:find|search(?:\s+for)?|look\s+for|show\s+me)\s+/i, '').replace(/\s+near\s+me$/i, '').trim() || text;
   search.dispatchEvent(new Event('input', { bubbles: true }));
   return;
   }
@@ -10558,9 +11616,13 @@ function handleWebShareTarget () {
   window.Cub.openAdd(shared);
   return;
   }
-  const name = title.replace(/\s*[-|].*$/, '').trim() || (text && !looksLikeSharedUrl(text) ? text.trim() : '') || 'Shared Place';
+  // From a city guide's Save (share-target=1): the exact name, and its address.
+  const fromGuide = params.get('share-target') === '1';
+  const name = (fromGuide ? title.trim() : title.replace(/\s*[-|].*$/, '').trim()) || (text && !looksLikeSharedUrl(text) ? text.trim() : '') || 'Shared Place';
   openAddModal();
   document.getElementById('form-name').value = name;
+  const addr = (params.get('addr') || '').trim().slice(0, 200);
+  if (addr) document.getElementById('form-address').value = addr;
   if (sharedUrl) {
   document.getElementById('form-website').value = sharedUrl;
   if (looksLikeSharedUrl(sharedUrl)) {
@@ -10578,6 +11640,16 @@ function handleLaunchActions () {
   history.replaceState(null, '', window.location.pathname + window.location.hash);
   if (action === 'add') {
   openAddModal();
+  return;
+  }
+  // A friend's "make your Bear Cave page" link: pick a username, once signed in.
+  if (action === 'page') {
+  let tries = 0;
+  const open = () => {
+    if (window._ftbUid && typeof openHandleSettings === 'function') { openHandleSettings(); trackProductEvent('bear_cave_invite_opened'); }
+    else if (++tries < 120) setTimeout(open, 1000);
+  };
+  setTimeout(open, 800);
   return;
   }
   if (action === 'discover' || action === 'nearby') {
@@ -10768,6 +11840,9 @@ const TOOL_ACTIONS = {
   'fortune':          () => openFortune(),
   'moodcal':          () => openMoodCal(),
   'feedbear':         () => openFeedBearGame(),
+  'foodfight':        () => openFoodFight(),
+  'burgerbar':        () => openBurgerBar(),
+  'foodmatch':        () => openFoodMatch(),
   'passport':         () => openPassport(),
   'worldmap':         () => openWorldMap(),
   'visitlog':         () => openVisitLog(),
@@ -10798,6 +11873,10 @@ function runToolAction (action) {
 // Six favorites up top, themed rows you swipe sideways, and utilities
 // folded under "More tools". Overlapping tools only show up in search.
 const HUB_SECTIONS = [
+  { title: 'Games', layout: 'featured', items: [
+  ['foodfight','🍕','Food Fight'], ['burgerbar','🍔','Bear Burger Bar'],
+  ['foodmatch','🃏','Food Match'], ['feedbear','🐻','Feed the Bear'],
+  ]},
   { title: 'Start here', layout: 'featured', items: [
   ['just-ate','📸','Just Ate'], ['swipe','👆','Swipe to Decide'],
   ['tonight','🌙',"Tonight's Pick"], ['open-now','🟢','Open Now'],
@@ -10819,7 +11898,7 @@ const HUB_SECTIONS = [
   ]},
   { title: 'Games & rewards', items: [
   ['challenge','🎯','Challenges'], ['achievements','🏅','Achievements'],
-  ['bingo','🎱','Cuisine Bingo'], ['feedbear','🐻','Feed the Bear'],
+  ['bingo','🎱','Cuisine Bingo'],
   ]},
   { title: 'Plan a food day', items: [
   ['itinerary','🗺️','Smart Itinerary'], ['mealplanner','🥗','Meal Planner'], ['travel','✈️','Trip Guides'],
@@ -10872,6 +11951,9 @@ const HUB_INFO = {
   achievements:  ['Badges you have earned', 'trophy'],
   bingo:         ['Fill the cuisine card', 'grid'],
   feedbear:      ['Catch food, dodge pests', 'bear'],
+  foodfight:     ['Toss food to hungry bears', 'bear'],
+  burgerbar:     ['Build each bear an order', 'stack'],
+  foodmatch:     ['Flip cards, find the food pairs', 'podium'],
 };
 
 function hubPreviewHtml (style) {
@@ -10950,6 +12032,7 @@ function renderMobileHub (filter = '') {
   const body = document.getElementById('mobile-hub-body');
   if (!body) return;
   const q = filter.trim().toLowerCase();
+  const showContests = /\b(?:contests?|competitions?|(?:food|bear) challenges?)\b/.test(q);
   const lock = action => (GRIZZLY_TOOLS.has(action) && !hasGrizzly() ? '<span class="hub-lock">GRIZZLY</span>' : '');
   const card = ([action, , label]) => {
   const [sub, style] = HUB_INFO[action] || ['', 'photo'];
@@ -10981,8 +12064,9 @@ function renderMobileHub (filter = '') {
     <div class="${rowClass}">${items.map(card).join('')}</div>
   </div>`;
   }).join('');
-  body.innerHTML = html || '<p class="hub-empty">No tools match “' + escHtml(filter) + '”.</p>';
+  body.innerHTML = html || (showContests ? '' : '<p class="hub-empty">No tools match “' + escHtml(filter) + '”.</p>');
   fillHubFoodPhotos(body);
+  if (!q || showContests) window.renderFoodEventsHub?.(body);
 }
 
 function openMobileHub () {
@@ -11003,6 +12087,9 @@ function closeMobileHub () {
 
 function initMobileHub () {
   document.getElementById('mobile-hub-close')?.addEventListener('click', closeMobileHub);
+  document.getElementById('hub-contests-btn')?.addEventListener('click', () => {
+    window.openFoodEvents?.();
+  });
   document.getElementById('mobile-hub-search')?.addEventListener('input', e => renderMobileHub(e.target.value));
   document.getElementById('mobile-hub-body')?.addEventListener('click', e => {
   const tile = e.target.closest('.hub-tile, .hub-card');
@@ -11099,7 +12186,7 @@ function closeCravingEngine () {
 function runCravingEngine () {
   const moods   = [..._cravingMoods];
   const freetext = document.getElementById('craving-freetext').value.toLowerCase();
-  const savedCandidates = state.restaurants.filter(r => r.status === 'want-to-try' || r.status === 'visited');
+  const savedCandidates = state.restaurants.filter(r => isAvailableSpot(r) && (r.status === 'want-to-try' || r.status === 'visited'));
   const nearbyCandidates = getNearbyDiscoveryRows(20);
   const candidates = savedCandidates.length ? savedCandidates : nearbyCandidates;
   if (!candidates.length) {
@@ -11221,13 +12308,13 @@ function verdictFromRating (rating = 0) {
 // Adds a dish or updates the one with the same name, so re-logging a dish
 // changes its verdict instead of creating duplicates.
 // `media` (list of { photo, video? }) adds photos ahead of the dish's existing ones.
-function upsertDish (r, { name, verdict, rating, note, photo, video, media } = {}) {
+function upsertDish (r, { name, verdict, rating, note, photo, video, media, date } = {}) {
   const clean = String(name || '').trim().slice(0, 80);
   if (!r || !clean) return null;
   if (!Array.isArray(r.dishes)) r.dishes = [];
   let dish = r.dishes.find(d => dishKey(d.name) === dishKey(clean));
   if (!dish) {
-  dish = { id: uid(), name: clean, verdict: 'ok', rating: 0, note: '', date: iso() };
+  dish = { id: uid(), name: clean, verdict: 'ok', rating: 0, note: '', date: date === undefined ? iso() : date };
   r.dishes.push(dish);
   }
   if (Number.isFinite(rating) && rating > 0) dish.rating = Math.min(5, Math.round(rating));
@@ -11236,7 +12323,8 @@ function upsertDish (r, { name, verdict, rating, note, photo, video, media } = {
   if (note != null) dish.note = String(note).slice(0, 200);
   if (photo) { dish.photo = photo; if (video) dish.video = video; else delete dish.video; }
   if (Array.isArray(media) && media.length) setMediaOn(dish, [...media, ...mediaOf(dish)]);
-  if (dish.verdict !== 'want') dish.date = iso();
+  if (date !== undefined) dish.date = date;
+  else if (dish.verdict !== 'want') dish.date = iso();
   r.updatedAt = Date.now();
   saveData();
   return dish;
@@ -11452,7 +12540,11 @@ function renderYourOrder (restaurantId) {
         </div>
         ${d.note ? `<div class="yo-dish-note">${escHtml(d.note)}</div>` : ''}
         <span class="yo-dish-actions">
-          <button type="button" class="yo-move yo-photo-btn" data-photo-for="${escHtml(d.id)}">${d.photo ? 'Add more photos/videos' : 'Add photos/videos'}</button>
+          <div class="food-capture-buttons">
+            <button type="button" class="yo-move yo-photo-btn" data-photo-for="${escHtml(d.id)}" data-source="library">${d.photo ? 'Add more photos/videos' : 'Add photos/videos'}</button>
+            <button type="button" class="yo-move yo-photo-btn" data-photo-for="${escHtml(d.id)}" data-source="photo">Take photo</button>
+            <button type="button" class="yo-move yo-photo-btn" data-photo-for="${escHtml(d.id)}" data-source="video">Record video</button>
+          </div>
           ${DISH_VERDICTS.filter(v => v !== g).map(v => `<button type="button" class="yo-move" data-move="${v}" data-id="${escHtml(d.id)}">${DISH_VERDICT_LABEL[v]}</button>`).join('')}
           <button type="button" class="yo-remove" data-remove="${escHtml(d.id)}" aria-label="Remove ${escHtml(d.name)}">✕</button>
         </span>
@@ -11465,7 +12557,7 @@ let _yoPendingMedia = [];
 
 // Photos/clips picked before the dish is named. Pass [] to clear.
 function setYourOrderPending (list = []) {
-  _yoPendingMedia = list.slice(0, FOOD_MEDIA_MAX);
+  _yoPendingMedia = mergeFoodMedia([], list);
   const box = document.getElementById('your-order-pending');
   if (!box) return;
   box.classList.toggle('hidden', !_yoPendingMedia.length);
@@ -11587,10 +12679,11 @@ function renderJustAtePlaces () {
 function syncJustAteSave () {
   const btn = document.getElementById('just-ate-save');
   const typed = (document.getElementById('just-ate-place')?.value || '').trim();
-  if (btn) btn.disabled = !(_justAte.placeId || typed);
+  if (btn) btn.disabled = foodMediaBusy() || !!window._ftbAccountSwitching || !(_justAte.placeId || typed);
 }
 
 function openJustAte (restaurantId = null) {
+  invalidateFoodMedia();
   const overlay = document.getElementById('just-ate-overlay');
   if (!overlay) return;
   const preset = restaurantId ? state.restaurants.find(r => r.id === restaurantId) : null;
@@ -11614,7 +12707,7 @@ function openJustAte (restaurantId = null) {
 }
 
 function setJustAteMedia (list = []) {
-  _justAte.media = list.slice(0, FOOD_MEDIA_MAX);
+  _justAte.media = mergeFoodMedia([], list);
   const n = _justAte.media.length;
   const preview = document.getElementById('just-ate-photo-preview');
   const label = document.getElementById('just-ate-photo-label');
@@ -11637,11 +12730,13 @@ function toggleJustAteTag (btn) {
 }
 
 function closeJustAte () {
+  invalidateFoodMedia();
   document.getElementById('just-ate-overlay')?.classList.add('hidden');
   maybeHideOverlay();
 }
 
 function saveJustAte () {
+  if (foodMediaBusy() || window._ftbAccountSwitching) { showToast('Please wait', 'Finish adding media before saving.', 'info'); return; }
   const placeName = (document.getElementById('just-ate-place')?.value || '').trim();
   const dishName = (document.getElementById('just-ate-dish')?.value || '').trim();
   const note = (document.getElementById('just-ate-note')?.value || '').trim().slice(0, 300);
@@ -11692,13 +12787,13 @@ function saveJustAte () {
   closeJustAte();
   renderAll();
   if (photo) photoReveal(photo, dishName || r.name);
+  if (stars >= 4) noteGoodMoment();
   trackProductEvent('just_ate_logged', { restaurantId: r.id, isNew, hasDish: !!dishName, hasPhoto: !!photo, mediaCount: media.length, hasNote: !!note, verdict: dishName ? verdict : null });
   showToast(`${r.name} is on your Been There list`,
   [stars ? '★'.repeat(stars) : '', dishName ? `${DISH_VERDICT_LABEL[verdict]}: ${dishName}` : ''].filter(Boolean).join(' · ') || 'Find it any time under Lists.',
   'success');
   if (typeof celebrateMilestones === 'function') celebrateMilestones();
-  // The moment people actually post: offer a Story card once the photo has landed.
-  setTimeout(() => offerShareMeal({ r, dish: dishName, verdict: dishName ? verdict : '', photo, note }), photo ? 2200 : 600);
+  offerShareMeal({ r, dish: dishName, verdict: dishName ? verdict : '', photo, video: media[0]?.video || '', media, note });
 }
 
 // "At The Mission get the guacamole, skip the churros" — the text a friend
@@ -11738,6 +12833,7 @@ async function shareYourOrder () {
 }
 
 function logYourOrder (verdict) {
+  if (foodMediaBusy() || window._ftbAccountSwitching) { showToast('Please wait', 'Finish adding media before saving.', 'info'); return; }
   const input = document.getElementById('your-order-input');
   const name = (input?.value || '').trim();
   if (!name) {
@@ -12140,8 +13236,11 @@ function renderNearbyCardsFromState () {
   list.innerHTML = `${_nearbyBannerMsg ? `<div class="nearby-home-loading">${escHtml(_nearbyBannerMsg)}</div>` : ''}` +
   filtered.map(card => renderNearbyVisualCard(card)).join('');
 
-  // Whole-card click opens Google Maps for the venue.
-  list.querySelectorAll('.nearby-home-card[data-card-link]').forEach(cardEl => {
+  wireNearbyCardLinks(list);
+}
+
+function wireNearbyCardLinks (root) {
+  root.querySelectorAll('.nearby-home-card[data-card-link]').forEach(cardEl => {
   const link = cardEl.dataset.cardLink || '';
   if (!link) return;
   cardEl.style.cursor = 'pointer';
@@ -12210,6 +13309,7 @@ function setNearbyCards (cards = [], opts = {}) {
   );
   _nearbyBannerMsg = String(opts.banner || '');
   renderNearbyCardsFromState();
+  if (state.filter.search) renderSearchMode();
   enrichNearbyCardsRealPhotos();
 }
 
@@ -12299,10 +13399,50 @@ function firstSuccess (tasks, hedgeMs) {
   });
 }
 
+/* Overpass endpoint health tracking: deprioritize mirrors that failed recently
+   so a dead/hung mirror doesn't eat the entire timeout budget. */
+const OVERPASS_FAIL_KEY = 'ftb_overpass_failures_v1';
+const OVERPASS_FAIL_TTL = 10 * 60 * 1000; // 10 minutes
+
+function getOverpassFailures () {
+  try { return JSON.parse(localStorage.getItem(OVERPASS_FAIL_KEY)) || {}; } catch (_) { return {}; }
+}
+
+function markOverpassEndpointHealthy (endpoint) {
+  try {
+    const fails = getOverpassFailures();
+    if (fails[endpoint]) {
+      delete fails[endpoint];
+      localStorage.setItem(OVERPASS_FAIL_KEY, JSON.stringify(fails));
+    }
+  } catch (_) {}
+}
+
+function markOverpassEndpointFailed (endpoint) {
+  try {
+    const fails = getOverpassFailures();
+    fails[endpoint] = Date.now();
+    localStorage.setItem(OVERPASS_FAIL_KEY, JSON.stringify(fails));
+  } catch (_) {}
+}
+
+function orderOverpassEndpoints (endpoints) {
+  const fails = getOverpassFailures();
+  const now = Date.now();
+  const fresh = [], stale = [];
+  for (const ep of endpoints) {
+    const failedAt = Number(fails[ep] || 0);
+    (failedAt && (now - failedAt) < OVERPASS_FAIL_TTL ? stale : fresh).push(ep);
+  }
+  return [...fresh, ...stale];
+}
+
 async function fetchOverpassElements (query, opts = {}) {
   const timeoutMs = Number(opts.timeoutMs) || 6000;
-  const healthy = (opts.endpoints || OVERPASS_ENDPOINTS).filter(u => !(_overpassDownUntil[u] > Date.now()));
-  const endpoints = healthy.length ? healthy : (opts.endpoints || OVERPASS_ENDPOINTS);
+  const ordered = orderOverpassEndpoints(opts.endpoints || OVERPASS_ENDPOINTS);
+  const failures = getOverpassFailures();
+  const healthy = ordered.filter(u => !(_overpassDownUntil[u] > Date.now()) && !(Number(failures[u]) + OVERPASS_FAIL_TTL > Date.now()));
+  const endpoints = healthy.length ? healthy : ordered;
 
   const overpassTask = endpoint => async signal => {
   const ctrl = new AbortController();
@@ -12323,9 +13463,11 @@ async function fetchOverpassElements (query, opts = {}) {
     const json = await resp.json();
     const elements = (json.elements || []).filter(isCredibleFoodVenue);
     if (!elements.length) throw new Error('Overpass empty');
+    markOverpassEndpointHealthy(endpoint);
     return elements;
   } catch (err) {
     if (timedOut) _overpassDownUntil[endpoint] = Date.now() + OVERPASS_DOWN_MS;
+    if (timedOut || err?.name !== 'AbortError') markOverpassEndpointFailed(endpoint);
     throw err;
   } finally {
     clearTimeout(t);
@@ -12365,10 +13507,25 @@ async function fetchNominatimNearbyElements (lat, lng, radiusMeters = 1609, limi
   if (i) await new Promise(r => setTimeout(r, i * 1000));
   if (signal?.aborted) return [];
   const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&bounded=1&extratags=1&addressdetails=1&limit=${Math.max(6, Math.ceil(limit / terms.length))}&viewbox=${encodeURIComponent(viewbox)}&q=${encodeURIComponent(term)}`;
-  const resp = await fetch(url, { headers: { 'Accept-Language': 'en' }, signal }).catch(() => null);
-  if (!resp || !resp.ok) return [];
-  const json = await resp.json();
-  return Array.isArray(json) ? json : [];
+    const ctrl = new AbortController();
+    const abort = () => ctrl.abort();
+    signal?.addEventListener('abort', abort, { once: true });
+    const timer = setTimeout(abort, 10000);
+    try {
+      const resp = await fetch(url, {
+        headers: { 'Accept-Language': 'en' },
+        signal: ctrl.signal,
+      });
+      if (!resp.ok) return [];
+      const json = await resp.json();
+      return Array.isArray(json) ? json : [];
+    } catch (err) {
+      if (!signal?.aborted) console.warn('[Nearby] Nominatim request failed:', err);
+      return [];
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+    }
   }));
 
   const seen = new Set();
@@ -12723,7 +13880,7 @@ function renderCraveHome () {
   const section = document.getElementById('crave-home');
   const list = document.getElementById('crave-home-list');
   if (!section || !list) return;
-  const all = state.restaurants || [];
+  const all = (state.restaurants || []).filter(isAvailableSpot);
   if (!all.length) { section.classList.add('hidden'); return; }
   section.classList.remove('hidden');
 
@@ -14494,6 +15651,7 @@ function showLocalDailyPick (opts) {
 }
 
 async function loadAiRec (discData) {
+  const generation = _dataGeneration;
   if (!window.AI || (typeof isPremium === 'function' && !isPremium())) { showLocalDailyPick(); return; }
   const banner = document.getElementById('ai-rec-banner');
   const textEl = document.getElementById('ai-rec-text');
@@ -14533,10 +15691,15 @@ ${swipe ? `- They just played Bear Swipe and are craving ${swipe.cuisine} food r
 ` : ''}Mention a specific place or cuisine name. Be warm and exciting.`;
 
   const rec = await AI.call(prompt);
+  if (generation !== _dataGeneration) return;
   const clean = wholeSentences((rec || '').trim().split('\n')[0].replace(/^["']|["']$/g, ''));
   if (clean) { sessionStorage.setItem(cacheKey, clean); textEl.textContent = clean; }
   else if (!showLocalDailyPick()) banner.classList.add('hidden');
-  } catch { if (!showLocalDailyPick()) banner.classList.add('hidden'); }
+  } catch (err) {
+    if (generation !== _dataGeneration) return;
+    console.warn('[FTB] Daily recommendation failed:', err);
+    if (!showLocalDailyPick()) banner.classList.add('hidden');
+  }
 }
 
 // Never show a reply that stops mid-sentence: keep the complete sentences, or nothing.
@@ -14977,10 +16140,20 @@ function _buildListContext () {
 }
 
 async function sendAiMessage (userText) {
+  if (window._ftbAccountSwitching) return;
+  const generation = _dataGeneration;
   if (!userText.trim()) return;
   if (!ensureAiUpgradeAccess('Byte Cub AI')) return;
   _appendAiMsg('user', userText);
   document.getElementById('ai-chat-input').value = '';
+
+  if (parseCubCommand(userText)) {
+    _appendAiMsg('assistant', 'Opening the save and action controls in our chat.');
+    closeAiPanel();
+    openChat();
+    await sendChat(userText);
+    return;
+  }
 
   if (!AI.hasAccess()) {
   const ruleResp = typeof chatResponse === 'function' ? chatResponse(userText) : "I need a Gemini API key to give smart answers!";
@@ -14990,19 +16163,26 @@ async function sendAiMessage (userText) {
 
   const thinking = _showAiThinking();
   try {
-  const reply = await AI.chat(userText, _aiHistory.slice(-12), state.restaurants, await userAreaName());
+  const area = await userAreaName();
+  if (generation !== _dataGeneration) { thinking.remove(); return; }
+  const reply = await AI.chat(userText, _aiHistory.slice(-12), state.restaurants, area);
+  if (generation !== _dataGeneration) { thinking.remove(); return; }
   thinking.remove();
   // A search for real places runs in Byte Cub's chat, which shows them with save buttons.
   const find = String(reply).match(/\[\[\s*FIND:\s*([^\]]{2,60})\]\]/i);
   if (find) {
     _appendAiMsg('assistant', `Looking for ${find[1].trim()} near you…`);
+    closeAiPanel();
     openChat();
     await cubFindNearby(find[1].trim().toLowerCase());
     return;
   }
+  if (!String(reply).trim()) throw new Error('Byte Cub returned an empty answer.');
   _appendAiMsg('assistant', reply);
   } catch (err) {
   thinking.remove();
+  if (generation !== _dataGeneration) return;
+  console.warn('[FTB] Byte Cub AI panel failed:', err);
   if (err.message === 'NO_KEY') {
     _appendAiMsg('assistant', 'Byte Cub is included by default. If AI is unavailable right now, please try again in a moment.');
   } else {
@@ -15429,7 +16609,7 @@ function clearTravelMode () {
   delete state._travelLat;
   delete state._travelLng;
   _refreshTravelUI();
-  showToast('C:\Users\baild Travel Mode Off', 'Back to real location', 'info');
+  showToast('Travel Mode Off', 'Back to real location', 'info');
 }
 
 function _refreshTravelUI () {
@@ -15897,6 +17077,7 @@ function _renderBeenaWhile () {
   const now = Date.now();
   const MS_90 = 90 * 24 * 60 * 60 * 1000;
   const candidates = state.restaurants
+  .filter(isAvailableSpot)
   .filter(r => r.myRating >= 4 && (r.status === 'visited' || (r.visits && r.visits.length)))
   .map(r => {
     const lastLogDate = r.visits && r.visits.length
@@ -15966,8 +17147,8 @@ async function generateMealPlan () {
   result.classList.remove('hidden');
   result.innerHTML = '<span class="ai-thinking-inline"><span></span><span></span><span></span></span> Planning your foodie week…';
   btn.disabled = true;
-  const wantToTry = state.restaurants.filter(r => r.status === 'want-to-try').slice(0, 10).map(r => r.name + (r.cuisine ? ' (' + r.cuisine + ')' : '')).join(', ');
-  const faves = state.restaurants.filter(r => r.myRating >= 4).slice(0, 8).map(r => r.name + (r.cuisine ? ' (' + r.cuisine + ')' : '')).join(', ');
+  const wantToTry = state.restaurants.filter(r => isAvailableSpot(r) && r.status === 'want-to-try').slice(0, 10).map(r => r.name + (r.cuisine ? ' (' + r.cuisine + ')' : '')).join(', ');
+  const faves = state.restaurants.filter(r => isAvailableSpot(r) && r.myRating >= 4).slice(0, 8).map(r => r.name + (r.cuisine ? ' (' + r.cuisine + ')' : '')).join(', ');
   const prompt = `You are a personal dining concierge. Create a ${days}-day dining plan for this week.
 
 User profile:
@@ -16019,7 +17200,7 @@ function closeGroupVote () {
   maybeHideOverlay();
 }
 function _renderGroupVotePicker () {
-  const sorted = state.restaurants.slice().sort((a, b) => (b.myRating || 0) - (a.myRating || 0)).slice(0, 30);
+  const sorted = state.restaurants.filter(isAvailableSpot).sort((a, b) => (b.myRating || 0) - (a.myRating || 0)).slice(0, 30);
   document.getElementById('groupvote-picker').innerHTML = sorted.map(r =>
   `<div class="groupvote-pick-item${_gvSelected.has(r.id) ? ' selected' : ''}" data-id="${r.id}">
     <div class="groupvote-pick-check">${_gvSelected.has(r.id) ? '✓' : ''}</div>
@@ -16380,7 +17561,7 @@ function openCheckinWithPhoto (id) {
 
 /* ── Priority Badge Helper ──────────────────────────────── */
 function priorityBadgeHtml (r) {
-  if (!r.priority || r.status !== 'want-to-try') return '';
+  if (!isAvailableSpot(r) || !r.priority || r.status !== 'want-to-try') return '';
   if (r.priority === 'hot')    return '<span class="priority-badge hot"> Must Go!</span>';
   if (r.priority === 'next')   return '<span class="priority-badge next">⭐ Up Next</span>';
   if (r.priority === 'someday') return '<span class="priority-badge someday"> Someday</span>';
@@ -16413,7 +17594,7 @@ function neverTriedCuisineResponse () {
 
 function timeBasedResponse (q) {
   const hour = new Date().getHours();
-  const want = state.restaurants.filter(r => r.status === 'want-to-try');
+  const want = state.restaurants.filter(r => isAvailableSpot(r) && r.status === 'want-to-try');
   const isMorning = hour < 11;
   const isLunch   = hour >= 11 && hour < 15;
   const isDinner  = hour >= 17;
@@ -16462,7 +17643,7 @@ function funnyNoteResponse () {
 }
 
 function goingTonightResponse () {
-  const want = state.restaurants.filter(r => r.status === 'want-to-try');
+  const want = state.restaurants.filter(r => isAvailableSpot(r) && r.status === 'want-to-try');
   const hot  = want.filter(r => r.priority === 'hot');
   const pool = hot.length ? hot : want;
   if (!pool.length) return `Your want-to-try list is empty - add some spots and come back! `;

@@ -91,6 +91,7 @@ asGrizzly(); // uses Grizzly-only features
     const writes = [];
     _db = { doc: () => ({ set: (data) => { writes.push(data); return Promise.resolve(); }, get: () => Promise.resolve({ exists: false, data: () => ({}) }) }), collection: () => ({ get: () => Promise.resolve({ docs: [] }) }) };
     window._ftbUid = 'friendUid12345678';
+    window._ftbSyncBlocked = false;
     const cloud = { friendsAt: Date.now() + 60000, friends: [{ key: 'id:zzz', name: 'Sam', data: { id: 'zzz', u: 'Sam', picks: [{ n: 'Bacanora', r: 5 }], w: [] } }] };
     _mergeFriendsFromCloud(cloud);
     const afterCloud = getFriends().map(x => x.name);
@@ -110,12 +111,14 @@ asGrizzly(); // uses Grizzly-only features
   await closeAllDialogs(p);
   check((await p.locator('#mobile-add-btn .mobile-nav-fab-label').innerText()) === 'Add', 'the bottom button says Add');
   check(await p.evaluate(() => document.body.classList.contains('add-hint')), 'it pulses for someone with few places');
-  check(await p.locator('#home-add-bar').isVisible(), 'home has an Add a place button (under Bear Swipe)');
+  check(await p.locator('#home-add-bar').isHidden(), 'the lean home relies on the bottom Add button');
   const fab = await p.locator('#mobile-add-btn').boundingBox();
   check(fab && fab.y < 844, `the gold Add button is always on screen (y=${fab && Math.round(fab.y)})`);
-  await p.click('#home-add-bar');
+  await p.click('#mobile-add-btn');
+  await p.click('.add-choice-place');
   await p.waitForTimeout(300);
   check(await p.locator('.qa-sheet:not(.hidden), #quick-add:not(.hidden), .qa-input').first().isVisible(), 'it opens Add a spot');
+  await p.click('.qa-import-options summary');
   await p.click('.qa-import');
   await p.waitForTimeout(400);
   check(await p.locator('#import-overlay').isVisible(), 'which links to importing a whole list');

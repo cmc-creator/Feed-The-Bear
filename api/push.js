@@ -6,6 +6,7 @@
      { action: 'unregister', token }      signed out / turned them off
      { action: 'follows', ids: [shareId] } the live profiles you follow
      { action: 'notify', id: shareId }    you just posted: ping your followers
+     { action: 'joined' }                 a brand-new account: tell the owner
 
    Server-only data (written with the Admin SDK, so firestore.rules need
    no changes; clients can't read or write these):
@@ -18,6 +19,8 @@
    ════════════════════════════════════════════════════════════ */
 
 const admin = require('firebase-admin');
+const { sendEmail, emailHtml, emailReady, esc } = require('./_email');
+const { bump } = require('./_count');
 
 const MAX_TOKENS = 5;
 const MAX_FOLLOWS = 50;
@@ -96,6 +99,66 @@ async function notify (db, fb, uid, id) {
   return { sent: res.successCount };
 }
 
+// A brand-new account (made in the last 30 minutes) tells the owner once:
+// a push to the owner's phones and/or an email, as set in the owner portal
+// (config/ownerAlerts). signups/{uid} is the record, and stops repeats.
+const OWNER_EMAILS = () => [...new Set(['cmc@conniemichelleconsulting.com',
+  ...(process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)])];
+async function joined (db, fb, uid) {
+  const u = await fb.auth().getUser(uid);
+  const born = Date.parse(u.metadata?.creationTime || '');
+  if (!born || Date.now() - born > 30 * 60 * 1000) return { told: false, reason: 'not new' };
+  if (OWNER_EMAILS().includes(String(u.email || '').toLowerCase())) return { told: false, reason: 'owner' };
+  const ref = db.doc(`signups/${uid}`);
+  const via = (u.providerData || []).some(p => p.providerId === 'google.com') ? 'Google' : 'email';
+  const fresh = await db.runTransaction(async t => {
+    if ((await t.get(ref)).exists) return false;
+    t.set(ref, { email: u.email || '', name: u.displayName || '', via, at: new Date(born).toISOString() });
+    return true;
+  });
+  if (!fresh) return { told: false, reason: 'already told' };
+
+  const prefs = (await db.doc('config/ownerAlerts').get()).data() || {};
+  const who = u.displayName ? `${u.displayName} (${u.email || 'no email'})` : (u.email || 'Someone');
+  const title = 'New sign-up 🐻';
+  const body = `${who} just joined Feed The Bear with ${via}.`;
+  let pushed = 0;
+  if (prefs.push !== false) {
+    const uids = (await Promise.all(OWNER_EMAILS().map(e => fb.auth().getUserByEmail(e).then(x => x.uid).catch(() => null)))).filter(Boolean);
+    const tokens = uids.length ? (await db.getAll(...uids.map(x => db.doc(`pushTokens/${x}`)))).flatMap(s => s.data()?.tokens || []) : [];
+    if (tokens.length) {
+      const r = await fb.messaging().sendEachForMulticast({
+        tokens, notification: { title, body }, data: { open: 'owner' },
+        android: { priority: 'high', notification: { tag: `signup-${uid}` } },
+      });
+      pushed = r.successCount;
+    }
+  }
+  // Their welcome email: three easy first things to do.
+  if (u.email && emailReady()) {
+    const first = String(u.displayName || '').trim().split(/\s+/)[0];
+    await sendEmail({
+      to: u.email, name: u.displayName || '', tag: 'welcome', subject: 'Welcome to the den 🐻',
+      html: emailHtml([
+        `<b>Welcome${first ? `, ${esc(first)}` : ''}!</b> Feed The Bear is your food diary: where you've eaten, what to order again, and where to go next.`,
+        'Three things to do first (about a minute):<br>1. <b>Save 3 spots</b> you love or want to try. Tap the big + button.<br>2. <b>Play Bear Swipe</b> on Home so the bear learns what you like.<br>3. <b>Turn on location</b> to see the best food near you right now.',
+        '<a href="https://www.feed-the-bear.com/app.html" style="display:inline-block;background:#ff8a3d;color:#1b130b;font-weight:800;padding:12px 20px;border-radius:12px;text-decoration:none">Open Feed The Bear</a>',
+      ]),
+    }).then(ok => ok && Promise.all([ref.set({ welcomedAt: new Date().toISOString() }, { merge: true }), bump(db, fb, 'welcome_email_sent')]))
+      .catch(err => console.warn('[FTB] welcome email failed:', err.message));
+  }
+
+  let emailed = false;
+  if (prefs.email !== false && emailReady()) {
+    emailed = await sendEmail({
+      to: process.env.OWNER_EMAIL || 'cmc@conniemichelleconsulting.com', tag: 'owner-signup', subject: `New sign-up: ${u.email || u.displayName || 'someone'}`,
+      html: emailHtml([`<b>${esc(who)}</b> just joined Feed The Bear with ${esc(via)}.`,
+        '<a href="https://www.feed-the-bear.com/owner.html" style="color:#b3541e;font-weight:700">See all sign-ups in the owner portal</a>']),
+    }).catch(err => { console.warn('[FTB] signup email failed:', err.message); return false; });
+  }
+  return { told: true, pushed, emailed };
+}
+
 module.exports = async function handler (req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -137,6 +200,25 @@ module.exports = async function handler (req, res) {
       await ref.set({ ids });
       return res.status(200).json({ ok: true, added: added.length, removed: removed.length });
     }
+
+    // Roughly where this phone is (2 decimals, ~1 km), its state, alert distance
+    // and Want to Try pins: api/nudges.js uses them for the weekly "near you"
+    // nudge and contests in your state. Sent at most once a day by the app.
+    if (body.action === 'area') {
+      const num = (v, lo, hi) => (Number.isFinite(Number(v)) && Number(v) >= lo && Number(v) <= hi ? Math.round(Number(v) * 100) / 100 : null);
+      const lat = num(body.lat, -90, 90);
+      const lng = num(body.lng, -180, 180);
+      if (lat === null || lng === null) return res.status(400).json({ error: 'Bad place' });
+      const st = /^[A-Z]{2}$/.test(String(body.state || '')) ? String(body.state) : '';
+      const miles = [1, 5, 10, 25, 50].includes(Number(body.miles)) ? Number(body.miles) : 10;
+      const want = (Array.isArray(body.want) ? body.want : []).slice(0, 100).map(w => ({
+        n: String(w?.n || '').slice(0, 60), lat: num(w?.lat, -90, 90), lng: num(w?.lng, -180, 180),
+      })).filter(w => w.n && w.lat !== null && w.lng !== null);
+      await db.doc(`pushArea/${uid}`).set({ lat, lng, state: st, miles, want, at: new Date().toISOString() }, { merge: true });
+      return res.status(200).json({ ok: true });
+    }
+
+    if (body.action === 'joined') return res.status(200).json(await joined(db, fb, uid));
 
     if (body.action === 'notify') {
       const id = String(body.id || '');

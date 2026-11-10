@@ -1,5 +1,189 @@
 # Changelog - Major Improvements
 
+## [Unreleased] - 2026-11-08 (foodie-first Home)
+
+- Move Add and existing meal/decision actions to the top of Home, ahead of
+  recommendations and games. Keep Bear Swipe below personal recommendations.
+- Preserve all controls and handlers; DOM order matches the visible hierarchy.
+- Verify Add and Just Ate fit above phone navigation at 320px and 390px, plus
+  swipe behavior, first impressions, smoke and multi-theme layouts.
+
+## [Unreleased] - 2026-11-08 (foodie audit reliability fixes)
+
+- Place upgrade dialogs above Add so video restrictions no longer appear to do
+  nothing; dismissing the offer preserves the unfinished place.
+- Identify trimmed photos using existing content references rather than array
+  positions, including main covers and visit/dish photos. Reject mismatched
+  video posters and warn about ambiguous legacy extra-photo slots.
+- Explain photo backup limits and device-local videos honestly; show video plan
+  and duration limits without expanding the compact Quick Add layout.
+
+## [Unreleased] - 2026-11-08 (sharing fallback reliability)
+
+- Fix photo-free post-save sharing on browsers without a native share sheet.
+  Reveal caption copying and social-posting guidance instead of throwing.
+- Handle synchronous share failures and show text-specific fallback instructions;
+  dismissing the share sheet remains a normal cancellation.
+- Wait for actual auth readiness in account-reload regressions rather than
+  assuming deferred authentication scripts have loaded.
+
+## [Unreleased] - 2026-11-08 (photo restore reliability)
+
+- Recover budget-trimmed root-level extra photos during same-device cloud merges,
+  using the existing visit/dish recovery logic.
+- Match video references before restoring posters and preserve newer fields and
+  removed media entries. Test collection restore alongside account isolation.
+
+## [Unreleased] - 2026-11-08 (detail-control polish)
+
+- Refresh sync timestamps for existing quick detail edits, update lists after
+  rating/price changes, and expose selected control states to screen readers.
+- Ignore reselecting the current visit status so unknown historical dates stay
+  unknown. Block shared detail patches during account transitions.
+- Test rating/price persistence, price clearing and unchanged historical dates.
+
+## [Unreleased] - 2026-11-08 (notes and visit reliability)
+
+- Bind pending detail-note edits to their original place and account generation.
+  Flush them before detail navigation, closing and account snapshots.
+- Update sync freshness on detail check-ins and close the saved check-in form.
+- Label unknown historical dates clearly. Add immediate-navigation and snapshot
+  regressions without adding or removing features.
+
+## [Unreleased] - 2026-11-08 (accurate meal sharing)
+
+- Pass the saved moment's media explicitly from Quick Add, full Add and Just Ate.
+  Use only those photos for its cover and original-file collection; do not borrow
+  photos or clips from previous visits when a new meal has no attachments.
+- Preserve place-detail sharing and existing capture options. Add current-media
+  and empty-moment sharing regressions.
+
+## [Unreleased] - 2026-11-08 (existing-flow reliability)
+
+- Clear stale visit selections when searching for a replacement place and
+  discard delayed AI details after a place, form or account changes.
+- Align camera recovery instructions with Choose photos or video.
+  No new features or removed media options.
+
+## [Unreleased] - 2026-11-08 (clear existing-photo selection)
+
+- Rename Gallery to Choose photos or video across capture forms. Make it
+  prominent above Quick Add camera actions without removing capture choices.
+- Verify multi-select intent, appended attachments and small-phone button fit.
+
+## [Unreleased] - 2026-11-08 (cover and caption polish)
+
+- Add personal-photo cover selection to Quick Add, size thumbnails explicitly,
+  enlarge removal targets, and keep Save visible while the sheet scrolls.
+- Keep caption editing expandable in the card preview, preserve edits when
+  sharing, and expose manual copying when clipboard access is blocked.
+- Release private card files on close and avoid stale share/copy feedback.
+- Align the branding workflow test with the intentionally understated personal
+  card design. Test cover choice, 11-item geometry and CI-style sharing limits.
+
+## [Unreleased] - 2026-11-08 (clear card sharing)
+
+- Keep Share card as the main preview action on all browsers, with Save image
+  separate. Unsupported or blocked image sharing opens explicit social posting
+  instructions instead of silently downloading. Preserve native file sharing.
+
+## [Unreleased] - 2026-11-08 (profile persistence)
+
+- Prevent legacy/default cloud avatars from replacing a saved personal photo.
+  Track explicit photo/avatar choices separately from appearance updates and
+  respect newer intentional selections/removals across devices.
+- Compress uploaded profile photos for cloud backup, wait for processing before
+  Save, report image errors, and discard late results after account/editor changes.
+- Refresh all profile visuals after restoration without re-saving restored theme
+  defaults as a new profile edit. Add login, cold-reload and isolation regressions.
+
+## [Unreleased] - 2026-11-08 (complete food moments)
+
+- Keep up to ten photos plus one clip per moment; Quick Add now appends media
+  with removable previews instead of replacing the previous attachment.
+- Add optional notes and preserve media, notes, rating, dish, tags and visit
+  status when opening the full form from More details.
+- Share a clean cover plus the original collection when the device supports it;
+  otherwise offer individual downloads and explicit social upload guidance.
+- Keep the existing Grizzly video restrictions and cloud document budget;
+  include root-level extra photos in cloud budget trimming.
+- Add exact-count, original-file, failed-share and advanced-handoff regressions.
+
+## [Unreleased] - 2026-11-08 (personal place cards)
+
+- Make the post-save place card the first sharing choice, with a clean
+  cream layout, restaurant name/address, up to three personal photos,
+  optional dish/rating and understated branding. Keep original media sharing.
+- Use the same personal-photo design from place details; remove listing-photo
+  fallbacks from order cards and food-date invitations too.
+- Keep no-photo cards text-only and report unreadable personal photos explicitly.
+- Verify collage pixels, metadata, photo priority, and listing-photo exclusion.
+
+## [Unreleased] - 2026-11-08 (video and social handoff)
+
+- Give Record video the same full-width icon, 60px touch target and finite,
+  reduced-motion-aware glow as Take photo. Keep Save visible on small phones.
+- Explain TikTok, Instagram and Facebook sharing through the device share sheet.
+  Add actual-media downloads and editable-caption copying for manual uploads
+  when a social app is missing or sharing is blocked; never post automatically.
+- Test actual video downloads, unsupported sharing, clipboard failures,
+  video label fit and both reduced-motion preferences.
+
+## [Unreleased] - 2026-11-08 (simpler Add)
+
+- Reduce Quick Add to the place, Here now / Went before / Want to try,
+  optional photo/video and Save. Collapse rating, dish, cuisine, AI fill
+  and the full form under Add details; collapse bulk import separately.
+- Replace the duplicate camera icon with one labelled Take photo action.
+  Keep social posting optional after saving.
+- Make Take photo full-width with a high-contrast camera icon and a gentle,
+  limited glow; preserve the full label on small phones and respect reduced motion.
+- Preserve optional past-visit dates consistently across visits and dishes;
+  unknown past dates stay unknown. Past-visit captions do not claim "Just ate".
+- Add measurable small-phone, optional-detail and save-to-share regressions.
+
+## [Unreleased] - 2026-11-08 (social foodie pass)
+
+- Add food-date invitations from Friends, shared interests, the Home feed and
+  post-save sharing: select a place and friend, optional date/time, preview,
+  send, copy, or make a Story-sized invitation card.
+- Allow edited sharing captions; require opt-in before including meal notes.
+  Label saved Want-to-Try places as bucket-list picks instead of "Just ate".
+- Preserve Friends feed controls when accounts switch and show friends'
+  recommendations before the user's first save. Cancel stale Story generation.
+- Update the Google Play deletion test to simulate a real completed sign-out.
+  Add social-planning regressions to CI and refresh the offline asset cache.
+- Prevent Enter in Byte Cub from activating a newly focused dialog's Close
+  button when handing off to Dinner Vote.
+
+## [Unreleased] - 2026-11-08
+
+### Account isolation and reliable backup
+- Hide private data immediately on sign-out and keep local diaries scoped to
+  the owning account, including profiles, friends, lists, chats and deletion
+  markers. Preserve existing caches and migrate older email-identified diaries
+  only when the matching account signs in.
+- Ignore stale account loads, plan checks, shared-list callbacks and chat
+  responses; cancel pending account uploads, chat backups and location alerts.
+- Show failed backup/restoration with Retry backup instead of silently treating
+  failures as empty cloud data or claiming that sign-in proves backup succeeded.
+- Explicitly use persistent Firebase authentication and surface storage failures.
+- Close custom account dialogs and pending welcome prompts on account changes.
+  Wait for sign-out storage cleanup during account deletion and preserve only
+  an explicitly kept signed-out diary, not the deleted account's identity.
+
+### Capture, save and share
+- Add separate Take photo, Record video and Gallery actions across the
+  primary add-place/meal flows and dish media editing.
+- Disable saving during media selection/processing, handle cancellation, and
+  reject late attachments from a closed or replaced form.
+- Offer immediate photo/video sharing, a Story card, or Done after new saves.
+  Share the actual video, not only its poster. Retain explicit download
+  fallbacks and show blocked-sharing errors.
+- Reflow capture/share controls for small phones and enlarged text, keep
+  sharing prompts out of other dialogs, and fix the malformed Travel Mode
+  notification. Refresh the offline asset cache.
+
 ## [Unreleased] - 2026-11-01 (fourth drop)
 
 ### Post to social media

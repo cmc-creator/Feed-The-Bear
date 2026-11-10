@@ -15,7 +15,7 @@
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="canonical" href="https://www.feed-the-bear.com/app.html" />
-  <meta name="theme-color" content="#E8B15A" />
+  <meta name="theme-color" content="#12141b" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Feed The Bear" />
@@ -37,7 +37,7 @@
   <link rel="stylesheet" href="micro-interactions.css" />
   <link rel="stylesheet" href="photo-gallery.css" />
 </head>
-<body>
+<body data-theme-accent="midnight">
 
   <!-- ── Signup / Create Account (first-run full-screen page) ── -->
   <div id="profile-setup-overlay" class="signup-fullscreen hidden" role="dialog" aria-modal="true" aria-label="Create your account">
@@ -68,6 +68,18 @@
     </div>
   </div>
 
+  <!-- ── Username & public page (Settings) ───────────────────── -->
+  <div id="handle-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="handle-title">
+    <div class="modal-card handle-card">
+      <div class="modal-header">
+        <h2 id="handle-title">Username &amp; public page</h2>
+        <button id="handle-close-btn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="handle-intro">Your username is how friends find you, and your public page link (feed-the-bear.com/@username) is the one to put in your TikTok and Instagram bio.</p>
+      <div id="settings-handle" class="friends-handle"></div>
+    </div>
+  </div>
+
   <!-- ── Account Portal ─────────────────────────────────────── -->
   <div id="account-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="account-title">
     <div class="modal-card account-portal-card">
@@ -94,10 +106,22 @@
         <button class="account-action-row" id="account-edit-btn">
           <span class="aar-icon" aria-hidden="true">✏️</span><span class="aar-label">Edit Profile</span><span class="aar-chevron">›</span>
         </button>
+        <button class="account-action-row" id="account-handle-row">
+          <span class="aar-icon" aria-hidden="true">@</span><span class="aar-label">Username &amp; public page<small id="account-handle-state" class="aar-sub">Pick the name friends find you by, and your page link for TikTok</small></span><span class="aar-chevron">›</span>
+        </button>
         <!-- Email, password, phone - signed in only -->
         <button class="account-action-row hidden" id="account-security-row">
           <span class="aar-icon" aria-hidden="true">🔐</span><span class="aar-label">Email, Password &amp; Phone</span><span class="aar-chevron">›</span>
         </button>
+        <a class="account-action-row hidden" id="account-shop-row" href="#" target="_blank" rel="noopener">
+          <span class="aar-icon" aria-hidden="true">🛍️</span><span class="aar-label">Bear Shop<small class="aar-sub">Stickers, shirts and mugs with our bears</small></span><span class="aar-chevron">›</span>
+        </a>
+        <a class="account-action-row" id="account-gift-row" href="/gift.html" target="_blank" rel="noopener">
+          <span class="aar-icon" aria-hidden="true">🎁</span><span class="aar-label">Gift Grizzly<small class="aar-sub">Give a food lover 3 months or a year</small></span><span class="aar-chevron">›</span>
+        </a>
+        <a class="account-action-row hidden" id="account-owner-row" href="/owner.html">
+          <span class="aar-icon" aria-hidden="true">👑</span><span class="aar-label">Owner portal<small class="aar-sub">Free Grizzly for VIPs, discount codes, usage</small></span><span class="aar-chevron">›</span>
+        </a>
         <button class="account-action-row" id="account-nearalerts-row">
           <span class="aar-icon" aria-hidden="true">📍</span><span class="aar-label">Nearby Want to Try alerts<small id="account-nearalerts-state" class="aar-sub">Off</small></span><span class="aar-chevron">›</span>
         </button>
@@ -161,6 +185,7 @@
       </div>
       <p>This permanently deletes your account and everything backed up with it: your spots, ratings, dishes, photos, profile and anything you shared with friends. A Grizzly subscription is cancelled. This can't be undone.</p>
       <label class="delete-account-check"><input type="checkbox" id="delete-account-local" aria-label="Also erase the data on this device" checked /> Also erase everything saved on this device</label>
+      <p class="form-hint">Uncheck to keep only your spots as a signed-out diary on this device. Your profile, friends and chats are removed.</p>
       <div id="delete-account-password-wrap" class="hidden">
         <label class="form-label" for="delete-account-password">Your password</label>
         <input id="delete-account-password" class="form-input" type="password" autocomplete="current-password" />
@@ -286,7 +311,7 @@
           <img id="edit-photo-preview" class="profile-photo-preview hidden" alt="Profile photo preview" />
         </div>
         <label class="form-label">Your name</label>
-        <input id="edit-name" class="form-input" type="text" placeholder="Your name" maxlength="30" />
+        <input id="edit-name" class="form-input" type="text" aria-label="Your name" placeholder="Your name" maxlength="30" />
         <label class="form-label" style="margin-top:16px;margin-bottom:8px;display:block">Avatar</label>
         <div class="avatar-emoji-grid" id="edit-avatar-grid"></div>
         <label class="form-label" style="margin-top:16px;margin-bottom:8px;display:block">Profile photo</label>
@@ -309,12 +334,15 @@
         <button id="personalize-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="personalize-body">
+        <a class="account-action-row hidden" id="settings-owner-row" href="/owner.html">
+          <span class="aar-icon" aria-hidden="true">👑</span><span class="aar-label">Owner portal<small class="aar-sub">Free Grizzly for VIPs, discount codes, usage</small></span><span class="aar-chevron">›</span>
+        </a>
         <div class="personalize-section-title">Appearance</div>
         <label class="form-label" for="personalize-theme-select">Theme</label>
         <select id="personalize-theme-select" class="form-select">
           <option value="auto">Auto (match my phone)</option>
-          <option value="dark">Velvet &amp; Champagne</option>
-          <option value="light">Champagne Cream</option>
+          <option value="dark">Dark (default)</option>
+          <option value="light">Light</option>
           <option value="forest">Moss &amp; Pine</option>
           <option value="ocean">Glacier Lake</option>
           <option value="sunset">Campfire Ember</option>
@@ -404,7 +432,7 @@
       </div>
       <div class="auth-body">
         <img class="auth-hero-bear" src="feedbear-sm.jpg" alt="Feed The Bear mascot" loading="lazy" />
-        <p class="auth-sub">It's free. Your spots, ratings and photos get backed up, so a new phone never means a lost food diary.</p>
+        <p class="auth-sub">It's free. Back up your spots, ratings and notes. Photos sync within backup limits; large photo collections and video clips may remain only on this device.</p>
         <div class="auth-tabs" role="tablist" aria-label="Sign in or create an account">
           <button type="button" class="auth-tab" role="tab" data-auth-mode="signin">Sign in</button>
           <button type="button" class="auth-tab" role="tab" data-auth-mode="signup">Create account</button>
@@ -416,8 +444,10 @@
         <label class="form-label" for="auth-password" style="margin-top:12px">Password</label>
         <input id="auth-password" class="form-input" type="password" placeholder="At least 8 characters" autocomplete="current-password" />
         <button id="auth-submit-btn" class="btn-primary" style="width:100%;margin-top:16px">Sign In</button>
+        <div id="auth-error" class="auth-error hidden" role="alert"></div>
         <p class="auth-forgot"><button type="button" class="auth-link-btn" id="auth-forgot-btn">Forgot password?</button></p>
         <p id="auth-toggle-text" class="auth-toggle-text">New here? <button class="auth-link-btn" id="auth-mode-toggle">Sign up, it's free</button></p>
+        <p class="auth-try-first"><button type="button" class="auth-link-btn" id="auth-try-first">Try it first: save 3 spots without an account</button></p>
         <p class="upgrade-legal">By continuing you agree to our <a href="terms.html" target="_blank" rel="noopener">Terms</a> and <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>
       </div>
     </div>
@@ -439,7 +469,7 @@
             <ul class="upgrade-plan-features">
               <li>✓ Up to 25 restaurants</li>
               <li>✓ Map, nearby &amp; Open now</li>
-              <li>✓ Free backup on every device</li>
+              <li>✓ Free diary backup (photo limits apply)</li>
               <li>✓ Follow one friend, invite anyone</li>
               <li class="dim">✗ More friends</li>
               <li class="dim">✗ Dinner Vote</li>
@@ -516,7 +546,7 @@
     <div class="header-actions">
       <!-- Always-visible: theme, voice, add, chat -->
       <button id="grizzly-pill" class="grizzly-pill hidden" type="button" data-upsell="general">Go Grizzly</button>
-      <button id="theme-toggle-btn" class="icon-btn" title="Toggle light/dark theme">
+      <button id="theme-toggle-btn" class="icon-btn" type="button" title="Switch to light theme" aria-label="Switch to light theme" aria-pressed="true">
         <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       </button>
@@ -534,6 +564,16 @@
         <span class="nav-badge-text">Byte Cub</span><span>Ask Byte Cub</span>
       </button>
 
+      <button id="header-friends-btn" class="moss-friends-btn" type="button" title="Friends" aria-label="Friends">
+        <span class="moss-ring" aria-hidden="true"></span>
+        <span class="moss-glint" aria-hidden="true"></span>
+        <span class="moss-core" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="18"><g opacity=".55"><circle cx="16.6" cy="7.4" r="3.1"/><path d="M11.4 19.6c.3-3.6 2.4-6 5.2-6s4.9 2.4 5.2 6z"/></g><circle cx="9" cy="8.6" r="3.7"/><path d="M2.2 21c.3-4.3 3-7.1 6.8-7.1s6.5 2.8 6.8 7.1z"/></svg>
+        </span>
+        <span class="moss-sparkle s1" aria-hidden="true"></span>
+        <span class="moss-sparkle s2" aria-hidden="true"></span>
+        <span id="header-friends-dot" class="moss-dot hidden" aria-hidden="true"></span>
+      </button>
       <button id="header-invite-btn" class="header-invite-btn" type="button" title="Invite friends" aria-label="Invite friends">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" width="15" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.4 3.4-5.5 6.5-5.5s5.7 2.1 6.5 5.5"/><path d="M19 7v6M16 10h6"/></svg>
         <span>Invite</span>
@@ -850,15 +890,6 @@
         </span>
       </button>
 
-      <!-- AI Recommendation Banner -->
-      <div id="ai-rec-banner" class="ai-rec-banner home-module hidden">
-        <div class="ai-rec-icon" aria-hidden="true">✨</div>
-        <div class="ai-rec-body">
-          <div class="ai-rec-label">Byte Cub's Pick For You</div>
-          <div id="ai-rec-text" class="ai-rec-text">Thinking…</div>
-        </div>
-        <button id="ai-rec-refresh-btn" class="ai-rec-refresh" title="Refresh recommendation">↻</button>
-      </div>
       <div class="home-quick-actions home-module" id="home-quick-actions" aria-label="Quick actions">
         <button class="home-quick-btn" id="home-quick-justate-btn" type="button">
           <span class="home-quick-emoji" aria-hidden="true">
@@ -924,6 +955,15 @@
           <span class="home-quick-label">Dinner Vote</span>
         </button>
       </div>
+      <!-- AI Recommendation Banner -->
+      <div id="ai-rec-banner" class="ai-rec-banner home-module hidden">
+        <div class="ai-rec-icon" aria-hidden="true">✨</div>
+        <div class="ai-rec-body">
+          <div class="ai-rec-label">Byte Cub's Pick For You</div>
+          <div id="ai-rec-text" class="ai-rec-text">Thinking…</div>
+        </div>
+        <button id="ai-rec-refresh-btn" class="ai-rec-refresh" title="Refresh recommendation">↻</button>
+      </div>
       <div id="today-vibe-row" class="today-vibe-row home-module" aria-label="Tonight vibe"></div>
 
       <!-- Home order: act now, what is near, what you want, then play, upsell, extras. -->
@@ -947,6 +987,15 @@
         <div class="nearby-home-loading">Finding restaurants near you…</div>
       </div>
 
+      <section id="bear-challenges-home" class="home-module bc-home" aria-label="Bear Challenges">
+        <div class="bc-home-heading">
+          <div><span class="bc-eyebrow">MAKE A FOOD MEMORY</span><h2>🏆 Bear Challenges</h2></div>
+          <button id="bear-challenges-all" type="button" class="btn-secondary btn-sm">See all</button>
+        </div>
+        <p id="bear-challenges-home-sub" class="bc-muted">Restaurant challenges &amp; upcoming competitions. Go with friends, or watch the fun.</p>
+        <div id="bear-challenges-home-list" class="bc-home-list" aria-live="polite"></div>
+      </section>
+
       <!-- Crave List: every dish you've been meaning to try, nearest first -->
       <div id="open-now-home" class="open-now-home home-module hidden" aria-label="Open right now">
         <div class="crave-home-header">
@@ -968,6 +1017,10 @@
         <div class="ff-header">
           <span class="ff-title">Friends' Feed</span>
           <button type="button" class="btn-ghost btn-sm" id="ff-open-friends">Friends</button>
+        </div>
+        <div class="foodie-social-start">
+          <span>Turn “we should go” into your next great bite.</span>
+          <button type="button" class="btn-sm btn-primary" id="ff-plan-date">Plan a food date</button>
         </div>
         <div id="ff-list" class="ff-list"></div>
       </div>
@@ -1101,7 +1154,7 @@
       <p class="challenge-subtitle">Share your top picks and see whose taste reigns supreme.</p>
       <div id="challenge-preview" class="challenge-preview"></div>
       <div class="challenge-share-row">
-        <input id="challenge-link" class="challenge-link-input" readonly placeholder="Generating link…" />
+        <input id="challenge-link" class="challenge-link-input" readonly aria-label="Challenge invite link" placeholder="Generating link…" />
         <button id="challenge-copy-btn" class="btn-sm btn-orange">Copy</button>
       </div>
       <button id="challenge-share-btn" class="btn-primary" style="width:100%;margin-top:12px">Share Challenge</button>
@@ -1299,7 +1352,7 @@
         <button id="command-palette-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="command-palette-input-row">
-        <input id="command-palette-input" class="form-input" type="text" placeholder="Search actions, views, tools" autocomplete="off" />
+        <input id="command-palette-input" class="form-input" type="text" aria-label="Search actions, views and tools" placeholder="Search actions, views, tools" autocomplete="off" />
       </div>
       <div id="command-palette-results" class="command-palette-results"></div>
     </div>
@@ -1380,13 +1433,14 @@
 
           <!-- Photo -->
           <div class="form-group form-full">
-            <label for="form-photo">Photo <span class="label-hint">(URL or upload)</span> <button type="button" id="ai-photo-btn" class="btn-sm btn-ai"> AI Fill</button></label>
+            <label for="form-photo">Photos &amp; videos <span class="label-hint">(or paste a photo URL)</span> <button type="button" id="ai-photo-btn" class="btn-sm btn-ai"> AI Fill</button></label>
             <input type="url" id="form-photo" placeholder="https://example.com/photo.jpg" />
             <label class="photo-upload-label">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              Upload from device
-              <input type="file" id="form-photo-file" accept="image/*" capture="environment" style="display:none" />
+              Choose from device
+              <input type="file" id="form-photo-file" accept="image/*,video/*" multiple style="display:none" />
             </label>
+            <div id="form-media-preview" class="hidden"></div>
           </div>
 
           <!-- Status -->
@@ -1575,7 +1629,7 @@
             <h4>My Notes</h4>
             <span class="detail-notes-saved" id="detail-notes-saved" aria-live="polite"></span>
           </div>
-          <textarea id="detail-notes-edit" class="detail-notes-edit" rows="3"
+          <textarea id="detail-notes-edit" class="detail-notes-edit" rows="3" aria-label="My notes about this place"
             placeholder="Jot the vibe, what to order, and who joined you" maxlength="2000"></textarea>
         </div>
 
@@ -1583,7 +1637,7 @@
           <h4>Links</h4>
           <div id="detail-links-list" class="detail-links-list"></div>
           <div class="detail-links-add">
-            <input id="detail-link-input" class="form-input" type="url" inputmode="url" placeholder="Paste a TikTok, Instagram, review or menu link" />
+            <input id="detail-link-input" class="form-input" type="url" inputmode="url" aria-label="Add a link to this place" placeholder="Paste a TikTok, Instagram, review or menu link" />
             <button type="button" id="detail-link-add-btn" class="btn-sm btn-primary">Add</button>
           </div>
         </div>
@@ -1671,6 +1725,9 @@
           <button id="detail-edit-btn" class="btn-ghost">
             ✏ Edit
           </button>
+          <button id="detail-closed-btn" class="btn-ghost" type="button" aria-pressed="false">
+            Mark permanently closed
+          </button>
           <button id="detail-delete-btn" class="btn-danger">
              Delete
           </button>
@@ -1680,15 +1737,29 @@
   </div>
 
   <!-- ── Chat Panel ─────────────────────────────────────────── -->
-  <aside id="chat-panel" class="chat-panel hidden" aria-label="Byte Cub Chat">
+  <aside id="chat-panel" class="chat-panel hidden" role="dialog" aria-modal="true" aria-label="Byte Cub Chat">
     <div class="chat-header">
       <div class="chat-avatar"><img class="bear-mark" src="feedbear-sm.jpg" alt="" aria-hidden="true" /></div>
       <div>
         <div class="chat-title">Byte Cub</div>
         <div class="chat-subtitle">Your food assistant: tell me where you ate</div>
       </div>
+      <button id="chat-history-btn" class="icon-btn chat-head-btn" type="button" title="Past chats" aria-label="Past chats">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="17" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/><path d="M12 7v5l3 2"/></svg>
+      </button>
+      <button id="chat-new-btn" class="icon-btn chat-head-btn" type="button" title="New chat" aria-label="New chat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="17" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.8 7L4 20.5l1.4-4.6A8 8 0 1 1 21 12z"/><path d="M12 8.5v7M8.5 12h7"/></svg>
+      </button>
       <button id="chat-hide-cub-btn" class="chat-hide-cub" type="button" title="Hide the floating cub until next time">Hide cub</button>
       <button id="chat-close-btn" class="icon-btn" aria-label="Close chat">✕</button>
+    </div>
+
+    <div id="chat-history" class="chat-history hidden" aria-label="Past chats">
+      <div class="chat-history-head">
+        <button id="chat-history-back" class="btn-ghost btn-sm" type="button">‹ Back to chat</button>
+        <span class="chat-history-title">Past chats</span>
+      </div>
+      <div id="chat-history-list" class="chat-history-list"></div>
     </div>
 
     <div class="chat-messages" id="chat-messages" aria-live="polite">
@@ -1700,7 +1771,7 @@
     </div>
 
     <div class="chat-input-row">
-      <input type="text" id="chat-input" placeholder="e.g. I went to Tacos Chiwas, had the birria, 5 stars" autocomplete="off" enterkeyhint="send" />
+      <input type="text" id="chat-input" aria-label="Message Byte Cub" placeholder="e.g. I went to Tacos Chiwas, had the birria, 5 stars" autocomplete="off" enterkeyhint="send" />
       <button id="chat-mic-btn" class="btn-secondary" type="button" title="Talk to Byte Cub" aria-label="Talk to Byte Cub">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/></svg>
       </button>
@@ -1752,7 +1823,36 @@
       <svg class="mobile-hub-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
       <input id="mobile-hub-search" class="mobile-hub-search" type="search" placeholder="Search tools and games" autocomplete="off" />
     </div>
+    <button id="hub-contests-btn" class="btn-secondary" type="button">🏆 Bear Challenges · competitions &amp; food challenges</button>
     <div id="mobile-hub-body" class="mobile-hub-body"></div>
+  </div>
+
+  <div id="bear-challenges-overlay" class="modal-overlay bc-screen hidden" role="dialog" aria-modal="true" aria-labelledby="bc-title">
+    <header class="bc-header">
+      <div><span class="bc-eyebrow">YOUR NEXT FOOD ADVENTURE</span><h2 id="bc-title" tabindex="-1">🏆 Bear Challenges</h2>
+        <p class="bc-muted">Discover a challenge. Bring your people. Make a memory.</p></div>
+      <button id="bear-challenges-close" type="button" class="icon-btn" aria-label="Close">✕</button>
+    </header>
+    <div class="bc-scroll">
+      <div class="bc-filters">
+        <label>Show<select id="bc-kind"><option value="all">All challenges &amp; events</option><option value="challenge">Restaurant challenges</option><option value="upcoming">Upcoming competitions &amp; festivals</option></select></label>
+        <label>State<select id="bc-state"><option value="">Nationwide</option></select></label>
+        <label>City or challenge<input id="bc-search" type="search" placeholder="City, restaurant, or challenge" autocomplete="off" /></label>
+        <label>When<select id="bc-when"><option value="all">Any time</option><option value="weekend">This weekend (dated events)</option><option value="month">Next 30 days (dated events)</option></select></label>
+      </div>
+      <div class="bc-toolbar">
+        <button id="bc-saved" type="button" class="btn-secondary" aria-pressed="false">☆ Saved on this device</button>
+        <button id="bc-your-state" type="button" class="btn-ghost">Use your state</button>
+        <button id="bc-refresh" type="button" class="btn-ghost">Refresh</button>
+      </div>
+      <p id="bc-status" class="bc-muted" role="status"></p>
+      <div id="bc-list" class="bc-grid" aria-live="polite"></div>
+      <p class="bc-disclaimer">Discovered from web sources, not organizer-verified. Confirm availability, costs, eligibility and rules with the organizer before going. Watching counts as a food adventure, too.</p>
+    </div>
+  </div>
+  <div id="bear-challenge-detail-overlay" class="modal-overlay bc-screen bc-detail-screen hidden" role="dialog" aria-modal="true" aria-labelledby="bc-detail-title">
+    <header class="bc-header"><h2 id="bc-detail-title" tabindex="-1">Challenge details</h2><button id="bear-challenge-detail-close" type="button" class="icon-btn" aria-label="Close">✕</button></header>
+    <div id="bc-detail" class="bc-scroll"></div>
   </div>
 
   <!-- ── Nearby Discovery Modal ─────────────────────────── -->
@@ -1923,7 +2023,7 @@
         <canvas id="profile-qr" width="180" height="180"></canvas>
       </div>
       <div class="profile-link-row">
-        <input id="profile-link" class="challenge-link-input" readonly placeholder="Generating…" />
+        <input id="profile-link" class="challenge-link-input" readonly aria-label="Your shareable profile link" placeholder="Generating…" />
         <button id="profile-copy-btn" class="btn-sm btn-orange">Copy</button>
       </div>
       <button id="profile-share-btn" class="btn-primary" style="width:100%;margin-top:10px">Share Profile</button>
@@ -2033,7 +2133,7 @@
         <button class="craving-chip" data-mood="cheap">Cheap Eats</button>
         <button class="craving-chip" data-mood="new">Try Something New</button>
       </div>
-      <input id="craving-freetext" class="form-input" placeholder="Or type anything: spicy noodles under $20" style="margin-top:12px" />
+      <input id="craving-freetext" class="form-input" aria-label="What are you craving?" placeholder="Or type anything: spicy noodles under $20" style="margin-top:12px" />
       <button id="craving-go-btn" class="btn-primary" style="width:100%;margin-top:12px">Find My Match</button>
       <div id="craving-result" class="craving-result hidden"></div>
     </div>
@@ -2089,6 +2189,7 @@
         <button id="friends-close-btn" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <p class="friends-subtitle">See what your friends order, what they skip, and what they're craving, right on the places you both save.</p>
+      <div id="friends-status" class="friends-status" aria-live="polite"></div>
       <button id="friends-invite-btn" type="button" class="btn-primary friends-invite-big">Invite a friend</button>
       <button id="friends-copy-btn" type="button" class="friends-copy-link">or copy your link</button>
       <button id="friends-qr-btn" type="button" class="friends-copy-link">or show my QR code</button>
@@ -2110,8 +2211,8 @@
       <details class="friends-paste">
         <summary>Got a friend's link? Paste it here</summary>
         <div style="display:flex;gap:8px;margin-top:8px">
-          <input id="friends-link-input" class="form-input" placeholder="Paste their link" style="flex:1" />
-          <button id="friends-load-btn" class="btn-sm btn-orange">Follow</button>
+          <input id="friends-link-input" class="form-input" aria-label="Friend's invite or profile link" placeholder="Paste their link" style="flex:1" />
+          <button id="friends-load-btn" class="btn-sm btn-orange" aria-label="Follow friend from link">Follow</button>
         </div>
       </details>
       <div id="friends-result" class="friends-result hidden"></div>
@@ -2256,7 +2357,7 @@
             <h3>Developer Override</h3>
             <p>Byte Cub is already included for users. This field is only for local developer fallback testing.</p>
             <div class="ai-key-input-row">
-              <input type="password" id="ai-gemini-key-input" class="form-input" placeholder="Paste Gemini API key (AIza…)" autocomplete="off" />
+              <input type="password" id="ai-gemini-key-input" class="form-input" aria-label="Developer Gemini API key" placeholder="Paste Gemini API key (AIza…)" autocomplete="off" />
               <button id="ai-save-key-btn" class="btn-primary btn-sm">Save</button>
             </div>
             <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="ai-key-link">Get a free key at Google AI Studio →</a>
@@ -2279,7 +2380,7 @@
         </div>
         <div class="ai-chat-history" id="ai-chat-history"></div>
         <div class="ai-input-row">
-          <input id="ai-chat-input" class="form-input" placeholder="Ask Byte Cub anything…" type="text" />
+          <input id="ai-chat-input" class="form-input" aria-label="Message Byte Cub" placeholder="Ask Byte Cub anything…" type="text" />
           <button id="ai-chat-send-btn" class="btn-primary" aria-label="Send">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
@@ -2443,7 +2544,7 @@
         </div>
         <div class="travel-section-label" style="margin-top:12px">Custom city</div>
         <div style="display:flex;gap:8px">
-          <input id="travel-city-input" class="form-input" placeholder="e.g. Melbourne, Australia" style="flex:1" />
+          <input id="travel-city-input" class="form-input" aria-label="City to explore" placeholder="e.g. Melbourne, Australia" style="flex:1" />
           <button id="travel-set-btn" class="btn-primary">Set</button>
         </div>
       </div>
@@ -2660,7 +2761,7 @@
       <p class="mealplanner-sub">Tell Byte Cub your week and budget - get a personalised dining plan.</p>
       <div class="mealplanner-controls">
         <div class="mealplanner-row">
-          <label class="mealplanner-label">Dining out days</label>
+          <label class="mealplanner-label" for="mp-days">Dining out days</label>
           <select id="mp-days" aria-label="Number of days" class="form-input" style="width:auto">
             <option value="2">2 days</option>
             <option value="3" selected>3 days</option>
@@ -2670,11 +2771,11 @@
           </select>
         </div>
         <div class="mealplanner-row">
-          <label class="mealplanner-label">Weekly budget</label>
+          <label class="mealplanner-label" for="mp-budget">Weekly budget</label>
           <input type="number" id="mp-budget" class="form-input" style="width:120px" placeholder="e.g. 150" min="0" step="5" />
         </div>
         <div class="mealplanner-row">
-          <label class="mealplanner-label">Vibe this week</label>
+          <label class="mealplanner-label" for="mp-vibe">Vibe this week</label>
           <input type="text" id="mp-vibe" class="form-input" style="flex:1" placeholder="e.g. comfort food, exploring, healthy…" />
         </div>
       </div>
@@ -2828,6 +2929,7 @@
   <script src="friends.js"></script>
   <script src="insights.js"></script>
   <script src="play.js"></script>
+  <script src="games.js"></script>
   <script src="bear-swipe.js"></script>
   <script src="cub.js"></script>
   <script src="story-card.js"></script>
@@ -2842,26 +2944,12 @@
         .then(reg => {
           // Force the browser to check for a new SW on every launch (bypasses
           // the default 24-hour check interval - critical for installed PWAs).
+          // No reload when it activates: app files are network-first, so this
+          // page is already fresh. Reloading here threw away whatever had just
+          // opened (a shared spot's Add form, an invite) and landed on Home.
           reg.update();
-
-          // When a new SW finishes installing, reload once it activates so the
-          // fresh assets are served immediately instead of on the next cold open.
-          reg.addEventListener('updatefound', () => {
-            const sw = reg.installing;
-            sw.addEventListener('statechange', () => {
-              if (sw.state === 'activated' && navigator.serviceWorker.controller) {
-                window.location.reload();
-              }
-            });
-          });
         })
         .catch(() => {});
-
-      // Guard against a double-reload if controllerchange fires more than once.
-      let _swRefreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!_swRefreshing) { _swRefreshing = true; window.location.reload(); }
-      });
     }
   </script>
 </body>

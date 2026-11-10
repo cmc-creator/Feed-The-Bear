@@ -47,6 +47,7 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
 
   // A notification while the app is open shows in the app; tapping one opens Friends.
   await p.evaluate(() => window._push.listeners.pushNotificationReceived({ title: 'Sam ate at Bacanora', body: 'Tap to see' }));
+  await p.waitForFunction(() => /Sam ate at Bacanora/.test(document.querySelector('#toast-container')?.innerText || ''), null, { timeout: 12000 }).catch(() => {});
   check(/Sam ate at Bacanora/.test(await p.locator('#toast-container').innerText()), 'a notification while the app is open shows as a message');
   await p.evaluate(() => window._push.listeners.pushNotificationActionPerformed({ notification: {} }));
   await p.waitForTimeout(700);

@@ -67,6 +67,8 @@ window.Cub = (() => {
   let sheet = null;
   let pick = null;          // the chosen place
   let status = null;        // 'visited' | 'want-to-try'
+  let visitChoice = null;
+  let attachments = [];
   let stars = 0;
   let verdict = null;
   let photo = '';
@@ -242,19 +244,29 @@ window.Cub = (() => {
     if (pick.source === 'social') {
       setStatus('want-to-try');
       if (pick.dish) sheet.querySelector('.qa-dish').value = pick.dish;
-      say(pick.dish ? `Saving it to Want to Try, with the ${pick.dish} on your Crave List.` : 'Saving it to your Want to Try list. Been already? Tap Been there.');
+      say(pick.dish ? `Saving it to Want to Try, with the ${pick.dish} on your Crave List.` : 'Saving it to your Want to Try list. Been already? Choose Here now or Went before.');
     }
     track('quick_add_place_picked', { source: pick.source, hasCuisine: !!pick.cuisine });
   }
 
   function setStatus (s) {
-    status = s;
-    sheet.querySelectorAll('.qa-status').forEach(b => b.classList.toggle('active', b.dataset.status === s));
-    sheet.classList.toggle('been', s === 'visited');
-    sheet.classList.toggle('want', s === 'want-to-try');
-    sheet.querySelector('.qa-dish').placeholder = s === 'visited' ? 'What did you have? (optional)' : 'Heard about a must-order dish? (optional)';
-    say(s === 'visited' ? 'Nice! How was it? Tap the stars.' : 'Good call. Any dish you have to try there?');
-    sheet.querySelector('.qa-save').disabled = false;
+    visitChoice = s;
+    status = s === 'visited-before' ? 'visited' : s;
+    sheet.querySelectorAll('.qa-status').forEach(b => {
+      b.classList.toggle('active', b.dataset.status === s);
+      b.setAttribute('aria-pressed', String(b.dataset.status === s));
+    });
+    sheet.classList.toggle('been', status === 'visited');
+    sheet.classList.toggle('want', status === 'want-to-try');
+    sheet.classList.toggle('went-before', s === 'visited-before');
+    sheet.querySelector('.qa-dish').placeholder = status === 'visited' ? 'What did you have? (optional)' : 'Heard about a must-order dish? (optional)';
+    say('Photo or video? Both optional. Save, then share.');
+    syncSave();
+  }
+
+  function syncSave () {
+    if (sheet) sheet.querySelector('.qa-save').disabled = !pick || !status || app().foodMediaBusy() || !!window._ftbAccountSwitching;
+    if (sheet) sheet.querySelector('.qa-save').textContent = status === 'visited' ? 'Save my visit' : 'Save place';
   }
 
   function setStars (n) {
@@ -266,15 +278,21 @@ window.Cub = (() => {
   async function aiFill () {
     if (!pick) return;
     if (!app().hasGrizzly()) { app().showGrizzlyUpsell('smartfill'); return; }
+    const target = pick;
+    const generation = _dataGeneration;
+    const isCurrent = () => pick === target && generation === _dataGeneration && !sheet.classList.contains('hidden');
     say('Sniffing out the details…');
     try {
-      const data = await app().AI.smartFill(pick.name, pick.address || '');
+      const data = await app().AI.smartFill(target.name, target.address || '');
+      if (!isCurrent()) return;
       if (data.cuisine) sheet.querySelector('.qa-cuisine').value = data.cuisine;
       if (data.priceRange) pick.priceRange = Number(data.priceRange) || 0;
       if (data.description) pick.notes = data.description;
       if (Array.isArray(data.tags)) pick.tags = data.tags.slice(0, 6);
       say(`Filled in: ${[data.cuisine, data.priceRange ? '$'.repeat(Number(data.priceRange)) : '', data.tags?.length ? 'tags' : ''].filter(Boolean).join(', ') || 'what I could find'}.`);
     } catch (err) {
+      if (!isCurrent()) return;
+      console.warn('[FTB] Quick Add smart fill failed:', err);
       say("I couldn't find more just now. You can still save it.");
     }
   }
@@ -283,21 +301,29 @@ window.Cub = (() => {
   function save () {
     if (!pick || !status) return;
     const a = app();
+    if (a.foodMediaBusy() || window._ftbAccountSwitching) { a.showToast('Please wait', 'Finish adding media before saving.', 'info'); return; }
     const atLimit = typeof a.isPremium === 'function' && !a.isPremium() && state.restaurants.length >= FREE_RESTAURANT_LIMIT;
     const today = a.iso();
+    const visitDate = visitChoice === 'visited-before' ? sheet.querySelector('.qa-visit-date').value : today;
+    if (visitChoice === 'visited-before' && !sheet.querySelector('.qa-visit-date').checkValidity()) {
+      sheet.querySelector('.qa-details').open = true;
+      sheet.querySelector('.qa-visit-date').reportValidity();
+      return;
+    }
     const cuisine = sheet.querySelector('.qa-cuisine').value.trim().slice(0, 40);
     const dish = sheet.querySelector('.qa-dish').value.trim().slice(0, 80);
     const r = {
       id: a.uid(), name: pick.name.slice(0, 80), cuisine, priceRange: pick.priceRange || 0,
       address: pick.address || '', lat: Number.isFinite(pick.lat) ? pick.lat : null, lng: Number.isFinite(pick.lng) ? pick.lng : null,
       website: pick.website || '', photo: '', googleRating: pick.rating || 0, googleReviews: pick.reviews || 0,
-      myRating: status === 'visited' ? stars : 0, notes: pick.notes || '', tags: pick.tags || [],
+      myRating: status === 'visited' ? stars : 0, notes: sheet.querySelector('.qa-notes').value.trim() || pick.notes || '', tags: pick.tags || [],
       collectionId: null, priority: '', status, dateAdded: today,
       links: pick.sourceUrl ? [{ url: pick.sourceUrl.slice(0, 500), added: today }] : [],
-      dateVisited: status === 'visited' ? today : null, updatedAt: Date.now(), visits: [],
+      dateVisited: status === 'visited' ? visitDate || null : null, updatedAt: Date.now(), visits: [],
     };
-    if (status === 'visited') r.visits.push({ date: today, note: '', rating: stars, dish, photo, ...(video ? { video } : {}) });
-    if (photo) r.photo = photo;
+    if (status === 'visited') r.visits.push({ date: visitDate, note: '', rating: stars, dish, photo, ...(video ? { video } : {}) });
+    a.setMediaOn(r, attachments);
+    if (r.visits[0]) a.setMediaOn(r.visits[0], attachments);
     if (atLimit) {
       // Over the free limit: the spot waits, and is saved the moment they go Grizzly.
       if (typeof a.holdSpotForGrizzly === 'function') a.holdSpotForGrizzly(r, dish ? { name: dish, verdict: status === 'visited' ? (verdict || 'ok') : 'want' } : null);
@@ -308,7 +334,7 @@ window.Cub = (() => {
       return;
     }
     state.restaurants.unshift(r);
-    if (dish) a.upsertDish(r, { name: dish, verdict: status === 'visited' ? (verdict || (stars >= 4 ? 'again' : stars && stars <= 2 ? 'skip' : 'ok')) : 'want', photo, video });
+    if (dish) a.upsertDish(r, { name: dish, verdict: status === 'visited' ? (verdict || (stars >= 4 ? 'again' : stars && stars <= 2 ? 'skip' : 'ok')) : 'want', media: attachments, date: status === 'visited' ? visitDate : today });
     else a.saveData();
     if (!Number.isFinite(r.lat) && r.address && typeof a.geocodeAddress === 'function') a.geocodeAddress(r.id, r.address);
     a.renderAll();
@@ -317,8 +343,9 @@ window.Cub = (() => {
     close();
     saving = false;
     if (photo) a.photoReveal(photo, dish || r.name);
-    a.showToast(status === 'visited' ? `${r.name} logged` : `${r.name} saved`, status === 'visited' ? 'In your den, with your rating.' : 'On your Want to Try list.', 'success');
+    a.showToast(status === 'visited' ? `${r.name} logged` : `${r.name} saved`, status === 'visited' ? 'Your visit is saved. Sharing is up to you.' : 'On your Want to Try list.', 'success');
     if (typeof a.celebrateMilestones === 'function') a.celebrateMilestones();
+    a.offerShareMeal({ r, dish, verdict: status === 'visited' ? verdict || 'ok' : '', photo, video, media: attachments, note: r.notes, rememberedVisit: visitChoice === 'visited-before' });
     if (welcomeActive) { resumeWelcome(true); return; }
     buddyTip(status === 'want-to-try' && !dish ? `Tip: open ${r.name} and add a must-try dish to your Crave List.` : '', true);
   }
@@ -329,7 +356,24 @@ window.Cub = (() => {
     close();
     app().openAddModalPreFilled(p.name, sheet?.querySelector('.qa-cuisine')?.value || p.cuisine || '', {
       name: p.name, address: p.address || '', website: p.website || '', lat: p.lat, lon: p.lng,
+      quickDish: sheet.querySelector('.qa-dish').value.trim(),
+      quickVerdict: verdict || (stars >= 4 ? 'again' : stars && stars <= 2 ? 'skip' : 'ok'),
+      quickUnknownDate: visitChoice === 'visited-before' && !sheet.querySelector('.qa-visit-date').value,
+      sourceUrl: p.sourceUrl || '',
     });
+    app().setFormMedia(attachments);
+    document.getElementById('form-notes').value = sheet.querySelector('.qa-notes').value.trim() || p.notes || '';
+    document.getElementById('form-price').value = p.priceRange || '';
+    document.getElementById('form-tags').value = (p.tags || []).join(', ');
+    document.getElementById('form-google-rating').value = p.rating || '';
+    document.getElementById('form-google-reviews').value = p.reviews || '';
+    app().setFormStars(stars);
+    document.querySelectorAll('input[name="form-status"]').forEach(radio => {
+      radio.checked = radio.value === (status || 'want-to-try');
+      if (radio.checked) radio.dispatchEvent(new Event('change'));
+    });
+    document.getElementById('form-date-visited').value = status === 'visited'
+      ? (visitChoice === 'visited-before' ? sheet.querySelector('.qa-visit-date').value : app().iso()) : '';
   }
 
   function build () {
@@ -351,34 +395,44 @@ window.Cub = (() => {
           <input class="form-input qa-input" type="text" maxlength="120" autocomplete="off" enterkeyhint="search"
             placeholder="Name, or paste a TikTok, Instagram or Maps link" aria-label="Restaurant name, or a TikTok, Instagram or Google Maps link" />
           <div class="qa-suggs"></div>
-          <button type="button" class="qa-import">Have a list in your notes? <strong>Import it all at once</strong></button>
+          <details class="qa-import-options"><summary>Import a list instead</summary><button type="button" class="qa-import">Have a list in your notes? <strong>Import it all at once</strong></button></details>
         </div>
         <div class="qa-step-2">
           <div class="qa-place">
             <div class="qa-place-name"></div>
             <div class="qa-place-meta"></div>
-            <div class="qa-row">
-              <input class="form-input qa-cuisine" type="text" maxlength="40" placeholder="Cuisine" aria-label="Cuisine" />
-              <button type="button" class="qa-ai">Let Cub fill the rest${'<span class="gz-badge qa-ai-badge">GRIZZLY</span>'}</button>
-            </div>
             <button type="button" class="qa-change">Not it? Search again</button>
           </div>
           <div class="qa-statuses">
-            <button type="button" class="qa-status" data-status="visited">Been there</button>
-            <button type="button" class="qa-status" data-status="want-to-try">Want to try</button>
+            <button type="button" class="qa-status" data-status="visited" aria-pressed="false">Here now</button>
+            <button type="button" class="qa-status" data-status="visited-before" aria-pressed="false">Went before</button>
+            <button type="button" class="qa-status" data-status="want-to-try" aria-pressed="false">Want to try</button>
           </div>
+          <div class="qa-media"><span class="qa-media-label">Up to 10 photos + 1 video (optional)</span>
+            <img class="qa-photo-preview hidden" alt="Your photo" />
+            <div class="qa-media-list"></div>
+          </div>
+          <details class="qa-details"><summary>Add details <span>Optional</span></summary>
+          <div class="qa-details-body">
+          <label class="qa-visit-date-wrap">Visit date (optional)<input class="form-input qa-visit-date" type="date" /></label>
           <div class="qa-been">
+            <span class="qa-field-label">Your rating (optional)</span>
             <div class="qa-stars" role="radiogroup" aria-label="Your rating">${[1, 2, 3, 4, 5].map(n => `<button type="button" class="qa-star" data-n="${n}" aria-label="${n} star${n > 1 ? 's' : ''}">★</button>`).join('')}</div>
           </div>
           <div class="qa-extra">
             <div class="qa-row">
-              <input class="form-input qa-dish" type="text" maxlength="80" autocomplete="off" />
-              <button type="button" class="qa-photo" aria-label="Add a photo or video"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+              <input class="form-input qa-dish" type="text" maxlength="80" autocomplete="off" aria-label="Dish (optional)" />
             </div>
-            <img class="qa-photo-preview hidden" alt="Your photo" />
           </div>
-          <button type="button" class="btn-primary qa-save" disabled>Add to my den</button>
+          <div class="qa-row">
+            <input class="form-input qa-cuisine" type="text" maxlength="40" placeholder="Cuisine" aria-label="Cuisine" />
+            <button type="button" class="qa-ai">Let Cub fill the rest${'<span class="gz-badge qa-ai-badge">GRIZZLY</span>'}</button>
+          </div>
+          <label>My notes (optional)<textarea class="form-input qa-notes" rows="3" maxlength="2000" placeholder="What you loved, what to order, tips for next time"></textarea></label>
           <button type="button" class="qa-more">More details</button>
+          </div></details>
+          <button type="button" class="btn-primary qa-save" disabled>Save place</button>
+          <p class="qa-save-hint">Save first. Share a photo, video or Story card next.</p>
         </div>
       </div>`;
     document.body.appendChild(el);
@@ -410,20 +464,72 @@ window.Cub = (() => {
       if (btn.dataset.typed) choose({ name: input.value.trim(), cuisine: guessCuisine(input.value), source: 'typed' });
       else choose(suggestions[Number(btn.dataset.i)]);
     });
-    el.querySelector('.qa-change').addEventListener('click', () => { el.classList.remove('step-2', 'been', 'want'); pick = null; status = null; input.focus(); say('Who are we looking for?'); });
+    el.querySelector('.qa-change').addEventListener('click', () => {
+      el.classList.remove('step-2', 'been', 'want', 'went-before');
+      pick = null; status = null; visitChoice = null;
+      el.querySelectorAll('.qa-status').forEach(button => {
+        button.classList.remove('active'); button.setAttribute('aria-pressed', 'false');
+      });
+      syncSave();
+      input.focus(); say('Who are we looking for?');
+    });
     el.querySelectorAll('.qa-status').forEach(b => b.addEventListener('click', () => setStatus(b.dataset.status)));
     el.querySelectorAll('.qa-star').forEach(b => b.addEventListener('click', () => setStars(Number(b.dataset.n))));
     el.querySelector('.qa-ai').addEventListener('click', aiFill);
-    el.querySelector('.qa-photo').addEventListener('click', async () => {
-      const media = await app().pickFoodMedia();
-      if (!media) return;
-      photo = media.photo;
-      video = media.video || '';
+    const attachMedia = async (source = 'library') => {
+      if (source === 'video' && attachments.some(m => m.video)) { app().showToast('One video per moment', 'Remove your clip to record a replacement.', 'info'); return; }
+      if (source === 'photo' && attachments.filter(m => !m.video).length >= 10) { app().showToast('10 photos per moment', 'Remove a photo to add another.', 'info'); return; }
+      const media = await app().pickFoodMediaList(FOOD_MEDIA_MAX - attachments.length, source);
+      if (!media.length) return;
+      attachments = app().mergeFoodMedia(attachments, media);
+      renderMedia();
+      say('Your food memories are ready. Add more or save.');
+    };
+    const renderMedia = () => {
+      photo = attachments[0]?.photo || '';
+      video = attachments.find(m => m.video)?.video || '';
       const prev = el.querySelector('.qa-photo-preview');
       prev.src = app().safeUrl(photo);
-      prev.classList.remove('hidden');
-      say(video ? 'Ooh, a video! That looks amazing.' : 'Looks delicious.');
+      prev.classList.toggle('hidden', !photo);
+      el.querySelector('.qa-media-list').innerHTML = attachments.length ? app().pendingMediaHtml(attachments) : '';
+      el.querySelectorAll('.qa-media-list .pm-item').forEach((item, i) => {
+        const image = item.querySelector('img');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'qa-cover-pick';
+        button.dataset.cover = i;
+        button.setAttribute('aria-label', `Use ${attachments[i].video ? 'video preview' : `photo ${i + 1}`} as cover`);
+        button.setAttribute('aria-pressed', String(i === 0));
+        image.replaceWith(button);
+        button.appendChild(image);
+        const label = document.createElement('span');
+        label.textContent = i === 0 ? 'Cover' : 'Set cover';
+        button.appendChild(label);
+      });
+      el.querySelector('.qa-media-label').textContent = attachments.length
+        ? `${attachments.filter(m => !m.video).length}/10 photos${video ? ' + 1 video' : ''}. Tap a photo to set your cover.`
+        : 'Up to 10 photos + 1 video (optional)';
+    };
+    el.querySelector('.qa-media-list').addEventListener('click', e => {
+      const remove = e.target.closest('.pm-remove');
+      if (remove) { attachments.splice(Number(remove.dataset.idx), 1); renderMedia(); }
+      const cover = e.target.closest('.qa-cover-pick');
+      if (cover) {
+        const [chosen] = attachments.splice(Number(cover.dataset.cover), 1);
+        attachments.unshift(chosen);
+        renderMedia();
+        el.querySelector('.qa-cover-pick').focus();
+      }
     });
+    const capture = app().addFoodCaptureActions(el.querySelector('.qa-media'), attachMedia);
+    capture.querySelector('.food-video-limits').remove();
+    el.querySelector('.qa-save-hint').textContent = 'Video: Grizzly, 15s; clips stay on this device.';
+    const cameraButton = capture.querySelector('[data-source="photo"]');
+    cameraButton.classList.add('qa-photo');
+    cameraButton.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Take photo</span>';
+    const videoButton = capture.querySelector('[data-source="video"]');
+    videoButton.classList.add('qa-video');
+    videoButton.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="12" height="12" rx="2"/><path d="m15 10 6-4v12l-6-4z"/></svg><span>Record video</span>';
     el.querySelector('.qa-save').addEventListener('click', save);
     el.querySelector('.qa-more').addEventListener('click', moreDetails);
     el.querySelector('.qa-close').addEventListener('click', close);
@@ -434,15 +540,25 @@ window.Cub = (() => {
   }
 
   function openAdd (prefill = '') {
+    app().invalidateFoodMedia();
     sheet = sheet || build();
-    pick = null; status = null; stars = 0; verdict = null; photo = ''; video = '';
-    sheet.classList.remove('step-2', 'been', 'want');
+    pick = null; status = null; visitChoice = null; stars = 0; verdict = null; photo = ''; video = '';
+    attachments = [];
+    sheet.querySelector('.qa-media-list').innerHTML = '';
+    sheet.querySelector('.qa-media-label').textContent = 'Up to 10 photos + 1 video (optional)';
+    sheet.querySelector('.qa-notes').value = '';
+    sheet.classList.remove('step-2', 'been', 'want', 'went-before');
+    sheet.querySelector('.qa-details').open = false;
+    sheet.querySelector('.qa-import-options').open = false;
+    sheet.querySelector('.qa-visit-date').value = '';
+    sheet.querySelector('.qa-visit-date').max = app().iso();
     sheet.querySelector('.qa-input').value = '';
     sheet.querySelector('.qa-dish').value = '';
+    sheet.querySelector('.qa-cuisine').value = '';
     sheet.querySelector('.qa-save').disabled = true;
     sheet.querySelector('.qa-photo-preview').classList.add('hidden');
     sheet.querySelectorAll('.qa-star').forEach(b => b.classList.remove('on'));
-    sheet.querySelectorAll('.qa-status').forEach(b => b.classList.remove('active'));
+    sheet.querySelectorAll('.qa-status').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false'); });
     sheet.querySelector('.qa-ai-badge').classList.toggle('hidden', app().hasGrizzly());
     renderSuggestions('');
     say(nearbyPlaces().length ? "Where'd you find a good bite? Here's what's near you." : "Where'd you find a good bite? Type a name or paste a Maps link.");
@@ -467,6 +583,7 @@ window.Cub = (() => {
   }
 
   function close () {
+    app().invalidateFoodMedia();
     // Closed on purpose (or saved): the shared post is dealt with.
     try { localStorage.removeItem(PENDING_SHARE_KEY); } catch { /* private mode */ }
     linkBusy = false;
@@ -484,6 +601,7 @@ window.Cub = (() => {
   let welcomeEl = null;
   let welcomeStep = 0;
   let welcomeActive = false;
+  let welcomeTimer = null;
   const welcomeDid = new Set();
 
   const WELCOME_STEPS = [
@@ -567,7 +685,8 @@ window.Cub = (() => {
   function resumeWelcome (saved) {
     if (!welcomeActive || WELCOME_STEPS[welcomeStep]?.key !== 'spot') return;
     if (!saved) welcomeDid.delete('spot');
-    setTimeout(() => showWelcomeStep(welcomeStep + 1), saved ? 900 : 150);
+    clearTimeout(welcomeTimer);
+    welcomeTimer = setTimeout(() => { if (welcomeActive) showWelcomeStep(welcomeStep + 1); }, saved ? 900 : 150);
   }
 
   function finishWelcome (skippedAll) {
@@ -672,6 +791,8 @@ window.Cub = (() => {
     let shown = false;
     try { shown = sessionStorage.getItem(TIP_KEY) === '1'; } catch { /* private mode */ }
     if (shown && !force) return;
+    // Byte Cub is already saying something (app.js showToast): one thing at a time.
+    if (document.body.classList.contains('cub-talking') && !force) return;
     const tip = text ? { text } : pickTip();
     if (!tip?.text) return;
     const bubble = buddy.querySelector('.cub-bubble');
@@ -710,7 +831,21 @@ window.Cub = (() => {
     return true;
   }
 
-  return { init, openAdd, close, welcome, guessCuisine, parseMapsLink, tip: buddyTip, hide: hideBuddy, resumeShare };
+  // Signed in to an account that already set up: close it without a toast.
+  function endWelcome () {
+    clearTimeout(welcomeTimer);
+    welcomeActive = false;
+    welcomeEl?.classList.add('hidden');
+  }
+
+  function resetSession () {
+    endWelcome();
+    close();
+    hideBubble();
+    lastAsk = null;
+  }
+
+  return { init, openAdd, close, welcome, endWelcome, resetSession, guessCuisine, parseMapsLink, tip: buddyTip, hide: hideBuddy, resumeShare, syncSave };
 })();
 
 document.addEventListener('DOMContentLoaded', () => window.Cub.init());

@@ -103,12 +103,12 @@ const { BASE, ROOT, check, launch, newPage, finish } = require('./lib');
 
   await p.evaluate(() => openFoodieFriends());
   await p.waitForTimeout(600);
-  check(/Your public page/.test(await p.locator('.my-page').innerText()), 'Friends explains the public page');
-  await p.click('.my-page-on');
+  check(/Your public page/.test(await p.locator('#friends-handle .my-page').innerText()), 'Friends explains the public page');
+  await p.click('#friends-handle .my-page-on');
   await p.waitForTimeout(600);
-  const on = await p.locator('.my-page').innerText();
+  const on = await p.locator('#friends-handle .my-page').innerText();
   check(/feed-the-bear\.com\/@connie_eats/.test(on) && /0 visits · 0 people joined/.test(on), `once on, it shows the link and numbers ("${on.replace(/\s+/g, ' ')}")`);
-  check(await p.locator('.my-page-copy').isVisible() && await p.locator('.my-page-off').isVisible(), 'with Copy link and Turn off');
+  check(await p.locator('#friends-handle .my-page-copy').isVisible() && await p.locator('#friends-handle .my-page-off').isVisible(), 'with Copy link and Turn off');
   check(p.errors.length === 0, `no page errors (${p.errors.slice(0, 2).join(' | ')})`);
   await browser.close();
   finish('creator');

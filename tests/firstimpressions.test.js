@@ -18,12 +18,13 @@ const spot = (id, name, extra) => ({ id, name, cuisine: 'Mexican', status: 'want
   await p.waitForTimeout(1800);
   await closeAllDialogs(p);
 
-  // Messages drop in at the top on phones, two at most, and never block the bottom bar.
+  // Byte Cub says messages one at a time, just above the bottom bar, never blocking it.
   await p.evaluate(() => { for (let i = 0; i < 4; i++) showToast('Hello ' + i, 'msg'); });
   await p.waitForTimeout(400);
   const toastBox = await p.locator('#toast-container .toast').last().boundingBox();
-  check(toastBox && toastBox.y < 200, `messages show at the top (y=${toastBox && Math.round(toastBox.y)})`);
-  check(await p.locator('#toast-container .toast:not(.removing)').count() <= 2, 'no more than two at once');
+  check(toastBox && toastBox.y > 400 && toastBox.y + toastBox.height < 844 - 100, `Byte Cub's bubble sits above the bottom bar (y=${toastBox && Math.round(toastBox.y)})`);
+  check(await p.locator('#toast-container .toast:not(.removing)').count() === 1, 'one message at a time');
+  check(await p.locator('#toast-container .toast .cub-say-face').count() === 1, 'said by Byte Cub');
   const atMap = await p.evaluate(() => document.elementFromPoint(120, 815)?.closest('.mobile-nav-btn') !== null);
   check(atMap, 'the bottom bar stays tappable');
   await p.locator('#toast-container .toast').last().click();
@@ -33,7 +34,8 @@ const spot = (id, name, extra) => ({ id, name, cuisine: 'Mexican', status: 'want
   const cardText = await p.locator('.restaurant-card').first().innerText();
   check(!/% match|Up next|Trusted pick/.test(cardText), 'cards show no invented match score');
 
-  // Today's Pick is Grizzly: a free account sees it locked, without the answer.
+  // Today's Pick is Grizzly: a free account sees it locked, without the answer (off the lean home).
+  await p.evaluate(() => document.body.classList.add('home-full'));
   check(await p.locator('#ai-rec-banner').isVisible(), "free accounts see Today's Pick");
   check(/unlock it with Grizzly/.test(await p.locator('#ai-rec-text').innerText()), 'locked, without giving the pick away');
   check((await p.locator('#ai-rec-banner .ai-rec-label').textContent()) === "Today's Pick", "labelled Today's Pick");
@@ -48,11 +50,11 @@ const spot = (id, name, extra) => ({ id, name, cuisine: 'Mexican', status: 'want
   await p.click('#ai-rec-text');
   await p.waitForTimeout(400);
   check(await p.evaluate(() => state.detailId) === 'b', 'tapping it opens that spot');
-  await p.evaluate(() => { window._ftbUid = null; window._ftbPlan = 'free'; });
+  await p.evaluate(() => { window._ftbUid = null; window._ftbPlan = 'free'; document.body.classList.remove('home-full'); });
   await closeAllDialogs(p);
 
   // Add a spot finds real places (Google) with rating and cuisine filled in.
-  await p.click('#home-add-bar');
+  await p.evaluate(() => openAddPlace());
   await p.fill('.qa-input', 'bacan');
   await p.waitForTimeout(1200);
   const sugg = (await p.locator('.qa-sugg').first().innerText()).replace(/\s+/g, ' ');

@@ -24,6 +24,7 @@ const Stripe = require('stripe');
 const admin  = require('firebase-admin');
 const { rewardInviter } = require('./_referral');
 const play = require('./_play');
+const { vipFor, grantVip } = require('./owner');
 const { sendEmail, emailHtml, esc } = require('./_email');
 
 function getAdmin () {
@@ -114,6 +115,51 @@ async function inviteFor (stripe, subId) {
   return uid && ref ? { uid, ref } : null;
 }
 
+// 20% of a referred member's payment (before tax) to whoever referred them,
+// once per invoice. The owner pays it out and marks it paid (owner.js).
+const CREATOR_SHARE = 0.2;
+async function creditCreator (db, invoice, invite) {
+  if (!invite?.ref || invite.ref === invite.uid) return;
+  const tax = Array.isArray(invoice.total_taxes) ? invoice.total_taxes.reduce((n, t) => n + (Number(t.amount) || 0), 0) : Number(invoice.tax) || 0;
+  const cents = Math.round(Math.max(0, invoice.amount_paid - tax) * CREATOR_SHARE);
+  if (!cents) return;
+  try { await db.doc(`creatorCredits/${invoice.id}`).create({ creator: invite.ref, friend: invite.uid, cents, at: new Date().toISOString() }); }
+  catch { return; } // already credited (Stripe sent it twice)
+  const inc = admin.firestore.FieldValue.increment;
+  await db.doc(`creatorEarnings/${invite.ref}`).set({ owedCents: inc(cents), earnedCents: inc(cents), payments: inc(1), lastAt: new Date().toISOString() }, { merge: true });
+}
+
+async function giftPaid (db, session) {
+  const m = session.metadata || {};
+  const ref = db.doc(`gifts/${session.id}`);
+  if ((await ref.get()).exists) return; // Stripe can send an event twice
+  const months = Number(m.months) === 12 ? 12 : 3;
+  const from = m.from || 'A friend';
+  const r = await grantVip(db, getAdmin(), { email: m.to, months, note: `Gift from ${from}`, by: 'gift' });
+  await ref.set({ to: m.to, from, months, buyer: session.customer_details?.email || session.customer_email || '', paid: session.amount_total || 0, at: new Date().toISOString(), pending: r.pending });
+  await bump(db, 'gift_bought').catch(() => {});
+  const app = process.env.APP_URL || 'https://www.feed-the-bear.com';
+  const hi = m.toName ? `Hi ${esc(m.toName)},` : 'Hi,';
+  await sendEmail({
+    to: m.to, name: m.toName || '', tag: 'gift',
+    subject: `🎁 ${from} gave you Feed The Bear Grizzly`,
+    html: emailHtml([
+      `<h1 style="margin:0 0 8px;font-size:22px">You got Grizzly! 🐻</h1>`,
+      `<p>${hi} <strong>${esc(from)}</strong> gave you ${months === 12 ? 'a year' : '3 months'} of Feed The Bear Grizzly: unlimited spots, Byte Cub AI picks, your Bear Cave page and more.</p>`,
+      m.message ? `<p style="padding:12px 14px;border-radius:12px;background:#f3ead9;font-style:italic">"${esc(m.message)}"</p>` : '',
+      `<p>Sign in with <strong>${esc(m.to)}</strong> and it's already on.</p>`,
+      `<p><a href="${app}/app.html" style="display:inline-block;padding:12px 18px;border-radius:12px;background:#ff8a3d;color:#1b130b;font-weight:800;text-decoration:none">Open Feed The Bear</a></p>`,
+    ]),
+  }).catch(err => console.error('[FTB] gift email:', err.message));
+  const buyer = session.customer_details?.email || session.customer_email;
+  if (buyer) {
+    await sendEmail({
+      to: buyer, tag: 'gift-receipt', subject: `Your Grizzly gift for ${m.toName || m.to} is on its way`,
+      html: emailHtml([`<h1 style="margin:0 0 8px;font-size:22px">Gift sent 🎁</h1>`, `<p>${esc(m.toName || m.to)} has ${months === 12 ? 'a year' : '3 months'} of Grizzly${r.pending ? ' waiting for them the first time they sign in' : ' on their account now'}. We emailed them too. Thank you!</p>`]),
+    }).catch(() => {});
+  }
+}
+
 module.exports = async function handler (req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -130,6 +176,33 @@ module.exports = async function handler (req, res) {
   try {
     const db = getAdmin().firestore();
     const obj = event.data.object;
+
+    // A restaurant paid to be featured on a city guide (advertise.js): waits for the owner's OK.
+    if (event.type === 'checkout.session.completed' && obj.metadata?.kind === 'featured') {
+      const m = obj.metadata;
+      const ref = db.doc(`featured/${obj.id}`);
+      if (!(await ref.get()).exists) {
+        await ref.set({ name: m.name, address: m.address || '', website: m.website || '', email: m.email, blurb: m.blurb || '', city: m.city, food: m.food,
+          key: `${m.city}_${m.food}`, status: 'pending', subscription: obj.subscription || '', customer: obj.customer || '', at: new Date().toISOString() });
+        await bump(db, 'featured_signup').catch(() => {});
+        // Tell the owner there's one to approve.
+        await sendEmail({ to: process.env.OWNER_EMAIL || 'cmc@conniemichelleconsulting.com', tag: 'featured-new', subject: `New featured restaurant: ${m.name}`,
+          html: emailHtml([`<p><strong>${esc(m.name)}</strong> paid to be featured on ${esc(m.food)} in ${esc(m.city)}.</p>`, '<p>Approve it in the owner portal: https://www.feed-the-bear.com/owner.html</p>']) }).catch(() => {});
+      }
+      return res.status(200).json({ received: true });
+    }
+    // Their subscription ended: off the guide.
+    if (event.type === 'customer.subscription.deleted' && obj.metadata?.kind === 'featured') {
+      const snap = await db.collection('featured').where('subscription', '==', obj.id).limit(5).get();
+      await Promise.all(snap.docs.map(d => d.ref.set({ status: 'ended', endedAt: new Date().toISOString() }, { merge: true })));
+      return res.status(200).json({ received: true });
+    }
+
+    // A Grizzly gift (gift.js): the friend gets Grizzly for those months, and an email.
+    if (event.type === 'checkout.session.completed' && obj.metadata?.kind === 'gift') {
+      if (obj.payment_status === 'paid') await giftPaid(db, obj);
+      return res.status(200).json({ received: true });
+    }
 
     if (event.type === 'checkout.session.completed') {
       const uid = obj.metadata?.uid || obj.client_reference_id;
@@ -175,6 +248,8 @@ module.exports = async function handler (req, res) {
     // checkout let free trials, cancelled right away, farm free months.
     if (event.type === 'invoice.paid' && obj.amount_paid > 0) {
       const invite = await inviteFor(stripe, obj.subscription || obj.parent?.subscription_details?.subscription);
+      // Creators earn 20% of every payment from people who joined from their link.
+      if (invite) await creditCreator(db, obj, invite).catch(err => console.error('[FTB] creator credit:', err.message));
       if (invite) await rewardInviter({ db, stripe, inviterUid: invite.ref, friendUid: invite.uid });
     }
 
@@ -192,7 +267,9 @@ module.exports = async function handler (req, res) {
       // 'incomplete' happens mid-checkout and may arrive late, so it changes nothing.
       const plan = event.type === 'customer.subscription.deleted' || ENDED.includes(obj.status) ? 'free'
         : ACTIVE.includes(obj.status) ? 'grizzly' : null;
-      if (uid && plan) await setPlan(db, uid, { plan, ...trialFields(event.type === 'customer.subscription.deleted' ? null : obj) });
+      // A VIP (owner.js) keeps Grizzly when a subscription of theirs ends.
+      const keep = plan === 'free' && uid && await vipFor(db, uid).catch(() => false);
+      if (uid && plan && !keep) await setPlan(db, uid, { plan, ...trialFields(event.type === 'customer.subscription.deleted' ? null : obj) });
     }
 
     if (event.type === 'customer.subscription.trial_will_end') {

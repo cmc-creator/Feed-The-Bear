@@ -1,9 +1,13 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": ".",
+  "functions": { "api/food-events.js": { "maxDuration": 120 }, "api/nudges.js": { "maxDuration": 300 }, "api/guide.js": { "maxDuration": 60 } },
   "rewrites": [
     { "source": "/@:handle", "destination": "/api/creator?h=:handle" },
-    { "source": "/u/:handle", "destination": "/api/creator?h=:handle" }
+    { "source": "/u/:handle", "destination": "/api/creator?h=:handle" },
+    { "source": "/eat", "destination": "/api/guide" },
+    { "source": "/eat/:city", "destination": "/api/guide?city=:city" },
+    { "source": "/eat/:city/:food", "destination": "/api/guide?city=:city&food=:food" }
   ],
   "headers": [
     {
@@ -42,6 +46,7 @@
     }
   ],
   "crons": [
-    { "path": "/api/digest", "schedule": "0 16 * * 4" }
+    { "path": "/api/digest", "schedule": "0 16 * * 4" },
+    { "path": "/api/nudges", "schedule": "0 16 * * *" }
   ]
 }

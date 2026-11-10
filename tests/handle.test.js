@@ -149,9 +149,9 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
   await p.waitForTimeout(300);
   check(await p.evaluate(() => getFriends().some(f => f.data?.id === 'jojoshare001')) && /You follow each other/.test(await p.locator('#friends-list').innerText()), 'Follow back follows them, and it says you follow each other');
   // Sent: someone you follow who hasn't followed back, and invites you shared.
-  const samRow = p.locator('.friend-row', { hasText: 'Sam' }).last();
+  const samRow = p.locator('.fx-card', { hasText: 'Sam' }).first();
   check(/Sent · waiting for them to follow back/.test(await samRow.innerText()), 'someone you follow who has not followed back shows as Sent');
-  const joRow = p.locator('.friend-row', { hasText: 'Jo' }).last();
+  const joRow = p.locator('.fx-card', { hasText: 'Jo' }).first();
   check(!/Sent ·/.test(await joRow.innerText()), 'a friend who follows you back is not marked Sent');
   // Inviting: "Who's this for?", then a link with its own code.
   await p.evaluate(() => {
@@ -206,9 +206,9 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
   await q.close();
 
   // Picking your own username.
-  await p.click('.friends-handle-edit');
-  await p.fill('.friends-handle-form input', 'Connie_Eats');
-  await p.click('.friends-handle-form button[type=submit]');
+  await p.click('#friends-handle .friends-handle-edit');
+  await p.fill('#friends-handle .friends-handle-form input', 'Connie_Eats');
+  await p.click('#friends-handle .friends-handle-form button[type=submit]');
   await p.waitForTimeout(400);
   const claim = claims.find(b => b.action === 'claim');
   check(claim?.handle === 'connie_eats' && claim.id, 'picking a username sends it with your profile');

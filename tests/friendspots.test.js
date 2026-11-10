@@ -35,8 +35,10 @@ const ME = [{ id: 'm1', name: 'Tacos Chiwas', cuisine: 'Mexican', status: 'want-
   await me.waitForTimeout(200);
   check(await me.evaluate(() => state.restaurants.some(r => r.name === 'Pizzeria Bianco' && r.status === 'want-to-try' && r.tags.includes('From a friend'))), 'Add puts it on Want to Try');
   check(await me.locator('#guest-profile-addall').isHidden(), 'one left: no Add all needed');
-  await me.locator('.guest-add').first().click();
+  check(await me.locator('.guest-add-been').count() === 1, 'each spot also offers Been there');
+  await me.locator('.guest-add-been').first().click();
   await me.waitForTimeout(200);
+  check(await me.evaluate(() => state.restaurants.find(r => r.name === 'Little Miss BBQ')?.status === 'visited'), 'Been there saves it to Been There, not Want to Try');
   check(await me.evaluate(() => state.restaurants.find(r => r.name === 'Little Miss BBQ')?.dishes?.some(d => d.name === 'Brisket' && d.verdict === 'want')), 'her go-to order comes along to try');
   await me.click('#guest-profile-close');
   await me.waitForTimeout(200);

@@ -1,6 +1,7 @@
 // Shared helpers for the browser tests. The app must be served at BASE
 // (python -m http.server 8765 from the repo root).
 //   PW_CHANNEL=msedge  use an installed browser instead of Playwright's Chromium
+//   PW_NO_SHARE=1      hide the browser's share sheet (as on CI's Linux Chromium)
 //   TEST_BASE=...      point at another server (e.g. a preview deployment)
 const path = require('path');
 const { chromium } = require('playwright-core');
@@ -36,6 +37,11 @@ async function newPage (browser, { seed = null, settings = {}, viewport = { widt
     viewport, isMobile: viewport.width < 500, hasTouch: viewport.width < 500, serviceWorkers: 'block',
     geolocation: geo, permissions: ['geolocation'],
   });
+  // PW_NO_SHARE=1: no built-in share sheet, like CI's Chromium on Linux
+  // (Edge on Windows has one, which hid a CI-only failure).
+  if (process.env.PW_NO_SHARE) {
+    await ctx.addInitScript(() => { delete Navigator.prototype.share; delete Navigator.prototype.canShare; });
+  }
   if (grizzly) {
     await ctx.addInitScript(() => {
       localStorage.setItem('ftb_plan_v1', 'grizzly');
@@ -56,13 +62,31 @@ async function newPage (browser, { seed = null, settings = {}, viewport = { widt
   const page = await ctx.newPage();
   page.errors = [];
   page.on('pageerror', e => page.errors.push(e.message));
+  if (grizzly) {
+    let navigation = 0;
+    page.on('request', request => {
+      if (request.isNavigationRequest() && request.frame() === page.mainFrame()) navigation++;
+    });
+    page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigation++; });
+    page.on('load', async () => {
+      if (!new URL(page.url()).pathname.endsWith('/app.html')) return;
+      const started = navigation;
+      try {
+        await page.waitForFunction(() => window._ftbAuthReady === true);
+        if (started !== navigation || page.isClosed()) return;
+        await page.evaluate(() => { window._ftbPlan = 'grizzly'; });
+      } catch (err) {
+        if (!page.isClosed() && started === navigation) page.errors.push('Grizzly fixture could not restore its test session: ' + err.message);
+      }
+    });
+  }
   page.on('console', m => {
     // Missing /api functions and blocked third-party assets are expected on a static server.
     // Public map servers (Overpass, Nominatim) reject busy requests without CORS
     // headers; the app falls back to another source, so that isn't a failure here.
     const text = m.text();
     if (m.type() === 'error' && !/Failed to load resource|ERR_|navigator\.vibrate/.test(text)
-        && !/CORS policy/.test(text) && !/overpass|nominatim|maps\.mail\.ru/.test(text)) page.errors.push('[console] ' + text.slice(0, 160));
+        && !/CORS policy|has not allowed access to system location/.test(text) && !/overpass|nominatim|maps\.mail\.ru/.test(text)) page.errors.push('[console] ' + text.slice(0, 160));
   });
   return page;
 }

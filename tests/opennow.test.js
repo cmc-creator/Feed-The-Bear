@@ -22,6 +22,8 @@ const SEED = [
   await p.route(/overpass|nominatim|place-info/, r => r.abort());
   await p.goto(`${BASE}/app.html`);
   await p.waitForTimeout(1500);
+  check(await p.locator('#open-now-home').isHidden(), 'the lean home leaves Open right now off');
+  await p.evaluate(() => document.body.classList.add('home-full'));
 
   check(await p.locator('#open-now-home').isVisible(), 'home shows Open right now');
   const names = await p.$$eval('#open-now-home-list .onc-name', els => els.map(e => e.textContent));
@@ -63,6 +65,7 @@ const SEED = [
   await q.route(/overpass|nominatim|place-info/, r => r.abort());
   await q.goto(`${BASE}/app.html`);
   await q.waitForTimeout(1200);
+  await q.evaluate(() => document.body.classList.add('home-full'));
   check(await q.locator('#open-now-home').isHidden(), 'hidden when nothing saved is open');
   await b2.close();
   finish('opennow');

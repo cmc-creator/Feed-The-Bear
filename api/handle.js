@@ -85,7 +85,22 @@ module.exports = async function handler (req, res) {
       if (req.query?.mine) {
         const handle = (await db.doc(`handleOf/${uid}`).get()).data()?.handle || '';
         const h = handle ? (await db.doc(`handles/${handle}`).get()).data() || {} : {};
-        return res.status(200).json({ handle, public: !!h.public, views: Number(h.views) || 0, joins: Number(h.joins) || 0 });
+        const earn = (await db.doc(`creatorEarnings/${uid}`).get()).data() || {};
+        return res.status(200).json({ handle, public: !!h.public, views: Number(h.views) || 0, joins: Number(h.joins) || 0,
+          earnedCents: Number(earn.earnedCents) || 0, owedCents: Number(earn.owedCents) || 0 });
+      }
+      // The public Bear Cave pages of people you follow (?pagesOf=id1,id2):
+      // { pages: { id: handle } }, public pages only (they're open to anyone anyway).
+      if (req.query?.pagesOf) {
+        const ids = [...new Set(String(req.query.pagesOf).split(','))].filter(x => ID_RE.test(x)).slice(0, 50);
+        const pages = {};
+        await Promise.all(ids.map(async id => {
+          const owner = (await db.doc(`profiles/${id}`).get()).data()?.uid;
+          const handle = owner ? (await db.doc(`handleOf/${owner}`).get()).data()?.handle : '';
+          const h = handle ? (await db.doc(`handles/${handle}`).get()).data() : null;
+          if (h?.public && h.id === id) pages[id] = handle;
+        }).map(p => p.catch(() => {})));
+        return res.status(200).json({ pages });
       }
       if (req.query?.followers) {
         const list = (await db.doc(`followedBy/${uid}`).get()).data()?.list;
