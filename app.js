@@ -12554,7 +12554,11 @@ function renderYourOrder (restaurantId) {
     : 'What did you order? Log it so next time you know exactly what to get.'}</div>`;
   return;
   }
-  listEl.innerHTML = bestBetHtml(r) + ['again', 'want', 'ok', 'skip'].filter(g => counts[g]).map(g => `
+  // The single best dish at this spot, called out at the top so it's
+  // unmissable: the top-rated "order again" dish, with its stars and note.
+  const goTo = goToDishOf(r);
+  const topHtml = goTo ? `<div class="yo-top-dish"><span class="yo-top-dish-label">⭐ Order this again</span><strong>${escHtml(goTo.name)}</strong>${goTo.rating ? ` <span class="yo-dish-stars" aria-label="${goTo.rating} stars">${'★'.repeat(goTo.rating)}</span>` : ''}${goTo.note ? `<div class="yo-top-dish-note">${escHtml(goTo.note)}</div>` : ''}</div>` : '';
+  listEl.innerHTML = bestBetHtml(r) + topHtml + ['again', 'want', 'ok', 'skip'].filter(g => counts[g]).map(g => `
   <div class="yo-group yo-group-${g}">
     <div class="yo-group-label">${DISH_VERDICT_LABEL[g]}</div>
     ${dishes.filter(d => d.verdict === g).map(d => `
@@ -12805,9 +12809,11 @@ function saveJustAte () {
   // First photo of a spot becomes its cover so the list stops showing placeholders.
   if (photo && !r.photo) r.photo = photo;
   r.updatedAt = Date.now();
-  const verdict = _justAte.verdict || 'ok';
-  if (dishName) upsertDish(r, { name: dishName, verdict, media, note: note || null });
-  else saveData();
+  // Rate the dish with the same stars: an explicit verdict tap wins,
+  // otherwise the stars decide (4-5 = order again, 1-2 = skip).
+  const dish = dishName ? upsertDish(r, { name: dishName, verdict: _justAte.verdict || undefined, rating: stars || undefined, media, note: note || null }) : null;
+  if (!dishName) saveData();
+  const verdict = dish?.verdict || 'ok';
 
   closeJustAte();
   renderAll();
@@ -12889,6 +12895,8 @@ function openDishTracker (restaurantId) {
   document.getElementById('dish-title').textContent = '🍽️ Dish Tracker';
   document.getElementById('dish-restaurant-name').textContent = r.name;
   document.getElementById('dish-name-input').value = '';
+  const dishNoteEl = document.getElementById('dish-note-input');
+  if (dishNoteEl) dishNoteEl.value = '';
   _dishRating = 0;
   _renderDishRatingPicker(0);
   renderDishList(restaurantId);
@@ -12908,9 +12916,12 @@ function _renderDishRatingPicker (val) {
 function addDish () {
   const name = document.getElementById('dish-name-input').value.trim();
   if (!name) { showToast('Name required', 'Enter a dish name.', 'error'); return; }
+  const note = (document.getElementById('dish-note-input')?.value || '').trim().slice(0, 200);
   const r = state.restaurants.find(x => x.id === state.detailId);
-  if (!upsertDish(r, { name, rating: _dishRating })) return;
+  if (!upsertDish(r, { name, rating: _dishRating, note: note || undefined })) return;
   document.getElementById('dish-name-input').value = '';
+  const noteEl = document.getElementById('dish-note-input');
+  if (noteEl) noteEl.value = '';
   _renderDishRatingPicker(0);
   renderDishList(state.detailId);
   renderYourOrder(state.detailId);
@@ -12930,12 +12941,16 @@ function renderDishList (restaurantId) {
   el.innerHTML = '<div class="dish-empty">No dishes logged yet. Add your first one above!</div>';
   return;
   }
+  const goTo = goToDishOf(r);
   el.innerHTML = list.map(d => `
   <div class="dish-item">
-    <div class="dish-item-name">${escHtml(d.name)}</div>
-    <div class="dish-item-stars">${d.rating ? '★'.repeat(d.rating) + '☆'.repeat(5-d.rating) : '☆'}</div>
-    <div class="dish-item-date" style="font-size:.72rem;color:var(--text-dim)">${d.date||''}</div>
-    <button class="dish-item-delete icon-btn" onclick="deleteDish('${restaurantId}','${d.id}')" title="Remove">✕</button>
+    <div class="dish-item-top">
+      <div class="dish-item-name">${escHtml(d.name)}${d.id === goTo?.id ? ' <span class="dish-badge dish-badge-again">★ Order again</span>' : ''}${d.verdict === 'skip' ? ' <span class="dish-badge dish-badge-skip">Skip this</span>' : ''}</div>
+      <div class="dish-item-stars">${d.rating ? '★'.repeat(d.rating) + '☆'.repeat(5-d.rating) : '☆'}</div>
+      <button class="dish-item-delete icon-btn" onclick="deleteDish('${restaurantId}','${d.id}')" title="Remove">✕</button>
+    </div>
+    ${d.note ? `<div class="dish-item-note">${escHtml(d.note)}</div>` : ''}
+    ${d.date ? `<div class="dish-item-date">${d.date}</div>` : ''}
   </div>
   `).join('');
 }

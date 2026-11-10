@@ -4315,19 +4315,31 @@ body.guest-open #upgrade-overlay { z-index:7100; }
   transition: color var(--transition);
 }
 .spm.on, .spm:hover { color: var(--gold); }
+.dish-note-input { width: 100%; margin-bottom: 14px; }
 .dish-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
 .dish-item {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; flex-direction: column; align-items: stretch; gap: 3px;
   padding: 10px 12px;
   background: var(--surface2);
   border-radius: 10px;
   font-size: .85rem;
 }
+.dish-item-top { display: flex; align-items: center; gap: 10px; }
 .dish-item-name { flex: 1; font-weight: 600; color: var(--text); }
-.dish-item-stars { color: var(--gold); font-size: .8rem; }
+.dish-item-stars { color: var(--gold); font-size: .8rem; white-space: nowrap; }
+.dish-item-note { font-size: .8rem; color: var(--text-dim); }
+.dish-item-date { font-size: .72rem; color: var(--text-dim); }
+.dish-badge { font-size: .68rem; font-weight: 700; padding: 2px 7px; border-radius: 999px; white-space: nowrap; border: 1px solid; }
+.dish-badge-again { color: var(--gold); border-color: var(--gold); }
+.dish-badge-skip { color: var(--red, #e74c3c); border-color: var(--red, #e74c3c); }
 .dish-item-delete { color: var(--text-dim); font-size: .8rem; cursor: pointer; }
 .dish-item-delete:hover { color: var(--red, #e74c3c); }
 .dish-empty { color: var(--text-dim); font-size: .82rem; text-align: center; padding: 20px; }
+
+/* Top dish callout at the head of Your Order on a spot view. */
+.yo-top-dish { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 8px; padding: 10px 12px; margin-bottom: 10px; background: var(--surface2); border: 1px solid var(--gold); border-radius: 12px; font-size: .88rem; }
+.yo-top-dish-label { font-weight: 800; color: var(--gold); }
+.yo-top-dish-note { width: 100%; font-size: .8rem; color: var(--text-dim); }
 
 /* ------------------------------------------------------------
    PHASE 8 � YEAR IN REVIEW
