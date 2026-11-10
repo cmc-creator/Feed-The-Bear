@@ -53,7 +53,10 @@ const SEED = [
   await p.screenshot({ path: path.join(SHOTS, 'story-preview.png') }).catch(() => {});
 
   // With a share sheet, the image file goes to it.
-  await p.evaluate(() => { navigator.canShare = () => true; navigator.share = async d => { window._shared = d; }; });
+  await p.evaluate(() => {
+    Object.defineProperty(navigator, 'canShare', { configurable: true, writable: true, value: () => true });
+    Object.defineProperty(navigator, 'share', { configurable: true, writable: true, value: async d => { window._shared = d; } });
+  });
   await p.click('.story-caption summary');
   await p.fill('.story-caption-text', 'Birria tacos: my new favorite bite!');
   await p.click('.story-share');
@@ -85,7 +88,7 @@ const SEED = [
   check(picks.want[0] === 'Horchata' && picks.skip[0] === 'Fish taco', 'next time and skip sections are filled');
 
   // Long names, no photo, only "fine" dishes, no share sheet
-  await p.evaluate(() => { navigator.canShare = () => false; });
+  await p.evaluate(() => { Object.defineProperty(navigator, 'canShare', { configurable: true, writable: true, value: () => false }); });
   await p.evaluate(() => openDetailModal('r2'));
   await p.waitForSelector('#your-order-share:not(.hidden)');
   await p.click('#your-order-share');

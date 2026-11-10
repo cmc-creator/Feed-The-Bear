@@ -88,6 +88,77 @@ function requiresPremium (featureName, fn) {
 }
 
 // ─── AUTH FUNCTIONS ───────────────────────────────────────────
+// Email verification (2026-11-10): a new email/password account must confirm
+// its inbox before the diary opens — bots were signing up with random emails
+// and each one could burn paid place lookups. Google accounts are verified
+// by Google. Accounts created before the cutoff never had verification, so
+// they keep working exactly as before.
+const EMAIL_VERIFY_CUTOFF = Date.parse('2026-11-10T21:00:00Z');
+
+function _needsEmailVerification (user) {
+  if (!user || user.emailVerified) return false;
+  if ((user.providerData || []).some(p => p.providerId === 'google.com')) return false;
+  const created = Date.parse(user.metadata?.creationTime || '') || 0;
+  return created >= EMAIL_VERIFY_CUTOFF;
+}
+
+// Show the sign-in sheet in "check your email" mode and lock the diary
+// until the inbox is confirmed.
+function _showVerifyEmail (user) {
+  window._ftbNeedsVerification = true;
+  const overlay = document.getElementById('auth-overlay');
+  if (!overlay) return;
+  const em = document.getElementById('auth-verify-email');
+  if (em) em.textContent = user?.email || '';
+  _setAuthMode('verify');
+  overlay.classList.add('auth-required');
+  overlay.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+
+// "I've verified — continue": reload the account and open the diary if confirmed.
+async function _checkVerification () {
+  const user = _auth?.currentUser;
+  if (!user) return;
+  const btn = document.getElementById('auth-verify-check');
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+  try {
+    await user.reload();
+    if (_needsEmailVerification(user)) {
+      _authError('Not verified yet — tap the link in the email we sent (check spam too), then try again.');
+    } else {
+      window._ftbNeedsVerification = false;
+      closeAuthModal();
+      _sessionTask = handleFirebaseUser(user);
+    }
+  } catch (err) {
+    _authError(err.message || 'Could not check. Try again.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "I've verified — continue"; }
+  }
+}
+
+async function _resendVerification () {
+  const user = _auth?.currentUser;
+  if (!user) return;
+  const btn = document.getElementById('auth-verify-resend');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    await user.sendEmailVerification();
+    showToast('Email sent', `We sent a new link to ${user.email}. Check your inbox (and spam).`, 'success');
+  } catch (err) {
+    showToast('Could not send it', err.message || 'Try again in a minute.', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Resend the email'; }
+  }
+}
+
+// Leave the verify screen to use a different account.
+async function _signOutFromVerify () {
+  window._ftbNeedsVerification = false;
+  await fbSignOut();
+}
+
 async function fbSignInGoogle () {
   await ensureAuthPersistence();
   const provider = new firebase.auth.GoogleAuthProvider();
@@ -104,7 +175,11 @@ async function fbSignInEmail (email, password) {
 
 async function fbSignUpEmail (email, password) {
   await ensureAuthPersistence();
-  return _auth.createUserWithEmailAndPassword(email, password);
+  const cred = await _auth.createUserWithEmailAndPassword(email, password);
+  // New accounts confirm their inbox before the diary opens. If the email
+  // can't be sent, the verify screen lets them resend it.
+  try { await cred.user.sendEmailVerification(); } catch (err) { console.warn('[FTB] Verification email failed:', err.message); }
+  return cred;
 }
 
 async function fbSignOut () {
@@ -835,6 +910,13 @@ async function handleFirebaseUser (user) {
       window._ftbUserEmail = user.email;
       // Next time this phone is signed out, the sheet opens on Sign in with the email filled.
       try { localStorage.setItem(LAST_ACCOUNT_KEY, user.email || '1'); } catch { /* private mode */ }
+      // A new email account that hasn't confirmed its inbox doesn't get the
+      // diary — or the "joined" email to the owner — until it verifies.
+      if (_needsEmailVerification(user)) {
+        _showVerifyEmail(user);
+        return;
+      }
+      window._ftbNeedsVerification = false;
       // A brand-new account (signed in for the first time just now), counted once for the funnel.
       try {
         const m = user.metadata || {};
@@ -1002,6 +1084,7 @@ async function handleFirebaseUser (user) {
     } else {
       window._ftbUid  = null;
       window._ftbPlan = 'free';
+      window._ftbNeedsVerification = false;
       localStorage.removeItem('ftb_plan_v1');
       localStorage.removeItem('ftb_uid_v1');
       setBackupStatus('idle');
@@ -1172,6 +1255,9 @@ async function _handleForgotPassword () {
 
 function closeAuthModal () {
   const overlay = document.getElementById('auth-overlay');
+  // An unverified account stays on the verify screen (sign out from there
+  // to use a different account).
+  if (window._ftbNeedsVerification) return;
   if (overlay?.classList.contains('auth-required') && _signInRequired()) return;
   overlay?.classList.remove('auth-required');
   overlay?.classList.add('hidden');
@@ -1181,15 +1267,25 @@ function closeAuthModal () {
 }
 
 function _setAuthMode (mode) {
-  const isSignup = mode === 'signup';
   const el = id => document.getElementById(id);
-  const forUpgrade = el('auth-overlay')?.dataset.purpose === 'upgrade';
+  const overlay = el('auth-overlay');
+  if (!overlay) return;
+  overlay.dataset.mode = mode;
+  // The verify panel shows only in verify mode (the .hidden class controls it).
+  const verifyPanel = el('auth-verify');
+  if (verifyPanel) verifyPanel.classList.toggle('hidden', mode !== 'verify');
+  // Verify mode: hide the sign-in form (style.css) and show the verify panel.
+  if (mode === 'verify') {
+    if (el('auth-title')) el('auth-title').textContent = 'Check your email';
+    return;
+  }
+  const isSignup = mode === 'signup';
+  const forUpgrade = overlay.dataset.purpose === 'upgrade';
   if (el('auth-title'))      el('auth-title').textContent      = forUpgrade ? (isSignup ? 'Create your account for Grizzly' : 'Sign in to get Grizzly') : isSignup ? 'Create your profile' : 'Welcome back';
   if (el('auth-submit-btn')) el('auth-submit-btn').textContent  = isSignup ? 'Create Profile'   : 'Sign In';
   if (el('auth-toggle-text')) el('auth-toggle-text').innerHTML  = isSignup
     ? 'Already have an account? <button class="auth-link-btn" id="auth-mode-toggle">Sign in</button>'
     : `New here? <button class="auth-link-btn" id="auth-mode-toggle">${forUpgrade ? 'Create an account' : 'Sign up, it\'s free'}</button>`;
-  document.getElementById('auth-overlay').dataset.mode = mode;
   document.getElementById('auth-mode-toggle')?.addEventListener('click', () => _setAuthMode(isSignup ? 'signin' : 'signup'));
   document.querySelectorAll('#auth-overlay .auth-tab').forEach(tab => {
     const on = tab.dataset.authMode === mode;
@@ -1213,10 +1309,12 @@ async function _handleAuthSubmit () {
   btn.disabled    = true;
   btn.textContent = 'Signing you in...';
   let nextMode = mode;
+  let justSignedUp = false;
   try {
     if (mode === 'signup') {
       try {
         await fbSignUpEmail(email, password);
+        justSignedUp = true;
       } catch (err) {
         // Already has an account: sign them in with what they typed instead of an error.
         if (err.code !== 'auth/email-already-in-use') throw err;
@@ -1226,12 +1324,18 @@ async function _handleAuthSubmit () {
     } else {
       await fbSignInEmail(email, password);
     }
-    closeAuthModal();
-    showToast(
-      'You are in',
-      'Your diary is opening. Backup status will appear if anything needs attention.',
-      'success'
-    );
+    // A brand-new email account confirms its inbox first; the sheet switches
+    // to the verify screen instead of "You are in".
+    if (justSignedUp && _needsEmailVerification(_auth.currentUser)) {
+      _showVerifyEmail(_auth.currentUser);
+    } else {
+      closeAuthModal();
+      showToast(
+        'You are in',
+        'Your diary is opening. Backup status will appear if anything needs attention.',
+        'success'
+      );
+    }
   } catch (err) {
     const BAD_LOGIN = ['auth/wrong-password', 'auth/invalid-credential', 'auth/invalid-login-credentials', 'auth/user-not-found', 'auth/email-already-in-use'];
     if (BAD_LOGIN.includes(err.code)) {
@@ -1774,6 +1878,9 @@ document.addEventListener('DOMContentLoaded', () => {
   appleBtn?.addEventListener('click', _handleAppleAuth);
   document.getElementById('auth-submit-btn')?.addEventListener('click', _handleAuthSubmit);
   document.getElementById('auth-forgot-btn')?.addEventListener('click', _handleForgotPassword);
+  document.getElementById('auth-verify-resend')?.addEventListener('click', _resendVerification);
+  document.getElementById('auth-verify-check')?.addEventListener('click', _checkVerification);
+  document.getElementById('auth-verify-signout')?.addEventListener('click', _signOutFromVerify);
   document.getElementById('auth-password')?.addEventListener('keydown', e => { if (e.key === 'Enter') _handleAuthSubmit(); });
 
   // Upgrade modal

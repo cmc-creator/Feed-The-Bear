@@ -65,7 +65,7 @@ asGrizzly(); // uses Grizzly-only features
     _auth = { currentUser: u };
     localStorage.setItem('ftb_user_v1', JSON.stringify({ name: 'Connie' }));
     let got = null;
-    navigator.share = async d => { got = d; };
+    Object.defineProperty(navigator, 'share', { configurable: true, writable: true, value: async d => { got = d; } });
     await shareInvite();
     return got;
   });

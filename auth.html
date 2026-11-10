@@ -360,8 +360,11 @@
     if (initMode === 'signup') switchTab('signup');
 
     // ── Redirect if already signed in ──
+    // (Held while a sign-up is sending its verification email, so the
+    // redirect doesn't cut the send off.)
+    let _signupSending = false;
     auth.onAuthStateChanged(user => {
-      if (user) redirectToApp();
+      if (user && !_signupSending) redirectToApp();
     });
 
     function redirectToApp () {
@@ -442,14 +445,20 @@
       const password = document.getElementById('suPassword').value;
       if (password.length < 8) { showMsg('Password must be at least 8 characters.'); return; }
       setLoading('signupBtn', 'signupSpinner', true);
+      _signupSending = true;
       try {
         await ensurePersistence();
         const cred = await auth.createUserWithEmailAndPassword(email, password);
         if (name) await cred.user.updateProfile({ displayName: name });
+        // New accounts confirm their inbox before the diary opens; the app
+        // shows the verify screen until they do.
+        try { await cred.user.sendEmailVerification(); } catch (err) { console.warn('[FTB] Verification email failed:', err.message); }
         redirectToApp();
       } catch (err) {
         showMsg(err.code ? friendlyError(err.code) : err.message);
         setLoading('signupBtn', 'signupSpinner', false);
+      } finally {
+        _signupSending = false;
       }
     }
 

@@ -446,6 +446,12 @@
         <input id="auth-password" class="form-input" type="password" placeholder="At least 8 characters" autocomplete="current-password" />
         <button id="auth-submit-btn" class="btn-primary" style="width:100%;margin-top:16px">Sign In</button>
         <div id="auth-error" class="auth-error hidden" role="alert"></div>
+        <div id="auth-verify" class="hidden">
+          <p>We sent a verification link to <strong id="auth-verify-email"></strong>. Tap the link in that email to open your diary — then come back here.</p>
+          <button id="auth-verify-resend" class="btn-primary" style="width:100%">Resend the email</button>
+          <button id="auth-verify-check" class="btn-secondary" style="width:100%;margin-top:8px">I've verified — continue</button>
+          <p style="text-align:center;margin-top:12px"><button type="button" class="auth-link-btn" id="auth-verify-signout">Sign out and use a different account</button></p>
+        </div>
         <p class="auth-forgot"><button type="button" class="auth-link-btn" id="auth-forgot-btn">Forgot password?</button></p>
         <p id="auth-toggle-text" class="auth-toggle-text">New here? <button class="auth-link-btn" id="auth-mode-toggle">Sign up, it's free</button></p>
         <p class="auth-try-first"><button type="button" class="auth-link-btn" id="auth-try-first">Try it first: save 3 spots without an account</button></p>
