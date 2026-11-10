@@ -10,7 +10,12 @@ const quota = {};
 const fakeAdmin = {
   apps: [1],
   auth: () => ({ verifyIdToken: async t => { if (t !== 'member-token') throw new Error('bad'); return { uid: 'member1' }; } }),
-  firestore: () => ({ doc: p => ({ get: async () => ({ data: () => quota[p] }), set: async d => { quota[p] = d; } }) }),
+  firestore: () => {
+    const doc = p => ({ path: p, get: async () => ({ data: () => quota[p] }), set: async d => { quota[p] = d; } });
+    // Daily caps are counted in a transaction (api/_guard.js, api/_limit.js).
+    const runTransaction = async fn => fn({ get: async ref => ref.get(), set: (ref, d) => { quota[ref.path] = d; } });
+    return { doc, runTransaction };
+  },
 };
 function loadApi (file) {
   const orig = Module._load;
