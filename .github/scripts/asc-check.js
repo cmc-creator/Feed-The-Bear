@@ -5,12 +5,18 @@ const crypto = require('crypto');
 
 const keyId = String(process.env.KEY_ID || '').trim();
 const issuer = String(process.env.ISSUER_ID || '').trim();
-const p8 = String(process.env.KEY_P8 || '').replace(/\\n/g, '\n').trim();
+// Rebuilt from its letters, so lost line breaks or extra spaces don't matter.
+const raw = String(process.env.KEY_P8 || '').replace(/\\n/g, '\n');
+const letters = raw.replace(/-----(BEGIN|END) PRIVATE KEY-----/g, '').replace(/[^A-Za-z0-9+/=]/g, '');
+const p8 = `-----BEGIN PRIVATE KEY-----\n${(letters.match(/.{1,64}/g) || []).join('\n')}\n-----END PRIVATE KEY-----\n`;
 
 const say = m => console.log(`[key check] ${m}`);
 say(`Key ID: ${keyId.length} characters (Apple's are 10)${/^[A-Z0-9]{10}$/.test(keyId) ? '' : '  <-- does not look like a Key ID'}`);
 say(`Issuer ID: ${issuer.length} characters (Apple's are 36, like 69a6de7e-...)${/^[0-9a-f-]{36}$/i.test(issuer) ? '' : '  <-- does not look like an Issuer ID'}`);
-say(`Key file: ${p8.includes('BEGIN PRIVATE KEY') && p8.includes('END PRIVATE KEY') ? 'has the BEGIN and END lines' : 'MISSING the BEGIN/END PRIVATE KEY lines  <-- paste the whole .p8 file'}`);
+say(`Key file: ${raw.includes('BEGIN PRIVATE KEY') && raw.includes('END PRIVATE KEY') ? 'has the BEGIN and END lines' : 'MISSING the BEGIN/END PRIVATE KEY lines  <-- paste the whole .p8 file'}`);
+
+// The signing step uses this cleaned-up copy.
+if (process.env.KEY_OUT) require('fs').writeFileSync(process.env.KEY_OUT, p8, { mode: 0o600 });
 
 let key;
 try { key = crypto.createPrivateKey(p8); } catch (err) {
