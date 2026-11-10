@@ -97,7 +97,7 @@ const EMAIL_VERIFY_CUTOFF = Date.parse('2026-11-10T21:00:00Z');
 
 function _needsEmailVerification (user) {
   if (!user || user.emailVerified) return false;
-  if ((user.providerData || []).some(p => p.providerId === 'google.com')) return false;
+  if ((user.providerData || []).some(p => p.providerId === 'google.com' || p.providerId === 'apple.com')) return false;
   const created = Date.parse(user.metadata?.creationTime || '') || 0;
   return created >= EMAIL_VERIFY_CUTOFF;
 }
