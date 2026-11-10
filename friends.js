@@ -56,10 +56,18 @@ function buildProfileData () {
    rendered by api/creator.js on your page. Skipping setup leaves the
    cozy default, so the page always looks good. */
 const CAVE_THEMES = {
-  cozy:   { label: 'Cozy Den', emoji: '🧸' },
-  forest: { label: 'Forest',   emoji: '🌲' },
-  neon:   { label: 'Neon',     emoji: '⚡' },
-  pastel: { label: 'Pastel',   emoji: '🌸' },
+  cozy:   { label: 'Cozy Cave',   emoji: '🧸' },
+  forest: { label: 'Forest Cave', emoji: '🐻' },
+  neon:   { label: 'Neon Cave',   emoji: '⚡' },
+  pastel: { label: 'Pastel Cave', emoji: '🌸' },
+  witchy: { label: 'Witchy Cave', emoji: '🔮' },
+  elf:    { label: 'Elf Cave',    emoji: '🧚' },
+  cute:   { label: 'Cute Cave',   emoji: '💖' },
+  mancave:{ label: 'Man Cave',    emoji: '🛋️' },
+  beach:  { label: 'Beach Cave',  emoji: '🏖️' },
+  winter: { label: 'Winter Cave', emoji: '❄️' },
+  cosmic: { label: 'Cosmic Cave', emoji: '🌌' },
+  jungle: { label: 'Jungle Cave', emoji: '🌿' },
 };
 const CAVE_DECOR = {
   lights:   { label: 'Fairy lights',    emoji: '✨', points: 0 },

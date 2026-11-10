@@ -2316,9 +2316,17 @@ body.celebrate-glow::before {
    so the banner feels like a real room instead of a flat color block. */
 .cave-preview-banner { display: block; text-align: center; border-radius: 12px; padding: 16px 10px 14px; font-size: .92rem; color: #f6ecdc; text-shadow: 0 2px 8px rgba(0,0,0,.65); box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), inset 0 -22px 44px rgba(0,0,0,.5), 0 8px 20px rgba(0,0,0,.3); }
 .cave-theme-cozy { background: radial-gradient(85% 90% at 50% 108%, rgba(255,150,60,.32), transparent 70%), linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.28)), linear-gradient(135deg, #4a3220, #241a12); }
-.cave-theme-forest { background: radial-gradient(85% 90% at 50% 108%, rgba(140,220,130,.24), transparent 70%), linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.28)), linear-gradient(135deg, #2c4630, #122019); }
+.cave-theme-forest { background: radial-gradient(85% 90% at 50% 108%, rgba(222,232,120,.24), transparent 70%), linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.28)), linear-gradient(135deg, #2a4a2a, #0e1f14); }
 .cave-theme-neon { background: radial-gradient(85% 90% at 50% 108%, rgba(255,93,162,.28), transparent 70%), linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.28)), linear-gradient(135deg, #3a2060, #1c1030); }
 .cave-theme-pastel { background: radial-gradient(85% 90% at 50% 108%, rgba(255,190,220,.24), transparent 70%), linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.28)), linear-gradient(135deg, #54405e, #2b2430); }
+.cave-theme-witchy { background: radial-gradient(85% 90% at 50% 108%, rgba(150,90,220,.32), transparent 70%), linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.28)), linear-gradient(135deg, #3a2a5e, #150e22); }
+.cave-theme-elf { background: radial-gradient(85% 90% at 50% 108%, rgba(170,230,100,.26), transparent 70%), linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.28)), linear-gradient(135deg, #2f5a34, #10241a); }
+.cave-theme-cute { background: radial-gradient(85% 90% at 50% 108%, rgba(255,150,200,.30), transparent 70%), linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.28)), linear-gradient(135deg, #6b3a58, #331e2a); }
+.cave-theme-mancave { background: radial-gradient(85% 90% at 50% 108%, rgba(230,160,70,.32), transparent 70%), linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.28)), linear-gradient(135deg, #4a2f1a, #1d150f); }
+.cave-theme-beach { background: radial-gradient(85% 90% at 50% 108%, rgba(120,210,230,.28), transparent 70%), linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.28)), linear-gradient(135deg, #2a6a7a, #12303a); }
+.cave-theme-winter { background: radial-gradient(85% 90% at 50% 108%, rgba(150,205,255,.28), transparent 70%), linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.28)), linear-gradient(135deg, #2a4a60, #101c26); }
+.cave-theme-cosmic { background: radial-gradient(85% 90% at 50% 108%, rgba(140,110,255,.32), transparent 70%), linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.28)), linear-gradient(135deg, #2a2a5e, #0a0e26); }
+.cave-theme-jungle { background: radial-gradient(85% 90% at 50% 108%, rgba(120,230,120,.26), transparent 70%), linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.28)), linear-gradient(135deg, #2a5a28, #0d2410); }
 
 /* Byte Cub's chat: above everything, with his action buttons under a message. */
 .chat-panel { z-index: 300; }

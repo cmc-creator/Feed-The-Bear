@@ -66,7 +66,7 @@ const voteCall = (method, { query = {}, body = {} } = {}) => new Promise(resolve
   check(pg.status === 200, 'the cave page opens');
   check(/data-cave-theme="forest"/.test(pg.html), 'the page carries the forest theme');
   check(/✨/.test(pg.html) && /🪴/.test(pg.html), 'the page shows the fairy lights and plant');
-  check(/Forest cave/.test(pg.html), 'the page names the theme');
+  check(/Forest Cave/.test(pg.html), 'the page names the theme');
   check(/id="cave-vote-btn" data-share="connieshare01"/.test(pg.html), 'the page has a vote button for this cave');
   check(/Love this cave\?/.test(pg.html), 'the vote button asks nicely');
   check(/\/api\/cave-vote/.test(pg.html), 'the page talks to the vote endpoint');

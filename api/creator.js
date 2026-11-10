@@ -46,9 +46,9 @@ const emojiFor = c => { const k = String(c || '').toLowerCase().trim(); return E
 // Bear Cave decor: the same themes and decorations the app offers in
 // Username & public page (friends.js). The cave rides in the live profile
 // (profile.cave, short form {t, d}); anything unknown falls back to cozy.
-const CAVE_THEMES = { cozy: '🧸', forest: '🌲', neon: '⚡', pastel: '🌸' };
+const CAVE_THEMES = { cozy: '🧸', forest: '🐻', neon: '⚡', pastel: '🌸', witchy: '🔮', elf: '🧚', cute: '💖', mancave: '🛋️', beach: '🏖️', winter: '❄️', cosmic: '🌌', jungle: '🌿' };
 const CAVE_DECOR = { lights: '✨', rug: '🧶', posters: '🖼️', plant: '🪴', trophy: '🏆', candle: '🕯️', fireplace: '🔥', shelf: '📚', barcart: '🍷' };
-const CAVE_THEME_LABELS = { cozy: 'Cozy Den', forest: 'Forest', neon: 'Neon', pastel: 'Pastel' };
+const CAVE_THEME_LABELS = { cozy: 'Cozy Cave', forest: 'Forest Cave', neon: 'Neon Cave', pastel: 'Pastel Cave', witchy: 'Witchy Cave', elf: 'Elf Cave', cute: 'Cute Cave', mancave: 'Man Cave', beach: 'Beach Cave', winter: 'Winter Cave', cosmic: 'Cosmic Cave', jungle: 'Jungle Cave' };
 function normalizeCave (raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
   const theme = CAVE_THEMES[src.theme || src.t] ? (src.theme || src.t) : 'cozy';
@@ -94,9 +94,17 @@ function page (res, status, { title, description, body, url = SITE, theme = 'coz
        grainy wall (SVG turbulence, no external assets), and a vignette,
        so the page feels like a real room instead of a flat color block. */
     body[data-cave-theme="cozy"] { --bg: #241a12; --card: #33261a; --accent: #ff8a3d; --gold: #ffd98a; --glow: rgba(255, 150, 60, .30); --glow2: rgba(255, 190, 90, .16); --wood: #4a3220; }
-    body[data-cave-theme="forest"] { --bg: #122019; --card: #1d2f24; --accent: #7dd87d; --gold: #c9f2b0; --glow: rgba(140, 220, 130, .22); --glow2: rgba(210, 240, 170, .10); --wood: #2c4630; }
+    body[data-cave-theme="forest"] { --bg: #0e1f14; --card: #1a2e1e; --accent: #8fd07a; --gold: #e8d98a; --glow: rgba(222, 232, 120, .20); --glow2: rgba(120, 200, 110, .12); --wood: #3a2c1c; }
     body[data-cave-theme="neon"] { --bg: #1c1030; --card: #2a1848; --accent: #ff5da2; --gold: #ffd166; --glow: rgba(255, 93, 162, .26); --glow2: rgba(120, 180, 255, .15); --wood: #3a2060; }
     body[data-cave-theme="pastel"] { --bg: #2b2430; --card: #3a3040; --accent: #ffb3d9; --gold: #ffe3a3; --glow: rgba(255, 190, 220, .22); --glow2: rgba(255, 230, 170, .13); --wood: #54405e; }
+    body[data-cave-theme="witchy"] { --bg: #150e22; --card: #241839; --accent: #b57edc; --gold: #d8c8ff; --glow: rgba(150, 90, 220, .30); --glow2: rgba(90, 60, 160, .15); --wood: #2e1f3d; }
+    body[data-cave-theme="elf"] { --bg: #10241a; --card: #1d3a2a; --accent: #a8e063; --gold: #f2e6a0; --glow: rgba(170, 230, 100, .22); --glow2: rgba(120, 220, 160, .12); --wood: #2f3d24; }
+    body[data-cave-theme="cute"] { --bg: #331e2a; --card: #452c3c; --accent: #ff8fc7; --gold: #ffd6ea; --glow: rgba(255, 150, 200, .28); --glow2: rgba(255, 200, 220, .14); --wood: #5a3a4a; }
+    body[data-cave-theme="mancave"] { --bg: #1d150f; --card: #2e2118; --accent: #e0a050; --gold: #ffcf8a; --glow: rgba(230, 160, 70, .28); --glow2: rgba(180, 120, 50, .14); --wood: #4a2f1a; }
+    body[data-cave-theme="beach"] { --bg: #12303a; --card: #1d4552; --accent: #5ec8d8; --gold: #ffe9a8; --glow: rgba(120, 210, 230, .26); --glow2: rgba(255, 220, 140, .14); --wood: #8a6b45; }
+    body[data-cave-theme="winter"] { --bg: #101c26; --card: #1b2c3a; --accent: #9fd8ff; --gold: #ffd98a; --glow: rgba(150, 205, 255, .24); --glow2: rgba(255, 195, 105, .20); --wood: #3d4a55; }
+    body[data-cave-theme="cosmic"] { --bg: #0a0e26; --card: #171a42; --accent: #8fb8ff; --gold: #d9e4ff; --glow: rgba(140, 110, 255, .30); --glow2: rgba(70, 140, 255, .16); --wood: #241a3d; }
+    body[data-cave-theme="jungle"] { --bg: #0d2410; --card: #17351c; --accent: #7ee081; --gold: #ffe08a; --glow: rgba(120, 230, 120, .22); --glow2: rgba(255, 190, 120, .14); --wood: #2e3d1e; }
     * { box-sizing: border-box; }
     body { margin: 0; color: var(--text); font: 500 1rem/1.45 system-ui, -apple-system, sans-serif;
       background:
@@ -262,7 +270,7 @@ module.exports = async function handler (req, res) {
     <h1>${esc(name)}'s food spots</h1>
     <div class="handle">@${esc(handle)}</div>
     <div class="cave-scene"><div class="cave-decor" aria-hidden="true">${decorRow}</div>
-    <div class="cave-theme">${CAVE_THEMES[cave.theme]} ${esc(CAVE_THEME_LABELS[cave.theme])} cave</div>${pointsRow}</div>
+    <div class="cave-theme">${CAVE_THEMES[cave.theme]} ${esc(CAVE_THEME_LABELS[cave.theme])}</div>${pointsRow}</div>
     <p class="lead">Where ${esc(name)} eats and exactly what to order.</p>
   </header>
   ${voteBox}
