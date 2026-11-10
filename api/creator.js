@@ -47,7 +47,7 @@ const emojiFor = c => { const k = String(c || '').toLowerCase().trim(); return E
 // Username & public page (friends.js). The cave rides in the live profile
 // (profile.cave, short form {t, d}); anything unknown falls back to cozy.
 const CAVE_THEMES = { cozy: '🧸', forest: '🌲', neon: '⚡', pastel: '🌸' };
-const CAVE_DECOR = { lights: '✨', rug: '🧶', posters: '🖼️', plant: '🪴', trophy: '🏆', candle: '🕯️' };
+const CAVE_DECOR = { lights: '✨', rug: '🧶', posters: '🖼️', plant: '🪴', trophy: '🏆', candle: '🕯️', fireplace: '🔥', shelf: '📚', barcart: '🍷' };
 const CAVE_THEME_LABELS = { cozy: 'Cozy Den', forest: 'Forest', neon: 'Neon', pastel: 'Pastel' };
 function normalizeCave (raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
@@ -90,20 +90,45 @@ function page (res, status, { title, description, body, url = SITE, theme = 'coz
   <link rel="icon" href="/feedbear-sm.jpg" />
   <style>
     :root { --bg: #1b241c; --card: #26322a; --text: #f6ecdc; --dim: #c9bfae; --accent: #ff8a3d; --gold: #ffd98a; }
-    body[data-cave-theme="cozy"] { --bg: #241a12; --card: #33261a; --accent: #ff8a3d; --gold: #ffd98a; }
-    body[data-cave-theme="forest"] { --bg: #122019; --card: #1d2f24; --accent: #7dd87d; --gold: #c9f2b0; }
-    body[data-cave-theme="neon"] { --bg: #1c1030; --card: #2a1848; --accent: #ff5da2; --gold: #ffd166; }
-    body[data-cave-theme="pastel"] { --bg: #2b2430; --card: #3a3040; --accent: #ffb3d9; --gold: #ffe3a3; }
+    /* Realistic cave scenes: warm light pooling from above and below, a
+       grainy wall (SVG turbulence, no external assets), and a vignette,
+       so the page feels like a real room instead of a flat color block. */
+    body[data-cave-theme="cozy"] { --bg: #241a12; --card: #33261a; --accent: #ff8a3d; --gold: #ffd98a; --glow: rgba(255, 150, 60, .30); --glow2: rgba(255, 190, 90, .16); --wood: #4a3220; }
+    body[data-cave-theme="forest"] { --bg: #122019; --card: #1d2f24; --accent: #7dd87d; --gold: #c9f2b0; --glow: rgba(140, 220, 130, .22); --glow2: rgba(210, 240, 170, .10); --wood: #2c4630; }
+    body[data-cave-theme="neon"] { --bg: #1c1030; --card: #2a1848; --accent: #ff5da2; --gold: #ffd166; --glow: rgba(255, 93, 162, .26); --glow2: rgba(120, 180, 255, .15); --wood: #3a2060; }
+    body[data-cave-theme="pastel"] { --bg: #2b2430; --card: #3a3040; --accent: #ffb3d9; --gold: #ffe3a3; --glow: rgba(255, 190, 220, .22); --glow2: rgba(255, 230, 170, .13); --wood: #54405e; }
     * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--text); font: 500 1rem/1.45 system-ui, -apple-system, sans-serif; }
-    main { max-width: 520px; margin: 0 auto; padding: 28px 16px 120px; }
+    body { margin: 0; color: var(--text); font: 500 1rem/1.45 system-ui, -apple-system, sans-serif;
+      background:
+        radial-gradient(120% 55% at 50% 0%, var(--glow), transparent 62%),
+        radial-gradient(90% 45% at 50% 108%, var(--glow2), transparent 62%),
+        linear-gradient(180deg, var(--bg), #100d0a 135%);
+    }
+    body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.055'/%3E%3C/svg%3E");
+      box-shadow: inset 0 0 140px rgba(0,0,0,.55);
+    }
+    main { max-width: 520px; margin: 0 auto; padding: 28px 16px 120px; position: relative; z-index: 1; }
     header { text-align: center; margin-bottom: 20px; }
-    .bear { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; }
+    .bear { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 3px var(--card), 0 10px 22px rgba(0,0,0,.5); }
     h1 { font-size: 1.6rem; line-height: 1.2; margin: 12px 0 4px; overflow-wrap: anywhere; }
     .handle { color: var(--gold); font-weight: 700; }
     .lead { color: var(--dim); margin: 6px 0 0; }
-    .cave-decor { text-align: center; font-size: 1.35rem; letter-spacing: 8px; margin-top: 12px; }
-    .cave-theme { text-align: center; color: var(--dim); font-size: .8rem; margin-top: 4px; }
+    .cave-scene { margin-top: 16px; border-radius: 18px; padding: 20px 12px 12px; position: relative; overflow: hidden;
+      background:
+        radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%),
+        linear-gradient(180deg, rgba(255,255,255,.055), rgba(0,0,0,.30)),
+        var(--card);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), inset 0 -28px 55px rgba(0,0,0,.45), 0 12px 30px rgba(0,0,0,.35);
+    }
+    .cave-scene::after { content: ""; display: block; height: 9px; margin: 12px 8px 0; border-radius: 5px;
+      background: linear-gradient(180deg, var(--wood), rgba(0,0,0,.45));
+      box-shadow: 0 5px 10px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.12);
+    }
+    .cave-decor { display: flex; justify-content: center; gap: 16px; font-size: 1.7rem; line-height: 1; }
+    .cave-decor span { filter: drop-shadow(0 7px 7px rgba(0,0,0,.6)); }
+    .cave-theme { text-align: center; color: var(--dim); font-size: .8rem; margin-top: 10px; }
+    .cave-points { text-align: center; color: var(--gold); font-weight: 800; font-size: .9rem; margin-top: 6px; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
     .cave-vote { text-align: center; margin-top: 14px; }
     .cave-vote button { border: 0; border-radius: 999px; padding: 10px 18px; background: var(--accent); color: #1b130b; font-weight: 800; font-size: .95rem; cursor: pointer; }
     .cave-vote-count { color: var(--dim); font-size: .82rem; margin-top: 6px; }
@@ -165,7 +190,9 @@ module.exports = async function handler (req, res) {
     const orders = picks.reduce((n, p) => n + p.g.length, 0);
     // The cave (theme + decorations) rides in the live profile.
     const cave = normalizeCave(profile.profile?.cave);
-    const decorRow = cave.decor.map(id => CAVE_DECOR[id]).join(' ');
+    const decorRow = cave.decor.map(id => `<span>${CAVE_DECOR[id]}</span>`).join('');
+    const cavePts = Math.max(0, Math.floor(Number(profile.profile?.pts) || 0));
+    const pointsRow = cavePts > 0 ? `<div class="cave-points">⭐ ${cavePts} cave point${cavePts === 1 ? '' : 's'}</div>` : '';
     const voteBox = `<div class="cave-vote">
   <button type="button" id="cave-vote-btn" data-share="${esc(h.id)}">🐻 Love this cave?</button>
   <div id="cave-vote-count" class="cave-vote-count"></div>
@@ -234,8 +261,8 @@ module.exports = async function handler (req, res) {
     <img class="bear" src="/feedbear-sm.jpg" alt="" />
     <h1>${esc(name)}'s food spots</h1>
     <div class="handle">@${esc(handle)}</div>
-    <div class="cave-decor" aria-hidden="true">${decorRow}</div>
-    <div class="cave-theme">${CAVE_THEMES[cave.theme]} ${esc(CAVE_THEME_LABELS[cave.theme])} cave</div>
+    <div class="cave-scene"><div class="cave-decor" aria-hidden="true">${decorRow}</div>
+    <div class="cave-theme">${CAVE_THEMES[cave.theme]} ${esc(CAVE_THEME_LABELS[cave.theme])} cave</div>${pointsRow}</div>
     <p class="lead">Where ${esc(name)} eats and exactly what to order.</p>
   </header>
   ${voteBox}

@@ -46,7 +46,7 @@ function buildProfileData () {
   state.restaurants.filter(isAvailableSpot).forEach(r => dishesOf(r).forEach(d => {
     if (d.verdict === 'want' && craves.length < 10) craves.push({ d: String(d.name).slice(0, 40), at: String(r.name).slice(0, 60) });
   }));
-  return { v: 2, id: getProfileShareId(), u: shownName().slice(0, 30), picks, w: craves, cave: caveShort(getCave()), ts: Date.now() };
+  return { v: 2, id: getProfileShareId(), u: shownName().slice(0, 30), picks, w: craves, cave: caveShort(getCave()), pts: cavePoints().total, ts: Date.now() };
 }
 
 /* ── Bear Cave: your personal page, decorated ────────────────
@@ -62,15 +62,62 @@ const CAVE_THEMES = {
   pastel: { label: 'Pastel',   emoji: '🌸' },
 };
 const CAVE_DECOR = {
-  lights:  { label: 'Fairy lights', emoji: '✨' },
-  rug:     { label: 'Rug',          emoji: '🧶' },
-  posters: { label: 'Posters',      emoji: '🖼️' },
-  plant:   { label: 'Plant',        emoji: '🪴' },
-  trophy:  { label: 'Trophy shelf', emoji: '🏆' },
-  candle:  { label: 'Candles',      emoji: '🕯️' },
+  lights:   { label: 'Fairy lights',    emoji: '✨', points: 0 },
+  rug:      { label: 'Rug',             emoji: '🧶', points: 0 },
+  posters:  { label: 'Posters',         emoji: '🖼️', points: 0 },
+  plant:    { label: 'Plant',           emoji: '🪴', points: 0 },
+  trophy:   { label: 'Trophy shelf',    emoji: '🏆', points: 0 },
+  candle:   { label: 'Candles',         emoji: '🕯️', points: 0 },
+  fireplace:{ label: 'Stone fireplace', emoji: '🔥', points: 50 },
+  shelf:    { label: 'Cookbook shelf',  emoji: '📚', points: 100 },
+  barcart:  { label: 'Bar cart',        emoji: '🍷', points: 250 },
 };
 const CAVE_MAX_DECOR = 4;
 const DEFAULT_CAVE = { theme: 'cozy', decor: ['lights', 'plant'] };
+
+// Cave points: earned by using the app, and they unlock new cave decor.
+// Derived from what you've actually done, so it can never double-count
+// and a fresh install credits everything you already did.
+const CAVE_POINTS = { spot: 10, dish: 5, visit: 5, list: 10 };
+function cavePoints () {
+  const spots = (state.restaurants || []).filter(isAvailableSpot);
+  let dishes = 0, visits = 0;
+  spots.forEach(r => {
+    dishes += dishesOf(r).filter(d => (Number(d.rating) || 0) > 0 || d.verdict === 'again' || d.verdict === 'skip').length;
+    visits += (r.visits || []).length;
+  });
+  const lists = Object.values(state.settings?.sharedLists || {})
+    .filter(m => !m.createdBy || m.createdBy === window._ftbUid).length;
+  const total = spots.length * CAVE_POINTS.spot + dishes * CAVE_POINTS.dish
+    + visits * CAVE_POINTS.visit + lists * CAVE_POINTS.list;
+  return { total, spots: spots.length, dishes, visits, lists };
+}
+// Unlocks are sticky: once a tier is earned it stays unlocked even if the
+// points total later drops (a deleted spot never takes your fireplace away).
+function caveUnlockedIds () {
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
+  const unlocked = new Set(Array.isArray(profile.caveUnlocked) ? profile.caveUnlocked : []);
+  const total = cavePoints().total;
+  Object.entries(CAVE_DECOR).forEach(([id, d]) => { if ((d.points || 0) <= total) unlocked.add(id); });
+  return unlocked;
+}
+function refreshCaveUnlocks () {
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || null;
+  if (!profile) return [];
+  const have = new Set(Array.isArray(profile.caveUnlocked) ? profile.caveUnlocked : []);
+  const fresh = [...caveUnlockedIds()].filter(id => !have.has(id) && (CAVE_DECOR[id]?.points || 0) > 0);
+  if (fresh.length && typeof saveUserProfile === 'function') {
+    saveUserProfile({ ...profile, caveUnlocked: [...have, ...fresh] });
+  }
+  return fresh;
+}
+function nextCaveUnlock () {
+  const total = cavePoints().total;
+  const locked = Object.entries(CAVE_DECOR)
+    .filter(([, d]) => (d.points || 0) > total)
+    .sort((a, b) => (a[1].points || 0) - (b[1].points || 0));
+  return locked.length ? { id: locked[0][0], ...locked[0][1] } : null;
+}
 
 // Accepts the full form {theme, decor} or the short link form {t, d}.
 function normalizeCave (raw) {
@@ -96,6 +143,9 @@ function caveOf (data) {
 }
 function saveCave (cave) {
   const next = normalizeCave(cave);
+  // A locked decoration can never be saved, even from a crafted link.
+  const unlocked = caveUnlockedIds();
+  next.decor = next.decor.filter(id => unlocked.has(id));
   const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || { name: 'Foodie', avatar: DEFAULT_AVATAR, joinDate: new Date().toISOString() };
   if (typeof saveUserProfile === 'function') saveUserProfile({ ...profile, cave: next });
   // Friends see the new look: the live profile republishes (it dedupes itself).
@@ -1826,14 +1876,27 @@ function renderCaveSetup () {
   const themeBox = document.getElementById('cave-theme-picks');
   const decorBox = document.getElementById('cave-decor-picks');
   if (!themeBox || !decorBox) return;
+  // Earn the unlocks the moment they cross a tier, so the picker shows them.
+  const fresh = refreshCaveUnlocks();
   let cave = getCave();
   const draw = () => {
+    const pts = cavePoints();
+    const unlocked = caveUnlockedIds();
+    const next = nextCaveUnlock();
+    const pointsBox = document.getElementById('cave-points');
+    if (pointsBox) {
+      pointsBox.innerHTML = `<b>⭐ ${pts.total} points</b> <span>(${pts.spots} spot${pts.spots === 1 ? '' : 's'} · ${pts.dishes} dish${pts.dishes === 1 ? '' : 'es'} rated · ${pts.visits} visit${pts.visits === 1 ? '' : 's'} · ${pts.lists} list${pts.lists === 1 ? '' : 's'} shared)</span>`
+        + `<span class="cave-points-next">${next ? `Next unlock: ${next.emoji} ${next.label} at ${next.points} points` : '🎉 Every decoration unlocked!'}</span>`
+        + `<span class="cave-points-earn">Save a spot +${CAVE_POINTS.spot} · Rate a dish +${CAVE_POINTS.dish} · Log a visit +${CAVE_POINTS.visit} · Share a list +${CAVE_POINTS.list}</span>`;
+    }
     themeBox.innerHTML = Object.entries(CAVE_THEMES).map(([id, t]) =>
       `<button type="button" class="cave-theme-chip${cave.theme === id ? ' on' : ''}" data-theme="${id}">${t.emoji} ${t.label}</button>`).join('');
     decorBox.innerHTML = Object.entries(CAVE_DECOR).map(([id, d]) => {
       const on = cave.decor.includes(id);
-      const disabled = !on && cave.decor.length >= CAVE_MAX_DECOR;
-      return `<button type="button" class="cave-decor-chip${on ? ' on' : ''}" data-decor="${id}"${disabled ? ' disabled' : ''}>${d.emoji} ${d.label}</button>`;
+      const locked = !unlocked.has(id);
+      const disabled = !on && !locked && cave.decor.length >= CAVE_MAX_DECOR;
+      const label = locked ? `🔒 ${d.label} · ${d.points} pts` : `${d.emoji} ${d.label}`;
+      return `<button type="button" class="cave-decor-chip${on ? ' on' : ''}${locked ? ' locked' : ''}" data-decor="${id}"${disabled ? ' disabled' : ''} title="${locked ? `Unlocks at ${d.points} points` : d.label}">${label}</button>`;
     }).join('');
     const prev = document.getElementById('cave-setup-preview');
     if (prev) {
@@ -1846,13 +1909,19 @@ function renderCaveSetup () {
     const b = e.target.closest('[data-decor]');
     if (!b || b.disabled) return;
     const id = b.dataset.decor;
+    if (!caveUnlockedIds().has(id)) {
+      const d = CAVE_DECOR[id];
+      showToast('Locked for now', `${d.emoji} ${d.label} unlocks at ${d.points} points — you have ${cavePoints().total}. Keep eating!`, 'info');
+      return;
+    }
     cave = { ...cave, decor: cave.decor.includes(id) ? cave.decor.filter(x => x !== id) : [...cave.decor, id].slice(0, CAVE_MAX_DECOR) };
     draw();
   };
   const saveBtn = document.getElementById('cave-save-btn');
   if (saveBtn) saveBtn.onclick = () => {
     saveCave(cave);
-    showToast('Your cave is decorated!', `${CAVE_THEMES[cave.theme].label} theme, ${cave.decor.length} decoration${cave.decor.length === 1 ? '' : 's'}.`, 'success');
+    const unlockedNote = fresh.length ? ` You unlocked: ${fresh.map(id => `${CAVE_DECOR[id].emoji} ${CAVE_DECOR[id].label}`).join(', ')}!` : '';
+    showToast('Your cave is decorated!', `${CAVE_THEMES[cave.theme].label} theme, ${cave.decor.length} decoration${cave.decor.length === 1 ? '' : 's'}.${unlockedNote}`, 'success');
   };
   draw();
 }
@@ -2045,10 +2114,12 @@ function myPageHtml () {
   }
   const n = (x, one, many) => `${x} ${x === 1 ? one : many}`;
   const votes = _myPage.votes ? ` · ❤️ ${n(_myPage.votes, 'person loves', 'people love')} your cave` : '';
+  const cavePts = (typeof cavePoints === 'function' ? cavePoints().total : 0);
+  const points = ` · ⭐ ${cavePts} cave point${cavePts === 1 ? '' : 's'}`;
   return `<div class="my-page is-on">
       <strong>Your public page is on</strong>
       <a class="my-page-link" href="${escHtml(myPageUrl())}" target="_blank" rel="noopener">feed-the-bear.com/@${escHtml(_myHandle)}</a>
-      <span class="my-page-stats">${n(_myPage.views, 'visit', 'visits')} · ${n(_myPage.joins, 'person joined', 'people joined')}${votes}</span>
+      <span class="my-page-stats">${n(_myPage.views, 'visit', 'visits')} · ${n(_myPage.joins, 'person joined', 'people joined')}${votes}${points}</span>
       <span class="my-page-earn">${_myPage.earnedCents
         ? `💰 You've earned <b>$${(_myPage.earnedCents / 100).toFixed(2)}</b>${_myPage.owedCents ? ` ($${(_myPage.owedCents / 100).toFixed(2)} on its way)` : ''}`
         : '💰 Earn 20% of what anyone who joins from your link pays for Grizzly, for as long as they stay.'}</span>
