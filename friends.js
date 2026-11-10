@@ -46,7 +46,61 @@ function buildProfileData () {
   state.restaurants.filter(isAvailableSpot).forEach(r => dishesOf(r).forEach(d => {
     if (d.verdict === 'want' && craves.length < 10) craves.push({ d: String(d.name).slice(0, 40), at: String(r.name).slice(0, 60) });
   }));
-  return { v: 2, id: getProfileShareId(), u: shownName().slice(0, 30), picks, w: craves, ts: Date.now() };
+  return { v: 2, id: getProfileShareId(), u: shownName().slice(0, 30), picks, w: craves, cave: caveShort(getCave()), ts: Date.now() };
+}
+
+/* ── Bear Cave: your personal page, decorated ────────────────
+   The cave IS your existing public page (feed-the-bear.com/@you):
+   a theme + a few decorations that make it yours. Stored in your
+   profile (local + cloud), published with the live profile, and
+   rendered by api/creator.js on your page. Skipping setup leaves the
+   cozy default, so the page always looks good. */
+const CAVE_THEMES = {
+  cozy:   { label: 'Cozy Den', emoji: '🧸' },
+  forest: { label: 'Forest',   emoji: '🌲' },
+  neon:   { label: 'Neon',     emoji: '⚡' },
+  pastel: { label: 'Pastel',   emoji: '🌸' },
+};
+const CAVE_DECOR = {
+  lights:  { label: 'Fairy lights', emoji: '✨' },
+  rug:     { label: 'Rug',          emoji: '🧶' },
+  posters: { label: 'Posters',      emoji: '🖼️' },
+  plant:   { label: 'Plant',        emoji: '🪴' },
+  trophy:  { label: 'Trophy shelf', emoji: '🏆' },
+  candle:  { label: 'Candles',      emoji: '🕯️' },
+};
+const CAVE_MAX_DECOR = 4;
+const DEFAULT_CAVE = { theme: 'cozy', decor: ['lights', 'plant'] };
+
+// Accepts the full form {theme, decor} or the short link form {t, d}.
+function normalizeCave (raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const theme = CAVE_THEMES[src.theme || src.t] ? (src.theme || src.t) : DEFAULT_CAVE.theme;
+  const list = Array.isArray(src.decor) ? src.decor : (Array.isArray(src.d) ? src.d : null);
+  const decor = list === null ? [...DEFAULT_CAVE.decor]
+    : [...new Set(list.map(x => String(x)).filter(id => CAVE_DECOR[id]))].slice(0, CAVE_MAX_DECOR);
+  return { theme, decor };
+}
+function getCave () {
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
+  return normalizeCave(profile.cave);
+}
+function caveShort (cave) {
+  const c = normalizeCave(cave);
+  return { t: c.theme, d: c.decor };
+}
+// A friend's cave: a profile link carries it at the top level, the live
+// doc nests it under profile (both come from buildProfileData).
+function caveOf (data) {
+  return normalizeCave(data?.cave || data?.profile?.cave);
+}
+function saveCave (cave) {
+  const next = normalizeCave(cave);
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || { name: 'Foodie', avatar: DEFAULT_AVATAR, joinDate: new Date().toISOString() };
+  if (typeof saveUserProfile === 'function') saveUserProfile({ ...profile, cave: next });
+  // Friends see the new look: the live profile republishes (it dedupes itself).
+  if (state.settings.shareLive && typeof fbPublishFriendProfile === 'function') fbPublishFriendProfile();
+  return next;
 }
 
 // The name friends see: the one you typed, else your Google first name.
@@ -1755,6 +1809,7 @@ function openFoodieFriends () {
 function openHandleSettings () {
   document.getElementById('handle-overlay')?.classList.remove('hidden');
   document.body.classList.add('overlay-open');
+  renderCaveSetup();
   renderMyHandle();
 }
 function closeHandleSettings () {
@@ -1763,6 +1818,44 @@ function closeHandleSettings () {
 }
 window.openHandleSettings = openHandleSettings;
 window.closeHandleSettings = closeHandleSettings;
+
+// Decorate your Bear Cave: pick a theme and a few decorations in one
+// short flow. Saves straight into your profile (local + cloud); the
+// live profile republishes so friends see the new look.
+function renderCaveSetup () {
+  const themeBox = document.getElementById('cave-theme-picks');
+  const decorBox = document.getElementById('cave-decor-picks');
+  if (!themeBox || !decorBox) return;
+  let cave = getCave();
+  const draw = () => {
+    themeBox.innerHTML = Object.entries(CAVE_THEMES).map(([id, t]) =>
+      `<button type="button" class="cave-theme-chip${cave.theme === id ? ' on' : ''}" data-theme="${id}">${t.emoji} ${t.label}</button>`).join('');
+    decorBox.innerHTML = Object.entries(CAVE_DECOR).map(([id, d]) => {
+      const on = cave.decor.includes(id);
+      const disabled = !on && cave.decor.length >= CAVE_MAX_DECOR;
+      return `<button type="button" class="cave-decor-chip${on ? ' on' : ''}" data-decor="${id}"${disabled ? ' disabled' : ''}>${d.emoji} ${d.label}</button>`;
+    }).join('');
+    const prev = document.getElementById('cave-setup-preview');
+    if (prev) {
+      const dec = cave.decor.map(id => CAVE_DECOR[id].emoji).join(' ');
+      prev.innerHTML = `<span class="cave-preview-banner cave-theme-${cave.theme}">${dec} <b>${escHtml(CAVE_THEMES[cave.theme].label)}</b> ${dec}</span>`;
+    }
+  };
+  themeBox.onclick = e => { const b = e.target.closest('[data-theme]'); if (!b) return; cave = { ...cave, theme: b.dataset.theme }; draw(); };
+  decorBox.onclick = e => {
+    const b = e.target.closest('[data-decor]');
+    if (!b || b.disabled) return;
+    const id = b.dataset.decor;
+    cave = { ...cave, decor: cave.decor.includes(id) ? cave.decor.filter(x => x !== id) : [...cave.decor, id].slice(0, CAVE_MAX_DECOR) };
+    draw();
+  };
+  const saveBtn = document.getElementById('cave-save-btn');
+  if (saveBtn) saveBtn.onclick = () => {
+    saveCave(cave);
+    showToast('Your cave is decorated!', `${CAVE_THEMES[cave.theme].label} theme, ${cave.decor.length} decoration${cave.decor.length === 1 ? '' : 's'}.`, 'success');
+  };
+  draw();
+}
 
 function closeFoodieFriends () {
   document.getElementById('friends-overlay').classList.add('hidden');
@@ -1892,7 +1985,7 @@ async function myShareLink () {
       if (ok) {
         _myHandleFor = uid;
         _myHandle = data.handle || '';
-        _myPage = { public: !!data.public, views: Number(data.views) || 0, joins: Number(data.joins) || 0, earnedCents: Number(data.earnedCents) || 0, owedCents: Number(data.owedCents) || 0 };
+        _myPage = { public: !!data.public, views: Number(data.views) || 0, joins: Number(data.joins) || 0, votes: Number(data.votes) || 0, earnedCents: Number(data.earnedCents) || 0, owedCents: Number(data.owedCents) || 0 };
       }
     } catch { /* offline: the site */ }
   }
@@ -1920,7 +2013,7 @@ async function renderMyHandle () {
       if (!isCurrent()) return;
       if (!ok) throw new Error(data.error || `error ${status}`);
       _myHandle = data.handle || '';
-      _myPage = { public: !!data.public, views: Number(data.views) || 0, joins: Number(data.joins) || 0, earnedCents: Number(data.earnedCents) || 0, owedCents: Number(data.owedCents) || 0 };
+      _myPage = { public: !!data.public, views: Number(data.views) || 0, joins: Number(data.joins) || 0, votes: Number(data.votes) || 0, earnedCents: Number(data.earnedCents) || 0, owedCents: Number(data.owedCents) || 0 };
     } catch (err) { if (!isCurrent()) return; failed = err.message || 'no connection'; }
   }
   if (!isCurrent()) return;
@@ -1941,7 +2034,7 @@ async function renderMyHandle () {
 
 /* ── Your public page (api/creator.js): feed-the-bear.com/@you ──
    For a TikTok or Instagram bio. Off until you turn it on. */
-let _myPage = { public: false, views: 0, joins: 0 };
+let _myPage = { public: false, views: 0, joins: 0, votes: 0 };
 function myPageUrl () { return `https://www.feed-the-bear.com/@${_myHandle}`; }
 function myPageHtml () {
   const intro = '<strong>Your public page</strong><span>Put a link in your TikTok or Instagram bio. Anyone can see your top spots and what to order, then join free and follow you. When someone who joined goes Grizzly, you get a free month.</span>';
@@ -1951,16 +2044,18 @@ function myPageHtml () {
       <button type="button" class="btn-sm btn-orange my-page-on">Turn on my page</button></div>`;
   }
   const n = (x, one, many) => `${x} ${x === 1 ? one : many}`;
+  const votes = _myPage.votes ? ` · ❤️ ${n(_myPage.votes, 'person loves', 'people love')} your cave` : '';
   return `<div class="my-page is-on">
       <strong>Your public page is on</strong>
       <a class="my-page-link" href="${escHtml(myPageUrl())}" target="_blank" rel="noopener">feed-the-bear.com/@${escHtml(_myHandle)}</a>
-      <span class="my-page-stats">${n(_myPage.views, 'visit', 'visits')} · ${n(_myPage.joins, 'person joined', 'people joined')}</span>
+      <span class="my-page-stats">${n(_myPage.views, 'visit', 'visits')} · ${n(_myPage.joins, 'person joined', 'people joined')}${votes}</span>
       <span class="my-page-earn">${_myPage.earnedCents
         ? `💰 You've earned <b>$${(_myPage.earnedCents / 100).toFixed(2)}</b>${_myPage.owedCents ? ` ($${(_myPage.owedCents / 100).toFixed(2)} on its way)` : ''}`
         : '💰 Earn 20% of what anyone who joins from your link pays for Grizzly, for as long as they stay.'}</span>
       <div class="my-page-actions">
         <button type="button" class="btn-sm btn-orange my-page-copy">Copy link</button>
         <button type="button" class="btn-sm btn-ghost my-page-share">Share</button>
+        <button type="button" class="btn-sm btn-ghost my-page-decorate">🎨 Decorate my cave</button>
         <button type="button" class="btn-sm btn-ghost my-page-off">Turn off</button>
       </div>
     </div>`;
@@ -1982,6 +2077,7 @@ function wireMyPage (box) {
   };
   box.querySelector('.my-page-on')?.addEventListener('click', () => setPublic(true));
   box.querySelector('.my-page-off')?.addEventListener('click', () => setPublic(false));
+  box.querySelector('.my-page-decorate')?.addEventListener('click', () => { if (typeof openHandleSettings === 'function') openHandleSettings(); });
   box.querySelector('.my-page-copy')?.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(myPageUrl()); showToast('Link copied', 'Paste it in your TikTok or Instagram bio.', 'success'); }
     catch { window.prompt('Copy your page link:', myPageUrl()); }

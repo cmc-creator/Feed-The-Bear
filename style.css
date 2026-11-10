@@ -2298,6 +2298,21 @@ body.celebrate-glow::before {
 .handle-card .handle-intro { margin: 0 18px 12px; overflow-wrap: anywhere; font-size: .9rem; color: var(--text-muted); line-height: 1.5; }
 .handle-card .friends-handle { margin: 0 18px; }
 
+/* ── Bear Cave setup (decorate your public page) ───────────── */
+.cave-setup { margin: 16px 18px 0; border-top: 1px solid var(--border); padding-top: 14px; }
+.cave-setup-title { font-weight: 800; font-size: 1rem; }
+.cave-setup-hint { font-size: .82rem; color: var(--text-dim); margin: 4px 0 10px; line-height: 1.45; }
+.cave-theme-row, .cave-decor-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.cave-theme-chip, .cave-decor-chip { border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 999px; padding: 8px 12px; font-size: .85rem; cursor: pointer; }
+.cave-theme-chip.on, .cave-decor-chip.on { background: var(--primary); border-color: transparent; color: #1b130b; font-weight: 700; }
+.cave-decor-chip:disabled { opacity: .4; cursor: default; }
+.cave-setup-preview { margin-top: 2px; }
+.cave-preview-banner { display: block; text-align: center; border-radius: 12px; padding: 12px 10px; font-size: .92rem; color: #f6ecdc; }
+.cave-theme-cozy { background: linear-gradient(135deg, #3a2a1a, #241a12); }
+.cave-theme-forest { background: linear-gradient(135deg, #1d3a24, #122019); }
+.cave-theme-neon { background: linear-gradient(135deg, #3d1a5c, #1c1030); }
+.cave-theme-pastel { background: linear-gradient(135deg, #4a3a52, #2b2430); }
+
 /* Byte Cub's chat: above everything, with his action buttons under a message. */
 .chat-panel { z-index: 300; }
 .chat-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: -2px 0 10px 44px; }
