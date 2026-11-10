@@ -98,6 +98,8 @@ const NEARBY = [
 
   // Header + and mobile + open Quick Add
   await p.click('#mobile-add-btn');
+  check(await p.locator('#add-choice').isVisible() && /I just ate/.test(await p.locator('#add-choice').innerText()), 'the + button offers Add a place or I just ate');
+  await p.click('.add-choice-place');
   check(await p.locator('#quick-add-overlay').isVisible(), 'the + button opens Quick Add');
   await closeAllDialogs(p);
 

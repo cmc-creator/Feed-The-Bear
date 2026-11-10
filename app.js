@@ -3711,7 +3711,7 @@ const PLAY_URL = 'https://play.google.com/store/apps/details?id=com.feedthebear.
    back to it never reloads. When a newer version is live (sw.js names it),
    refresh: quietly if nothing is open, else Byte Cub offers an Update button.
    APP_BUILD must match CACHE in sw.js (tests/version.test.js checks). */
-const APP_BUILD = 'ftb-v185';
+const APP_BUILD = 'ftb-v186';
 let _freshCheckedAt = 0;
 async function checkForNewBuild () {
   if (Date.now() - _freshCheckedAt < 5 * 60 * 1000 || !navigator.onLine) return;
@@ -5131,6 +5131,34 @@ function renderStatsView () {
 function openAddPlace () {
   if (window.Cub) window.Cub.openAdd(); else openAddModal();
 }
+
+// The gold + button: save a place, or log a meal you just had (Just Ate is
+// off the lean home, so it lives here, one tap away).
+function closeAddChoice () {
+  const el = document.getElementById('add-choice');
+  if (!el) return;
+  el.classList.add('closing');
+  setTimeout(() => el.remove(), 180);
+}
+function openAddChoice () {
+  if (document.getElementById('add-choice')) { closeAddChoice(); return; }
+  const el = document.createElement('div');
+  el.id = 'add-choice';
+  el.className = 'add-choice';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-modal', 'true');
+  el.setAttribute('aria-label', 'Add');
+  el.innerHTML = `<div class="add-choice-sheet">
+    <button type="button" class="add-choice-btn add-choice-place"><span class="add-choice-icon" aria-hidden="true">📍</span><span><strong>Add a place</strong><small>Somewhere to try, or one you love</small></span></button>
+    <button type="button" class="add-choice-btn add-choice-ate"><span class="add-choice-icon" aria-hidden="true">🍽️</span><span><strong>I just ate</strong><small>Log it in 10 seconds</small></span></button>
+  </div>`;
+  document.body.appendChild(el);
+  el.addEventListener('click', e => { if (e.target === el) closeAddChoice(); });
+  el.querySelector('.add-choice-place').addEventListener('click', () => { el.remove(); trackProductEvent('add_choice_place'); openAddPlace(); });
+  el.querySelector('.add-choice-ate').addEventListener('click', () => { el.remove(); trackProductEvent('add_choice_ate'); openJustAte(); });
+  el.querySelector('.add-choice-place').focus();
+}
+window.openAddChoice = openAddChoice;
 
 function renderAll () {
   // A soft ring on the Add button until someone has saved a few places.
@@ -8713,7 +8741,7 @@ function setupEvents () {
   document.getElementById('mobile-bottom-nav').addEventListener('click', e => {
   const btn = e.target.closest('.mobile-nav-btn, .mobile-nav-fab');
   if (!btn) return;
-  if (btn.id === 'mobile-add-btn')  { hapticTap('medium'); openAddPlace(); return; }
+  if (btn.id === 'mobile-add-btn')  { hapticTap('medium'); openAddChoice(); return; }
   if (btn.id === 'mobile-play-btn') { openMobileHub(); return; }
   if (!btn.dataset.view) return;
   hapticTap('light');

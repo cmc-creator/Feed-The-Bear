@@ -9,6 +9,7 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
   await p.waitForTimeout(1000);
   await closeAllDialogs(p);
   await p.click('#mobile-add-btn');
+  await p.click('.add-choice-place');
   check(await p.locator('.qa-input').isVisible() && await p.locator('.qa-import').isHidden(),
     'Add opens with a single place input and keeps bulk import out of the main path');
   await p.fill('.qa-input', 'Simple Taco Place');

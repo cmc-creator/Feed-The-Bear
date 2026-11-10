@@ -78,6 +78,8 @@
       <div class="panel" id="funnel-signup"></div>
       <div class="panel" id="funnel-welcome"></div>
       <div class="panel" id="funnel-money"></div>
+      <div class="panel" id="funnel-rating"></div>
+      <div class="panel" id="funnel-new"></div>
     </div>
     <div class="panel">
       <h2>Errors people hit</h2>
@@ -119,6 +121,10 @@ const LABELS = {
   account_created: 'Account created', first_spot_saved: 'First spot saved', bear_swipe_first_round: 'First Bear Swipe round',
   free_limit_hit: 'Hit the free spot limit', trial_started: 'Grizzly trial started', paid_signup: 'Paid Grizzly (no trial)', first_payment: 'First payment',
   trial_reminder_manage: 'Trial reminder: Manage tapped',
+  rate_prompt_shown: 'Rate prompt shown', rate_play_opened: 'Rate on Google Play tapped',
+  food_fight_throw: 'Food thrown at a friend', food_fight_hit: 'Got hit with food', food_fight_push_sent: 'Food fight push sent',
+  add_choice_place: '+ button: Add a place', add_choice_ate: '+ button: I just ate',
+  welcome_email_sent: 'Welcome email sent', welcome_nudge_push: 'Next-day nudge (push)', welcome_nudge_email: 'Next-day nudge (email)',
   decision_session_started: 'Decision started', decision_session_completed: 'Decision finished', decision_option_selected: 'Decision option picked',
 };
 const label = k => LABELS[k] || k.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
@@ -142,6 +148,8 @@ function demoData (n) {
       upgrade_cta_clicked: Math.round(base / 18), grizzly_upgraded: i % 4 ? 0 : 1,
       account_created: Math.round(base / 5), first_spot_saved: Math.round(base / 7), bear_swipe_first_round: Math.round(base / 10),
       trial_started: i % 3 ? 0 : 1, first_payment: i % 6 ? 0 : 1,
+      rate_prompt_shown: Math.round(base / 9), rate_play_opened: Math.round(base / 20), food_fight_throw: Math.round(base / 4), food_fight_hit: Math.round(base / 5),
+      add_choice_place: Math.round(base / 3), add_choice_ate: Math.round(base / 4), welcome_email_sent: Math.round(base / 5), welcome_nudge_push: Math.round(base / 15), welcome_nudge_email: Math.round(base / 12),
     }, errors: i % 5 ? {} : { a1: { m: "Cannot read properties of null (reading 'lat')", w: 'app.js:2240', n: 3 } } });
   }
   return { days: out };
@@ -208,6 +216,19 @@ function render (list) {
     ['Finished it', t('welcome_done')],
     ['Skipped it', t('welcome_skipped')],
   ]);
+  funnel('funnel-rating', 'Google Play ratings', [
+    ['Asked to rate', t('rate_prompt_shown')],
+    ['Tapped Rate on Google Play', t('rate_play_opened')],
+  ]);
+  countList('funnel-new', 'New features', [
+    ['Bear Swipe rounds played', t('bear_swipe_round_done')],
+    ['Food thrown at friends', t('food_fight_throw')],
+    ['Friends hit back (saw the splat)', t('food_fight_hit')],
+    ['+ button: Add a place', t('add_choice_place')],
+    ['+ button: I just ate', t('add_choice_ate')],
+    ['Welcome emails sent', t('welcome_email_sent')],
+    ['Next-day nudges sent', t('welcome_nudge_push') + t('welcome_nudge_email')],
+  ]);
   funnel('funnel-money', 'Grizzly upgrades', [
     ['Saw the upgrade screen', t('upgrade_modal_opened')],
     ['Tapped upgrade', t('upgrade_cta_clicked')],
@@ -231,6 +252,12 @@ function render (list) {
   $('rows').innerHTML = rows.length
     ? rows.map(([k, v]) => `<tr><td>${label(k)} <code>${k}</code></td><td class="n">${fmt(v)}</td><td class="n">${(v / list.length).toFixed(1)}</td></tr>`).join('')
     : '<tr><td colspan="3" class="muted">Nothing recorded in this range yet.</td></tr>';
+}
+
+// Plain counts, no percentages (these aren't steps of one journey).
+function countList (id, title, rows) {
+  const top = Math.max(1, ...rows.map(r => r[1]));
+  $(id).innerHTML = `<h2>${title}</h2>` + rows.map(([l, n]) => `<div class="step"><div class="step-head"><span>${l}</span><em>${fmt(n)}</em></div><div class="bar"><i style="width:${Math.round((n / top) * 100)}%"></i></div></div>`).join('');
 }
 
 function funnel (id, title, steps) {

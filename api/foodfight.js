@@ -15,6 +15,7 @@
    ════════════════════════════════════════════════════════════ */
 
 const admin = require('firebase-admin');
+const { bump } = require('./_count');
 
 const FOODS = {
   pie: ['🥧', 'a pie'], taco: ['🌮', 'a taco'], spaghetti: ['🍝', 'spaghetti'],
@@ -88,6 +89,7 @@ async function throwFood (db, fb, uid, body) {
   }
   const [emoji, what] = FOODS[food];
   const pushed = await pushTo(db, fb, target, `${name} threw ${what} at you! ${emoji}`, 'Splat! Tap to throw one back.');
+  if (pushed) await bump(db, fb, 'food_fight_push_sent');
   return { status: 200, ok: true, pair, food, me: result.score[uid] || 0, them: result.score[target] || 0, left: result.left, pushed };
 }
 
@@ -109,14 +111,16 @@ async function inbox (db, uid) {
 async function scores (db, uid, ids) {
   const list = [...new Set((Array.isArray(ids) ? ids : []).map(String).filter(x => ID_RE.test(x)))].slice(0, 50);
   const out = {};
+  const live = [];
   await Promise.all(list.map(async id => {
     const other = (await db.doc(`profiles/${id}`).get()).data()?.uid;
     if (!other || other === uid) return;
+    live.push(id);
     const pair = pairKey(uid, other);
     const f = (await db.doc(`foodfights/${pair}`).get()).data();
     if (f) out[id] = { pair, me: f.score?.[uid] || 0, them: f.score?.[other] || 0 };
   }));
-  return { scores: out };
+  return { scores: out, live };
 }
 
 module.exports = async function handler (req, res) {

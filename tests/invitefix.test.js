@@ -115,6 +115,7 @@ asGrizzly(); // uses Grizzly-only features
   const fab = await p.locator('#mobile-add-btn').boundingBox();
   check(fab && fab.y < 844, `the gold Add button is always on screen (y=${fab && Math.round(fab.y)})`);
   await p.click('#mobile-add-btn');
+  await p.click('.add-choice-place');
   await p.waitForTimeout(300);
   check(await p.locator('.qa-sheet:not(.hidden), #quick-add:not(.hidden), .qa-input').first().isVisible(), 'it opens Add a spot');
   await p.click('.qa-import-options summary');

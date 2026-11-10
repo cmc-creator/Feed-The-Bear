@@ -16,6 +16,7 @@
    ════════════════════════════════════════════════════════════ */
 
 const admin = require('firebase-admin');
+const { bump } = require('./_count');
 const { nationalList } = require('./food-events');
 const { refreshGuides } = require('./guide');
 const { expireVips } = require('./owner');
@@ -90,12 +91,12 @@ async function welcomeNudges (db, fb) {
     const tokens = (await db.doc(`pushTokens/${d.id}`).get()).data()?.tokens || [];
     if (tokens.length) {
       const r = await fb.messaging().sendEachForMulticast({ tokens, notification: { title, body }, data: { open: 'add' }, android: { notification: { tag: 'welcome-nudge' } } });
-      if (r.successCount) { sent++; continue; }
+      if (r.successCount) { sent++; await bump(db, fb, 'welcome_nudge_push'); continue; }
     }
     if (s.email && emailReady()) {
       const ok = await sendEmail({ to: s.email, name: s.name || '', tag: 'welcome-nudge', subject: title,
         html: emailHtml([body, '<a href="https://www.feed-the-bear.com/app.html?action=add" style="display:inline-block;background:#ff8a3d;color:#1b130b;font-weight:800;padding:12px 20px;border-radius:12px;text-decoration:none">Save my first spot</a>']) }).catch(() => false);
-      if (ok) sent++;
+      if (ok) { sent++; await bump(db, fb, 'welcome_nudge_email'); }
     }
   }
   return sent;

@@ -161,7 +161,9 @@
       box-shadow: 0 4px 20px rgba(255,107,53,.4);
     }
     .btn-hero-primary:hover { background: var(--primary-dk); transform: translateY(-2px); box-shadow: 0 8px 30px rgba(255,107,53,.5); }
-    .hero-play { display: inline-flex; align-items: center; gap: 10px; margin: -40px auto 44px; padding: 8px 18px; border-radius: 12px; background: #111; color: #fff; text-decoration: none; border: 1px solid #444; }
+    .hero-stores { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin: -40px auto 44px; }
+    .hero-play { display: inline-flex; align-items: center; gap: 10px; padding: 8px 18px; border-radius: 12px; background: #111; color: #fff; text-decoration: none; border: 1px solid #444; }
+    .hero-apple { position: relative; cursor: default; opacity: .92; }
     .hero-play span { display: grid; text-align: left; font-weight: 700; font-size: 1rem; line-height: 1.1; }
     .hero-play small { font-weight: 500; font-size: .66rem; letter-spacing: .04em; text-transform: uppercase; opacity: .85; }
     .btn-hero-secondary {
@@ -425,10 +427,16 @@
       <a href="auth.html?mode=signup" class="btn-hero-primary">Start For Free</a>
       <a href="auth.html?mode=signin" class="btn-hero-secondary">Sign In</a>
     </div>
-    <a class="hero-play" href="https://play.google.com/store/apps/details?id=com.feedthebear.app" rel="noopener">
-      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M4 2.6v18.8c0 .5.5.8.9.6l16.3-9.4c.4-.2.4-.8 0-1L4.9 2c-.4-.2-.9.1-.9.6z"/></svg>
-      <span><small>Get it on</small>Google Play</span>
-    </a>
+    <div class="hero-stores">
+      <a class="hero-play" href="https://play.google.com/store/apps/details?id=com.feedthebear.app" rel="noopener">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M4 2.6v18.8c0 .5.5.8.9.6l16.3-9.4c.4-.2.4-.8 0-1L4.9 2c-.4-.2-.9.1-.9.6z"/></svg>
+        <span><small>Get it on</small>Google Play</span>
+      </a>
+      <div class="hero-play hero-apple" role="img" aria-label="App Store: coming soon">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9-.1 0-2.7-1-2.7-4.1zM13.9 5c.7-.9 1.2-2 1-3.2-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.1 1.2.1 2.3-.6 3.1-1.5z"/></svg>
+        <span><small>Coming soon to the</small>App Store</span>
+      </div>
+    </div>
     <div class="hero-social-proof">
       <div class="hero-proof-kicker">Sniff. Swipe. Supper.</div>
       <span>Less app-juggling, more paw-picked meals.</span>

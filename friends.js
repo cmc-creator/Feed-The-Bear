@@ -508,10 +508,16 @@ function renderFriendsFeedHome () {
       <span>${escHtml(best.f.name)} has <strong>${best.n} spot${best.n === 1 ? '' : 's'}</strong> you don't have yet.</span>
       <button type="button" class="btn-sm btn-orange ff-new-see">See ${best.n === 1 ? 'it' : 'them'}</button>
     </div>` : '';
-  section.classList.toggle('hidden', !items.length && !nudge);
-  if (!items.length && !nudge) { list.innerHTML = ''; return; }
+  const hit = ffLastHit();
+  const fight = hit ? `<div class="fft-home">
+      <span class="fft-home-emoji" aria-hidden="true">${hit.emoji}</span>
+      <span class="fft-home-text"><strong>${escHtml(String(hit.name || 'A friend').split(/\s+/)[0])}</strong> hit you with ${escHtml(FF_WHAT[hit.food] || 'food')}!<small>Food fight: You ${hit.me} · ${escHtml(String(hit.name || 'Friend').split(/\s+/)[0])} ${hit.them}</small></span>
+      <button type="button" class="btn-sm btn-orange fft-home-back">Throw back</button>
+    </div>` : '';
+  section.classList.toggle('hidden', !items.length && !nudge && !fight);
+  if (!items.length && !nudge && !fight) { list.innerHTML = ''; return; }
   const mine = new Map((state.restaurants || []).map(r => [normalizeName(r.name), r]));
-  list.innerHTML = nudge + items.map((x, i) => {
+  list.innerHTML = fight + nudge + items.map((x, i) => {
     const who = `<strong>${escHtml(x.who.name)}</strong>`;
     const at = `<strong>${escHtml(x.n)}</strong>`;
     const stars = x.r ? ` <span class="ff-stars">${'★'.repeat(x.r)}</span>` : '';
@@ -530,6 +536,7 @@ function renderFriendsFeedHome () {
   list.querySelectorAll('.ff-save').forEach(b => b.addEventListener('click', () => saveFromFriend(items[Number(b.dataset.i)])));
   list.querySelectorAll('.ff-save-been').forEach(b => b.addEventListener('click', () => saveFromFriend(items[Number(b.dataset.i)], { status: 'visited' })));
   list.querySelector('.ff-new-see')?.addEventListener('click', () => openFriendSpots(best.f.data));
+  list.querySelector('.fft-home-back')?.addEventListener('click', () => openFriendThrow({ pair: hit.pair, name: hit.name }));
 }
 
 // A friend's spot: you pick whether you've been there or want to try it.
@@ -1587,7 +1594,7 @@ function friendCardHtml (f, { waiting = false } = {}) {
     ${f.data?.id ? `<div class="fft-score" data-id="${escHtml(f.data.id)}">${ffScoreLine(_ffScores[f.data.id], first)}</div>` : ''}
     <div class="fx-actions">
       <button type="button" class="btn-sm ${fresh ? 'btn-orange' : 'btn-ghost'} friend-spots" data-key="${escHtml(f.key)}">${fresh ? `${fresh} new spot${fresh === 1 ? '' : 's'}` : 'All their spots'}</button>
-      ${f.data?.id ? `<button type="button" class="btn-sm btn-ghost fx-throw" data-key="${escHtml(f.key)}" aria-label="Throw food at ${escHtml(first)}">🥧 Throw</button>` : ''}
+      ${f.data?.id ? `<button type="button" class="btn-sm btn-ghost fx-throw" data-key="${escHtml(f.key)}" data-id="${escHtml(f.data.id)}" aria-label="Throw food at ${escHtml(first)}"${_ffLive.has(f.data.id) ? '' : ' hidden'}>🥧 Throw</button>` : ''}
       ${page ? `<a class="btn-sm btn-ghost fx-page" href="/@${encodeURIComponent(page)}" target="_blank" rel="noopener">🐻 Bear Cave</a>`
         : f.data?.id ? `<button type="button" class="btn-sm btn-ghost fx-page-invite" data-key="${escHtml(f.key)}">Invite to make a Bear Cave page</button>` : ''}
     </div>
@@ -2033,6 +2040,20 @@ async function findFriendByHandle (raw) {
 const FF_FOODS = [['pie', '🥧', 'Pie'], ['taco', '🌮', 'Taco'], ['spaghetti', '🍝', 'Spaghetti'], ['donut', '🍩', 'Donut'], ['pizza', '🍕', 'Pizza'], ['cake', '🎂', 'Cake']];
 const FF_WHAT = { pie: 'a pie', taco: 'a taco', spaghetti: 'spaghetti', donut: 'a donut', pizza: 'pizza', cake: 'cake' };
 let _ffScores = {};
+let _ffLive = new Set();
+const FFT_LAST_KEY = 'ftb_foodfight_last_v1';
+// The last food thrown at you that you haven't answered (3 days at most).
+function ffLastHit () {
+  try {
+    const h = JSON.parse(localStorage.getItem(FFT_LAST_KEY));
+    if (!h || h.uid !== window._ftbUid || Date.now() - Date.parse(h.at) > 3 * 864e5) return null;
+    return h;
+  } catch { return null; }
+}
+function ffSetLastHit (h) {
+  try { if (h) localStorage.setItem(FFT_LAST_KEY, JSON.stringify({ ...h, uid: window._ftbUid })); else localStorage.removeItem(FFT_LAST_KEY); } catch { /* storage full */ }
+  if (typeof renderFriendsFeedHome === 'function') renderFriendsFeedHome();
+}
 async function ffApi (body) {
   const headers = { 'Content-Type': 'application/json', ...(typeof ftbApiHeaders === 'function' ? await ftbApiHeaders() : {}) };
   const resp = await fetch('/api/foodfight', { method: 'POST', headers, body: JSON.stringify(body) });
@@ -2050,6 +2071,8 @@ async function loadFoodFightScores () {
     const { ok, data } = await ffApi({ action: 'scores', ids });
     if (!ok) return;
     _ffScores = data.scores || {};
+    _ffLive = new Set(data.live || []);
+    document.querySelectorAll('.fx-throw[data-id]').forEach(b => { b.hidden = !_ffLive.has(b.dataset.id); });
     document.querySelectorAll('.fft-score[data-id]').forEach(el => {
       const f = getFriends().find(x => x.data?.id === el.dataset.id);
       el.innerHTML = ffScoreLine(_ffScores[el.dataset.id], String(f?.name || 'Friend').split(/\s+/)[0]);
@@ -2101,6 +2124,7 @@ function openFriendThrow ({ to = '', pair = '', name = 'Friend', av = '' } = {})
     }
     const d = res.data;
     if (to) _ffScores[to] = { pair: d.pair, me: d.me, them: d.them };
+    if (ffLastHit()?.pair === d.pair) ffSetLastHit(null);
     status.innerHTML = `<strong>Splat! 🎯</strong> You ${d.me} · ${escHtml(first)} ${d.them}`;
     trackProductEvent('food_fight_throw', { food, back: !!pair });
     setTimeout(() => {
@@ -2150,6 +2174,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
 
 function ffSplat (hits) {
   const h = hits[hits.length - 1];
+  ffSetLastHit(h);
   const first = String(h.name || 'A friend').split(/\s+/)[0];
   const others = hits.length - 1;
   const what = FF_WHAT[h.food] || 'food';

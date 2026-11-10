@@ -9791,3 +9791,21 @@ body:has(.share-nudge, #save-diary-nudge, #rate-prompt, .photo-reveal) #toast-co
 @keyframes fft-shake { 0%, 100% { transform: none; } 25% { transform: translateX(-6px) rotate(-4deg); } 60% { transform: translateX(5px) rotate(3deg); } }
 @keyframes fft-incoming { 0% { transform: translateY(-70vh) scale(.5) rotate(-40deg); } 70% { transform: translateY(-14vh) scale(1.25, .8) rotate(8deg); } 100% { transform: translateY(-18vh) scale(1.05) rotate(0); } }
 @media (prefers-reduced-motion: reduce) { .fft-flying, .fft-splat span, .fft-target.fft-hit, .fft-target.fft-hit::after, .fft-card { animation: none !important; } }
+
+/* ── Add: place or Just Ate ── */
+.add-choice { position: fixed; inset: 0; z-index: 1200; background: rgba(10, 8, 6, .45); display: flex; align-items: flex-end; justify-content: center; padding: 16px 16px calc(96px + env(safe-area-inset-bottom, 0px)); animation: add-choice-in .18s ease-out; }
+.add-choice.closing { opacity: 0; transition: opacity .18s; }
+.add-choice-sheet { width: min(420px, 100%); display: grid; gap: 10px; animation: add-choice-up .22s cubic-bezier(.2,.8,.3,1.1); }
+.add-choice-btn { display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px 18px; border-radius: 18px; border: 1px solid var(--border); background: var(--surface); color: var(--text, inherit); font: inherit; text-align: left; cursor: pointer; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+.add-choice-btn strong { display: block; font-size: 1.08rem; }
+.add-choice-btn small { display: block; opacity: .75; font-size: .85rem; margin-top: 2px; }
+.add-choice-icon { font-size: 1.8rem; line-height: 1; flex: none; }
+.add-choice-btn:active { transform: scale(.98); }
+@keyframes add-choice-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes add-choice-up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .add-choice, .add-choice-sheet { animation: none; } }
+
+.fft-home { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: color-mix(in srgb, var(--primary, #e8b15a) 14%, var(--surface2)); border: 1px solid color-mix(in srgb, var(--primary, #e8b15a) 40%, transparent); margin-bottom: 8px; }
+.fft-home-emoji { font-size: 1.8rem; line-height: 1; flex: none; }
+.fft-home-text { flex: 1; min-width: 0; }
+.fft-home-text small { display: block; opacity: .8; font-size: .8rem; margin-top: 2px; }

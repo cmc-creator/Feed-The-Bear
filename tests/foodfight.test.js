@@ -47,6 +47,7 @@ const JO = { v: 2, id: 'joshare12345', u: 'Jo Smith', w: [], ts: Date.now(), pic
   r = await call('connieUid01', { action: 'throw', to: 'joshare12345', food: 'pie', name: 'Connie' });
   check(r.status === 429 && /plenty of food/.test(r.error), 'three a day at the same friend');
   const sc = await call('connieUid01', { action: 'scores', ids: ['joshare12345', 'nobodyshare1'] });
+  check(sc.live.includes('joshare12345') && !sc.live.includes('nobodyshare1'), 'scores say which friends can be hit');
   check(sc.scores.joshare12345?.me === 3 && sc.scores.joshare12345.them === 1 && !sc.scores.nobodyshare1, `scores per friend (${JSON.stringify(sc.scores)})`);
 
   // ── In the app ──
@@ -59,7 +60,7 @@ const JO = { v: 2, id: 'joshare12345', u: 'Jo Smith', w: [], ts: Date.now(), pic
     const b = route.request().postDataJSON();
     posted.push(b);
     if (b.action === 'throw') return route.fulfill({ json: { ok: true, pair: 'a_b', food: b.food, me: 4, them: 2, left: 2, pushed: 1 } });
-    if (b.action === 'scores') return route.fulfill({ json: { scores: { joshare12345: { pair: 'a_b', me: 3, them: 2 } } } });
+    if (b.action === 'scores') return route.fulfill({ json: { scores: { joshare12345: { pair: 'a_b', me: 3, them: 2 } }, live: ['joshare12345'] } });
     if (b.action === 'inbox') { const hits = inboxHits; inboxHits = []; return route.fulfill({ json: { hits } }); }
     return route.fulfill({ status: 400, json: {} });
   });
@@ -68,7 +69,7 @@ const JO = { v: 2, id: 'joshare12345', u: 'Jo Smith', w: [], ts: Date.now(), pic
   await closeAllDialogs(p);
   await p.evaluate(j => { window._ftbUid = 'connieUid01'; saveFriends([{ key: `id:${j.id}`, name: j.u, data: j, savedAt: Date.now() }]); openFoodieFriends(); }, JO);
   await p.waitForTimeout(800);
-  check(await p.locator('.fx-throw').isVisible(), 'each friend has a Throw button');
+  check(await p.locator('.fx-throw').isVisible(), 'a friend whose profile is live has a Throw button');
   check(/Food fight: You 3 · Jo 2/.test(await p.locator('.fft-score').innerText()), 'with your running score');
   await p.evaluate(() => { window._ftbUid = 'connieUid01'; });
   await p.click('.fx-throw');
@@ -90,9 +91,16 @@ const JO = { v: 2, id: 'joshare12345', u: 'Jo Smith', w: [], ts: Date.now(), pic
   check(await p.locator('.fft-incoming').isVisible() && /Jo threw a pie at you! 🥧/.test(await p.locator('.fft-incoming .fft-title').innerText()), 'incoming food splats on screen');
   check(/You 4 · Jo 3/.test(await p.locator('.fft-incoming .fft-status').innerText()), 'with the score');
   await p.evaluate(() => { window._ftbUid = 'connieUid01'; });
-  await p.click('.fft-back');
-  await p.click('.fft-food[data-food="pie"]');
-  await p.waitForTimeout(400);
+  await p.click('.fft-wipe');
+  await p.waitForTimeout(300);
+  await p.evaluate(() => { window._ftbUid = 'connieUid01'; closeFoodieFriends?.(); renderFriendsFeedHome(); });
+  check(await p.locator('.fft-home').isVisible() && /Jo hit you with a pie!/.test(await p.locator('.fft-home').innerText()), 'wiped it off? Home keeps a Throw back card');
+  await p.click('.fft-home-back');
+  await p.waitForTimeout(300);
+  await p.evaluate(() => { window._ftbUid = 'connieUid01'; });
+  await p.click('.fft-food[data-food="pie"]').catch(() => {});
+  await p.waitForTimeout(1600);
+  check(await p.locator('.fft-home').count() === 0, 'throwing back clears it');
   check(posted.some(b => b.action === 'throw' && b.pair === 'a_b' && b.food === 'pie'), 'Throw one back answers the same fight');
   await p.screenshot({ path: path.join(__dirname, 'shots', 'foodfight.png') }).catch(() => {});
   check(!p.errors.length, `no page errors ${p.errors.join(' | ')}`);

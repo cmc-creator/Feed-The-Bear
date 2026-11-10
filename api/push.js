@@ -20,6 +20,7 @@
 
 const admin = require('firebase-admin');
 const { sendEmail, emailHtml, emailReady, esc } = require('./_email');
+const { bump } = require('./_count');
 
 const MAX_TOKENS = 5;
 const MAX_FOLLOWS = 50;
@@ -143,7 +144,7 @@ async function joined (db, fb, uid) {
         'Three things to do first (about a minute):<br>1. <b>Save 3 spots</b> you love or want to try. Tap the big + button.<br>2. <b>Play Bear Swipe</b> on Home so the bear learns what you like.<br>3. <b>Turn on location</b> to see the best food near you right now.',
         '<a href="https://www.feed-the-bear.com/app.html" style="display:inline-block;background:#ff8a3d;color:#1b130b;font-weight:800;padding:12px 20px;border-radius:12px;text-decoration:none">Open Feed The Bear</a>',
       ]),
-    }).then(ok => ok && ref.set({ welcomedAt: new Date().toISOString() }, { merge: true }))
+    }).then(ok => ok && Promise.all([ref.set({ welcomedAt: new Date().toISOString() }, { merge: true }), bump(db, fb, 'welcome_email_sent')]))
       .catch(err => console.warn('[FTB] welcome email failed:', err.message));
   }
 
