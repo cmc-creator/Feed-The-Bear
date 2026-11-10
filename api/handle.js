@@ -6,7 +6,7 @@
    are rate-limited, so the list can't be scraped.
    X-FTB-Token: <Firebase ID token> on every call.
      GET  ?q=connie                         -> { found, u, id }   (id = live profile share id)
-     GET  ?mine=1                           -> { handle }
+     GET  ?mine=1                           -> { handle }   (plus public, views, joins, votes, earnings)
      POST { action: 'claim', handle, id }   -> { handle }   (409 if taken)
      POST { action: 'release' }             -> { ok }
      POST { action: 'followed', id, me }    -> { ok }   (you follow profile `id`; `me` is your own profile)
@@ -86,7 +86,12 @@ module.exports = async function handler (req, res) {
         const handle = (await db.doc(`handleOf/${uid}`).get()).data()?.handle || '';
         const h = handle ? (await db.doc(`handles/${handle}`).get()).data() || {} : {};
         const earn = (await db.doc(`creatorEarnings/${uid}`).get()).data() || {};
-        return res.status(200).json({ handle, public: !!h.public, views: Number(h.views) || 0, joins: Number(h.joins) || 0,
+        // How many people love your Bear Cave page (cave-vote.js).
+        let votes = 0;
+        if (h.id && typeof db.collection === 'function') {
+          try { votes = (await db.collection(`caveVotes/${h.id}/votes`).get()).size; } catch { votes = 0; }
+        }
+        return res.status(200).json({ handle, public: !!h.public, views: Number(h.views) || 0, joins: Number(h.joins) || 0, votes,
           earnedCents: Number(earn.earnedCents) || 0, owedCents: Number(earn.owedCents) || 0 });
       }
       // The public Bear Cave pages of people you follow (?pagesOf=id1,id2):
