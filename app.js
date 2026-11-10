@@ -1343,6 +1343,9 @@ async function switchAccountData (uid, isCurrent, captured = captureAccountData(
   loadData();
   updateProfileVisuals(loadUserProfile() || { name: 'Foodie', avatar: DEFAULT_AVATAR });
   renderAll();
+  // Sign-in has settled: a returning user whose avatar picker opened before
+  // auth resolved goes to the diary; a genuine new user gets the picker.
+  if (typeof recheckProfileSetup === 'function') recheckProfileSetup();
 }
 
 // Map tags saved from Discover ("steak_house", "mexican;pizza", "regional") read like a person wrote them.
@@ -1884,7 +1887,10 @@ const UI_MOTION = new Set(['playful', 'reduced']);
 function loadUserProfile () {
   if (window._ftbAccountSwitching) return null;
   const owner = localStorage.getItem('ftb_data_owner_v1') || localStorage.getItem('ftb_uid_v1');
-  if (owner && owner !== window._ftbUid) return null;
+  // Before sign-in resolves the uid is still unknown: don't treat the saved
+  // profile as someone else's just because we don't know who is signed in
+  // yet. Once auth settles the uid is set (or null) and the check applies.
+  if (owner && window._ftbUid !== undefined && owner !== window._ftbUid) return null;
   try {
     const profile = JSON.parse(localStorage.getItem(USER_KEY)) || null;
     if (!profile) return null;
@@ -1916,18 +1922,39 @@ function persistAppearanceProfile () {
   saveUserProfile({ ...base, visualUpdatedAt: base.visualUpdatedAt ?? base.updatedAt ?? 0, appearance });
 }
 
-function initUserProfile () {
+// Re-decide the profile setup once sign-in has settled. A returning user
+// whose picker opened before auth resolved is sent to the diary; a genuine
+// new user is shown the picker. Never re-opens the picker while it is
+// already open, so what the user typed isn't wiped. The picker is only
+// offered on the first decision of the session (a fresh open) — an account
+// switch later must not pop it open.
+let _profileSetupDecided = false;
+function recheckProfileSetup (openIfMissing = true) {
+  const overlay = document.getElementById('profile-setup-overlay');
   const profile = loadUserProfile();
-  if (!profile) {
-    // Show full-screen signup immediately - suppress onboarding for new users
-    const ob = document.getElementById('onboarding-overlay');
-    if (ob) ob.classList.add('hidden');
-    state.settings.onboardingDone = true;
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
-    openProfileSetup();
-  } else {
+  if (profile) {
+    if (overlay) overlay.classList.add('hidden');
     updateProfileVisuals(profile);
+    _profileSetupDecided = true;
+    return;
   }
+  if (!openIfMissing) return;
+  if (overlay && !overlay.classList.contains('hidden')) { _profileSetupDecided = true; return; }
+  // Sign-in hasn't settled yet (returning user, uid still unknown): don't
+  // trap them on the avatar picker. Auth re-checks once the account is
+  // restored.
+  if (!window._ftbAuthReady || window._ftbAccountSwitching || window._ftbUid === undefined) return;
+  if (_profileSetupDecided) return;
+  _profileSetupDecided = true;
+  const ob = document.getElementById('onboarding-overlay');
+  if (ob) ob.classList.add('hidden');
+  state.settings.onboardingDone = true;
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); } catch { /* private mode */ }
+  openProfileSetup();
+}
+
+function initUserProfile () {
+  recheckProfileSetup();
 }
 
 function updateHeaderAvatar (emoji) {

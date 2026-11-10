@@ -1181,6 +1181,10 @@ async function handleFirebaseUser (user) {
       if (!isCurrent()) return;
       updateAuthUI(null);
       if (wasSignedIn && !_signingOut) showToast('Please sign in again', 'Your session ended. Your diary is kept for this account and is hidden until you sign back in.', 'info');
+      // Sign-in settled with no account: a guest whose avatar picker opened
+      // before auth resolved goes to the diary (don't open the picker here —
+      // the sign-in sheet is the new-guest flow).
+      if (typeof recheckProfileSetup === 'function') recheckProfileSetup(false);
       if (typeof refreshSharedRealtimeSubscriptions === 'function') refreshSharedRealtimeSubscriptions();
       // Back from Stripe but signed out here (e.g. it opened in a browser, not the app)
       if (_getPendingSession()) {
