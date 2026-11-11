@@ -1,12 +1,16 @@
 // App Store signing for the iPhone build, with no Mac and no registered devices:
 // through the App Store Connect key it makes a distribution certificate and an
-// App Store profile for this run, and removes both afterwards (builds already
-// sent to Apple are not affected).
+// App Store profile for this run. Both are KEPT afterwards: deleting the
+// certificate revokes it, and Apple then rejects the uploaded binary as an
+// invalid signature (ITMS-90035) when the version is submitted for review.
+// Old FTB CI certificates are removed only when the account hits the
+// certificate limit (see makeCertificate's 409 handling).
 //
 //   node asc-sign.js setup  <dir>   writes <dir>/key.pem's certificate as
 //                                   <dir>/cert.pem and <dir>/profile.mobileprovision;
 //                                   prints NAME=, UUID=, CERT_ID=, PROFILE_ID= lines
-//   node asc-sign.js cleanup        removes CERT_ID and PROFILE_ID (from env)
+//   node asc-sign.js cleanup        keeps CERT_ID and PROFILE_ID (from env);
+//                                   removes nothing, by design (see above)
 //
 // Env: KEY_ID, ISSUER_ID, KEY_FILE (the .p8, already cleaned up), BUNDLE_ID.
 const crypto = require('crypto');
@@ -82,9 +86,12 @@ async function setup (dir) {
 }
 
 async function cleanup () {
-  if (process.env.PROFILE_ID) await api('DELETE', `/v1/profiles/${process.env.PROFILE_ID}`).catch(e => console.log(e.message));
-  if (process.env.CERT_ID) await api('DELETE', `/v1/certificates/${process.env.CERT_ID}`).catch(e => console.log(e.message));
-  console.log('Removed this build\'s certificate and profile.');
+  // Do NOT delete the certificate or profile: deleting the certificate
+  // revokes it, and Apple then rejects this build's binary as an invalid
+  // signature (ITMS-90035) when the version is submitted for review.
+  // The certificate stays valid for this build; old FTB CI certificates
+  // are removed only if the account hits the certificate limit.
+  console.log('Keeping this build\'s certificate and profile so the binary stays valid through review.');
 }
 
 (process.argv[2] === 'cleanup' ? cleanup() : setup(process.argv[3]))
