@@ -73,7 +73,7 @@ const JO = { v: 2, id: 'joshare12345', u: 'Jo Smith', w: [], ts: Date.now(), pic
   check(/Food fight: You 3 · Jo 2/.test(await p.locator('.fft-score').innerText()), 'with your running score');
   await p.evaluate(() => { window._ftbUid = 'connieUid01'; });
   await p.click('.fx-throw');
-  check(await p.locator('.fft-overlay .fft-food').count() === 6 && /Throw something at Jo!/.test(await p.locator('.fft-title').innerText()), 'pick a food to throw at Jo');
+  check(await p.locator('.fft-overlay .fft-food').count() === 25 && /Throw something at Jo!/.test(await p.locator('.fft-title').innerText()), 'pick a food to throw at Jo (25 to choose from)');
   await p.click('.fft-food[data-food="taco"]');
   await p.waitForTimeout(700);
   check(posted.some(b => b.action === 'throw' && b.to === 'joshare12345' && b.food === 'taco'), 'the taco is thrown at Jo');

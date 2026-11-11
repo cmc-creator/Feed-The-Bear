@@ -9855,12 +9855,13 @@ body:has(.share-nudge, #save-diary-nudge, #rate-prompt, .photo-reveal) #toast-co
 .fft-target.fft-hit { animation: fft-shake .45s ease-out; }
 .fft-target.fft-hit::after { content: attr(data-splat); position: absolute; inset: 0; display: grid; place-items: center; font-size: 3.4rem; animation: fft-squish .5s ease-out forwards; }
 .fft-status { margin: 0 0 12px; font-size: .95rem; }
-.fft-foods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.fft-foods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-height: 42vh; overflow-y: auto; padding-right: 2px; }
 .fft-food { display: grid; gap: 2px; justify-items: center; padding: 10px 4px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface2); color: inherit; font: inherit; cursor: pointer; }
 .fft-food span { font-size: 2rem; line-height: 1; }
 .fft-food small { font-size: .75rem; opacity: .8; }
 .fft-food:active { transform: scale(.94); }
 .fft-flying { position: fixed; z-index: 9001; font-size: 2.4rem; pointer-events: none; transform: translate(-50%, -50%); animation: fft-fly .52s cubic-bezier(.3,.6,.4,1) forwards; }
+.fft-drip { position: fixed; top: -8vh; z-index: 9001; pointer-events: none; line-height: 1; opacity: .95; filter: drop-shadow(0 4px 8px rgba(0,0,0,.35)); animation: fft-drip 1.6s ease-in forwards; }
 .fft-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 .fft-more { margin: 0 0 8px; font-size: .9rem; opacity: .8; }
 .fft-splat { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; }
@@ -9871,7 +9872,8 @@ body:has(.share-nudge, #save-diary-nudge, #rate-prompt, .photo-reveal) #toast-co
 @keyframes fft-squish { 0% { transform: scale(.4); } 60% { transform: scale(1.35, .8); } 100% { transform: scale(1.15, .95); } }
 @keyframes fft-shake { 0%, 100% { transform: none; } 25% { transform: translateX(-6px) rotate(-4deg); } 60% { transform: translateX(5px) rotate(3deg); } }
 @keyframes fft-incoming { 0% { transform: translateY(-70vh) scale(.5) rotate(-40deg); } 70% { transform: translateY(-14vh) scale(1.25, .8) rotate(8deg); } 100% { transform: translateY(-18vh) scale(1.05) rotate(0); } }
-@media (prefers-reduced-motion: reduce) { .fft-flying, .fft-splat span, .fft-target.fft-hit, .fft-target.fft-hit::after, .fft-card { animation: none !important; } }
+@keyframes fft-drip { 0% { transform: translateY(0) rotate(-8deg) scale(1); opacity: .95; } 70% { opacity: .85; } 100% { transform: translateY(115vh) rotate(14deg) scale(.85); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .fft-flying, .fft-splat span, .fft-target.fft-hit, .fft-target.fft-hit::after, .fft-card, .fft-drip { animation: none !important; } }
 
 /* ── Add: place or Just Ate ── */
 .add-choice { position: fixed; inset: 0; z-index: 1200; background: rgba(10, 8, 6, .45); display: flex; align-items: flex-end; justify-content: center; padding: 16px 16px calc(96px + env(safe-area-inset-bottom, 0px)); animation: add-choice-in .18s ease-out; }

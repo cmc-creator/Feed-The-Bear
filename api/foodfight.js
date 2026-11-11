@@ -21,6 +21,13 @@ const { sendMulticast } = require('./_push');
 const FOODS = {
   pie: ['🥧', 'a pie'], taco: ['🌮', 'a taco'], spaghetti: ['🍝', 'spaghetti'],
   donut: ['🍩', 'a donut'], pizza: ['🍕', 'a slice of pizza'], cake: ['🎂', 'cake'],
+  burger: ['🍔', 'a burger'], hotdog: ['🌭', 'a hot dog'], sushi: ['🍣', 'sushi'],
+  ramen: ['🍜', 'ramen'], icecream: ['🍦', 'an ice cream'], cupcake: ['🧁', 'a cupcake'],
+  cookie: ['🍪', 'a cookie'], popcorn: ['🍿', 'popcorn'], fries: ['🍟', 'fries'],
+  sandwich: ['🥪', 'a sandwich'], burrito: ['🌯', 'a burrito'], pancake: ['🥞', 'a pancake'],
+  waffle: ['🧇', 'a waffle'], cheese: ['🧀', 'cheese'], egg: ['🍳', 'an egg'],
+  bacon: ['🥓', 'bacon'], corn: ['🌽', 'corn'], apple: ['🍎', 'an apple'],
+  pretzel: ['🥨', 'a pretzel'],
 };
 const PER_DAY = 10;      // throws a day, in all
 const PER_FRIEND = 3;    // throws a day at the same friend

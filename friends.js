@@ -2253,8 +2253,64 @@ async function findFriendByHandle (raw) {
    and next time they open the app it lands on their screen with a splat;
    they can throw one back. A running score per pair of friends; a few
    throws a day (api/foodfight.js keeps it fair). */
-const FF_FOODS = [['pie', '🥧', 'Pie'], ['taco', '🌮', 'Taco'], ['spaghetti', '🍝', 'Spaghetti'], ['donut', '🍩', 'Donut'], ['pizza', '🍕', 'Pizza'], ['cake', '🎂', 'Cake']];
-const FF_WHAT = { pie: 'a pie', taco: 'a taco', spaghetti: 'spaghetti', donut: 'a donut', pizza: 'pizza', cake: 'cake' };
+const FF_FOODS = [['pie', '🥧', 'Pie'], ['taco', '🌮', 'Taco'], ['spaghetti', '🍝', 'Spaghetti'], ['donut', '🍩', 'Donut'], ['pizza', '🍕', 'Pizza'], ['cake', '🎂', 'Cake'], ['burger', '🍔', 'Burger'], ['hotdog', '🌭', 'Hot Dog'], ['sushi', '🍣', 'Sushi'], ['ramen', '🍜', 'Ramen'], ['icecream', '🍦', 'Ice Cream'], ['cupcake', '🧁', 'Cupcake'], ['cookie', '🍪', 'Cookie'], ['popcorn', '🍿', 'Popcorn'], ['fries', '🍟', 'Fries'], ['sandwich', '🥪', 'Sandwich'], ['burrito', '🌯', 'Burrito'], ['pancake', '🥞', 'Pancake'], ['waffle', '🧇', 'Waffle'], ['cheese', '🧀', 'Cheese'], ['egg', '🍳', 'Egg'], ['bacon', '🥓', 'Bacon'], ['corn', '🌽', 'Corn'], ['apple', '🍎', 'Apple'], ['pretzel', '🥨', 'Pretzel']];
+const FF_WHAT = { pie: 'a pie', taco: 'a taco', spaghetti: 'spaghetti', donut: 'a donut', pizza: 'pizza', cake: 'cake', burger: 'a burger', hotdog: 'a hot dog', sushi: 'sushi', ramen: 'ramen', icecream: 'an ice cream', cupcake: 'a cupcake', cookie: 'a cookie', popcorn: 'popcorn', fries: 'fries', sandwich: 'a sandwich', burrito: 'a burrito', pancake: 'a pancake', waffle: 'a waffle', cheese: 'cheese', egg: 'an egg', bacon: 'bacon', corn: 'corn', apple: 'an apple', pretzel: 'a pretzel' };
+
+// Wet splat sound when food lands (Web Audio, no file needed).
+let _ffSplatAudioCtx = null;
+function playSplatSfx () {
+  const ACtx = window.AudioContext || window.webkitAudioContext;
+  if (!ACtx) return;
+  try {
+    if (!_ffSplatAudioCtx) _ffSplatAudioCtx = new ACtx();
+    const ctx = _ffSplatAudioCtx;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    const now = ctx.currentTime;
+    const duration = 0.22;
+    const noiseBuffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * duration), ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(900, now);
+    filter.frequency.exponentialRampToValueAtTime(140, now + duration);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.5, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    noise.connect(filter).connect(gain).connect(ctx.destination);
+    noise.start(now);
+    // Low thump underneath.
+    const thump = ctx.createOscillator();
+    thump.type = 'sine';
+    thump.frequency.setValueAtTime(160, now);
+    thump.frequency.exponentialRampToValueAtTime(55, now + 0.16);
+    const thumpGain = ctx.createGain();
+    thumpGain.gain.setValueAtTime(0.35, now);
+    thumpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    thump.connect(thumpGain).connect(ctx.destination);
+    thump.start(now);
+    thump.stop(now + 0.2);
+  } catch { /* sound is a bonus, never break the game */ }
+}
+
+// Blobs of the food drip down the overlay and fade away.
+function ffDrips (ov, emoji, n = 7) {
+  if (!ov || !ov.isConnected) return;
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement('span');
+    d.className = 'fft-drip';
+    d.textContent = emoji;
+    d.setAttribute('aria-hidden', 'true');
+    d.style.left = `${4 + Math.random() * 88}%`;
+    d.style.fontSize = `${1.1 + Math.random() * 1.1}rem`;
+    d.style.animationDelay = `${Math.random() * 0.45}s`;
+    d.style.animationDuration = `${1.1 + Math.random() * 0.9}s`;
+    ov.appendChild(d);
+    setTimeout(() => d.remove(), 2600);
+  }
+}
 let _ffScores = {};
 let _ffLive = new Set();
 const FFT_LAST_KEY = 'ftb_foodfight_last_v1';
@@ -2369,6 +2425,8 @@ function ffFly (ov, from, emoji) {
     el.remove();
     target.classList.add('fft-hit');
     target.dataset.splat = emoji;
+    playSplatSfx();
+    ffDrips(ov, emoji);
   }, 520);
 }
 
@@ -2411,6 +2469,8 @@ function ffSplat (hits) {
     </div>
   </div>`;
   document.body.appendChild(ov);
+  playSplatSfx();
+  ffDrips(ov, h.emoji, 9);
   if (typeof hapticTap === 'function') hapticTap('heavy');
   ov.querySelector('.fft-wipe').addEventListener('click', () => {
     closeFriendThrow();

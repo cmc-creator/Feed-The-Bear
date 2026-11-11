@@ -111,7 +111,7 @@ function openFoodMatch () {
 }
 
 /* ── Food Fight ───────────────────────────────────────────── */
-const FIGHT_FOODS = ['🍕', '🌮', '🍩', '🍔', '🍗', '🥧', '🍰', '🌭'];
+const FIGHT_FOODS = ['🍕', '🌮', '🍩', '🍔', '🍗', '🥧', '🍰', '🌭', '🍣', '🍜', '🍦', '🧁', '🍪', '🍿', '🍟', '🥪', '🌯', '🥞', '🧇', '🧀', '🍳', '🥓', '🌽', '🍎', '🥨'];
 function openFoodFight () {
   const body = gameOverlay('Food Fight');
   if (_gameStop) _gameStop();
