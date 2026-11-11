@@ -2113,6 +2113,35 @@ async function renderMyHandle () {
    For a TikTok or Instagram bio. Off until you turn it on. */
 let _myPage = { public: false, views: 0, joins: 0, votes: 0 };
 function myPageUrl () { return `https://www.feed-the-bear.com/@${_myHandle}`; }
+
+/* ── "My Cave" header button: go to your own cave page ──
+   Signed in with a live page → open your cave (/ @you).
+   Signed in but no username yet, or the page is off → open the cave setup
+   (pick a username, turn the page on, decorate).
+   Not signed in → sign in first. */
+async function openMyCave () {
+  if (!window._ftbUid) {
+    if (typeof openAuthModal === 'function') openAuthModal();
+    return;
+  }
+  // Make sure the username / page state is loaded before deciding.
+  if (_myHandleFor !== window._ftbUid) { _myHandle = null; _myHandleFor = window._ftbUid; }
+  if (_myHandle === null) {
+    try {
+      const { ok, data } = await handleApi('GET', { query: '?mine=1' });
+      if (ok) {
+        _myHandle = data.handle || '';
+        _myPage = { public: !!data.public, views: Number(data.views) || 0, joins: Number(data.joins) || 0, votes: Number(data.votes) || 0, earnedCents: Number(data.earnedCents) || 0, owedCents: Number(data.owedCents) || 0 };
+      }
+    } catch { /* offline: fall through to the setup, which shows the state */ }
+  }
+  if (!_myHandle || !_myPage?.public) {
+    if (typeof openHandleSettings === 'function') openHandleSettings();
+    return;
+  }
+  window.open(myPageUrl(), '_blank', 'noopener');
+}
+window.openMyCave = openMyCave;
 function myPageHtml () {
   const intro = '<strong>Your public page</strong><span>Put a link in your TikTok or Instagram bio. Anyone can see your top spots and what to order, then join free and follow you. When someone who joined goes Grizzly, you get a free month.</span>';
   if (!_myHandle) return `<div class="my-page">${intro}<span class="my-page-note">Pick your username first (button above), then you can turn your page on.</span></div>`;

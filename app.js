@@ -8587,6 +8587,7 @@ function setupEvents () {
   document.getElementById('empty-import-btn')?.addEventListener('click', () => showImportBookmarks());
   document.getElementById('header-invite-btn')?.addEventListener('click', () => { hapticTap('light'); inviteFriend(); });
   document.getElementById('header-friends-btn')?.addEventListener('click', () => { hapticTap('light'); openFoodieFriends(); });
+  document.getElementById('header-cave-btn')?.addEventListener('click', () => { hapticTap('light'); if (typeof openMyCave === 'function') openMyCave(); });
   document.getElementById('chat-hide-cub-btn')?.addEventListener('click', () => { closeChat(); window.Cub?.hide?.(); });
   // Links on a spot (detail page)
   const addDetailLink = () => {

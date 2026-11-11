@@ -2229,6 +2229,17 @@ body.celebrate-glow::before {
 }
 @media (max-width: 420px) { .header-invite-btn span { display: none; } .header-invite-btn { width: 32px; padding: 0; justify-content: center; } }
 
+/* Small "My Cave" button in the header, next to Invite. Warm wood brown so it
+   reads as a cave, distinct from Invite's gold. Collapses to just the bear
+   icon on phones so it stays visible and compact. */
+.header-cave-btn {
+  display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 11px; cursor: pointer;
+  border-radius: 999px; font: inherit; font-size: .76rem; font-weight: 800; color: #2a1a05;
+  background: linear-gradient(135deg, #e0aa6e, #a96f35); border: 1px solid #ffd9a8;
+}
+.header-cave-btn .cave-btn-icon { font-size: .95rem; line-height: 1; }
+@media (max-width: 600px) { .header-cave-btn .cave-btn-label { display: none; } .header-cave-btn { width: 32px; padding: 0; justify-content: center; } }
+
 /* Friends in the header: a moss ring with sunlight sliding around it.
    Phones give it the Invite button's spot (Invite is first in Friends). */
 .moss-friends-btn {
