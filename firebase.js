@@ -609,6 +609,16 @@ async function fbSaveProfileCloud (uid, profile) {
   // from the client or the whole write gets rejected. Friends sync on their
   // own (fbSaveFriendsCloud), so a stale copy here can't overwrite them.
   const { plan, stripeCustomerId, stripeSessionId, upgradedAt, friends, friendsAt, profileShareId, ...safe } = profile;
+  // The public cave page reads the points total from this doc when the
+  // live profile's copy is stale, so keep it here too — but only when
+  // the total is really above zero: a failed count must never wipe a
+  // stored total.
+  try {
+    if (typeof cavePoints === 'function') {
+      const total = Math.max(0, Math.floor(Number(cavePoints().total) || 0));
+      if (total > 0) safe.pts = total;
+    }
+  } catch { /* points stay as they were */ }
   try { await _db.doc(`users/${uid}/meta/profile`).set(safe, { merge: true }); }
   catch (err) {
     console.warn('[FTB] Profile backup failed:', err);

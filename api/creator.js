@@ -196,11 +196,36 @@ module.exports = async function handler (req, res) {
     const name = str(profile.u || h.u || handle, 30);
     const picks = cleanPicks(profile.profile?.picks);
     const orders = picks.reduce((n, p) => n + p.g.length, 0);
-    // The cave (theme + decorations) rides in the live profile.
-    const cave = normalizeCave(profile.profile?.cave);
+    // The cave (theme + decorations) rides in the live profile — but that
+    // doc is published with a full overwrite from whatever the phone had
+    // at the time, so one publish from a device that hadn't loaded the
+    // saved cave yet wipes it back to the cozy default (and the points
+    // with it), and the page then shows the default until a good publish
+    // lands. The profile under users/{uid}/meta/profile is the source of
+    // truth: it is merge-written, keyed by the stable uid (not the share
+    // id, which can change), and it carries the saved cave, the points
+    // total, and the photo. Read it and let it win whenever the live
+    // profile has fallen back to the default. A failed read must never
+    // break the page: live-only is the fallback.
+    let saved = {};
+    try { saved = (await db.doc(`users/${h.uid}/meta/profile`).get()).data() || {}; } catch { saved = {}; }
+    const liveCave = normalizeCave(profile.profile?.cave);
+    const savedCave = normalizeCave(saved.cave);
+    const isDefaultCave = c => c.theme === 'cozy' && c.decor.length === 2 && c.decor[0] === 'lights' && c.decor[1] === 'plant';
+    const cave = !isDefaultCave(savedCave) ? savedCave : liveCave;
     const decorRow = cave.decor.map(id => `<span>${CAVE_DECOR[id]}</span>`).join('');
-    const cavePts = Math.max(0, Math.floor(Number(profile.profile?.pts) || 0));
+    const livePts = Math.max(0, Math.floor(Number(profile.profile?.pts) || 0));
+    const savedPts = Math.max(0, Math.floor(Number(saved.pts) || 0));
+    const cavePts = livePts > 0 ? livePts : savedPts;
     const pointsRow = cavePts > 0 ? `<div class="cave-points">⭐ ${cavePts} cave point${cavePts === 1 ? '' : 's'}</div>` : '';
+    // The header shows the creator's own photo when the saved profile has
+    // one (a compressed data URL or an https link); otherwise the bear.
+    const photoSrc = (() => {
+      const p = String(saved.photo || '');
+      if (/^https:\/\//i.test(p) && p.length <= 300) return p;
+      if (/^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(p) && p.length <= 300000) return p;
+      return '/feedbear-sm.jpg';
+    })();
     const voteBox = `<div class="cave-vote">
   <button type="button" id="cave-vote-btn" data-share="${esc(h.id)}">🐻 Love this cave?</button>
   <div id="cave-vote-count" class="cave-vote-count"></div>
@@ -266,7 +291,7 @@ module.exports = async function handler (req, res) {
       theme: cave.theme,
       body: `<main>
   <header>
-    <img class="bear" src="/feedbear-sm.jpg" alt="" />
+    <img class="bear" src="${esc(photoSrc)}" alt="" />
     <h1>${esc(name)}'s food spots</h1>
     <div class="handle">@${esc(handle)}</div>
     <div class="cave-scene"><div class="cave-decor" aria-hidden="true">${decorRow}</div>
