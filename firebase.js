@@ -828,7 +828,8 @@ var FriendPings = (() => {
     p.addListener('registration', ({ value }) => { call('register', { token: tokenFor(value) }); syncFollows(true); });
     p.addListener('registrationError', err => console.warn('[FTB] push registration failed:', err?.error || err));
     // Tapping one opens what it's about: contests in Play, your Want to Try
-    // list (api/nudges.js), or Friends.
+    // list (api/nudges.js), Tonight's Pick at dinner time, your Bear Cave
+    // for a win-back, or Friends.
     p.addListener('pushNotificationActionPerformed', a => {
       const open = a?.notification?.data?.open;
       setTimeout(() => {
@@ -836,6 +837,8 @@ var FriendPings = (() => {
         else if (open === 'add') (window.Cub?.openAdd || window.openAddModal)?.();
         else if (open === 'contests') window.openFoodEvents?.();
         else if (open === 'want') window.setView?.('want-to-try');
+        else if (open === 'tonight') document.getElementById('tonight-btn')?.click();
+        else if (open === 'cave') window.openHandleSettings?.();
         else if (open === 'foodfight') window.checkFoodFight?.({ force: true });
         else window.openFoodieFriends?.();
       }, 400);
@@ -1627,7 +1630,7 @@ function openUpgradeModal (highlightFeature) {
   }
   overlay.classList.remove('hidden');
   document.body.classList.add('overlay-open');
-  _setUpgradePlan(pitch?.period || 'yearly'); // default to yearly (best value)
+  _setUpgradePlan(pitch?.period || 'monthly'); // default to monthly — the cheapest first step; yearly stays on screen as best value
   _refreshTrialOffer();
   if (typeof trackProductEvent === 'function') trackProductEvent('upgrade_modal_opened', { feature: pitch?.key || String(highlightFeature || 'general').slice(0, 40) });
 }

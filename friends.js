@@ -104,9 +104,12 @@ const DEFAULT_CAVE = { theme: 'cozy', decor: ['lights', 'plant'], furniture: [] 
 // Derived from what you've actually done, so it can never double-count
 // and a fresh install credits everything you already did.
 // - total: activity points (spots, dishes, visits, lists).
-// - bonus: daily check-in bonuses (+5/day, stored in the profile).
-// - lifetime: total + bonus, never below the stored high-water mark, so
-//   deleting a spot never takes an unlock away.
+// - bonus: daily check-in bonuses (stored in the profile, caveBonus).
+// - fun: small awards for the playful parts — food-fight wins, daily
+//   challenges, gifts, votes, invites, sharing your cave (stored in
+//   the profile, caveFun; see awardCaveFun).
+// - lifetime: total + bonus + fun, never below the stored high-water
+//   mark, so deleting a spot never takes an unlock away.
 // - spent: points used in the Cave Shop (stored in the profile).
 // - balance: what you can spend right now (lifetime - spent, never below 0).
 const CAVE_POINTS = { spot: 10, dish: 5, visit: 5, list: 10 };
@@ -123,10 +126,37 @@ function cavePoints () {
     + visits * CAVE_POINTS.visit + lists * CAVE_POINTS.list;
   const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
   const bonus = Math.max(0, Math.floor(Number(profile.caveBonus) || 0));
+  const fun = Math.max(0, Math.floor(Number(profile.caveFun) || 0));
   const spent = Math.max(0, Math.floor(Number(profile.caveSpent) || 0));
   const storedLifetime = Math.max(0, Math.floor(Number(profile.caveLifetime) || 0));
-  const lifetime = Math.max(total + bonus, storedLifetime);
-  return { total, spots: spots.length, dishes, visits, lists, bonus, spent, lifetime, balance: Math.max(0, lifetime - spent) };
+  const lifetime = Math.max(total + bonus + fun, storedLifetime);
+  return { total, spots: spots.length, dishes, visits, lists, bonus, fun, spent, lifetime, balance: Math.max(0, lifetime - spent) };
+}
+// Fun points: small awards for the playful parts of the app — food-fight
+// wins (+5), a food-fight score of 50+ (+10), finishing the daily
+// challenge (+10), giving a gift (+5), loving a cave (+2), a friend
+// joining from your invite (+50), sharing your cave (+10). They count
+// toward lifetime (and therefore the Fireplace / Shelf / Bar Cart
+// unlocks) exactly like activity points. Each award is guarded by a
+// per-day key in the profile (caveFunDays), so nothing here can be
+// farmed in a loop. Server-side awards (invite joins, gifts received)
+// write the same caveFun field.
+const CAVE_FUN_AWARDS = { fightWin: 5, fight50: 10, challenge: 10, giftGiven: 5, giftReceived: 5, vote: 2, inviteJoin: 50, caveShare: 10 };
+function awardCaveFun (amount, key) {
+  if (!window._ftbUid) return { ok: false, reason: 'signedout' };
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || null;
+  if (!profile) return { ok: false, reason: 'noprofile' };
+  const pts = cavePoints();
+  const today = new Date().toDateString();
+  const days = { ...((profile.caveFunDays && typeof profile.caveFunDays === 'object') ? profile.caveFunDays : {}) };
+  if (key && days[key] === today) return { ok: false, reason: 'done' };
+  if (key) days[key] = today;
+  const fun = pts.fun + amount;
+  if (typeof saveUserProfile === 'function') {
+    saveUserProfile({ ...profile, caveFun: fun, caveFunDays: days,
+      caveLifetime: Math.max(pts.total + pts.bonus + fun, pts.lifetime) });
+  }
+  return { ok: true, fun };
 }
 // Unlocks are sticky: once a tier is earned it stays unlocked even if the
 // points total later drops (a deleted spot never takes your fireplace away).
@@ -478,21 +508,84 @@ function usePantryFood (id) {
   if (typeof saveUserProfile === 'function') saveUserProfile({ ...profile, pantry });
   return true;
 }
-// Daily check-in: +5 points the first time the app opens each day, for a
-// signed-in user with a profile. The toast is the celebration. Runs once
-// per day per account (caveBonusDate), so reopening the app does not farm it.
-const CAVE_DAILY_BONUS = 5;
+
+/* ── Mystery Box: the recurring points sink ──
+   Every other shop item is a one-time purchase, so a bear who owns
+   everything has nothing left to want and no reason to keep earning.
+   The Mystery Box costs 100 points and hands over one random decor
+   piece you don't own yet (points decor and luxury decor only — never
+   a Grizzly piece). When you own every decor piece there is nothing
+   left to win, so the box says so instead of taking your points. */
+const MYSTERY_BOX_PRICE = 100;
+function mysteryBoxPool () {
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
+  const owned = new Set(Array.isArray(profile.caveOwnedDecor) ? profile.caveOwnedDecor : []);
+  return Object.entries(CAVE_SHOP_DECOR).filter(([id, d]) => !d.grizzly && !owned.has(id));
+}
+function buyMysteryBox () {
+  const pool = mysteryBoxPool();
+  if (!pool.length) return { ok: false, reason: 'allowned' };
+  const pts = cavePoints();
+  if (pts.balance < MYSTERY_BOX_PRICE) return { ok: false, reason: 'points', need: MYSTERY_BOX_PRICE - pts.balance };
+  const [id, item] = pool[Math.floor(Math.random() * pool.length)];
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || { name: 'Foodie', avatar: DEFAULT_AVATAR, joinDate: new Date().toISOString() };
+  const owned = [...new Set([...(Array.isArray(profile.caveOwnedDecor) ? profile.caveOwnedDecor : []), id])];
+  if (typeof saveUserProfile === 'function') {
+    saveUserProfile({ ...profile, caveSpent: (Number(profile.caveSpent) || 0) + MYSTERY_BOX_PRICE, caveLifetime: pts.lifetime, caveOwnedDecor: owned });
+  }
+  return { ok: true, id, label: item.label };
+}
+// Daily check-in streak: coming back every day pays more, and every
+// 7th day also drops a bonus decor piece you don't own yet (base points
+// decor only — never a Grizzly piece). Missing a day resets the streak
+// to day 1; there is no punishment beyond the reset. The streak lives
+// in the profile (caveStreak / caveStreakDate) so it follows the
+// account, and the rewards are daily bonuses, so they count toward
+// lifetime exactly like the old flat +5.
+const CAVE_STREAK_REWARDS = [5, 5, 10, 10, 15, 15, 25];
+function caveStreakInfo () {
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
+  return { streak: Math.max(0, Math.floor(Number(profile.caveStreak) || 0)), date: String(profile.caveStreakDate || '') };
+}
 function grantDailyBonus () {
   if (!window._ftbUid) return false;
   const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || null;
   if (!profile) return false;
   const today = new Date().toDateString();
   if (profile.caveBonusDate === today) return false;
-  if (typeof saveUserProfile === 'function') {
-    saveUserProfile({ ...profile, caveBonus: (Number(profile.caveBonus) || 0) + CAVE_DAILY_BONUS, caveBonusDate: today, caveLifetime: cavePoints().lifetime });
+  const yesterday = new Date(Date.now() - 86400000).toDateString();
+  const streak = profile.caveStreakDate === yesterday ? Math.max(0, Math.floor(Number(profile.caveStreak) || 0)) + 1 : 1;
+  const reward = CAVE_STREAK_REWARDS[Math.min(streak, 7) - 1];
+  const pts = cavePoints();
+  const next = { ...profile, caveBonus: (Number(profile.caveBonus) || 0) + reward, caveBonusDate: today,
+    caveStreak: streak, caveStreakDate: today,
+    caveLifetime: Math.max(pts.total + pts.bonus + pts.fun + reward, pts.lifetime) };
+  // Day 7 (and every 7th day after): a bonus decor piece you don't own
+  // yet. If you own them all, it's just the points.
+  let bonusDecor = null;
+  if (streak % 7 === 0) {
+    const owned = new Set(Array.isArray(profile.caveOwnedDecor) ? profile.caveOwnedDecor : []);
+    const pool = Object.entries(CAVE_SHOP_DECOR).filter(([id, d]) => !d.grizzly && !d.luxury && !owned.has(id));
+    if (pool.length) {
+      bonusDecor = pool[Math.floor(Math.random() * pool.length)];
+      next.caveOwnedDecor = [...new Set([...(Array.isArray(profile.caveOwnedDecor) ? profile.caveOwnedDecor : []), bonusDecor[0]])];
+    }
   }
-  if (typeof showToast === 'function') showToast('Daily bonus', `+${CAVE_DAILY_BONUS} cave points for stopping by! Come back tomorrow for more.`, 'success');
+  if (typeof saveUserProfile === 'function') saveUserProfile(next);
+  if (typeof showToast === 'function') {
+    showToast('Daily bonus', `+${reward} cave points for stopping by! ${streak}-day streak${bonusDecor ? ` — day 7! You also got the ${bonusDecor[1].label}.` : ' — come back tomorrow for more.'}`, 'success');
+  }
   return true;
+}
+// A reward notice the server left on your profile (e.g. a friend joined
+// from your invite: +50 cave points). Show it once, then clear it so it
+// never repeats.
+function drainCaveRewardNotice () {
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || null;
+  if (!profile || !profile.caveRewardNotice) return;
+  const text = String(profile.caveRewardNotice.text || '');
+  if (typeof saveUserProfile === 'function') saveUserProfile({ ...profile, caveRewardNotice: null });
+  if (text && typeof showToast === 'function') showToast('A friend joined!', text, 'success');
 }
 
 // The name friends see: the one you typed, else your Google first name.
@@ -2252,6 +2345,8 @@ function renderCaveSetup () {
   const themeBox = document.getElementById('cave-theme-picks');
   const decorBox = document.getElementById('cave-decor-picks');
   if (!themeBox || !decorBox) return;
+  // The home card shows the same balance, so it stays fresh too.
+  if (typeof renderMyCaveHome === 'function') renderMyCaveHome();
   // Earn the unlocks the moment they cross a tier, so the picker shows them.
   const fresh = refreshCaveUnlocks();
   let cave = getCave();
@@ -2264,7 +2359,7 @@ function renderCaveSetup () {
       pointsBox.innerHTML = `<b>${pts.total} points</b> <span>(${pts.spots} spot${pts.spots === 1 ? '' : 's'} · ${pts.dishes} dish${pts.dishes === 1 ? '' : 'es'} rated · ${pts.visits} visit${pts.visits === 1 ? '' : 's'} · ${pts.lists} list${pts.lists === 1 ? '' : 's'} shared)</span>`
         + `<span class="cave-points-balance">${pts.balance} to spend in the <button type="button" class="cave-shop-link" id="cave-shop-open-link">Cave Shop</button></span>`
         + `<span class="cave-points-next">${next ? `Next unlock: ${next.label} at ${next.points} points` : 'Every decoration unlocked!'}</span>`
-        + `<span class="cave-points-earn">Save a spot +${CAVE_POINTS.spot} · Rate a dish +${CAVE_POINTS.dish} · Log a visit +${CAVE_POINTS.visit} · Share a list +${CAVE_POINTS.list} · Daily visit +${CAVE_DAILY_BONUS}</span>`;
+        + `<span class="cave-points-earn">Save a spot +${CAVE_POINTS.spot} · Rate a dish +${CAVE_POINTS.dish} · Log a visit +${CAVE_POINTS.visit} · Share a list +${CAVE_POINTS.list} · Daily visit +${CAVE_STREAK_REWARDS[0]} to +${CAVE_STREAK_REWARDS[6]} (streak) · Food fight win +${CAVE_FUN_AWARDS.fightWin} · Daily challenge +${CAVE_FUN_AWARDS.challenge}</span>`;
     }
     // Gifts a visitor left on your public cave page (api/cave-gift.js).
     // Food is already in your pantry; decor waits for you to claim it.
@@ -2383,6 +2478,30 @@ function renderCaveSetup () {
   draw();
 }
 
+// My Cave home card: your cave scene, your points, your streak, and how
+// far the next unlock is — the thing you're earning points for, on the
+// screen you see every day. Tapping it opens the Cave Shop. Rendered
+// from renderCaveSetup too, so the balance never goes stale.
+function renderMyCaveHome () {
+  const card = document.getElementById('my-cave-home');
+  if (!card) return;
+  const pts = cavePoints();
+  const cave = getCave();
+  const theme = caveThemeInfo(cave.theme) || {};
+  const img = document.getElementById('my-cave-home-img');
+  if (img && theme.photo) { img.src = '/assets/caves/' + theme.photo; img.alt = (theme.label || 'My cave'); }
+  const title = document.getElementById('my-cave-home-title');
+  if (title) title.textContent = theme.label || 'My Bear Cave';
+  const streak = caveStreakInfo().streak;
+  const next = nextCaveUnlock();
+  const meta = document.getElementById('my-cave-home-meta');
+  if (meta) {
+    meta.textContent = `${pts.balance} points to spend${streak > 0 ? ` · ${streak}-day streak` : ''}${next ? ` · ${next.points - pts.lifetime} more to ${next.label}` : ' · every decoration unlocked'}`;
+  }
+  card.classList.remove('hidden');
+}
+window.renderMyCaveHome = renderMyCaveHome;
+
 function closeFoodieFriends () {
   document.getElementById('friends-overlay').classList.add('hidden');
   maybeHideOverlay();
@@ -2405,12 +2524,13 @@ function renderCaveShop () {
   const luxRoomGrid = document.getElementById('cave-shop-luxury-rooms');
   const luxDecorGrid = document.getElementById('cave-shop-luxury-decor');
   const pantryGrid = document.getElementById('cave-shop-pantry');
-  if (!themeGrid || !decorGrid || !furnGrid || !roomGrid || !luxRoomGrid || !luxDecorGrid || !pantryGrid) return;
+  const mysteryGrid = document.getElementById('cave-shop-mystery');
+  if (!themeGrid || !decorGrid || !furnGrid || !roomGrid || !luxRoomGrid || !luxDecorGrid || !pantryGrid || !mysteryGrid) return;
   const pts = cavePoints();
   const cave = getCave();
   if (balanceEl) {
     balanceEl.innerHTML = `<b>${pts.balance} points to spend</b><span>${pts.lifetime} earned all time · ${pts.spent} spent</span>`
-      + `<span class="cave-shop-earn">Save a spot +${CAVE_POINTS.spot} · Rate a dish +${CAVE_POINTS.dish} · Log a visit +${CAVE_POINTS.visit} · Share a list +${CAVE_POINTS.list} · Daily visit +${CAVE_DAILY_BONUS}</span>`;
+      + `<span class="cave-shop-earn">Save a spot +${CAVE_POINTS.spot} · Rate a dish +${CAVE_POINTS.dish} · Log a visit +${CAVE_POINTS.visit} · Share a list +${CAVE_POINTS.list} · Daily visit +${CAVE_STREAK_REWARDS[0]} to +${CAVE_STREAK_REWARDS[6]} (streak) · Food fight win +${CAVE_FUN_AWARDS.fightWin} · Daily challenge +${CAVE_FUN_AWARDS.challenge}</span>`;
   }
   const card = (kind, id, item) => {
     const owned = caveShopOwns(kind, id);
@@ -2465,6 +2585,19 @@ function renderCaveShop () {
   roomGrid.innerHTML = Object.entries(CAVE_SHOP_ROOMS).filter(([, r]) => !r.luxury).map(([id, r]) => card('room', id, r)).join('');
   luxRoomGrid.innerHTML = Object.entries(CAVE_SHOP_ROOMS).filter(([, r]) => r.luxury).map(([id, r]) => card('room', id, r)).join('');
   pantryGrid.innerHTML = Object.entries(CAVE_PANTRY).map(([id, p]) => pantryCard(id, p)).join('');
+  // Mystery Box: the recurring sink — 100 points for a random decor
+  // piece you don't own yet. When there's nothing left to win, it says so.
+  const pool = mysteryBoxPool();
+  mysteryGrid.innerHTML = `<article class="cave-shop-item mystery-box-item">
+    <img src="/assets/caves/decor-crystal.jpg" alt="Mystery Box" loading="lazy" onerror="this.style.display='none'" />
+    <div class="cave-shop-item-body"><b>Mystery Box</b>
+    <span class="cave-shop-rarity rarity-epic">Weekly surprise</span>
+    <span class="cave-shop-price">${pool.length ? 'A random decor piece you don\'t own yet' : 'You own every decor piece'}</span></div>
+    ${!pool.length
+      ? '<button type="button" class="btn-sm btn-secondary" disabled>All yours</button>'
+      : pts.balance >= MYSTERY_BOX_PRICE
+        ? `<button type="button" class="btn-sm btn-primary" data-mystery-buy>Open · ${MYSTERY_BOX_PRICE} pts</button>`
+        : `<button type="button" class="btn-sm btn-secondary" disabled>Need ${MYSTERY_BOX_PRICE - pts.balance} more</button>`}</article>`;
 }
 function openCaveShop () {
   const overlay = document.getElementById('cave-shop-overlay');
@@ -2527,6 +2660,16 @@ document.addEventListener('click', e => {
     if (res.ok) showToast('Added to your pantry', `${item.label} is in your pantry (${res.count}). Throw it in a food fight!`, 'success');
     else if (res.reason === 'points') showToast('Not enough points yet', `You need ${res.need} more points for ${item.label}. Save a spot or come back tomorrow for your daily bonus.`, 'info');
     renderCaveShop();
+    return;
+  }
+  const mysteryBuy = e.target.closest('[data-mystery-buy]');
+  if (mysteryBuy) {
+    const res = buyMysteryBox();
+    if (res.ok) showToast('Mystery Box!', `You got the ${res.label}. Tap Use it in Decorations to put it in your cave.`, 'success');
+    else if (res.reason === 'points') showToast('Not enough points yet', `You need ${res.need} more points for a Mystery Box. Save a spot or come back tomorrow for your daily bonus.`, 'info');
+    else if (res.reason === 'allowned') showToast('You own them all', 'There is no decor left to win — new pieces land in the shop soon.', 'info');
+    renderCaveShop();
+    if (typeof renderCaveSetup === 'function') renderCaveSetup();
     return;
   }
   const grz = e.target.closest('[data-shop-grizzly]');
@@ -2789,14 +2932,24 @@ function wireMyPage (box) {
   box.querySelector('.my-page-off')?.addEventListener('click', () => setPublic(false));
   box.querySelector('.my-page-decorate')?.addEventListener('click', () => { if (typeof openHandleSettings === 'function') openHandleSettings(); });
   box.querySelector('.my-page-copy')?.addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(myPageUrl()); showToast('Link copied', 'Paste it in your TikTok or Instagram bio.', 'success'); }
+    try {
+      await navigator.clipboard.writeText(myPageUrl());
+      // Sharing your cave is +10 cave points, once a day — the cave is
+      // the thing you show off, so showing it off pays.
+      const res = (typeof awardCaveFun === 'function') ? awardCaveFun(CAVE_FUN_AWARDS.caveShare, 'caveShare') : { ok: false };
+      showToast('Link copied', res.ok ? 'Paste it in your TikTok or Instagram bio. +10 cave points for sharing your cave.' : 'Paste it in your TikTok or Instagram bio.', 'success');
+    }
     catch { window.prompt('Copy your page link:', myPageUrl()); }
     trackProductEvent('public_page_copied');
   });
   box.querySelector('.my-page-share')?.addEventListener('click', async () => {
     trackProductEvent('public_page_shared');
     if (!navigator.share) { box.querySelector('.my-page-copy')?.click(); return; }
-    try { await navigator.share({ title: 'My food spots', text: 'Where I eat and what to order:', url: myPageUrl() }); }
+    try {
+      await navigator.share({ title: 'My food spots', text: 'Where I eat and what to order:', url: myPageUrl() });
+      const res = (typeof awardCaveFun === 'function') ? awardCaveFun(CAVE_FUN_AWARDS.caveShare, 'caveShare') : { ok: false };
+      if (res.ok && typeof showToast === 'function') showToast('Shared!', '+10 cave points for sharing your cave.', 'success');
+    }
     catch { /* closed the share sheet */ }
   });
 }

@@ -42,12 +42,18 @@ module.exports = async function handler (req, res) {
     const body = (req.method === 'POST' && req.body && typeof req.body === 'object') ? req.body : {};
     const share = String(req.method === 'GET' ? (req.query?.share || '') : (body.share || '')).trim();
     const voter = String(req.method === 'GET' ? (req.query?.voter || '') : (body.voter || '')).trim();
+    // The signed-in uid, when the voter is also signed into the app on
+    // this device (the public page sends it). Only ever used to reject
+    // an owner's vote for their own cave — never to grant anything.
+    const uid = String(body.uid || '').trim();
     if (!ID_RE.test(share)) return res.status(400).json({ error: 'That cave link does not look right.' });
     if (!VOTER_RE.test(voter)) return res.status(400).json({ error: 'Something is off with that vote.' });
+    if (uid && !/^[A-Za-z0-9]{10,64}$/.test(uid)) return res.status(400).json({ error: 'Something is off with that vote.' });
 
     // The cave must exist: a live profile with this share id.
     const profile = await db.doc(`profiles/${share}`).get();
     if (!profile.exists) return res.status(404).json({ error: 'That cave was not found.' });
+    const ownerUid = profile.data()?.uid;
 
     const votesRef = db.collection(`caveVotes/${share}/votes`);
     const countVotes = async () => (await votesRef.get()).size;
@@ -61,13 +67,20 @@ module.exports = async function handler (req, res) {
     if (body.action !== 'vote' && body.action !== 'unvote') return res.status(400).json({ error: 'Unknown action' });
     if (await overLimit(`cavevote:${ip}`, 60, 600)) return res.status(429).json({ error: 'Slow down a little and try again soon.' });
 
+    // You can't vote for your own cave — that would inflate Cave of the Day.
+    if (body.action === 'vote' && uid && ownerUid && uid === ownerUid) {
+      return res.status(403).json({ error: 'You can\'t vote for your own cave.', reason: 'own-cave' });
+    }
+
     const ref = db.doc(`caveVotes/${share}/votes/${voter}`);
     if (body.action === 'vote') {
       const snap = await votesRef.get();
       if (!snap.docs.some(d => d.id === voter) && snap.size >= MAX_VOTERS) {
         return res.status(409).json({ error: 'This cave has enough love for now.' });
       }
-      await ref.set({ at: new Date().toISOString() });
+      // The uid is stored when the voter is signed in, so Cave of the
+      // Day can exclude an owner's vote even if one slips through.
+      await ref.set({ at: new Date().toISOString(), ...(uid ? { uid } : {}) });
     } else {
       await ref.delete();
     }

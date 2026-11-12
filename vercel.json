@@ -47,6 +47,7 @@
   ],
   "crons": [
     { "path": "/api/digest", "schedule": "0 16 * * 4" },
-    { "path": "/api/nudges", "schedule": "0 16 * * *" }
+    { "path": "/api/nudges", "schedule": "0 16 * * *" },
+    { "path": "/api/nudges?dinner=1", "schedule": "30 0 * * *" }
   ]
 }

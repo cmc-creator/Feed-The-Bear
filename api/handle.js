@@ -187,7 +187,30 @@ module.exports = async function handler (req, res) {
       const cur = (await ref.get()).data();
       if (!cur || cur.owner === uid || (cur.joinedUid && cur.joinedUid !== uid)) return res.status(200).json({ ok: false });
       const now = new Date().toISOString();
+      const firstJoin = !cur.joinedUid;
       await ref.set({ ...cur, openedAt: cur.openedAt || now, joinedAt: cur.joinedAt || now, joinedUid: uid, joinedId: me, joinedName: String(mine.u || 'Friend').slice(0, 30) });
+      // Instant invite reward: +50 cave points for the inviter the
+      // moment a friend joins (the free month still waits until they go
+      // Grizzly — see api/_referral.js). Once per friend, guarded by
+      // the invite's joinedUid and by a per-friend day key, so a
+      // re-join can never pay twice. A failure here never fails the join.
+      if (firstJoin && cur.owner) {
+        try {
+          const ownerRef = db.doc(`users/${cur.owner}/meta/profile`);
+          await db.runTransaction(async tx => {
+            const snap = await tx.get(ownerRef);
+            const p = snap.exists ? (snap.data() || {}) : {};
+            const days = { ...(p.caveFunDays || {}) };
+            const key = `invite:${uid}`;
+            if (days[key]) return;
+            days[key] = new Date().toISOString().slice(0, 10);
+            const fun = Math.max(0, Math.floor(Number(p.caveFun) || 0)) + 50;
+            tx.set(ownerRef, { caveFun: fun, caveFunDays: days,
+              caveLifetime: Math.max(Math.floor(Number(p.caveLifetime) || 0), fun + Math.floor(Number(p.caveBonus) || 0)),
+              caveRewardNotice: { text: 'Your friend joined — +50 cave points', at: new Date().toISOString() } }, { merge: true });
+          });
+        } catch (err) { console.error('[FTB] invite join reward failed:', err.message); }
+      }
       return res.status(200).json({ ok: true });
     }
 

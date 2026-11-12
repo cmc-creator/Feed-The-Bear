@@ -1346,8 +1346,12 @@ async function switchAccountData (uid, isCurrent, captured = captureAccountData(
   // Sign-in has settled: a returning user whose avatar picker opened before
   // auth resolved goes to the diary; a genuine new user gets the picker.
   if (typeof recheckProfileSetup === 'function') recheckProfileSetup();
-  // Daily check-in: +5 cave points the first time the app opens each day.
+  // Daily check-in: +5 to +25 cave points the first time the app opens
+  // each day (a streak — see grantDailyBonus in friends.js).
   if (typeof grantDailyBonus === 'function') grantDailyBonus();
+  // A reward notice the server left on the profile (a friend joined from
+  // your invite: +50 cave points). Shown once, then cleared.
+  if (typeof drainCaveRewardNotice === 'function') drainCaveRewardNotice();
 }
 
 // Map tags saved from Discover ("steak_house", "mexican;pizza", "regional") read like a person wrote them.
@@ -11876,6 +11880,7 @@ const TOOL_ACTIONS = {
   'rooms':            () => openDinnerRooms(),
   'discover':         () => openDiscover(),
   'challenge':        () => openChallenges(),
+  'dailychallenge':  () => openDailyChallenge(),
   'gallery':          () => openGallery(),
   'compare':          () => toggleCompareMode(),
   'budget':           () => openBudget(),
@@ -11958,7 +11963,7 @@ const HUB_SECTIONS = [
   ['beenawhile','⏰','Been a While'], ['stats-view','📈','My Stats'], ['stats2','📊','Deep Stats'],
   ]},
   { title: 'Games & rewards', items: [
-  ['challenge','🎯','Challenges'], ['achievements','🏅','Achievements'],
+  ['challenge','🎯','Challenges'], ['dailychallenge','☀️','Daily Challenge'], ['achievements','🏅','Achievements'],
   ['bingo','🎱','Cuisine Bingo'],
   ]},
   { title: 'Plan a food day', items: [
@@ -15516,6 +15521,8 @@ function initHomeDiscoverySection () {
   renderTodayVibeRow();
   stageHomeModules();
   renderCaveOfTheDayHome();
+  if (typeof renderMyCaveHome === 'function') renderMyCaveHome();
+  if (typeof renderDailyChallengeHome === 'function') renderDailyChallengeHome();
   renderForYouHome();
   renderWeeklyRecapHome();
   renderMoodPicksHome();

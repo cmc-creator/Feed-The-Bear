@@ -55,11 +55,22 @@ function closeGame () {
 function gameOver (body, { game, headline, line, score, lowerWins = false, again, share }) {
   const best = noteGameBest(game, score, lowerWins);
   const xp = typeof awardXp === 'function' ? awardXp(Math.max(5, Math.min(40, Math.round(score / (lowerWins ? 1 : 5)))), headline, { quiet: true }) : '';
+  // Food Fight feeds the cave economy: a win (score 20+, the bears are
+  // full) is +5 cave points once a day, and scoring 50+ is the daily
+  // food-fight challenge for +10 once a day. Both go through
+  // awardCaveFun so they can't be farmed in a loop.
+  let fightAward = '';
+  if (game === 'fight' && window._ftbUid && typeof awardCaveFun === 'function') {
+    const win = score >= 20 ? awardCaveFun(5, 'fightWin') : null;
+    const fifty = score >= 50 ? awardCaveFun(10, 'fight50') : null;
+    const total = (win?.ok ? 5 : 0) + (fifty?.ok ? 10 : 0);
+    if (total) fightAward = `<br>+${total} cave points!`;
+  }
   if (typeof hapticTap === 'function') hapticTap('medium');
   if (typeof trackProductEvent === 'function') trackProductEvent('game_played', { game, best });
   body.insertAdjacentHTML('beforeend', `<div class="game-over" role="status">
     <div class="game-over-big">${escHtml(headline)}</div>
-    <p>${line}${best ? '<br><strong>New best!</strong>' : ''}${xp ? `<br>You're now a ${escHtml(xp)}!` : ''}</p>
+    <p>${line}${best ? '<br><strong>New best!</strong>' : ''}${fightAward}${xp ? `<br>You're now a ${escHtml(xp)}!` : ''}</p>
     <div class="game-over-actions"><button type="button" class="btn-primary game-again">Play again</button><button type="button" class="btn-ghost game-share">Challenge a friend</button></div></div>`);
   body.querySelector('.game-again').addEventListener('click', again);
   body.querySelector('.game-share').addEventListener('click', () => {
@@ -123,7 +134,7 @@ function openFoodFight () {
   _gameStop = () => { over = true; clearInterval(tick); timers.forEach(clearTimeout); timers.clear(); };
   const best = gameBest('fight');
   body.innerHTML = `<div class="game-hud"><span>Score <b id="fight-score">0</b></span><span>Time <b id="fight-time">${ROUND}</b></span><span>Best <b>${best || 'none yet'}</b></span></div>
-    <p class="game-hint">Toss food to the hungry bears before they duck! Don't feed the 🦝 raccoon.</p>
+    <p class="game-hint">Toss food to the hungry bears before they duck! Don't feed the 🦝 raccoon. Score 50 today for +10 cave points.</p>
     <div class="fight-grid">${Array.from({ length: 9 }, (_, i) => `<div class="fight-hole" data-i="${i}"><div class="fight-table"></div></div>`).join('')}</div>
     <div class="fight-start"><button type="button" class="btn-primary" id="fight-go">Start</button></div>`;
   const holes = [...body.querySelectorAll('.fight-hole')];

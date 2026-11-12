@@ -394,6 +394,31 @@ module.exports = async function handler (req, res) {
 </div>
 <script>
 (function () {
+  // The cave owner viewing their own page: no vote button, no gift
+  // section, no follow CTA — you can't vote for, gift, or follow your
+  // own cave. The page is server-rendered and doesn't know who the
+  // viewer is, so the signed-in uid comes from localStorage (the same
+  // keys the app uses) and the owner uid is embedded in the page.
+  var ownerUid = ${JSON.stringify(h.uid)};
+  window.__ftbOwnerUid = ownerUid;
+  function signedInUid () {
+    try { return localStorage.getItem('ftb_data_owner_v1') || localStorage.getItem('ftb_uid_v1') || ''; } catch (e) { return ''; }
+  }
+  window.__ftbSignedInUid = signedInUid;
+  function isOwner () { var uid = signedInUid(); return !!uid && uid === ownerUid; }
+  window.__ftbIsOwner = isOwner;
+  // +2 cave points for loving a cave (once per cave per day, only if
+  // you're signed into the app on this device). Verified server-side
+  // against the vote itself (api/cave-points.js). The gift script below
+  // reuses this.
+  window.awardCavePoints = function (action, shareId, voterId) {
+    try {
+      var uid = signedInUid();
+      if (!uid) return;
+      fetch('/api/cave-points', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: action, share: shareId, voter: voterId, uid: uid }) }).catch(function () {});
+    } catch (e) { /* private mode */ }
+  };
   var btn = document.getElementById('cave-vote-btn');
   var count = document.getElementById('cave-vote-count');
   if (!btn || !count) return;
@@ -407,20 +432,29 @@ module.exports = async function handler (req, res) {
     }
   } catch (e) { voter = 'anon'; }
   var voted = false;
+  // The owner sees no vote button at all — hide it right away, before
+  // the count loads, so it never flashes.
+  if (isOwner()) { btn.style.display = 'none'; count.textContent = 'This is your cave'; }
   function render (state) {
     voted = !!state.voted;
     var n = Number(state.count) || 0;
+    if (isOwner()) {
+      btn.style.display = 'none';
+      count.textContent = n === 0 ? 'This is your cave' : 'This is your cave — ' + n + (n === 1 ? ' person loves' : ' people love') + ' this cave';
+      return;
+    }
     count.textContent = n === 1 ? '1 person loves this cave' : n + ' people love this cave';
     btn.textContent = voted ? 'You love this cave — tap to undo' : 'Love this cave?';
   }
   function load () {
     fetch('/api/cave-vote?share=' + encodeURIComponent(share) + '&voter=' + encodeURIComponent(voter))
-      .then(function (r) { return r.json(); }).then(render).catch(function () { count.textContent = ''; });
+      .then(function (r) { return r.json(); }).then(render).catch(function () { if (!isOwner()) count.textContent = ''; });
   }
   btn.addEventListener('click', function () {
+    var wasVote = !voted;
     fetch('/api/cave-vote', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: voted ? 'unvote' : 'vote', share: share, voter: voter }) })
-      .then(function (r) { return r.json(); }).then(render).catch(function () {});
+      body: JSON.stringify({ action: voted ? 'unvote' : 'vote', share: share, voter: voter, uid: signedInUid() }) })
+      .then(function (r) { return r.json(); }).then(function (d) { render(d); if (wasVote && d.voted) awardCavePoints('vote', share, voter); }).catch(function () {});
   });
   load();
 })();
@@ -460,6 +494,8 @@ module.exports = async function handler (req, res) {
     chips.forEach(function (c) { c.disabled = true; });
     if (msg) note.textContent = msg;
   }
+  // The owner can't gift their own cave — gifts come from visitors.
+  if (typeof window.__ftbIsOwner === 'function' && window.__ftbIsOwner()) { disable('This is your cave — gifts come from your visitors.'); return; }
   fetch('/api/cave-gift?share=' + encodeURIComponent(share) + '&voter=' + encodeURIComponent(voter))
     .then(function (r) { return r.json(); })
     .then(function (d) { if (d.giftedToday) disable('You already left a gift today — come back tomorrow.'); })
@@ -469,10 +505,10 @@ module.exports = async function handler (req, res) {
       var kind = chip.getAttribute('data-gift-kind');
       var id = chip.getAttribute('data-gift-id');
       fetch('/api/cave-gift', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ share: share, voter: voter, gift: { kind: kind, id: id } }) })
+        body: JSON.stringify({ share: share, voter: voter, uid: (typeof window.__ftbSignedInUid === 'function' ? window.__ftbSignedInUid() : ''), gift: { kind: kind, id: id } }) })
         .then(function (r) { return r.json().then(function (d) { return { status: r.status, d: d }; }); })
         .then(function (res) {
-          if (res.status === 200 && res.d.ok) disable('Gift sent — thanks for making their day!');
+          if (res.status === 200 && res.d.ok) { disable('Gift sent — thanks for making their day!'); if (typeof window.awardCavePoints === 'function') window.awardCavePoints('giftGiven', share, voter); }
           else if (res.d && res.d.error) note.textContent = res.d.error;
           else note.textContent = 'That did not go through. Try again in a moment.';
         })
@@ -551,7 +587,21 @@ document.addEventListener('DOMContentLoaded', function () {
 <div class="cta">
   <a href="${esc(join)}">Follow ${esc(name)} &amp; save these spots</a>
   <small>Free · You also get 30 days of Grizzly free</small>
-</div>`,
+</div>
+<script>
+// You can't follow your own cave: hide the follow CTA when the viewer
+// is the owner (same localStorage uid check as the vote/gift scripts).
+(function () {
+  try {
+    var owner = window.__ftbOwnerUid || ${JSON.stringify(h.uid)};
+    var uid = localStorage.getItem('ftb_data_owner_v1') || localStorage.getItem('ftb_uid_v1') || '';
+    if (owner && uid && uid === owner) {
+      var cta = document.querySelector('.cta');
+      if (cta) cta.style.display = 'none';
+    }
+  } catch (e) { /* private mode */ }
+})();
+</script>`,
     });
   } catch (err) {
     console.error('[FTB] creator page error:', err.message);

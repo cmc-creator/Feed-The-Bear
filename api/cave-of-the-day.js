@@ -87,7 +87,12 @@ module.exports = async function handler (req, res) {
       try {
         const votesSnap = await db.collection(`caveVotes/${h.id}/votes`).get();
         votes = (votesSnap.docs || []).filter(d => {
-          const at = d.data()?.at;
+          const data = d.data() || {};
+          // An owner's vote never counts — you can't vote for your own
+          // cave (the vote endpoint rejects it and stores the uid when
+          // the voter is signed in, so this is the backstop).
+          if (data.uid && data.uid === h.uid) return false;
+          const at = data.at;
           if (!at) return true; // pre-timestamp votes are from the last few days
           const t = new Date(at).getTime();
           return Number.isFinite(t) && t >= cutoff;

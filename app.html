@@ -106,6 +106,7 @@
       <div class="cave-shop-section"><h3>Luxury Decorations</h3><div class="cave-shop-grid" id="cave-shop-luxury-decor"></div></div>
       <div class="cave-shop-section"><h3>Furniture</h3><div class="cave-shop-grid" id="cave-shop-furniture"></div></div>
       <div class="cave-shop-section"><h3>Pantry</h3><div class="cave-shop-grid" id="cave-shop-pantry"></div></div>
+      <div class="cave-shop-section"><h3>Mystery Box</h3><div class="cave-shop-grid" id="cave-shop-mystery"></div></div>
     </div>
   </div>
 
@@ -1035,6 +1036,22 @@
           <img id="cave-of-the-day-img" src="/assets/caves/scene-forest-3d.jpg" alt="Cave of the Day" loading="lazy" />
           <span class="cave-of-the-day-body"><b id="cave-of-the-day-name">Connie's cave</b><span id="cave-of-the-day-meta"></span></span>
         </a>
+      </section>
+
+      <!-- My Bear Cave: your scene, your points, your streak, and how far the next unlock is -->
+      <section id="my-cave-home" class="my-cave-home home-module hidden" aria-label="My Bear Cave">
+        <div class="my-cave-home-head"><span class="my-cave-home-eyebrow">MY BEAR CAVE</span></div>
+        <button id="my-cave-home-card" type="button" class="my-cave-home-card" onclick="openCaveShop()">
+          <img id="my-cave-home-img" src="/assets/caves/scene-cozy-3d.jpg" alt="My cave" loading="lazy" />
+          <span class="my-cave-home-body"><b id="my-cave-home-title">My Bear Cave</b><span id="my-cave-home-meta"></span></span>
+        </button>
+      </section>
+
+      <!-- Today's challenge: the daily reason to open the app -->
+      <section id="daily-challenge-home" class="daily-challenge-home home-module hidden" aria-label="Today's challenge">
+        <div class="dc-home-head"><span class="dc-home-eyebrow">DAILY CHALLENGE</span><h2>Today's challenge</h2></div>
+        <p id="daily-challenge-home-text" class="dc-home-text"></p>
+        <button id="daily-challenge-home-btn" type="button" class="btn-primary">Take the challenge</button>
       </section>
 
       <section id="bear-challenges-home" class="home-module bc-home" aria-label="Bear Challenges">

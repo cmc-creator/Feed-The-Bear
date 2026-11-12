@@ -728,6 +728,27 @@ function openDailyChallenge () {
   document.body.classList.add('overlay-open');
   _renderDailyChallenge();
 }
+// Today's challenge on the home screen: the challenge text, the streak,
+// and a button that opens it. This is the daily reason to open the app,
+// and until now nothing in the app linked to it at all.
+function renderDailyChallengeHome () {
+  const card = document.getElementById('daily-challenge-home');
+  if (!card) return;
+  const dc = _initDailyChallenge();
+  const text = document.getElementById('daily-challenge-home-text');
+  if (text) {
+    text.textContent = dc.completed
+      ? `Done for today — ${dc.streak || 0}-day streak. Come back tomorrow for a new one.`
+      : `${dc.text || ''}${dc.streak ? ` — ${dc.streak}-day streak` : ''}`;
+  }
+  const btn = document.getElementById('daily-challenge-home-btn');
+  if (btn) {
+    btn.textContent = dc.completed ? 'See today\'s challenge' : 'Take the challenge';
+    btn.onclick = () => openDailyChallenge();
+  }
+  card.classList.remove('hidden');
+}
+window.renderDailyChallengeHome = renderDailyChallengeHome;
 function closeDailyChallenge () {
   document.getElementById('dailychallenge-overlay')?.classList.add('hidden');
   maybeHideOverlay();
@@ -771,8 +792,13 @@ function completeDailyChallenge () {
   dc.history.push({ date: today, done: true, text: dc.text });
   state.settings.dailyChallenge = dc;
   persistSettingsLocal();
-  showToast('Challenge complete!', `+25 XP · ${dc.streak} day streak!`, 'success');
+  // Finishing the day's challenge is +10 cave points, once a day — the
+  // challenge feeds the cave economy, so the fun pulls toward the thing
+  // that keeps people coming back.
+  const caveAward = (window._ftbUid && typeof awardCaveFun === 'function') ? awardCaveFun(10, 'challenge') : { ok: false };
+  showToast('Challenge complete!', `+25 XP · ${dc.streak} day streak!${caveAward.ok ? ' +10 cave points.' : ''}`, 'success');
   _renderDailyChallenge();
+  if (typeof renderDailyChallengeHome === 'function') renderDailyChallengeHome();
 }
 function skipDailyChallenge () {
   const dc = _getDCState();

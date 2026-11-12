@@ -92,6 +92,12 @@ module.exports = async function handler (req, res) {
     const label = giftLabel(body.gift);
     if (!label) return res.status(400).json({ error: 'Pick a gift from the list.' });
     if (await overLimit(`cavegift:${ip}`, 60, 600)) return res.status(429).json({ error: 'Slow down a little and try again soon.' });
+    // You can't leave a gift on your own cave — gifts are from visitors.
+    // The uid is sent by the public page when the giver is signed into
+    // the app on this device; it can only ever cause a rejection.
+    const giverUid = String(body.uid || '').trim();
+    if (giverUid && !/^[A-Za-z0-9]{10,64}$/.test(giverUid)) return res.status(400).json({ error: 'Something is off with that gift.' });
+    if (giverUid && giverUid === ownerUid) return res.status(403).json({ error: 'You can\'t leave a gift on your own cave.', reason: 'own-cave' });
     if (await giftedToday()) return res.status(409).json({ error: 'You already left a gift today — come back tomorrow.' });
 
     const gift = { kind: body.gift.kind, id: body.gift.id, label, at: new Date().toISOString() };
@@ -106,6 +112,15 @@ module.exports = async function handler (req, res) {
         const pantry = { ...(data.pantry || {}) };
         pantry[gift.id] = Math.max(0, Math.floor(Number(pantry[gift.id]) || 0)) + 1;
         update.pantry = pantry;
+      }
+      // +5 cave points for the owner, once a day no matter how many
+      // gifts arrive — getting a gift feeds the cave economy too.
+      const days = { ...(data.caveFunDays || {}) };
+      if (days.giftReceived !== today) {
+        days.giftReceived = today;
+        update.caveFunDays = days;
+        update.caveFun = Math.max(0, Math.floor(Number(data.caveFun) || 0)) + 5;
+        update.caveLifetime = Math.max(Math.floor(Number(data.caveLifetime) || 0), update.caveFun + Math.floor(Number(data.caveBonus) || 0));
       }
       tx.set(profileRef, update, { merge: true });
       tx.set(logRef, { date: today, kind: gift.kind, id: gift.id });

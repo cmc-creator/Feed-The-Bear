@@ -2415,6 +2415,21 @@ body.celebrate-glow::before {
 .cave-of-the-day-body { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; }
 .cave-of-the-day-body b { font-size: .95rem; }
 .cave-of-the-day-body span { font-size: .82rem; color: var(--text-dim); }
+/* My Bear Cave home card: your scene, your points, your streak, and how
+   far the next unlock is. Same shape as Cave of the Day; the whole card
+   is a button into the Cave Shop. */
+.my-cave-home-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.my-cave-home-eyebrow { font-size: .72rem; font-weight: 800; letter-spacing: .12em; color: var(--gold, #ffd98a); }
+.my-cave-home-card { display: block; width: 100%; padding: 0; border-radius: 16px; overflow: hidden; text-align: left; cursor: pointer; color: inherit; background: var(--card, rgba(255,255,255,.04)); border: 1px solid var(--border); font: inherit; }
+.my-cave-home-card img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
+.my-cave-home-body { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; }
+.my-cave-home-body b { font-size: .95rem; }
+.my-cave-home-body span { font-size: .82rem; color: var(--text-dim); }
+/* Today's challenge home card. */
+.dc-home-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.dc-home-eyebrow { font-size: .72rem; font-weight: 800; letter-spacing: .12em; color: var(--gold, #ffd98a); }
+.dc-home-head h2 { margin: 0; font-size: 1.05rem; }
+.dc-home-text { margin: 0 0 10px; color: var(--text); }
 .cave-points-balance { color: var(--gold); font-weight: 700; }
 .cave-shop-link { background: none; border: 0; padding: 0; font: inherit; color: var(--gold); font-weight: 800; text-decoration: underline; cursor: pointer; }
 
