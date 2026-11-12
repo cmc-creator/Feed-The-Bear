@@ -65,11 +65,12 @@ const voteCall = (method, { query = {}, body = {} } = {}) => new Promise(resolve
   let pg = await view('connie_eats');
   check(pg.status === 200, 'the cave page opens');
   check(/data-cave-theme="forest"/.test(pg.html), 'the page carries the forest theme');
-  check(/decor-lights\.jpg/.test(pg.html) && /decor-plant\.jpg/.test(pg.html), 'the page shows the fairy lights and plant photos');
+  check(/scene-forest-3d\.jpg/.test(pg.html), 'the page shows the Forest 3D scene');
   check(/Forest Cave/.test(pg.html), 'the page names the theme');
   check(/class="cave-scene"/.test(pg.html), 'the cave renders as a scene, not a flat row');
-  check(/cave-decor-item decor-lights/.test(pg.html) && /cave-decor-item decor-plant/.test(pg.html),
-    'each decoration is placed in the scene with its own position');
+  check(!/cave-decor-item decor-/.test(pg.html),
+    'a 3D-scene theme shows no pasted decorations — the scene is the whole room');
+  check(/Leave a gift/.test(pg.html) && /\/api\/cave-gift/.test(pg.html), 'the page offers a gift for the cave owner');
   check(/class="cave-scene"[\s\S]*?class="cave-caption"/.test(pg.html), 'the theme and points caption sits below the scene');
   check(!/🐻|⭐|❤️/.test(pg.html), 'the cave page has no emoji in the scene, caption, or vote button');
   check(/id="cave-vote-btn" data-share="connieshare01"/.test(pg.html), 'the page has a vote button for this cave');

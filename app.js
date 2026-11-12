@@ -15479,6 +15479,35 @@ function initBearSwipeHome () {
   mod.dataset.bound = '1';
 }
 
+// ── Cave of the Day: the most-loved public cave from the last day ──
+// Fetched from api/cave-of-the-day (most votes in the last 24 hours,
+// Connie's cave when nobody has a vote yet). The card in app.html
+// already holds the Connie fallback, so a failed fetch just leaves
+// that in place — the slot is never empty.
+let _caveOfTheDayLoaded = false;
+function renderCaveOfTheDayHome () {
+  const section = document.getElementById('cave-of-the-day-home');
+  if (!section || _caveOfTheDayLoaded) return;
+  _caveOfTheDayLoaded = true;
+  section.classList.remove('hidden');
+  fetch('/api/cave-of-the-day')
+    .then(r => (r.ok ? r.json() : null))
+    .then(d => {
+      if (!d || !d.handle) return;
+      const link = document.getElementById('cave-of-the-day-link');
+      const img = document.getElementById('cave-of-the-day-img');
+      const name = document.getElementById('cave-of-the-day-name');
+      const meta = document.getElementById('cave-of-the-day-meta');
+      if (link) link.href = d.url || ('/@' + d.handle);
+      if (img && d.scene) { img.src = '/assets/caves/' + d.scene; img.alt = (d.themeLabel || 'Cave') + ' — Cave of the Day'; }
+      if (name) name.textContent = d.name + "'s " + (d.themeLabel || 'cave');
+      if (meta) meta.textContent = d.votes > 0
+        ? d.votes + (d.votes === 1 ? ' person loves this cave today' : ' people love this cave today')
+        : "Today's featured cave — go say hi";
+    })
+    .catch(() => { /* the Connie fallback stays in place */ });
+}
+
 function initHomeDiscoverySection () {
   const list = document.getElementById('nearby-home-list');
   if (!list) return;
@@ -15486,6 +15515,7 @@ function initHomeDiscoverySection () {
   renderTodayStatusRow();
   renderTodayVibeRow();
   stageHomeModules();
+  renderCaveOfTheDayHome();
   renderForYouHome();
   renderWeeklyRecapHome();
   renderMoodPicksHome();

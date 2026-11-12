@@ -2,8 +2,10 @@
 // - Points are earned by using the app (spot +10, dish rated +5, visit +5,
 //   list shared +10) and unlock new cave decor at 50 / 100 / 250 points.
 //   Unlocks are sticky; a locked decoration can never be saved.
-// - The public cave page is a realistic scene (light pools, wall grain,
-//   vignette, decor on a shelf) and shows the creator's points.
+// - The public cave page is one 3D-rendered scene per theme (light pools,
+//   wall grain, vignette); a 3D-scene theme shows no pasted decorations,
+//   while the graded shop themes still place decor in the scene. It
+//   shows the creator's points.
 const path = require('path');
 const Module = require('module');
 const { BASE, check, launch, newPage, finish } = require('./lib');
@@ -14,7 +16,7 @@ const docs = {
     { n: 'Tacos Chiwas', c: 'Mexican', a: 'Phoenix', r: 5, g: ['Birria quesatacos'], s: ['Horchata'] },
   ], cave: { t: 'forest', d: ['lights', 'fireplace', 'barcart'] }, pts: 265 } },
   'profiles/samshare0001': { uid: 'samUid1234567', u: 'Sam', profile: { picks: [] } },
-  'profiles/bogusshare01': { uid: 'bogusUid12345', u: 'Bogus', profile: { picks: [], cave: { t: 'cozy', d: ['bogus', 'rug'] } } },
+  'profiles/bogusshare01': { uid: 'bogusUid12345', u: 'Bogus', profile: { picks: [], cave: { t: 'midnight', d: ['bogus', 'rug'] } } },
 };
 const ref = p => ({
   p,
@@ -59,13 +61,12 @@ const view = h => new Promise(resolve => {
   await callHandle('connieUid12345', { method: 'POST', body: { action: 'publicPage', on: true } });
   let pg = await view('connie_eats');
   check(pg.status === 200, 'the cave page opens');
-  check(/decor-fireplace\.jpg/.test(pg.html), 'the page shows the unlocked stone fireplace photo');
-  check(/decor-barcart\.jpg/.test(pg.html), 'the page shows the unlocked bar cart photo');
+  check(/scene-forest-3d\.jpg/.test(pg.html), 'the page shows the Forest 3D scene');
+  check(!/cave-decor-item decor-/.test(pg.html), 'a 3D-scene theme shows no pasted decorations — the scene is the whole room');
   check(/265 cave points/.test(pg.html), 'the page shows the creator’s points');
   check(/class="cave-scene"/.test(pg.html), 'the cave renders as a scene, not a flat row');
   check(/radial-gradient/.test(pg.html), 'the scene has warm light pools');
   check(/feTurbulence/.test(pg.html), 'the scene has a grainy wall texture');
-  check(/cave-decor-item decor-/.test(pg.html), 'each decoration is placed in the scene as its own photo');
 
   // Unknown decor is still dropped; a cave with no points shows no badge.
   await callHandle('bogusUid12345', { method: 'POST', body: { action: 'claim', handle: 'bogus_eats', id: 'bogusshare01', name: 'Bogus' } });

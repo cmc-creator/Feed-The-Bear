@@ -79,7 +79,8 @@ const setupPage = async (uid, handle, id) => {
   check(pg.status === 200, 'the stale-live cave page opens');
   check(/data-cave-theme="forest"/.test(pg.html), 'a stale live profile still renders the saved forest theme');
   check(/Forest Cave/.test(pg.html), 'the page names the saved theme');
-  check(/decor-fireplace\.jpg/.test(pg.html) && /decor-shelf\.jpg/.test(pg.html) && /decor-barcart\.jpg/.test(pg.html), 'the page shows the saved decorations (fireplace, shelf, bar cart)');
+  check(/scene-forest-3d\.jpg/.test(pg.html), 'the page shows the saved Forest 3D scene');
+  check(!/cave-decor-item decor-/.test(pg.html), 'a 3D-scene theme shows no pasted decorations');
   check(/265 cave points/.test(pg.html), 'the page shows the saved points total');
   check(pg.html.includes(`src="${PHOTO}"`), 'the header shows her own photo from the saved profile');
 
@@ -87,7 +88,8 @@ const setupPage = async (uid, handle, id) => {
   await setupPage('witchUid123456', 'witch_eats', 'witchshare01');
   pg = await view('witch_eats');
   check(pg.status === 200 && /data-cave-theme="witchy"/.test(pg.html), 'a live witchy cave still renders when the canonical doc has no cave');
-  check(/decor-candle\.jpg/.test(pg.html) && /decor-plant\.jpg/.test(pg.html), 'the live decorations render');
+  check(/scene-witchy-3d\.jpg/.test(pg.html), 'the live Witchy 3D scene renders');
+  check(!/cave-decor-item decor-/.test(pg.html), 'a 3D-scene theme shows no pasted decorations');
   check(/40 cave points/.test(pg.html), 'the live points render');
   check(/src="\/feedbear-sm\.jpg"/.test(pg.html), 'no saved photo means the bear image');
 

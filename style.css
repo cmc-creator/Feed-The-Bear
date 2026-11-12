@@ -2355,22 +2355,22 @@ body.celebrate-glow::before {
 .cave-preview-decor-img.furn-fridge { right: 2%; bottom: 5%; width: 20%; aspect-ratio: 3 / 4; z-index: 2; }
 .cave-preview-decor-img.furn-sink { left: 3%; bottom: 4%; width: 22%; aspect-ratio: 4 / 3; z-index: 2; }
 .cave-preview-caption { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; padding: 8px 12px; font-size: .85rem; color: #f6ecdc; text-shadow: 0 2px 8px rgba(0,0,0,.65); background: linear-gradient(180deg, transparent, rgba(0,0,0,.55)); }
-.cave-theme-cozy { background: radial-gradient(85% 90% at 50% 108%, rgba(255,150,60,.32), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-cozy.jpg); background-size: cover; background-position: center 30%; }
-.cave-theme-forest { background: radial-gradient(85% 90% at 50% 108%, rgba(222,232,120,.24), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-forest.jpg); background-size: cover; background-position: center 30%; }
-.cave-theme-neon { background: radial-gradient(85% 90% at 50% 108%, rgba(255,93,162,.28), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-neon.jpg); background-size: cover; background-position: center 30%; }
-.cave-theme-pastel { background: radial-gradient(85% 90% at 50% 108%, rgba(255,190,220,.24), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-pastel.jpg); background-size: cover; background-position: center 30%; }
-.cave-theme-witchy { background: radial-gradient(85% 90% at 50% 108%, rgba(150,90,220,.32), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-witchy.jpg); background-size: cover; background-position: center 30%; }
-.cave-theme-elf { background: radial-gradient(85% 90% at 50% 108%, rgba(170,230,100,.26), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-elf.jpg); background-size: cover; background-position: center 30%; }
-.cave-theme-cute { background: radial-gradient(85% 90% at 50% 108%, rgba(255,150,200,.30), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-cute.jpg); background-size: cover; background-position: center 30%; }
-.cave-theme-mancave { background: radial-gradient(85% 90% at 50% 108%, rgba(230,160,70,.32), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-mancave.jpg); background-size: cover; background-position: center 30%; }
-.cave-theme-beach { background: radial-gradient(85% 90% at 50% 108%, rgba(120,210,230,.28), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-beach.jpg); background-size: cover; background-position: center 30%; }
-.cave-theme-winter { background: radial-gradient(85% 90% at 50% 108%, rgba(150,205,255,.28), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-winter.jpg); background-size: cover; background-position: center 30%; }
-.cave-theme-cosmic { background: radial-gradient(85% 90% at 50% 108%, rgba(140,110,255,.32), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-cosmic.jpg); background-size: cover; background-position: center 30%; }
-.cave-theme-jungle { background: radial-gradient(85% 90% at 50% 108%, rgba(120,230,120,.26), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-jungle.jpg); background-size: cover; background-position: center 30%; }
-.cave-theme-den { background: radial-gradient(85% 90% at 50% 108%, rgba(255,170,80,.30), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-den.jpg); background-size: cover; background-position: center 30%; }
-.cave-theme-grotto { background: radial-gradient(85% 90% at 50% 108%, rgba(110,210,200,.26), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-grotto.jpg); background-size: cover; background-position: center 30%; }
-.cave-theme-lookout { background: radial-gradient(85% 90% at 50% 108%, rgba(160,200,240,.24), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-lookout.jpg); background-size: cover; background-position: center 30%; }
-.cave-theme-arch { background: radial-gradient(85% 90% at 50% 108%, rgba(230,180,110,.28), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-arch.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-cozy { background: radial-gradient(85% 90% at 50% 108%, rgba(255,150,60,.32), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-cozy-3d.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-forest { background: radial-gradient(85% 90% at 50% 108%, rgba(222,232,120,.24), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-forest-3d.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-neon { background: radial-gradient(85% 90% at 50% 108%, rgba(255,93,162,.28), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-neon-3d.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-pastel { background: radial-gradient(85% 90% at 50% 108%, rgba(255,190,220,.24), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-pastel-3d.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-witchy { background: radial-gradient(85% 90% at 50% 108%, rgba(150,90,220,.32), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-witchy-3d.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-elf { background: radial-gradient(85% 90% at 50% 108%, rgba(170,230,100,.26), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-elf-3d.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-cute { background: radial-gradient(85% 90% at 50% 108%, rgba(255,150,200,.30), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-cute-3d.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-mancave { background: radial-gradient(85% 90% at 50% 108%, rgba(230,160,70,.32), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-mancave-3d.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-beach { background: radial-gradient(85% 90% at 50% 108%, rgba(120,210,230,.28), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-beach-3d.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-winter { background: radial-gradient(85% 90% at 50% 108%, rgba(150,205,255,.28), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-winter-3d.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-cosmic { background: radial-gradient(85% 90% at 50% 108%, rgba(140,110,255,.32), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-cosmic-3d.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-jungle { background: radial-gradient(85% 90% at 50% 108%, rgba(120,230,120,.26), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-jungle-3d.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-den { background: radial-gradient(85% 90% at 50% 108%, rgba(255,170,80,.30), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-den-3d.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-grotto { background: radial-gradient(85% 90% at 50% 108%, rgba(110,210,200,.26), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-grotto-3d.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-lookout { background: radial-gradient(85% 90% at 50% 108%, rgba(160,200,240,.24), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-lookout-3d.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-arch { background: radial-gradient(85% 90% at 50% 108%, rgba(230,180,110,.28), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-arch-3d.jpg); background-size: cover; background-position: center 30%; }
 /* Cave Shop themes: the same real cave photos, colour-graded with a tint
    so each shop cave looks like a different place. */
 .cave-theme-midnight { background: radial-gradient(85% 90% at 50% 108%, rgba(90,110,255,.30), transparent 70%), linear-gradient(180deg, rgba(15,15,50,.45), rgba(5,5,20,.60)), url(/assets/caves/theme-forest.jpg); background-size: cover; background-position: center 30%; }
@@ -2379,6 +2379,24 @@ body.celebrate-glow::before {
 .cave-theme-ember { background: radial-gradient(85% 90% at 50% 108%, rgba(255,90,20,.32), transparent 70%), linear-gradient(180deg, rgba(255,90,20,.30), rgba(80,20,0,.50)), url(/assets/caves/theme-den.jpg); background-size: cover; background-position: center 30%; }
 .cave-theme-aurora { background: radial-gradient(85% 90% at 50% 108%, rgba(80,255,170,.28), transparent 70%), linear-gradient(180deg, rgba(80,255,170,.22), rgba(40,20,90,.50)), url(/assets/caves/theme-cosmic.jpg); background-size: cover; background-position: center 30%; }
 .cave-theme-royal { background: radial-gradient(85% 90% at 50% 108%, rgba(255,215,120,.32), transparent 70%), linear-gradient(180deg, rgba(255,215,120,.30), rgba(90,60,0,.45)), url(/assets/caves/theme-cozy.jpg); background-size: cover; background-position: center 30%; }
+/* Seasonal caves: single 3D scene images, like the base themes. */
+.cave-theme-halloween { background: radial-gradient(85% 90% at 50% 108%, rgba(255,140,40,.32), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-halloween-3d.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-christmas { background: radial-gradient(85% 90% at 50% 108%, rgba(255,200,120,.30), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-christmas-3d.jpg); background-size: cover; background-position: center 30%; }
+/* Limited-time badge on seasonal shop cards. */
+.cave-shop-limited { display: inline-block; font-size: .75rem; font-weight: 800; color: #1b130b; background: var(--gold, #ffd98a); border-radius: 999px; padding: 2px 8px; margin-top: 2px; }
+/* "You got a gift" note in cave setup. */
+.cave-gift-note { margin: 8px 0; padding: 10px 12px; border-radius: 12px; background: rgba(255,217,138,.12); border: 1px solid rgba(255,217,138,.35); font-size: .88rem; line-height: 1.6; }
+.cave-gift-note b { color: var(--gold, #ffd98a); }
+.cave-gift-item { display: inline-block; margin-right: 6px; }
+/* Cave of the Day card on the home screen. */
+.cave-of-the-day-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.cave-of-the-day-eyebrow { font-size: .72rem; font-weight: 800; letter-spacing: .12em; color: var(--gold, #ffd98a); }
+.cave-of-the-day-head h2 { margin: 0; font-size: 1.05rem; }
+.cave-of-the-day-card { display: block; border-radius: 16px; overflow: hidden; text-decoration: none; color: inherit; background: var(--card, rgba(255,255,255,.04)); border: 1px solid var(--border); }
+.cave-of-the-day-card img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
+.cave-of-the-day-body { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; }
+.cave-of-the-day-body b { font-size: .95rem; }
+.cave-of-the-day-body span { font-size: .82rem; color: var(--text-dim); }
 .cave-points-balance { color: var(--gold); font-weight: 700; }
 .cave-shop-link { background: none; border: 0; padding: 0; font: inherit; color: var(--gold); font-weight: 800; text-decoration: underline; cursor: pointer; }
 

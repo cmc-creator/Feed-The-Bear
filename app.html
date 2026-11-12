@@ -81,6 +81,7 @@
         <div class="cave-setup-title">Decorate your Bear Cave</div>
         <p class="cave-setup-hint">Your page, your vibe. Pick a theme and a few decorations — takes a minute, and you can change it any time.</p>
         <div class="cave-points" id="cave-points"></div>
+        <div class="cave-gift-note" id="cave-gift-note"></div>
         <div class="cave-theme-row" id="cave-theme-picks" role="group" aria-label="Cave theme"></div>
         <div class="cave-decor-row" id="cave-decor-picks" role="group" aria-label="Cave decorations"></div>
         <div class="cave-decor-row" id="cave-furniture-picks" role="group" aria-label="Cave furniture"></div>
@@ -1022,6 +1023,15 @@
       <div id="nearby-home-list" class="nearby-home-list">
         <div class="nearby-home-loading">Finding restaurants near you…</div>
       </div>
+
+      <!-- Cave of the Day: the most-loved public cave from the last day -->
+      <section id="cave-of-the-day-home" class="cave-of-the-day home-module hidden" aria-label="Cave of the Day">
+        <div class="cave-of-the-day-head"><span class="cave-of-the-day-eyebrow">CAVE OF THE DAY</span><h2 id="cave-of-the-day-title">Today's cave</h2></div>
+        <a id="cave-of-the-day-link" class="cave-of-the-day-card" href="/@feedthebear32">
+          <img id="cave-of-the-day-img" src="/assets/caves/scene-forest-3d.jpg" alt="Cave of the Day" loading="lazy" />
+          <span class="cave-of-the-day-body"><b id="cave-of-the-day-name">Connie's cave</b><span id="cave-of-the-day-meta"></span></span>
+        </a>
+      </section>
 
       <section id="bear-challenges-home" class="home-module bc-home" aria-label="Bear Challenges">
         <div class="bc-home-heading">

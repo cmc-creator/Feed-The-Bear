@@ -55,24 +55,36 @@ function buildProfileData () {
    profile (local + cloud), published with the live profile, and
    rendered by api/creator.js on your page. Skipping setup leaves the
    cozy default, so the page always looks good. */
+/* 3D cave scenes: each base theme is now one photorealistic 3D-rendered
+   furnished cave picture (assets/caves/scene-<theme>-3d.jpg) — the whole
+   room, walls, furniture and all, in a single image. That is the fix for
+   the collage problem: pasting rectangular decor/furniture photos on top
+   of a background photo never looked like a real room, so when a theme
+   has a 3D scene (scene: true) the cave shows JUST that one image,
+   full-bleed, and the user's placed decor/furniture are NOT pasted on
+   top of it. Owned decor/furniture are still listed in setup and the
+   shop, and they still show on the non-3D themes (the colour-graded
+   shop themes), which have no 3D scene of their own. */
 const CAVE_THEMES = {
-  cozy:   { label: 'Cozy Cave',   emoji: '🧸', photo: 'theme-cozy.jpg' },
-  forest: { label: 'Forest Cave', emoji: '🐻', photo: 'theme-forest.jpg' },
-  neon:   { label: 'Neon Cave',   emoji: '⚡', photo: 'theme-neon.jpg' },
-  pastel: { label: 'Pastel Cave', emoji: '🌸', photo: 'theme-pastel.jpg' },
-  witchy: { label: 'Witchy Cave', emoji: '🔮', photo: 'theme-witchy.jpg' },
-  elf:    { label: 'Elf Cave',    emoji: '🧚', photo: 'theme-elf.jpg' },
-  cute:   { label: 'Cute Cave',   emoji: '💖', photo: 'theme-cute.jpg' },
-  mancave:{ label: 'Man Cave',    emoji: '🛋️', photo: 'theme-mancave.jpg' },
-  beach:  { label: 'Beach Cave',  emoji: '🏖️', photo: 'theme-beach.jpg' },
-  winter: { label: 'Winter Cave', emoji: '❄️', photo: 'theme-winter.jpg' },
-  cosmic: { label: 'Cosmic Cave', emoji: '🌌', photo: 'theme-cosmic.jpg' },
-  jungle: { label: 'Jungle Cave', emoji: '🌿', photo: 'theme-jungle.jpg' },
-  den:    { label: 'Bear Den',    emoji: '🐾', photo: 'theme-den.jpg' },
-  grotto: { label: 'Grotto',      emoji: '💧', photo: 'theme-grotto.jpg' },
-  lookout:{ label: 'Mountain Lookout', emoji: '⛰️', photo: 'theme-lookout.jpg' },
-  arch:   { label: 'Stone Arch',  emoji: '🪨', photo: 'theme-arch.jpg' },
+  cozy:   { label: 'Cozy Cave',   emoji: '🧸', photo: 'scene-cozy-3d.jpg',   scene: true },
+  forest: { label: 'Forest Cave', emoji: '🐻', photo: 'scene-forest-3d.jpg', scene: true },
+  neon:   { label: 'Neon Cave',   emoji: '⚡', photo: 'scene-neon-3d.jpg',   scene: true },
+  pastel: { label: 'Pastel Cave', emoji: '🌸', photo: 'scene-pastel-3d.jpg', scene: true },
+  witchy: { label: 'Witchy Cave', emoji: '🔮', photo: 'scene-witchy-3d.jpg', scene: true },
+  elf:    { label: 'Elf Cave',    emoji: '🧚', photo: 'scene-elf-3d.jpg',    scene: true },
+  cute:   { label: 'Cute Cave',   emoji: '💖', photo: 'scene-cute-3d.jpg',   scene: true },
+  mancave:{ label: 'Man Cave',    emoji: '🛋️', photo: 'scene-mancave-3d.jpg', scene: true },
+  beach:  { label: 'Beach Cave',  emoji: '🏖️', photo: 'scene-beach-3d.jpg',  scene: true },
+  winter: { label: 'Winter Cave', emoji: '❄️', photo: 'scene-winter-3d.jpg', scene: true },
+  cosmic: { label: 'Cosmic Cave', emoji: '🌌', photo: 'scene-cosmic-3d.jpg', scene: true },
+  jungle: { label: 'Jungle Cave', emoji: '🌿', photo: 'scene-jungle-3d.jpg', scene: true },
+  den:    { label: 'Bear Den',    emoji: '🐾', photo: 'scene-den-3d.jpg',    scene: true },
+  grotto: { label: 'Grotto',      emoji: '💧', photo: 'scene-grotto-3d.jpg', scene: true },
+  lookout:{ label: 'Mountain Lookout', emoji: '⛰️', photo: 'scene-lookout-3d.jpg', scene: true },
+  arch:   { label: 'Stone Arch',  emoji: '🪨', photo: 'scene-arch-3d.jpg',   scene: true },
 };
+// True when the theme is a single 3D scene image — nothing gets pasted on it.
+function caveHas3dScene (id) { return !!(caveThemeInfo(id) || {}).scene; }
 const CAVE_DECOR = {
   lights:   { label: 'Fairy lights',    emoji: '✨', points: 0, photo: 'decor-lights.jpg' },
   rug:      { label: 'Rug',             emoji: '🧶', points: 0, photo: 'decor-rug.jpg' },
@@ -209,6 +221,13 @@ const CAVE_SHOP_THEMES = {
   ember:    { label: 'Ember Grotto',       emoji: '🔥', photo: 'theme-den.jpg',    tint: 'rgba(255,90,20,.30)',  filter: 'sepia(.5) saturate(2) hue-rotate(-15deg) brightness(.95)', price: 400, rarity: 'Epic',  grizzly: false },
   aurora:   { label: 'Aurora Cave',        emoji: '🌌', photo: 'theme-cosmic.jpg', tint: 'rgba(80,255,170,.22)', filter: 'hue-rotate(90deg) saturate(1.6) brightness(1.05)', price: 0,   rarity: 'Epic',      grizzly: true },
   royal:    { label: 'Royal Bear Suite',   emoji: '👑', photo: 'theme-cozy.jpg',   tint: 'rgba(255,215,120,.30)', filter: 'sepia(.45) saturate(1.8) brightness(1.08)',     price: 0,   rarity: 'Legendary', grizzly: true },
+  // Seasonal caves: limited-time 3D scenes, bought with points (500) so
+  // anyone can earn them. They only appear in the shop inside their
+  // window and can only be bought inside it; owners keep them forever
+  // after the window closes. Halloween ends Nov 15, 2026 (urgency);
+  // Christmas runs Dec 1–31, 2026.
+  halloween: { label: 'Halloween Cave', emoji: '🎃', photo: 'scene-halloween-3d.jpg', scene: true, price: 500, rarity: 'Epic', grizzly: false, seasonal: true, availableUntil: '2026-11-15' },
+  christmas: { label: 'Christmas Cave', emoji: '🎄', photo: 'scene-christmas-3d.jpg', scene: true, price: 500, rarity: 'Epic', grizzly: false, seasonal: true, availableFrom: '2026-12-01', availableUntil: '2026-12-31' },
 };
 const CAVE_SHOP_DECOR = {
   lantern:    { label: 'Lantern glow',      emoji: '🏮', photo: 'decor-lantern.jpg',    price: 50,  rarity: 'Common',    grizzly: false },
@@ -248,16 +267,39 @@ function caveShopOwns (kind, id) {
   const key = kind === 'theme' ? 'caveOwnedThemes' : kind === 'decor' ? 'caveOwnedDecor' : 'caveOwnedFurniture';
   return Array.isArray(profile[key]) && profile[key].includes(id);
 }
+// Seasonal window: a seasonal item is buyable only inside its dates
+// (YYYY-MM-DD, local day). Non-seasonal items are always available.
+// `now` is injectable so tests can freeze the date.
+function caveSeasonalAvailable (item, now) {
+  if (!item || !item.seasonal) return true;
+  const d = now instanceof Date ? now : new Date(now || Date.now());
+  const day = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  if (item.availableFrom && day < item.availableFrom) return false;
+  if (item.availableUntil && day > item.availableUntil) return false;
+  return true;
+}
+// Short human window for the shop badge, e.g. "Until Nov 15" / "Dec 1 – Dec 31".
+function caveSeasonalWindowLabel (item) {
+  if (!item || !item.seasonal) return '';
+  const fmt = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+  if (item.availableFrom && item.availableUntil) return `${fmt(item.availableFrom)} – ${fmt(item.availableUntil)}`;
+  if (item.availableUntil) return `Until ${fmt(item.availableUntil)}`;
+  if (item.availableFrom) return `From ${fmt(item.availableFrom)}`;
+  return 'Limited time';
+}
 // Buy a points item: validates the item, ownership, and the balance, then
 // deducts the price from the spendable balance (lifetime - spent) and
 // records the purchase. Returns {ok} or {ok:false, reason}. Spending
 // never touches lifetime, so the Fireplace / Shelf / Bar Cart unlocks
 // (based on lifetime) can never be lost by buying things.
-function buyCaveShopItem (kind, id) {
+function buyCaveShopItem (kind, id, now) {
   const catalog = kind === 'theme' ? CAVE_SHOP_THEMES : kind === 'decor' ? CAVE_SHOP_DECOR : CAVE_SHOP_FURNITURE;
   const item = catalog[id];
   if (!item) return { ok: false, reason: 'unknown' };
   if (item.grizzly) return { ok: false, reason: 'grizzly' };
+  // A seasonal cave can only be bought inside its window — after it
+  // closes (or before it opens) the sale is gone, even from a crafted call.
+  if (!caveSeasonalAvailable(item, now)) return { ok: false, reason: 'seasonal' };
   if (caveShopOwns(kind, id)) return { ok: false, reason: 'owned' };
   const pts = cavePoints();
   if (pts.balance < item.price) return { ok: false, reason: 'points', need: item.price - pts.balance };
@@ -285,6 +327,54 @@ function equipCaveShopItem (kind, id) {
   if (cave.decor.includes(id)) return true;
   if (cave.decor.length >= CAVE_MAX_DECOR) return false;
   saveCave({ ...cave, decor: [...cave.decor, id].slice(0, CAVE_MAX_DECOR) });
+  return true;
+}
+
+/* ── Cave gifts: a visitor on your public cave page can leave you one
+   gift a day — a food for your pantry or a small decor piece. The gift
+   is recorded on your profile by api/cave-gift.js (caveGifts, newest
+   first, capped at 20). Food lands in your pantry straight away; a
+   decor gift waits here until you tap "Add to my cave". Nothing costs
+   anything and there is no messaging — just the gift. */
+function caveGifts () {
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
+  return (Array.isArray(profile.caveGifts) ? profile.caveGifts : []).filter(g => g && g.kind && g.id);
+}
+function caveUnseenGifts () { return caveGifts().filter(g => !g.seen); }
+function markCaveGiftsSeen () {
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || null;
+  if (!profile || !caveUnseenGifts().length) return;
+  const gifts = caveGifts().map(g => ({ ...g, seen: true }));
+  if (typeof saveUserProfile === 'function') saveUserProfile({ ...profile, caveGifts: gifts });
+}
+function markCaveGiftSeen (index) {
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || null;
+  if (!profile) return;
+  const gifts = caveGifts();
+  if (!gifts[index]) return;
+  gifts[index] = { ...gifts[index], seen: true, claimed: true };
+  if (typeof saveUserProfile === 'function') saveUserProfile({ ...profile, caveGifts: gifts });
+}
+// Claim a gifted decor piece: it joins your cave if a slot is free.
+// A gifted piece becomes yours (recorded as owned first, so saveCave's
+// shop-ownership check keeps it). Food gifts are already in the pantry;
+// claiming just marks them seen.
+function claimCaveGift (index) {
+  const gifts = caveGifts();
+  const gift = gifts[index];
+  if (!gift) return false;
+  if (gift.kind === 'decor') {
+    const cave = getCave();
+    if (cave.decor.includes(gift.id)) { markCaveGiftSeen(index); return true; }
+    if (cave.decor.length >= CAVE_MAX_DECOR) return false;
+    const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
+    if (caveIsShopDecor(gift.id) && !caveShopOwns('decor', gift.id)) {
+      const owned = [...new Set([...(Array.isArray(profile.caveOwnedDecor) ? profile.caveOwnedDecor : []), gift.id])];
+      if (typeof saveUserProfile === 'function') saveUserProfile({ ...profile, caveOwnedDecor: owned });
+    }
+    saveCave({ ...cave, decor: [...cave.decor, gift.id] });
+  }
+  markCaveGiftSeen(index);
   return true;
 }
 
@@ -2128,6 +2218,22 @@ function renderCaveSetup () {
         + `<span class="cave-points-next">${next ? `Next unlock: ${next.label} at ${next.points} points` : 'Every decoration unlocked!'}</span>`
         + `<span class="cave-points-earn">Save a spot +${CAVE_POINTS.spot} · Rate a dish +${CAVE_POINTS.dish} · Log a visit +${CAVE_POINTS.visit} · Share a list +${CAVE_POINTS.list} · Daily visit +${CAVE_DAILY_BONUS}</span>`;
     }
+    // Gifts a visitor left on your public cave page (api/cave-gift.js).
+    // Food is already in your pantry; decor waits for you to claim it.
+    const giftBox = document.getElementById('cave-gift-note');
+    if (giftBox) {
+      const unseen = caveUnseenGifts();
+      if (!unseen.length) { giftBox.innerHTML = ''; giftBox.classList.add('hidden'); }
+      else {
+        giftBox.classList.remove('hidden');
+        giftBox.innerHTML = `<b>You got a gift!</b> ` + unseen.slice(0, 3).map(g => {
+          const idx = caveGifts().indexOf(g);
+          const what = g.kind === 'food' ? `${escHtml(g.label || g.id)} — in your pantry` : escHtml(g.label || g.id);
+          const claim = g.kind === 'decor' ? ` <button type="button" class="btn-sm btn-primary" data-gift-claim="${idx}">Add to my cave</button>` : '';
+          return `<span class="cave-gift-item">${what}${claim}</span>`;
+        }).join('') + ` <button type="button" class="btn-sm btn-secondary" data-gift-dismiss="1">Thanks!</button>`;
+      }
+    }
     themeBox.innerHTML = Object.entries(CAVE_THEMES).map(([id, t]) =>
       `<button type="button" class="cave-theme-chip${cave.theme === id ? ' on' : ''}" data-theme="${id}"><img src="/assets/caves/${t.photo}" alt="" loading="lazy" /><span>${t.label}</span></button>`).join('');
     decorBox.innerHTML = Object.entries(CAVE_DECOR).map(([id, d]) => {
@@ -2139,8 +2245,12 @@ function renderCaveSetup () {
     }).join('');
     const prev = document.getElementById('cave-setup-preview');
     if (prev) {
-      const dec = cave.decor.map(id => { const d = caveDecorInfo(id); return d ? `<img class="cave-preview-decor-img decor-${escHtml(id)}" src="/assets/caves/${d.photo}" alt="${escHtml(d.label)}" onerror="this.style.display='none'" />` : ''; }).join('');
-      const furn = cave.furniture.map(id => { const f = caveFurnitureInfo(id); return f ? `<img class="cave-preview-decor-img furn-${escHtml(id)}" src="/assets/caves/${f.photo}" alt="${escHtml(f.label)}" onerror="this.style.display='none'" />` : ''; }).join('');
+      // 3D-scene themes show just the one scene image — pasting decor or
+      // furniture on top would rebuild the collage Connie hated. The
+      // pieces stay owned and still show on the non-3D (graded) themes.
+      const is3d = caveHas3dScene(cave.theme);
+      const dec = is3d ? '' : cave.decor.map(id => { const d = caveDecorInfo(id); return d ? `<img class="cave-preview-decor-img decor-${escHtml(id)}" src="/assets/caves/${d.photo}" alt="${escHtml(d.label)}" onerror="this.style.display='none'" />` : ''; }).join('');
+      const furn = is3d ? '' : cave.furniture.map(id => { const f = caveFurnitureInfo(id); return f ? `<img class="cave-preview-decor-img furn-${escHtml(id)}" src="/assets/caves/${f.photo}" alt="${escHtml(f.label)}" onerror="this.style.display='none'" />` : ''; }).join('');
       prev.innerHTML = `<span class="cave-preview-scene cave-theme-${cave.theme}"><span class="cave-preview-decor">${dec}${furn}</span><span class="cave-preview-caption"><span>${escHtml((caveThemeInfo(cave.theme) || {}).label || 'Cozy Cave')}</span><span>${pts.total} points</span></span></span>`;
     }
     // Furniture row (owned pieces only — tap to place up to 3).
@@ -2175,6 +2285,19 @@ function renderCaveSetup () {
     const id = b.dataset.furniture;
     cave = { ...cave, furniture: cave.furniture.includes(id) ? cave.furniture.filter(x => x !== id) : [...cave.furniture, id].slice(0, CAVE_MAX_FURNITURE) };
     draw();
+  };
+  const giftBox = document.getElementById('cave-gift-note');
+  if (giftBox) giftBox.onclick = e => {
+    const claim = e.target.closest('[data-gift-claim]');
+    if (claim) {
+      const ok = claimCaveGift(Number(claim.dataset.giftClaim));
+      showToast(ok ? 'Added to your cave!' : 'Your cave is full',
+        ok ? 'Your gifted decoration is in your cave.' : 'Remove a decoration first, then come back to claim it.',
+        ok ? 'success' : 'info');
+      draw();
+      return;
+    }
+    if (e.target.closest('[data-gift-dismiss]')) { markCaveGiftsSeen(); draw(); }
   };
   const saveBtn = document.getElementById('cave-save-btn');
   if (saveBtn) saveBtn.onclick = () => {
@@ -2222,6 +2345,7 @@ function renderCaveShop () {
     const active = isTheme ? cave.theme === id : isFurniture ? cave.furniture.includes(id) : cave.decor.includes(id);
     const imgStyle = item.filter ? ` style="filter:${item.filter}"` : '';
     const price = item.grizzly ? 'Grizzly' : `${item.price} pts`;
+    const seasonal = item.seasonal ? `<span class="cave-shop-limited">Limited time · ${escHtml(caveSeasonalWindowLabel(item))}</span>` : '';
     const max = isFurniture ? CAVE_MAX_FURNITURE : CAVE_MAX_DECOR;
     const count = isFurniture ? cave.furniture.length : cave.decor.length;
     const full = !isTheme && !active && count >= max;
@@ -2235,7 +2359,7 @@ function renderCaveShop () {
     return `<article class="cave-shop-item${owned ? ' owned' : ''}${item.grizzly ? ' grizzly-item' : ''}">
       <img src="/assets/caves/${item.photo}" alt="${escHtml(item.label)}" loading="lazy"${imgStyle} onerror="this.style.display='none'" />
       <div class="cave-shop-item-body"><b>${escHtml(item.label)}</b>
-      <span class="cave-shop-rarity rarity-${String(item.rarity || '').toLowerCase()}">${escHtml(item.rarity)}</span>
+      <span class="cave-shop-rarity rarity-${String(item.rarity || '').toLowerCase()}">${escHtml(item.rarity)}</span>${seasonal}
       <span class="cave-shop-price">${price}</span></div>${action}</article>`;
   };
   // Pantry cards: each food costs 5 points and adds one to the pantry.
@@ -2250,7 +2374,11 @@ function renderCaveShop () {
       <span class="cave-shop-rarity rarity-common">Pantry</span>
       <span class="cave-shop-price">${count > 0 ? `In pantry: ${count}` : `${PANTRY_PRICE} pts each`}</span></div>${action}</article>`;
   };
-  themeGrid.innerHTML = Object.entries(CAVE_SHOP_THEMES).map(([id, t]) => card('theme', id, t)).join('');
+  // Seasonal caves only show inside their window — except ones you already
+  // own, which stay visible so you can keep using them after it closes.
+  themeGrid.innerHTML = Object.entries(CAVE_SHOP_THEMES)
+    .filter(([id, t]) => caveSeasonalAvailable(t) || caveShopOwns('theme', id))
+    .map(([id, t]) => card('theme', id, t)).join('');
   decorGrid.innerHTML = Object.entries(CAVE_SHOP_DECOR).map(([id, d]) => card('decor', id, d)).join('');
   furnGrid.innerHTML = Object.entries(CAVE_SHOP_FURNITURE).map(([id, f]) => card('furniture', id, f)).join('');
   pantryGrid.innerHTML = Object.entries(CAVE_PANTRY).map(([id, p]) => pantryCard(id, p)).join('');
@@ -2279,6 +2407,8 @@ document.addEventListener('click', e => {
       showToast('It\'s yours!', `${item.label} is in your cave collection. Tap Use it to put it in your cave.`, 'success');
     } else if (res.reason === 'points') {
       showToast('Not enough points yet', `You need ${res.need} more points for ${item.label}. Save a spot or come back tomorrow for your daily bonus.`, 'info');
+    } else if (res.reason === 'seasonal') {
+      showToast('That cave has gone', `${item.label} was only here for a limited time (${caveSeasonalWindowLabel(item)}). Watch the shop for the next one.`, 'info');
     } else if (res.reason === 'owned') {
       showToast('Already yours', `${item.label} is already in your collection.`, 'info');
     }
