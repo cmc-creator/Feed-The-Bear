@@ -79,16 +79,16 @@ const setupPage = async (uid, handle, id) => {
   check(pg.status === 200, 'the stale-live cave page opens');
   check(/data-cave-theme="forest"/.test(pg.html), 'a stale live profile still renders the saved forest theme');
   check(/Forest Cave/.test(pg.html), 'the page names the saved theme');
-  check(/🔥/.test(pg.html) && /📚/.test(pg.html) && /🍷/.test(pg.html), 'the page shows the saved decorations (fireplace, shelf, bar cart)');
-  check(/⭐ 265 cave points/.test(pg.html), 'the page shows the saved points total');
+  check(/decor-fireplace\.jpg/.test(pg.html) && /decor-shelf\.jpg/.test(pg.html) && /decor-barcart\.jpg/.test(pg.html), 'the page shows the saved decorations (fireplace, shelf, bar cart)');
+  check(/265 cave points/.test(pg.html), 'the page shows the saved points total');
   check(pg.html.includes(`src="${PHOTO}"`), 'the header shows her own photo from the saved profile');
 
   // 2. A good live profile is not overridden by an empty canonical doc.
   await setupPage('witchUid123456', 'witch_eats', 'witchshare01');
   pg = await view('witch_eats');
   check(pg.status === 200 && /data-cave-theme="witchy"/.test(pg.html), 'a live witchy cave still renders when the canonical doc has no cave');
-  check(/🕯️/.test(pg.html) && /🪴/.test(pg.html), 'the live decorations render');
-  check(/⭐ 40 cave points/.test(pg.html), 'the live points render');
+  check(/decor-candle\.jpg/.test(pg.html) && /decor-plant\.jpg/.test(pg.html), 'the live decorations render');
+  check(/40 cave points/.test(pg.html), 'the live points render');
   check(/src="\/feedbear-sm\.jpg"/.test(pg.html), 'no saved photo means the bear image');
 
   // 3. A live profile clobbered back to the cozy default still shows the
@@ -96,7 +96,7 @@ const setupPage = async (uid, handle, id) => {
   await setupPage('clobUid1234567', 'clob_eats', 'clobshare01');
   pg = await view('clob_eats');
   check(pg.status === 200 && /data-cave-theme="forest"/.test(pg.html), 'a clobbered live profile still renders the saved forest theme');
-  check(/⭐ 120 cave points/.test(pg.html), 'the saved points show when the live total is zero');
+  check(/120 cave points/.test(pg.html), 'the saved points show when the live total is zero');
 
   // 4. No cave anywhere: the cozy default, no points badge, bear image.
   await setupPage('samUid1234567', 'sam_eats', 'samshare0001');

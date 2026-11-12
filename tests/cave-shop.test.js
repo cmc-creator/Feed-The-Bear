@@ -183,6 +183,84 @@ const view = h => new Promise(resolve => {
   await p.waitForFunction(() => /to spend in the/.test(document.getElementById('cave-points')?.innerText || ''));
   check(/15 to spend/.test(await p.locator('#cave-points').innerText()),
     'the cave setup shows the 15-point spendable balance');
+  // ── 4. Furniture: buy, equip, max three, Grizzly bed, and the pantry ──
+  // Earn more points first: 70 more spots is 700 points.
+  await p.evaluate(() => {
+    for (let i = 0; i < 70; i++) state.restaurants.push({ id: `fx${i}`, name: `Furn Spot ${i}`, cuisine: 'Mexican', status: 'visited', myRating: 5, tags: [], visits: [], dateAdded: '2026-11-01', updatedAt: 1, dishes: [] });
+  });
+  pts = await p.evaluate(() => cavePoints());
+  check(pts.balance === 715 && pts.lifetime === 765, `seventy more spots is 715 to spend (${JSON.stringify(pts)})`);
+  // Furniture: lamp 100, table 150, sink 175, couch 200.
+  res = await p.evaluate(() => buyCaveShopItem('furniture', 'lamp'));
+  check(res.ok === true, 'buying the lamp with 715 points works');
+  res = await p.evaluate(() => buyCaveShopItem('furniture', 'table'));
+  check(res.ok === true, 'buying the table works');
+  res = await p.evaluate(() => buyCaveShopItem('furniture', 'sink'));
+  check(res.ok === true, 'buying the sink works');
+  res = await p.evaluate(() => buyCaveShopItem('furniture', 'couch'));
+  check(res.ok === true, 'buying the couch works');
+  pts = await p.evaluate(() => cavePoints());
+  check(pts.balance === 90 && pts.spent === 675, `four furniture pieces cost 625, leaving 90 (${JSON.stringify(pts)})`);
+  check(await p.evaluate(() => (loadUserProfile()?.caveOwnedFurniture || []).join() === 'lamp,table,sink,couch'),
+    'the furniture purchases are saved in the profile');
+  // The bed is the Grizzly piece: never sold for points, never equipped.
+  res = await p.evaluate(() => buyCaveShopItem('furniture', 'bed'));
+  check(res.ok === false && res.reason === 'grizzly', 'the Grizzly bed cannot be bought with points');
+  check(await p.evaluate(() => equipCaveShopItem('furniture', 'bed')) === false,
+    'the Grizzly bed cannot be equipped without Grizzly');
+  // Equip three, then the cave is full for furniture.
+  check(await p.evaluate(() => equipCaveShopItem('furniture', 'lamp')) === true, 'the lamp equips into the cave');
+  check(await p.evaluate(() => equipCaveShopItem('furniture', 'table')) === true, 'the table equips into the cave');
+  check(await p.evaluate(() => equipCaveShopItem('furniture', 'sink')) === true, 'the sink equips into the cave');
+  check(await p.evaluate(() => (loadUserProfile()?.cave?.furniture || []).join() === 'lamp,table,sink'),
+    'three furniture pieces sit in the saved cave');
+  check(await p.evaluate(() => equipCaveShopItem('furniture', 'couch')) === false,
+    'a fourth furniture piece does not fit (max three)');
+  // Take the sink out, the couch fits.
+  await p.evaluate(() => saveCave({ theme: 'cozy', decor: ['lantern'], furniture: ['lamp', 'table'] }));
+  check(await p.evaluate(() => equipCaveShopItem('furniture', 'couch')) === true,
+    'after removing a piece the couch fits');
+  // A furniture piece you do not own can never be saved, even handed to saveCave.
+  await p.evaluate(() => saveCave({ theme: 'cozy', decor: ['lantern'], furniture: ['couch', 'bed'] }));
+  check(await p.evaluate(() => (loadUserProfile()?.cave?.furniture || []).join() === 'couch'),
+    'saving the unowned bed drops it, the owned couch stays');
+
+  // Pantry: 5 points a food, counts stack, throws use one up.
+  check(await p.evaluate(() => pantryCount('pie')) === 0, 'the pantry starts empty');
+  res = await p.evaluate(() => buyPantryItem('pie'));
+  check(res.ok === true && res.count === 1, 'buying a pie adds one to the pantry');
+  res = await p.evaluate(() => buyPantryItem('pie'));
+  check(res.ok === true && res.count === 2, 'buying a second pie stacks');
+  pts = await p.evaluate(() => cavePoints());
+  check(pts.balance === 80, `two pies cost 10, leaving 80 (${JSON.stringify(pts)})`);
+  res = await p.evaluate(() => buyPantryItem('nope'));
+  check(res.ok === false && res.reason === 'unknown', 'an unknown pantry food is rejected');
+  check(await p.evaluate(() => usePantryFood('pie')) === true, 'using a pantry pie works');
+  check(await p.evaluate(() => pantryCount('pie')) === 1, 'one pie is left after a throw');
+  check(await p.evaluate(() => usePantryFood('pie')) === true, 'the last pie is used');
+  check(await p.evaluate(() => pantryCount('pie')) === 0, 'the pantry is empty again');
+  check(await p.evaluate(() => usePantryFood('pie')) === false, 'an empty pantry changes nothing (throws still work as today)');
+
+  // The shop UI shows the Furniture and Pantry sections.
+  await p.evaluate(() => { closeHandleSettings(); openCaveShop(); });
+  await p.waitForFunction(() => !document.getElementById('cave-shop-overlay')?.classList.contains('hidden'));
+  check(await p.locator('#cave-shop-furniture [data-shop-use="furniture:lamp"]').isVisible(),
+    'the owned lamp shows a Use button in the Furniture section');
+  check(await p.locator('#cave-shop-furniture [data-shop-grizzly="furniture:bed"]').isVisible(),
+    'the Grizzly bed shows a Grizzly button, not a price');
+  check(await p.locator('#cave-shop-pantry [data-pantry-buy="pie"]').isVisible(),
+    'the Pantry section sells pie');
+  // Buy a pie from the shop UI and see the pantry count in a food fight.
+  await p.locator('#cave-shop-pantry [data-pantry-buy="pie"]').click();
+  await p.waitForTimeout(400);
+  check(await p.evaluate(() => pantryCount('pie')) === 1, 'buying a pie from the shop UI adds it to the pantry');
+  await p.evaluate(() => { closeCaveShop(); openFriendThrow({ to: 'friend1234567', name: 'Friend' }); });
+  await p.waitForFunction(() => !!document.querySelector('.fft-food[data-food="pie"] .fft-pantry-count'));
+  const badge = await p.locator('.fft-food[data-food="pie"] .fft-pantry-count').innerText();
+  check(badge === '×1', `the food fight picker shows the pantry count on the pie ("${badge}")`);
+  await p.locator('.fft-close').click();
+  await p.waitForTimeout(300);
+
   check(p.errors.length === 0, `no page errors in the shop (${p.errors.slice(0, 2).join(' | ')})`);
   await p.close();
 

@@ -59,19 +59,19 @@ const view = h => new Promise(resolve => {
   await callHandle('connieUid12345', { method: 'POST', body: { action: 'publicPage', on: true } });
   let pg = await view('connie_eats');
   check(pg.status === 200, 'the cave page opens');
-  check(/🔥/.test(pg.html), 'the page shows the unlocked stone fireplace');
-  check(/🍷/.test(pg.html), 'the page shows the unlocked bar cart');
-  check(/⭐ 265 cave points/.test(pg.html), 'the page shows the creator’s points');
+  check(/decor-fireplace\.jpg/.test(pg.html), 'the page shows the unlocked stone fireplace photo');
+  check(/decor-barcart\.jpg/.test(pg.html), 'the page shows the unlocked bar cart photo');
+  check(/265 cave points/.test(pg.html), 'the page shows the creator’s points');
   check(/class="cave-scene"/.test(pg.html), 'the cave renders as a scene, not a flat row');
   check(/radial-gradient/.test(pg.html), 'the scene has warm light pools');
   check(/feTurbulence/.test(pg.html), 'the scene has a grainy wall texture');
-  check(/cave-decor"[^>]*><span>/.test(pg.html), 'each decoration sits on the shelf on its own');
+  check(/cave-decor-item decor-/.test(pg.html), 'each decoration is placed in the scene as its own photo');
 
   // Unknown decor is still dropped; a cave with no points shows no badge.
   await callHandle('bogusUid12345', { method: 'POST', body: { action: 'claim', handle: 'bogus_eats', id: 'bogusshare01', name: 'Bogus' } });
   await callHandle('bogusUid12345', { method: 'POST', body: { action: 'publicPage', on: true } });
   pg = await view('bogus_eats');
-  check(pg.status === 200 && /🧶/.test(pg.html) && !/🔥/.test(pg.html), 'an unknown decoration is dropped, the rug stays');
+  check(pg.status === 200 && /decor-rug\.jpg/.test(pg.html) && !/decor-fireplace\.jpg/.test(pg.html), 'an unknown decoration is dropped, the rug stays');
   check(!/class="cave-points"/.test(pg.html), 'a cave with no points shows no points badge');
   await callHandle('samUid1234567', { method: 'POST', body: { action: 'claim', handle: 'sam_eats', id: 'samshare0001', name: 'Sam' } });
   await callHandle('samUid1234567', { method: 'POST', body: { action: 'publicPage', on: true } });
@@ -164,9 +164,9 @@ const view = h => new Promise(resolve => {
   // The setup flow shows the points, the next unlock, and the unlocked chip.
   await p.evaluate(() => openHandleSettings());
   await p.waitForFunction(() => !document.getElementById('handle-overlay')?.classList.contains('hidden'));
-  await p.waitForFunction(() => /⭐ 50 points/.test(document.getElementById('cave-points')?.innerText || ''));
+  await p.waitForFunction(() => /50 points/.test(document.getElementById('cave-points')?.innerText || ''));
   const pointsText = await p.locator('#cave-points').innerText();
-  check(/Next unlock: 📚 Cookbook shelf at 100 points/.test(pointsText), `the setup names the next unlock ("${pointsText.replace(/\s+/g, ' ')}")`);
+  check(/Next unlock: Cookbook shelf at 100 points/.test(pointsText), `the setup names the next unlock ("${pointsText.replace(/\s+/g, ' ')}")`);
   check(/Save a spot \+10 · Rate a dish \+5 · Log a visit \+5 · Share a list \+10/.test(pointsText), 'the setup shows how points are earned');
   check(await p.locator('#cave-decor-picks [data-decor="fireplace"]').isVisible(), 'the unlocked fireplace chip shows in setup');
   check(await p.locator('#cave-decor-picks [data-decor="fireplace"]').evaluate(el => !el.classList.contains('locked')),

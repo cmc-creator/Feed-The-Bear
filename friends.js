@@ -85,7 +85,8 @@ const CAVE_DECOR = {
   barcart:  { label: 'Bar cart',        emoji: '🍷', points: 250, photo: 'decor-barcart.jpg' },
 };
 const CAVE_MAX_DECOR = 4;
-const DEFAULT_CAVE = { theme: 'cozy', decor: ['lights', 'plant'] };
+const CAVE_MAX_FURNITURE = 3;
+const DEFAULT_CAVE = { theme: 'cozy', decor: ['lights', 'plant'], furniture: [] };
 
 // Cave points: earned by using the app, and they unlock new cave decor.
 // Derived from what you've actually done, so it can never double-count
@@ -144,16 +145,18 @@ function nextCaveUnlock () {
   return { id, label: d.label, emoji: d.emoji, points: d.points };
 }
 
-// Accepts the full form {theme, decor} or the short link form {t, d}.
-// Shop themes and decor are valid too (the shop catalogs are checked
-// alongside the free ones).
+// Accepts the full form {theme, decor, furniture} or the short link form
+// {t, d, f}. Shop themes and decor are valid too (the shop catalogs are
+// checked alongside the free ones).
 function normalizeCave (raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
   const theme = caveThemeInfo(src.theme || src.t) ? (src.theme || src.t) : DEFAULT_CAVE.theme;
   const list = Array.isArray(src.decor) ? src.decor : (Array.isArray(src.d) ? src.d : null);
   const decor = list === null ? [...DEFAULT_CAVE.decor]
     : [...new Set(list.map(x => String(x)).filter(id => caveDecorInfo(id)))].slice(0, CAVE_MAX_DECOR);
-  return { theme, decor };
+  const flist = Array.isArray(src.furniture) ? src.furniture : (Array.isArray(src.f) ? src.f : []);
+  const furniture = [...new Set(flist.map(x => String(x)).filter(id => caveFurnitureInfo(id)))].slice(0, CAVE_MAX_FURNITURE);
+  return { theme, decor, furniture };
 }
 function getCave () {
   const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
@@ -161,7 +164,7 @@ function getCave () {
 }
 function caveShort (cave) {
   const c = normalizeCave(cave);
-  return { t: c.theme, d: c.decor };
+  return { t: c.theme, d: c.decor, f: c.furniture };
 }
 // A friend's cave: a profile link carries it at the top level, the live
 // doc nests it under profile (both come from buildProfileData).
@@ -178,6 +181,8 @@ function saveCave (cave) {
   // Shop decorations need a purchase (or Grizzly) instead of a points tier.
   const unlocked = caveUnlockedIds();
   next.decor = next.decor.filter(id => caveIsShopDecor(id) ? caveShopOwns('decor', id) : unlocked.has(id));
+  // Furniture can only be placed when it is owned (or Grizzly, while Grizzly).
+  next.furniture = (next.furniture || []).filter(id => caveShopOwns('furniture', id));
   const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || { name: 'Foodie', avatar: DEFAULT_AVATAR, joinDate: new Date().toISOString() };
   if (typeof saveUserProfile === 'function') saveUserProfile({ ...profile, cave: next, caveLifetime: cavePoints().lifetime });
   // Friends see the new look: the live profile republishes (it dedupes itself).
@@ -215,19 +220,32 @@ const CAVE_SHOP_DECOR = {
   chandelier: { label: 'Crystal chandelier', emoji: '✨', photo: 'decor-chandelier.jpg', price: 0,   rarity: 'Epic',      grizzly: true },
   throne:     { label: 'Bear throne',       emoji: '🪑', photo: 'decor-throne.jpg',     price: 0,   rarity: 'Legendary', grizzly: true },
 };
-const CAVE_SHOP_RARITY = { Common: '🤍', Rare: '💙', Epic: '💜', Legendary: '🧡' };
+/* Furniture for the cave: real photos of furniture, bought with points
+   like decor and placed in the scene. The bed is the Grizzly piece.
+   Photos are CC-licensed (Openverse) and live in assets/caves/. */
+const CAVE_SHOP_FURNITURE = {
+  couch:  { label: 'Couch',  photo: 'furn-couch.jpg',  price: 200, rarity: 'Rare',      grizzly: false },
+  table:  { label: 'Table',  photo: 'furn-table.jpg',  price: 150, rarity: 'Common',    grizzly: false },
+  lamp:   { label: 'Lamp',   photo: 'furn-lamp.jpg',   price: 100, rarity: 'Common',    grizzly: false },
+  sink:   { label: 'Sink',   photo: 'furn-sink.jpg',   price: 175, rarity: 'Rare',      grizzly: false },
+  fridge: { label: 'Fridge', photo: 'furn-fridge.jpg', price: 300, rarity: 'Epic',      grizzly: false },
+  bed:    { label: 'Bed',    photo: 'furn-bed.jpg',    price: 0,   rarity: 'Legendary', grizzly: true },
+};
 function caveThemeInfo (id) { return CAVE_THEMES[id] || CAVE_SHOP_THEMES[id] || null; }
 function caveDecorInfo (id) { return CAVE_DECOR[id] || CAVE_SHOP_DECOR[id] || null; }
+function caveFurnitureInfo (id) { return CAVE_SHOP_FURNITURE[id] || null; }
 function caveIsShopTheme (id) { return !!CAVE_SHOP_THEMES[id]; }
 function caveIsShopDecor (id) { return !!CAVE_SHOP_DECOR[id]; }
+function caveIsShopFurniture (id) { return !!CAVE_SHOP_FURNITURE[id]; }
 // Grizzly members own every Grizzly shop item automatically, for as long
 // as they are Grizzly. Points items are owned only once bought.
 function caveShopOwns (kind, id) {
-  const item = kind === 'theme' ? CAVE_SHOP_THEMES[id] : CAVE_SHOP_DECOR[id];
+  const catalog = kind === 'theme' ? CAVE_SHOP_THEMES : kind === 'decor' ? CAVE_SHOP_DECOR : CAVE_SHOP_FURNITURE;
+  const item = catalog[id];
   if (!item) return false;
   if (item.grizzly) return typeof hasGrizzly === 'function' && hasGrizzly();
   const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
-  const key = kind === 'theme' ? 'caveOwnedThemes' : 'caveOwnedDecor';
+  const key = kind === 'theme' ? 'caveOwnedThemes' : kind === 'decor' ? 'caveOwnedDecor' : 'caveOwnedFurniture';
   return Array.isArray(profile[key]) && profile[key].includes(id);
 }
 // Buy a points item: validates the item, ownership, and the balance, then
@@ -236,7 +254,7 @@ function caveShopOwns (kind, id) {
 // never touches lifetime, so the Fireplace / Shelf / Bar Cart unlocks
 // (based on lifetime) can never be lost by buying things.
 function buyCaveShopItem (kind, id) {
-  const catalog = kind === 'theme' ? CAVE_SHOP_THEMES : CAVE_SHOP_DECOR;
+  const catalog = kind === 'theme' ? CAVE_SHOP_THEMES : kind === 'decor' ? CAVE_SHOP_DECOR : CAVE_SHOP_FURNITURE;
   const item = catalog[id];
   if (!item) return { ok: false, reason: 'unknown' };
   if (item.grizzly) return { ok: false, reason: 'grizzly' };
@@ -244,7 +262,7 @@ function buyCaveShopItem (kind, id) {
   const pts = cavePoints();
   if (pts.balance < item.price) return { ok: false, reason: 'points', need: item.price - pts.balance };
   const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || { name: 'Foodie', avatar: DEFAULT_AVATAR, joinDate: new Date().toISOString() };
-  const key = kind === 'theme' ? 'caveOwnedThemes' : 'caveOwnedDecor';
+  const key = kind === 'theme' ? 'caveOwnedThemes' : kind === 'decor' ? 'caveOwnedDecor' : 'caveOwnedFurniture';
   const owned = [...new Set([...(Array.isArray(profile[key]) ? profile[key] : []), id])];
   if (typeof saveUserProfile === 'function') {
     saveUserProfile({ ...profile, caveSpent: (Number(profile.caveSpent) || 0) + item.price, caveLifetime: pts.lifetime, [key]: owned });
@@ -252,15 +270,85 @@ function buyCaveShopItem (kind, id) {
   return { ok: true };
 }
 // Equip a shop item you own: a theme becomes the cave theme, a decoration
-// joins the cave (up to 4). Returns false when it is not owned or, for
-// decorations, when the cave is already full.
+// joins the cave (up to 4), furniture joins the cave (up to 3). Returns
+// false when it is not owned or when the cave is already full.
 function equipCaveShopItem (kind, id) {
   if (!caveShopOwns(kind, id)) return false;
   const cave = getCave();
-  if (kind === 'theme') saveCave({ ...cave, theme: id });
-  else if (cave.decor.includes(id)) return true;
-  else if (cave.decor.length >= CAVE_MAX_DECOR) return false;
-  else saveCave({ ...cave, decor: [...cave.decor, id].slice(0, CAVE_MAX_DECOR) });
+  if (kind === 'theme') { saveCave({ ...cave, theme: id }); return true; }
+  if (kind === 'furniture') {
+    if (cave.furniture.includes(id)) return true;
+    if (cave.furniture.length >= CAVE_MAX_FURNITURE) return false;
+    saveCave({ ...cave, furniture: [...cave.furniture, id].slice(0, CAVE_MAX_FURNITURE) });
+    return true;
+  }
+  if (cave.decor.includes(id)) return true;
+  if (cave.decor.length >= CAVE_MAX_DECOR) return false;
+  saveCave({ ...cave, decor: [...cave.decor, id].slice(0, CAVE_MAX_DECOR) });
+  return true;
+}
+
+/* ── Pantry: buy food with points, throw it in food fights ──
+   Each food costs 5 points and adds one to the pantry. The pantry lives
+   in the profile (pantry: {foodId: count}) and syncs with the cloud save.
+   Throwing a food you own in the pantry uses one up; when the pantry is
+   empty for that food (or you never bought any), the food fight works
+   exactly as it does today — nothing is ever locked behind the pantry. */
+const PANTRY_PRICE = 5;
+const CAVE_PANTRY = {
+  pie:       { label: 'Pie',       photo: 'assets/food/pie.jpg' },
+  taco:      { label: 'Taco',      photo: 'assets/food/tacos.jpg' },
+  spaghetti: { label: 'Spaghetti', photo: 'assets/food/pasta.jpg' },
+  donut:     { label: 'Donut',     photo: 'assets/food/donut.jpg' },
+  pizza:     { label: 'Pizza',     photo: 'assets/food/pizza.jpg' },
+  cake:      { label: 'Cake',      photo: 'assets/food/cheesecake.jpg' },
+  burger:    { label: 'Burger',    photo: 'assets/food/burger.jpg' },
+  hotdog:    { label: 'Hot Dog',   photo: 'assets/food/hotdog.jpg' },
+  sushi:     { label: 'Sushi',     photo: 'assets/food/sushi.jpg' },
+  ramen:     { label: 'Ramen',     photo: 'assets/food/ramen.jpg' },
+  icecream:  { label: 'Ice Cream', photo: 'assets/food/gelato.jpg' },
+  cupcake:   { label: 'Cupcake',   photo: 'assets/food/cupcake.jpg' },
+  cookie:    { label: 'Cookie',    photo: 'assets/food/cookie.jpg' },
+  popcorn:   { label: 'Popcorn',   photo: 'assets/food/popcorn.jpg' },
+  fries:     { label: 'Fries',     photo: 'assets/food/fries.jpg' },
+  sandwich:  { label: 'Sandwich',  photo: 'assets/food/grilled_cheese.jpg' },
+  burrito:   { label: 'Burrito',   photo: 'assets/food/burrito.jpg' },
+  pancake:   { label: 'Pancake',   photo: 'assets/food/pancakes.jpg' },
+  waffle:    { label: 'Waffle',    photo: 'assets/food/waffles.jpg' },
+  cheese:    { label: 'Cheese',    photo: 'assets/food/mac_and_cheese.jpg' },
+  egg:       { label: 'Egg',       photo: 'assets/food/omelette.jpg' },
+  bacon:     { label: 'Bacon',     photo: 'assets/food/bacon.jpg' },
+  corn:      { label: 'Corn',      photo: 'assets/food/corn.jpg' },
+  apple:     { label: 'Apple',     photo: 'assets/food/apple.jpg' },
+  pretzel:   { label: 'Pretzel',   photo: 'assets/food/pretzel.jpg' },
+};
+function pantryCount (id) {
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
+  return Math.max(0, Math.floor(Number((profile.pantry || {})[id]) || 0));
+}
+function buyPantryItem (id) {
+  const item = CAVE_PANTRY[id];
+  if (!item) return { ok: false, reason: 'unknown' };
+  const pts = cavePoints();
+  if (pts.balance < PANTRY_PRICE) return { ok: false, reason: 'points', need: PANTRY_PRICE - pts.balance };
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || { name: 'Foodie', avatar: DEFAULT_AVATAR, joinDate: new Date().toISOString() };
+  const pantry = { ...(profile.pantry || {}) };
+  pantry[id] = Math.floor(Number(pantry[id]) || 0) + 1;
+  if (typeof saveUserProfile === 'function') {
+    saveUserProfile({ ...profile, pantry, caveSpent: (Number(profile.caveSpent) || 0) + PANTRY_PRICE, caveLifetime: pts.lifetime });
+  }
+  return { ok: true, count: pantry[id] };
+}
+// Use one pantry food for a throw. Returns true when stock was used;
+// false when the pantry is empty for that food (the throw still goes
+// ahead exactly as it does today).
+function usePantryFood (id) {
+  if (pantryCount(id) <= 0) return false;
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || null;
+  if (!profile) return false;
+  const pantry = { ...(profile.pantry || {}) };
+  pantry[id] = Math.max(0, Math.floor(Number(pantry[id]) || 0) - 1);
+  if (typeof saveUserProfile === 'function') saveUserProfile({ ...profile, pantry });
   return true;
 }
 // Daily check-in: +5 points the first time the app opens each day, for a
@@ -2035,24 +2123,36 @@ function renderCaveSetup () {
     const next = nextCaveUnlock();
     const pointsBox = document.getElementById('cave-points');
     if (pointsBox) {
-      pointsBox.innerHTML = `<b>⭐ ${pts.total} points</b> <span>(${pts.spots} spot${pts.spots === 1 ? '' : 's'} · ${pts.dishes} dish${pts.dishes === 1 ? '' : 'es'} rated · ${pts.visits} visit${pts.visits === 1 ? '' : 's'} · ${pts.lists} list${pts.lists === 1 ? '' : 's'} shared)</span>`
-        + `<span class="cave-points-balance">💰 ${pts.balance} to spend in the <button type="button" class="cave-shop-link" id="cave-shop-open-link">Cave Shop</button></span>`
-        + `<span class="cave-points-next">${next ? `Next unlock: ${next.emoji} ${next.label} at ${next.points} points` : '🎉 Every decoration unlocked!'}</span>`
+      pointsBox.innerHTML = `<b>${pts.total} points</b> <span>(${pts.spots} spot${pts.spots === 1 ? '' : 's'} · ${pts.dishes} dish${pts.dishes === 1 ? '' : 'es'} rated · ${pts.visits} visit${pts.visits === 1 ? '' : 's'} · ${pts.lists} list${pts.lists === 1 ? '' : 's'} shared)</span>`
+        + `<span class="cave-points-balance">${pts.balance} to spend in the <button type="button" class="cave-shop-link" id="cave-shop-open-link">Cave Shop</button></span>`
+        + `<span class="cave-points-next">${next ? `Next unlock: ${next.label} at ${next.points} points` : 'Every decoration unlocked!'}</span>`
         + `<span class="cave-points-earn">Save a spot +${CAVE_POINTS.spot} · Rate a dish +${CAVE_POINTS.dish} · Log a visit +${CAVE_POINTS.visit} · Share a list +${CAVE_POINTS.list} · Daily visit +${CAVE_DAILY_BONUS}</span>`;
     }
     themeBox.innerHTML = Object.entries(CAVE_THEMES).map(([id, t]) =>
-      `<button type="button" class="cave-theme-chip${cave.theme === id ? ' on' : ''}" data-theme="${id}"><img src="/assets/caves/${t.photo}" alt="" loading="lazy" /><span>${t.emoji} ${t.label}</span></button>`).join('');
+      `<button type="button" class="cave-theme-chip${cave.theme === id ? ' on' : ''}" data-theme="${id}"><img src="/assets/caves/${t.photo}" alt="" loading="lazy" /><span>${t.label}</span></button>`).join('');
     decorBox.innerHTML = Object.entries(CAVE_DECOR).map(([id, d]) => {
       const on = cave.decor.includes(id);
       const locked = !unlocked.has(id);
       const disabled = !on && !locked && cave.decor.length >= CAVE_MAX_DECOR;
-      const label = locked ? `🔒 ${d.label} · ${d.points} pts` : `${d.emoji} ${d.label}`;
+      const label = locked ? `${d.label} · ${d.points} pts` : `${d.label}`;
       return `<button type="button" class="cave-decor-chip${on ? ' on' : ''}${locked ? ' locked' : ''}" data-decor="${id}"${disabled ? ' disabled' : ''} title="${locked ? `Unlocks at ${d.points} points` : d.label}"><img src="/assets/caves/${d.photo}" alt="" loading="lazy" /><span>${label}</span></button>`;
     }).join('');
     const prev = document.getElementById('cave-setup-preview');
     if (prev) {
-      const dec = cave.decor.map(id => { const d = caveDecorInfo(id); return d ? `<img class="cave-preview-decor-img" src="/assets/caves/${d.photo}" alt="${escHtml(d.emoji)} ${escHtml(d.label)}" onerror="this.style.display='none'" />` : ''; }).join('');
-      prev.innerHTML = `<span class="cave-preview-banner cave-theme-${cave.theme}"><span class="cave-preview-decor">${dec}</span><b>${escHtml((caveThemeInfo(cave.theme) || {}).label || 'Cozy Cave')}</b></span>`;
+      const dec = cave.decor.map(id => { const d = caveDecorInfo(id); return d ? `<img class="cave-preview-decor-img decor-${escHtml(id)}" src="/assets/caves/${d.photo}" alt="${escHtml(d.label)}" onerror="this.style.display='none'" />` : ''; }).join('');
+      const furn = cave.furniture.map(id => { const f = caveFurnitureInfo(id); return f ? `<img class="cave-preview-decor-img furn-${escHtml(id)}" src="/assets/caves/${f.photo}" alt="${escHtml(f.label)}" onerror="this.style.display='none'" />` : ''; }).join('');
+      prev.innerHTML = `<span class="cave-preview-scene cave-theme-${cave.theme}"><span class="cave-preview-decor">${dec}${furn}</span><span class="cave-preview-caption"><span>${escHtml((caveThemeInfo(cave.theme) || {}).label || 'Cozy Cave')}</span><span>${pts.total} points</span></span></span>`;
+    }
+    // Furniture row (owned pieces only — tap to place up to 3).
+    const furnBox = document.getElementById('cave-furniture-picks');
+    if (furnBox) {
+      const owned = Object.keys(CAVE_SHOP_FURNITURE).filter(id => caveShopOwns('furniture', id));
+      furnBox.innerHTML = owned.map(id => {
+        const item = CAVE_SHOP_FURNITURE[id];
+        const on = cave.furniture.includes(id);
+        const disabled = !on && cave.furniture.length >= CAVE_MAX_FURNITURE;
+        return `<button type="button" class="cave-decor-chip${on ? ' on' : ''}" data-furniture="${id}"${disabled ? ' disabled' : ''} title="${escHtml(item.label)}"><img src="/assets/caves/${item.photo}" alt="" loading="lazy" /><span>${escHtml(item.label)}</span></button>`;
+      }).join('') || '<p class="cave-setup-hint">Buy furniture in the Cave Shop to place it here.</p>';
     }
   };
   themeBox.onclick = e => { const b = e.target.closest('[data-theme]'); if (!b) return; cave = { ...cave, theme: b.dataset.theme }; draw(); };
@@ -2062,16 +2162,24 @@ function renderCaveSetup () {
     const id = b.dataset.decor;
     if (!caveUnlockedIds().has(id)) {
       const d = CAVE_DECOR[id];
-      showToast('Locked for now', `${d.emoji} ${d.label} unlocks at ${d.points} points — you have ${cavePoints().total}. Keep eating!`, 'info');
+      showToast('Locked for now', `${d.label} unlocks at ${d.points} points — you have ${cavePoints().total}. Keep eating!`, 'info');
       return;
     }
     cave = { ...cave, decor: cave.decor.includes(id) ? cave.decor.filter(x => x !== id) : [...cave.decor, id].slice(0, CAVE_MAX_DECOR) };
     draw();
   };
+  const furnBox = document.getElementById('cave-furniture-picks');
+  if (furnBox) furnBox.onclick = e => {
+    const b = e.target.closest('[data-furniture]');
+    if (!b || b.disabled) return;
+    const id = b.dataset.furniture;
+    cave = { ...cave, furniture: cave.furniture.includes(id) ? cave.furniture.filter(x => x !== id) : [...cave.furniture, id].slice(0, CAVE_MAX_FURNITURE) };
+    draw();
+  };
   const saveBtn = document.getElementById('cave-save-btn');
   if (saveBtn) saveBtn.onclick = () => {
     saveCave(cave);
-    const unlockedNote = fresh.length ? ` You unlocked: ${fresh.map(id => `${CAVE_DECOR[id].emoji} ${CAVE_DECOR[id].label}`).join(', ')}!` : '';
+    const unlockedNote = fresh.length ? ` You unlocked: ${fresh.map(id => `${CAVE_DECOR[id].label}`).join(', ')}!` : '';
     showToast('Your cave is decorated!', `${(caveThemeInfo(cave.theme) || {}).label || 'Cozy Cave'} theme, ${cave.decor.length} decoration${cave.decor.length === 1 ? '' : 's'}.${unlockedNote}`, 'success');
   };
   const shopLink = document.getElementById('cave-shop-open-link');
@@ -2098,35 +2206,54 @@ function renderCaveShop () {
   const balanceEl = document.getElementById('cave-shop-balance');
   const themeGrid = document.getElementById('cave-shop-themes');
   const decorGrid = document.getElementById('cave-shop-decor');
-  if (!themeGrid || !decorGrid) return;
+  const furnGrid = document.getElementById('cave-shop-furniture');
+  const pantryGrid = document.getElementById('cave-shop-pantry');
+  if (!themeGrid || !decorGrid || !furnGrid || !pantryGrid) return;
   const pts = cavePoints();
   const cave = getCave();
   if (balanceEl) {
-    balanceEl.innerHTML = `<b>💰 ${pts.balance} points to spend</b><span>${pts.lifetime} earned all time · ${pts.spent} spent</span>`
+    balanceEl.innerHTML = `<b>${pts.balance} points to spend</b><span>${pts.lifetime} earned all time · ${pts.spent} spent</span>`
       + `<span class="cave-shop-earn">Save a spot +${CAVE_POINTS.spot} · Rate a dish +${CAVE_POINTS.dish} · Log a visit +${CAVE_POINTS.visit} · Share a list +${CAVE_POINTS.list} · Daily visit +${CAVE_DAILY_BONUS}</span>`;
   }
   const card = (kind, id, item) => {
     const owned = caveShopOwns(kind, id);
     const isTheme = kind === 'theme';
-    const active = isTheme ? cave.theme === id : cave.decor.includes(id);
+    const isFurniture = kind === 'furniture';
+    const active = isTheme ? cave.theme === id : isFurniture ? cave.furniture.includes(id) : cave.decor.includes(id);
     const imgStyle = item.filter ? ` style="filter:${item.filter}"` : '';
-    const price = item.grizzly ? '🐻 Grizzly' : `⭐ ${item.price}`;
-    const full = !isTheme && !active && cave.decor.length >= CAVE_MAX_DECOR;
+    const price = item.grizzly ? 'Grizzly' : `${item.price} pts`;
+    const max = isFurniture ? CAVE_MAX_FURNITURE : CAVE_MAX_DECOR;
+    const count = isFurniture ? cave.furniture.length : cave.decor.length;
+    const full = !isTheme && !active && count >= max;
     let action;
     if (owned && active) action = `<button type="button" class="btn-sm btn-secondary" disabled>✓ In your cave</button>`;
-    else if (owned && full) action = `<button type="button" class="btn-sm btn-secondary" disabled>Cave full (4 max)</button>`;
+    else if (owned && full) action = `<button type="button" class="btn-sm btn-secondary" disabled>Cave full (${max} max)</button>`;
     else if (owned) action = `<button type="button" class="btn-sm btn-primary" data-shop-use="${kind}:${id}">Use it</button>`;
-    else if (item.grizzly) action = `<button type="button" class="btn-sm btn-orange" data-shop-grizzly="${kind}:${id}">🐻 Grizzly</button>`;
-    else if (pts.balance >= item.price) action = `<button type="button" class="btn-sm btn-primary" data-shop-buy="${kind}:${id}">Buy · ⭐ ${item.price}</button>`;
+    else if (item.grizzly) action = `<button type="button" class="btn-sm btn-orange" data-shop-grizzly="${kind}:${id}">Grizzly</button>`;
+    else if (pts.balance >= item.price) action = `<button type="button" class="btn-sm btn-primary" data-shop-buy="${kind}:${id}">Buy · ${item.price} pts</button>`;
     else action = `<button type="button" class="btn-sm btn-secondary" disabled>Need ${item.price - pts.balance} more</button>`;
     return `<article class="cave-shop-item${owned ? ' owned' : ''}${item.grizzly ? ' grizzly-item' : ''}">
-      <img src="/assets/caves/${item.photo}" alt="${escHtml(item.emoji)} ${escHtml(item.label)}" loading="lazy"${imgStyle} onerror="this.style.display='none'" />
-      <div class="cave-shop-item-body"><b>${item.emoji} ${escHtml(item.label)}</b>
-      <span class="cave-shop-rarity">${CAVE_SHOP_RARITY[item.rarity] || ''} ${escHtml(item.rarity)}</span>
+      <img src="/assets/caves/${item.photo}" alt="${escHtml(item.label)}" loading="lazy"${imgStyle} onerror="this.style.display='none'" />
+      <div class="cave-shop-item-body"><b>${escHtml(item.label)}</b>
+      <span class="cave-shop-rarity rarity-${String(item.rarity || '').toLowerCase()}">${escHtml(item.rarity)}</span>
       <span class="cave-shop-price">${price}</span></div>${action}</article>`;
+  };
+  // Pantry cards: each food costs 5 points and adds one to the pantry.
+  const pantryCard = (id, item) => {
+    const count = pantryCount(id);
+    const action = pts.balance >= PANTRY_PRICE
+      ? `<button type="button" class="btn-sm btn-primary" data-pantry-buy="${id}">Buy · ${PANTRY_PRICE} pts</button>`
+      : `<button type="button" class="btn-sm btn-secondary" disabled>Need ${PANTRY_PRICE - pts.balance} more</button>`;
+    return `<article class="cave-shop-item${count > 0 ? ' owned' : ''}">
+      <img src="/${item.photo}" alt="${escHtml(item.label)}" loading="lazy" onerror="this.style.display='none'" />
+      <div class="cave-shop-item-body"><b>${escHtml(item.label)}</b>
+      <span class="cave-shop-rarity rarity-common">Pantry</span>
+      <span class="cave-shop-price">${count > 0 ? `In pantry: ${count}` : `${PANTRY_PRICE} pts each`}</span></div>${action}</article>`;
   };
   themeGrid.innerHTML = Object.entries(CAVE_SHOP_THEMES).map(([id, t]) => card('theme', id, t)).join('');
   decorGrid.innerHTML = Object.entries(CAVE_SHOP_DECOR).map(([id, d]) => card('decor', id, d)).join('');
+  furnGrid.innerHTML = Object.entries(CAVE_SHOP_FURNITURE).map(([id, f]) => card('furniture', id, f)).join('');
+  pantryGrid.innerHTML = Object.entries(CAVE_PANTRY).map(([id, p]) => pantryCard(id, p)).join('');
 }
 function openCaveShop () {
   const overlay = document.getElementById('cave-shop-overlay');
@@ -2146,10 +2273,10 @@ document.addEventListener('click', e => {
   const buy = e.target.closest('[data-shop-buy]');
   if (buy) {
     const [kind, id] = buy.dataset.shopBuy.split(':');
-    const item = kind === 'theme' ? CAVE_SHOP_THEMES[id] : CAVE_SHOP_DECOR[id];
+    const item = kind === 'theme' ? CAVE_SHOP_THEMES[id] : kind === 'decor' ? CAVE_SHOP_DECOR[id] : CAVE_SHOP_FURNITURE[id];
     const res = buyCaveShopItem(kind, id);
     if (res.ok) {
-      showToast('It\'s yours!', `${item.emoji} ${item.label} is in your cave collection. Tap Use it to put it in your cave.`, 'success');
+      showToast('It\'s yours!', `${item.label} is in your cave collection. Tap Use it to put it in your cave.`, 'success');
     } else if (res.reason === 'points') {
       showToast('Not enough points yet', `You need ${res.need} more points for ${item.label}. Save a spot or come back tomorrow for your daily bonus.`, 'info');
     } else if (res.reason === 'owned') {
@@ -2162,11 +2289,21 @@ document.addEventListener('click', e => {
   const use = e.target.closest('[data-shop-use]');
   if (use) {
     const [kind, id] = use.dataset.shopUse.split(':');
-    const item = kind === 'theme' ? CAVE_SHOP_THEMES[id] : CAVE_SHOP_DECOR[id];
-    if (equipCaveShopItem(kind, id)) showToast('In your cave!', `${item.emoji} ${item.label} is now in your cave.`, 'success');
-    else showToast('Your cave is full', 'Remove a decoration from your cave first, then come back.', 'info');
+    const item = kind === 'theme' ? CAVE_SHOP_THEMES[id] : kind === 'decor' ? CAVE_SHOP_DECOR[id] : CAVE_SHOP_FURNITURE[id];
+    if (equipCaveShopItem(kind, id)) showToast('In your cave!', `${item.label} is now in your cave.`, 'success');
+    else showToast('Your cave is full', kind === 'furniture' ? 'Remove a piece of furniture from your cave first, then come back.' : 'Remove a decoration from your cave first, then come back.', 'info');
     renderCaveShop();
     if (typeof renderCaveSetup === 'function') renderCaveSetup();
+    return;
+  }
+  const pantryBuy = e.target.closest('[data-pantry-buy]');
+  if (pantryBuy) {
+    const id = pantryBuy.dataset.pantryBuy;
+    const item = CAVE_PANTRY[id];
+    const res = buyPantryItem(id);
+    if (res.ok) showToast('Added to your pantry', `${item.label} is in your pantry (${res.count}). Throw it in a food fight!`, 'success');
+    else if (res.reason === 'points') showToast('Not enough points yet', `You need ${res.need} more points for ${item.label}. Save a spot or come back tomorrow for your daily bonus.`, 'info');
+    renderCaveShop();
     return;
   }
   const grz = e.target.closest('[data-shop-grizzly]');
@@ -2613,7 +2750,13 @@ function openFriendThrow ({ to = '', pair = '', name = 'Friend', av = '' } = {})
     <h3 class="fft-title">Throw something at ${escHtml(first)}!</h3>
     <div class="fft-target" aria-hidden="true"><span class="fft-face">${av && typeof avatarSvg === 'function' ? avatarSvg(av) : '🐻'}</span></div>
     <p class="fft-status" aria-live="polite">Pick your food:</p>
-    <div class="fft-foods">${FF_FOODS.map(([k, e, l]) => `<button type="button" class="fft-food" data-food="${k}" aria-label="Throw ${l.toLowerCase()}"><span aria-hidden="true">${e}</span><small>${l}</small></button>`).join('')}</div>
+    <div class="fft-foods">${FF_FOODS.map(([k, e, l]) => {
+      // Pantry stock shows as a small count badge; when you own none of a
+      // food (or never bought any) the food is still throwable as today.
+      const stocked = pantryCount(k);
+      const badge = stocked > 0 ? `<b class="fft-pantry-count">×${stocked}</b>` : '';
+      return `<button type="button" class="fft-food" data-food="${k}" aria-label="Throw ${l.toLowerCase()}"><span aria-hidden="true">${e}</span><small>${l}</small>${badge}</button>`;
+    }).join('')}</div>
   </div>`;
   document.body.appendChild(ov);
   ov.addEventListener('click', e => { if (e.target === ov) closeFriendThrow(); });
@@ -2637,6 +2780,9 @@ function openFriendThrow ({ to = '', pair = '', name = 'Friend', av = '' } = {})
       return;
     }
     const d = res.data;
+    // A successful throw uses one pantry food, when you own it. An empty
+    // pantry changes nothing — the throw still goes ahead as today.
+    usePantryFood(food);
     if (to) _ffScores[to] = { pair: d.pair, me: d.me, them: d.them };
     if (ffLastHit()?.pair === d.pair) ffSetLastHit(null);
     status.innerHTML = `<strong>Splat! 🎯</strong> You ${d.me} · ${escHtml(first)} ${d.them}`;

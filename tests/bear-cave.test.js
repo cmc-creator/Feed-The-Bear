@@ -65,8 +65,13 @@ const voteCall = (method, { query = {}, body = {} } = {}) => new Promise(resolve
   let pg = await view('connie_eats');
   check(pg.status === 200, 'the cave page opens');
   check(/data-cave-theme="forest"/.test(pg.html), 'the page carries the forest theme');
-  check(/✨/.test(pg.html) && /🪴/.test(pg.html), 'the page shows the fairy lights and plant');
+  check(/decor-lights\.jpg/.test(pg.html) && /decor-plant\.jpg/.test(pg.html), 'the page shows the fairy lights and plant photos');
   check(/Forest Cave/.test(pg.html), 'the page names the theme');
+  check(/class="cave-scene"/.test(pg.html), 'the cave renders as a scene, not a flat row');
+  check(/cave-decor-item decor-lights/.test(pg.html) && /cave-decor-item decor-plant/.test(pg.html),
+    'each decoration is placed in the scene with its own position');
+  check(/class="cave-scene"[\s\S]*?class="cave-caption"/.test(pg.html), 'the theme and points caption sits below the scene');
+  check(!/🐻|⭐|❤️/.test(pg.html), 'the cave page has no emoji in the scene, caption, or vote button');
   check(/id="cave-vote-btn" data-share="connieshare01"/.test(pg.html), 'the page has a vote button for this cave');
   check(/Love this cave\?/.test(pg.html), 'the vote button asks nicely');
   check(/\/api\/cave-vote/.test(pg.html), 'the page talks to the vote endpoint');
@@ -140,13 +145,16 @@ const voteCall = (method, { query = {}, body = {} } = {}) => new Promise(resolve
   await p.waitForTimeout(1200);
 
   // Defaults: no cave set yet, so the cozy default with fairy lights + plant.
-  check(await p.evaluate(() => JSON.stringify(getCave())) === JSON.stringify({ theme: 'cozy', decor: ['lights', 'plant'] }),
+  check(await p.evaluate(() => JSON.stringify(getCave())) === JSON.stringify({ theme: 'cozy', decor: ['lights', 'plant'], furniture: [] }),
     'a user who skipped setup gets the cozy default cave');
   check(await p.evaluate(() => JSON.stringify(normalizeCave({ theme: 'nope', decor: ['bogus', 'plant', 'plant', 'rug', 'lights', 'trophy', 'candle'] })))
-    === JSON.stringify({ theme: 'cozy', decor: ['plant', 'rug', 'lights', 'trophy'] }),
+    === JSON.stringify({ theme: 'cozy', decor: ['plant', 'rug', 'lights', 'trophy'], furniture: [] }),
     'unknown themes and decorations are dropped, duplicates removed, capped at four');
-  check(await p.evaluate(() => JSON.stringify(normalizeCave({ t: 'neon', d: ['candle'] }))) === JSON.stringify({ theme: 'neon', decor: ['candle'] }),
+  check(await p.evaluate(() => JSON.stringify(normalizeCave({ t: 'neon', d: ['candle'] }))) === JSON.stringify({ theme: 'neon', decor: ['candle'], furniture: [] }),
     'the short link form reads back the same cave');
+  check(await p.evaluate(() => JSON.stringify(normalizeCave({ theme: 'forest', decor: [], furniture: ['couch', 'bed', 'lamp', 'table', 'bogus'] })))
+    === JSON.stringify({ theme: 'forest', decor: [], furniture: ['couch', 'bed', 'lamp'] }),
+    'furniture is validated against the catalog and capped at three');
 
   // The public-page section shows the votes and a Decorate button.
   await p.evaluate(() => { window._ftbUid = 'connieUid12345'; });
@@ -169,15 +177,19 @@ const voteCall = (method, { query = {}, body = {} } = {}) => new Promise(resolve
     `setup saves the theme and decorations (${JSON.stringify(saved)})`);
   const preview = await p.evaluate(() => document.getElementById('cave-setup-preview')?.innerText || '');
   check(/Neon/.test(preview), 'the setup preview shows the chosen theme');
+  check(/cave-preview-scene/.test(await p.evaluate(() => document.getElementById('cave-setup-preview')?.innerHTML || '')),
+    'the setup preview is a scene, not a row of thumbnails');
+  check(/Buy furniture in the Cave Shop/.test(await p.evaluate(() => document.getElementById('cave-furniture-picks')?.innerText || '')),
+    'with no furniture owned the setup points at the Cave Shop');
 
   // Sharing: the cave rides the profile link data and the live profile.
   const shared = await p.evaluate(() => buildProfileData().cave);
-  check(shared?.t === 'neon' && shared?.d?.join() === 'lights,plant,trophy,candle',
-    'the share link data carries the cave');
+  check(shared?.t === 'neon' && shared?.d?.join() === 'lights,plant,trophy,candle' && Array.isArray(shared?.f),
+    'the share link data carries the cave (theme, decor, furniture)');
   await p.evaluate(() => { state.settings.shareLive = true; });
   const live = await p.evaluate(() => buildLiveProfile()?.profile?.cave);
   check(live?.t === 'neon' && live?.d?.length === 4, 'the live profile carries the cave for the page');
-  check(await p.evaluate(() => JSON.stringify(caveOf({ profile: { cave: { t: 'pastel', d: ['rug'] } } }))) === JSON.stringify({ theme: 'pastel', decor: ['rug'] }),
+  check(await p.evaluate(() => JSON.stringify(caveOf({ profile: { cave: { t: 'pastel', d: ['rug'] } } }))) === JSON.stringify({ theme: 'pastel', decor: ['rug'], furniture: [] }),
     'a friend’s live profile reads back their cave');
   check(p.errors.length === 0, `no page errors (${p.errors.slice(0, 2).join(' | ')})`);
   await p.close();

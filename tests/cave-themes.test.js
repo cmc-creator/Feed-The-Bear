@@ -119,7 +119,7 @@ const view = h => new Promise(resolve => {
   for (const id of THEME_IDS) {
     await p.locator(`#cave-theme-picks [data-theme="${id}"]`).click();
     await p.waitForTimeout(120);
-    bannerLooks.add(await p.evaluate(() => getComputedStyle(document.querySelector('.cave-preview-banner')).backgroundImage));
+    bannerLooks.add(await p.evaluate(() => getComputedStyle(document.querySelector('.cave-preview-scene')).backgroundImage));
   }
   check(bannerLooks.size === THEME_IDS.length, `every theme preview looks distinct (${bannerLooks.size} of ${THEME_IDS.length})`);
 
@@ -142,8 +142,8 @@ const view = h => new Promise(resolve => {
   await p.waitForTimeout(400);
   check((await p.evaluate(() => loadUserProfile()?.cave?.theme)) === 'jungle', 'switching to Jungle Cave saves over Witchy Cave');
   check((await p.evaluate(() => getCave().theme)) === 'jungle', 'the Jungle Cave theme is the live cave');
-  check(await p.evaluate(() => JSON.stringify(normalizeCave({ theme: 'witchy', decor: ['lights'] }))) === JSON.stringify({ theme: 'witchy', decor: ['lights'] }), 'a saved Witchy Cave reads back cleanly');
-  check(await p.evaluate(() => JSON.stringify(normalizeCave({ theme: 'cozy', decor: ['lights', 'plant'] }))) === JSON.stringify({ theme: 'cozy', decor: ['lights', 'plant'] }), 'the old Cozy theme still works');
+  check(await p.evaluate(() => JSON.stringify(normalizeCave({ theme: 'witchy', decor: ['lights'] }))) === JSON.stringify({ theme: 'witchy', decor: ['lights'], furniture: [] }), 'a saved Witchy Cave reads back cleanly');
+  check(await p.evaluate(() => JSON.stringify(normalizeCave({ theme: 'cozy', decor: ['lights', 'plant'] }))) === JSON.stringify({ theme: 'cozy', decor: ['lights', 'plant'], furniture: [] }), 'the old Cozy theme still works');
   check(p.errors.length === 0, `no page errors (${p.errors.slice(0, 2).join(' | ')})`);
   await p.close();
 

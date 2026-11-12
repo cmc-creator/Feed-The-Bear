@@ -56,13 +56,19 @@ const CAVE_THEME_LABELS = { cozy: 'Cozy Cave', forest: 'Forest Cave', neon: 'Neo
 const CAVE_PHOTOS = { cozy: 'theme-cozy.jpg', forest: 'theme-forest.jpg', neon: 'theme-neon.jpg', pastel: 'theme-pastel.jpg', witchy: 'theme-witchy.jpg', elf: 'theme-elf.jpg', cute: 'theme-cute.jpg', mancave: 'theme-mancave.jpg', beach: 'theme-beach.jpg', winter: 'theme-winter.jpg', cosmic: 'theme-cosmic.jpg', jungle: 'theme-jungle.jpg', den: 'theme-den.jpg', grotto: 'theme-grotto.jpg', lookout: 'theme-lookout.jpg', arch: 'theme-arch.jpg', midnight: 'theme-forest.jpg', golden: 'theme-arch.jpg', misty: 'theme-grotto.jpg', ember: 'theme-den.jpg', aurora: 'theme-cosmic.jpg', royal: 'theme-cozy.jpg' };
 const CAVE_DECOR_PHOTOS = { lights: 'decor-lights.jpg', rug: 'decor-rug.jpg', posters: 'decor-posters.jpg', plant: 'decor-plant.jpg', trophy: 'decor-trophy.jpg', candle: 'decor-candle.jpg', fireplace: 'decor-fireplace.jpg', shelf: 'decor-shelf.jpg', barcart: 'decor-barcart.jpg', lantern: 'decor-lantern.jpg', honeypot: 'decor-honeypot.jpg', picnic: 'decor-picnic.jpg', mushroom: 'decor-mushroom.jpg', campfire: 'decor-campfire.jpg', crystal: 'decor-crystal.jpg', chandelier: 'decor-chandelier.jpg', throne: 'decor-throne.jpg' };
 const CAVE_DECOR_LABELS = { lights: 'Fairy lights', rug: 'Rug', posters: 'Posters', plant: 'Plant', trophy: 'Trophy shelf', candle: 'Candles', fireplace: 'Stone fireplace', shelf: 'Cookbook shelf', barcart: 'Bar cart', lantern: 'Lantern glow', honeypot: 'Honey pot', picnic: 'Picnic basket', mushroom: 'Mushroom patch', campfire: 'Campfire', crystal: 'Crystal cluster', chandelier: 'Crystal chandelier', throne: 'Bear throne' };
+// Furniture (Cave Shop): real photos of furniture, placed in the scene like
+// decor. The photo/label maps mirror friends.js CAVE_SHOP_FURNITURE.
+const CAVE_FURNITURE_PHOTOS = { couch: 'furn-couch.jpg', bed: 'furn-bed.jpg', table: 'furn-table.jpg', lamp: 'furn-lamp.jpg', fridge: 'furn-fridge.jpg', sink: 'furn-sink.jpg' };
+const CAVE_FURNITURE_LABELS = { couch: 'Couch', bed: 'Bed', table: 'Table', lamp: 'Lamp', fridge: 'Fridge', sink: 'Sink' };
 function normalizeCave (raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
   const theme = CAVE_THEMES[src.theme || src.t] ? (src.theme || src.t) : 'cozy';
   const list = Array.isArray(src.decor) ? src.decor : (Array.isArray(src.d) ? src.d : null);
   const decor = list === null ? ['lights', 'plant']
     : [...new Set(list.map(x => String(x)).filter(id => CAVE_DECOR[id]))].slice(0, 4);
-  return { theme, decor };
+  const flist = Array.isArray(src.furniture) ? src.furniture : (Array.isArray(src.f) ? src.f : []);
+  const furniture = [...new Set(flist.map(x => String(x)).filter(id => CAVE_FURNITURE_PHOTOS[id]))].slice(0, 3);
+  return { theme, decor, furniture };
 }
 
 // The same shape the app's profile links use (friends.js sanitizeFriendData).
@@ -186,22 +192,53 @@ function page (res, status, { title, description, body, url = SITE, theme = 'coz
     h1 { font-size: 1.6rem; line-height: 1.2; margin: 12px 0 4px; overflow-wrap: anywhere; }
     .handle { color: var(--gold); font-weight: 700; }
     .lead { color: var(--dim); margin: 6px 0 0; }
-    .cave-scene { margin-top: 16px; border-radius: 18px; padding: 20px 12px 12px; position: relative; overflow: hidden;
-      background:
-        radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%),
-        linear-gradient(180deg, rgba(255,255,255,.055), rgba(0,0,0,.30)),
-        var(--card);
+    /* The cave is a big scene now: the theme photo fills a tall 4:3 frame,
+       and each decoration is placed in it like furniture in a room —
+       grounded on the floor, hung from the top, or set on the wall. The
+       page itself stays dark so the scene is the cave. The position map
+       below is shared with the in-app preview (style.css) — keep the
+       two in sync. */
+    body[data-cave-theme] { background-image: none; }
+    .cave-scene { position: relative; aspect-ratio: 4 / 3; margin-top: 16px; border-radius: 20px; overflow: hidden;
+      background: var(--card);
       background-size: cover; background-position: center 30%;
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), inset 0 -28px 55px rgba(0,0,0,.45), 0 12px 30px rgba(0,0,0,.35);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), inset 0 -40px 80px rgba(0,0,0,.45), 0 12px 30px rgba(0,0,0,.35);
     }
-    .cave-scene::after { content: ""; display: block; height: 9px; margin: 12px 8px 0; border-radius: 5px;
-      background: linear-gradient(180deg, var(--wood), rgba(0,0,0,.45));
-      box-shadow: 0 5px 10px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.12);
-    }
-    .cave-decor { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
-    .cave-decor-img { width: 64px; height: 64px; object-fit: cover; border-radius: 12px; border: 2px solid rgba(255,255,255,.18); box-shadow: 0 6px 14px rgba(0,0,0,.55); }
-    .cave-theme { text-align: center; color: var(--dim); font-size: .8rem; margin-top: 10px; }
-    .cave-points { text-align: center; color: var(--gold); font-weight: 800; font-size: .9rem; margin-top: 6px; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
+    .cave-decor { position: absolute; inset: 0; }
+    /* The scene is a room, not a row: big pieces take a third each
+       (fireplace left, couch centre, bed right), small pieces sit on the
+       floor in front of them, and z-index is the depth — the rug is the
+       floor (0), wall and back pieces sit behind (1), the furniture
+       sits mid-room (2), small floor pieces sit in front (3), and
+       hanging lights sit above it all (4). The slight darkening blends
+       each photo into the cave's moody light. */
+    .cave-decor-item { position: absolute; object-fit: cover; border-radius: 14px; box-shadow: 0 10px 24px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.4); filter: brightness(.92) saturate(1.05); }
+    .decor-lights { left: 15%; top: 3%; width: 70%; height: 12%; z-index: 4; border-radius: 999px; }
+    .decor-chandelier { left: 37%; top: 0; width: 26%; height: 16%; z-index: 4; }
+    .decor-lantern { left: 44%; top: 2%; width: 13%; aspect-ratio: 1; z-index: 4; }
+    .decor-shelf { right: 5%; top: 20%; width: 30%; aspect-ratio: 1; z-index: 1; }
+    .decor-posters { left: 5%; top: 18%; width: 28%; aspect-ratio: 1; z-index: 1; }
+    .decor-trophy { right: 4%; bottom: 30%; width: 25%; aspect-ratio: 1; z-index: 1; }
+    .decor-plant { left: 30%; bottom: 2%; width: 12%; aspect-ratio: 1; z-index: 3; }
+    .decor-fireplace { left: 2%; bottom: 10%; width: 30%; aspect-ratio: 1; z-index: 1; }
+    .decor-throne { left: 35%; bottom: 12%; width: 30%; aspect-ratio: 1; z-index: 1; }
+    .decor-barcart { right: 4%; bottom: 4%; width: 24%; aspect-ratio: 1; z-index: 2; }
+    .decor-campfire { left: 69%; bottom: 2%; width: 16%; aspect-ratio: 1; z-index: 3; }
+    .decor-crystal { left: 86%; bottom: 1%; width: 12%; aspect-ratio: 1; z-index: 3; }
+    .decor-candle { left: 62%; bottom: 1%; width: 9%; aspect-ratio: 1; z-index: 3; }
+    .decor-honeypot { left: 17%; bottom: 1%; width: 11%; aspect-ratio: 1; z-index: 3; }
+    .decor-mushroom { left: 3%; bottom: 1%; width: 12%; aspect-ratio: 1; z-index: 3; }
+    .decor-picnic { left: 70%; bottom: 1%; width: 24%; height: 12%; z-index: 3; }
+    .decor-rug { left: 15%; bottom: 0; width: 70%; height: 8%; z-index: 0; }
+    .furn-couch { left: 35%; bottom: 6%; width: 30%; aspect-ratio: 4 / 3; z-index: 2; }
+    .furn-bed { right: 2%; bottom: 6%; width: 30%; aspect-ratio: 4 / 3; z-index: 2; }
+    .furn-table { left: 40%; bottom: 1%; width: 20%; aspect-ratio: 4 / 3; z-index: 3; }
+    .furn-lamp { right: 7%; bottom: 32%; width: 14%; aspect-ratio: 1; z-index: 4; }
+    .furn-fridge { right: 2%; bottom: 5%; width: 20%; aspect-ratio: 3 / 4; z-index: 2; }
+    .furn-sink { left: 3%; bottom: 4%; width: 22%; aspect-ratio: 4 / 3; z-index: 2; }
+    .cave-caption { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-top: 10px; }
+    .cave-theme { color: var(--dim); font-size: .85rem; }
+    .cave-points { color: var(--gold); font-weight: 800; font-size: .9rem; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
     .cave-vote { text-align: center; margin-top: 14px; }
     .cave-vote button { border: 0; border-radius: 999px; padding: 10px 18px; background: var(--accent); color: #1b130b; font-weight: 800; font-size: .95rem; cursor: pointer; }
     .cave-vote-count { color: var(--dim); font-size: .82rem; margin-top: 6px; }
@@ -278,13 +315,14 @@ module.exports = async function handler (req, res) {
     try { saved = (await db.doc(`users/${h.uid}/meta/profile`).get()).data() || {}; } catch { saved = {}; }
     const liveCave = normalizeCave(profile.profile?.cave);
     const savedCave = normalizeCave(saved.cave);
-    const isDefaultCave = c => c.theme === 'cozy' && c.decor.length === 2 && c.decor[0] === 'lights' && c.decor[1] === 'plant';
+    const isDefaultCave = c => c.theme === 'cozy' && c.decor.length === 2 && c.decor[0] === 'lights' && c.decor[1] === 'plant' && !(c.furniture && c.furniture.length);
     const cave = !isDefaultCave(savedCave) ? savedCave : liveCave;
-    const decorRow = cave.decor.map(id => `<span><img class="cave-decor-img" src="/assets/caves/${CAVE_DECOR_PHOTOS[id]}" alt="${esc(CAVE_DECOR[id])} ${esc(CAVE_DECOR_LABELS[id])}" onerror="this.closest('span').style.display='none'" /></span>`).join('');
+    const decorRow = cave.decor.map(id => `<img class="cave-decor-item decor-${id}" src="/assets/caves/${CAVE_DECOR_PHOTOS[id]}" alt="${esc(CAVE_DECOR_LABELS[id])}" onerror="this.remove()" />`).join('');
+    const furnitureRow = (cave.furniture || []).map(id => `<img class="cave-decor-item furn-${id}" src="/assets/caves/${CAVE_FURNITURE_PHOTOS[id]}" alt="${esc(CAVE_FURNITURE_LABELS[id])}" onerror="this.remove()" />`).join('');
     const livePts = Math.max(0, Math.floor(Number(profile.profile?.pts) || 0));
     const savedPts = Math.max(0, Math.floor(Number(saved.pts) || 0));
     const cavePts = livePts > 0 ? livePts : savedPts;
-    const pointsRow = cavePts > 0 ? `<div class="cave-points">⭐ ${cavePts} cave point${cavePts === 1 ? '' : 's'}</div>` : '';
+    const pointsRow = cavePts > 0 ? `<span class="cave-points">${cavePts} cave point${cavePts === 1 ? '' : 's'}</span>` : '';
     // The header shows the creator's own photo when the saved profile has
     // one (a compressed data URL or an https link); otherwise the bear.
     const photoSrc = (() => {
@@ -294,7 +332,7 @@ module.exports = async function handler (req, res) {
       return '/feedbear-sm.jpg';
     })();
     const voteBox = `<div class="cave-vote">
-  <button type="button" id="cave-vote-btn" data-share="${esc(h.id)}">🐻 Love this cave?</button>
+  <button type="button" id="cave-vote-btn" data-share="${esc(h.id)}">Love this cave?</button>
   <div id="cave-vote-count" class="cave-vote-count"></div>
 </div>
 <script>
@@ -315,8 +353,8 @@ module.exports = async function handler (req, res) {
   function render (state) {
     voted = !!state.voted;
     var n = Number(state.count) || 0;
-    count.textContent = n === 1 ? '❤️ 1 person loves this cave' : '❤️ ' + n + ' people love this cave';
-    btn.textContent = voted ? '❤️ You love this cave — tap to undo' : '🐻 Love this cave?';
+    count.textContent = n === 1 ? '1 person loves this cave' : n + ' people love this cave';
+    btn.textContent = voted ? 'You love this cave — tap to undo' : 'Love this cave?';
   }
   function load () {
     fetch('/api/cave-vote?share=' + encodeURIComponent(share) + '&voter=' + encodeURIComponent(voter))
@@ -357,13 +395,13 @@ module.exports = async function handler (req, res) {
       url: `${SITE}/@${handle}`,
       theme: cave.theme,
       body: `<main>
-  <div class="cave-home-row"><a class="cave-home" href="/app.html">🏠 Home</a></div>
+  <div class="cave-home-row"><a class="cave-home" href="/app.html">Home</a></div>
   <header>
     <img class="bear" src="${esc(photoSrc)}" alt="" />
     <h1>${esc(name)}'s food spots</h1>
     <div class="handle">@${esc(handle)}</div>
-    <div class="cave-scene"><div class="cave-decor" aria-hidden="true">${decorRow}</div>
-    <div class="cave-theme">${CAVE_THEMES[cave.theme]} ${esc(CAVE_THEME_LABELS[cave.theme])}</div>${pointsRow}</div>
+    <div class="cave-scene"><div class="cave-decor" aria-hidden="true">${decorRow}${furnitureRow}</div></div>
+    <div class="cave-caption"><span class="cave-theme">${esc(CAVE_THEME_LABELS[cave.theme])}</span>${pointsRow}</div>
     <p class="lead">Where ${esc(name)} eats and exactly what to order.</p>
   </header>
   ${voteBox}
