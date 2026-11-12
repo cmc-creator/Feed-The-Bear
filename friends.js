@@ -46,7 +46,7 @@ function buildProfileData () {
   state.restaurants.filter(isAvailableSpot).forEach(r => dishesOf(r).forEach(d => {
     if (d.verdict === 'want' && craves.length < 10) craves.push({ d: String(d.name).slice(0, 40), at: String(r.name).slice(0, 60) });
   }));
-  return { v: 2, id: getProfileShareId(), u: shownName().slice(0, 30), picks, w: craves, cave: caveShort(getCave()), pts: cavePoints().total, ts: Date.now() };
+  return { v: 2, id: getProfileShareId(), u: shownName().slice(0, 30), picks, w: craves, cave: caveShort(getCave()), rooms: caveOwnedRooms(), pts: cavePoints().total, ts: Date.now() };
 }
 
 /* ── Bear Cave: your personal page, decorated ────────────────
@@ -250,6 +250,28 @@ const CAVE_SHOP_FURNITURE = {
   fridge: { label: 'Fridge', photo: 'furn-fridge.jpg', price: 300, rarity: 'Epic',      grizzly: false },
   bed:    { label: 'Bed',    photo: 'furn-bed.jpg',    price: 0,   rarity: 'Legendary', grizzly: true },
 };
+/* Add-on rooms for the cave: each one is a whole extra room, a single
+   photorealistic 3D scene (assets/caves/scene-room-*-3d.jpg) — the same
+   one-image rule as the themes, so nothing is ever pasted on top of a
+   room scene. All points-priced so anyone can earn them. Owned rooms
+   live in the profile (caveRooms) and show as tabs on the cave — the
+   living room (your theme) plus every room you own. */
+const CAVE_SHOP_ROOMS = {
+  kitchen:  { label: 'Kitchen',   photo: 'scene-room-kitchen-3d.jpg',  price: 300, rarity: 'Rare', grizzly: false },
+  bedroom:  { label: 'Bedroom',   photo: 'scene-room-bedroom-3d.jpg',  price: 400, rarity: 'Epic', grizzly: false },
+  pantry:   { label: 'Pantry',    photo: 'scene-room-pantry-3d.jpg',   price: 250, rarity: 'Rare', grizzly: false },
+  games:    { label: 'Game Room', photo: 'scene-room-games-3d.jpg',    price: 350, rarity: 'Epic', grizzly: false },
+  bath:     { label: 'Bathroom',  photo: 'scene-room-bath-3d.jpg',     price: 300, rarity: 'Rare', grizzly: false },
+  library:  { label: 'Library',   photo: 'scene-room-library-3d.jpg',  price: 450, rarity: 'Epic', grizzly: false },
+};
+function caveRoomInfo (id) { return CAVE_SHOP_ROOMS[id] || null; }
+function caveIsShopRoom (id) { return !!CAVE_SHOP_ROOMS[id]; }
+// Owned rooms, in catalog order, from the profile (caveRooms).
+function caveOwnedRooms () {
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
+  const owned = Array.isArray(profile.caveRooms) ? profile.caveRooms : [];
+  return Object.keys(CAVE_SHOP_ROOMS).filter(id => owned.includes(id));
+}
 function caveThemeInfo (id) { return CAVE_THEMES[id] || CAVE_SHOP_THEMES[id] || null; }
 function caveDecorInfo (id) { return CAVE_DECOR[id] || CAVE_SHOP_DECOR[id] || null; }
 function caveFurnitureInfo (id) { return CAVE_SHOP_FURNITURE[id] || null; }
@@ -259,12 +281,12 @@ function caveIsShopFurniture (id) { return !!CAVE_SHOP_FURNITURE[id]; }
 // Grizzly members own every Grizzly shop item automatically, for as long
 // as they are Grizzly. Points items are owned only once bought.
 function caveShopOwns (kind, id) {
-  const catalog = kind === 'theme' ? CAVE_SHOP_THEMES : kind === 'decor' ? CAVE_SHOP_DECOR : CAVE_SHOP_FURNITURE;
+  const catalog = kind === 'theme' ? CAVE_SHOP_THEMES : kind === 'decor' ? CAVE_SHOP_DECOR : kind === 'room' ? CAVE_SHOP_ROOMS : CAVE_SHOP_FURNITURE;
   const item = catalog[id];
   if (!item) return false;
   if (item.grizzly) return typeof hasGrizzly === 'function' && hasGrizzly();
   const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
-  const key = kind === 'theme' ? 'caveOwnedThemes' : kind === 'decor' ? 'caveOwnedDecor' : 'caveOwnedFurniture';
+  const key = kind === 'theme' ? 'caveOwnedThemes' : kind === 'decor' ? 'caveOwnedDecor' : kind === 'room' ? 'caveRooms' : 'caveOwnedFurniture';
   return Array.isArray(profile[key]) && profile[key].includes(id);
 }
 // Seasonal window: a seasonal item is buyable only inside its dates
@@ -293,7 +315,7 @@ function caveSeasonalWindowLabel (item) {
 // never touches lifetime, so the Fireplace / Shelf / Bar Cart unlocks
 // (based on lifetime) can never be lost by buying things.
 function buyCaveShopItem (kind, id, now) {
-  const catalog = kind === 'theme' ? CAVE_SHOP_THEMES : kind === 'decor' ? CAVE_SHOP_DECOR : CAVE_SHOP_FURNITURE;
+  const catalog = kind === 'theme' ? CAVE_SHOP_THEMES : kind === 'decor' ? CAVE_SHOP_DECOR : kind === 'room' ? CAVE_SHOP_ROOMS : CAVE_SHOP_FURNITURE;
   const item = catalog[id];
   if (!item) return { ok: false, reason: 'unknown' };
   if (item.grizzly) return { ok: false, reason: 'grizzly' };
@@ -304,7 +326,7 @@ function buyCaveShopItem (kind, id, now) {
   const pts = cavePoints();
   if (pts.balance < item.price) return { ok: false, reason: 'points', need: item.price - pts.balance };
   const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || { name: 'Foodie', avatar: DEFAULT_AVATAR, joinDate: new Date().toISOString() };
-  const key = kind === 'theme' ? 'caveOwnedThemes' : kind === 'decor' ? 'caveOwnedDecor' : 'caveOwnedFurniture';
+  const key = kind === 'theme' ? 'caveOwnedThemes' : kind === 'decor' ? 'caveOwnedDecor' : kind === 'room' ? 'caveRooms' : 'caveOwnedFurniture';
   const owned = [...new Set([...(Array.isArray(profile[key]) ? profile[key] : []), id])];
   if (typeof saveUserProfile === 'function') {
     saveUserProfile({ ...profile, caveSpent: (Number(profile.caveSpent) || 0) + item.price, caveLifetime: pts.lifetime, [key]: owned });
@@ -2200,6 +2222,17 @@ window.closeHandleSettings = closeHandleSettings;
 // Decorate your Bear Cave: pick a theme and a few decorations in one
 // short flow. Saves straight into your profile (local + cloud); the
 // live profile republishes so friends see the new look.
+// Which room the cave setup preview is showing: null is the living room
+// (your theme); otherwise an owned room id. Just a view — it is never
+// saved, and switching rooms never changes your cave.
+let caveRoomView = null;
+function viewCaveRoom (id) {
+  caveRoomView = id && caveShopOwns('room', id) ? id : null;
+  if (typeof renderCaveSetup === 'function') renderCaveSetup();
+  return caveRoomView;
+}
+window.viewCaveRoom = viewCaveRoom;
+
 function renderCaveSetup () {
   const themeBox = document.getElementById('cave-theme-picks');
   const decorBox = document.getElementById('cave-decor-picks');
@@ -2243,15 +2276,31 @@ function renderCaveSetup () {
       const label = locked ? `${d.label} · ${d.points} pts` : `${d.label}`;
       return `<button type="button" class="cave-decor-chip${on ? ' on' : ''}${locked ? ' locked' : ''}" data-decor="${id}"${disabled ? ' disabled' : ''} title="${locked ? `Unlocks at ${d.points} points` : d.label}"><img src="/assets/caves/${d.photo}" alt="" loading="lazy" /><span>${label}</span></button>`;
     }).join('');
+    // Room tabs: the living room (your theme) plus every room you own.
+    // Tapping a tab switches the preview to that room's full 3D scene.
+    const roomBox = document.getElementById('cave-room-tabs');
+    if (roomBox) {
+      const ownedRooms = caveOwnedRooms();
+      if (caveRoomView && !ownedRooms.includes(caveRoomView)) caveRoomView = null;
+      roomBox.innerHTML = ownedRooms.length
+        ? `<button type="button" class="cave-room-tab${!caveRoomView ? ' on' : ''}" data-room="">Living Room</button>`
+          + ownedRooms.map(id => `<button type="button" class="cave-room-tab${caveRoomView === id ? ' on' : ''}" data-room="${id}">${escHtml((CAVE_SHOP_ROOMS[id] || {}).label || id)}</button>`).join('')
+        : '';
+    }
     const prev = document.getElementById('cave-setup-preview');
     if (prev) {
-      // 3D-scene themes show just the one scene image — pasting decor or
-      // furniture on top would rebuild the collage Connie hated. The
-      // pieces stay owned and still show on the non-3D (graded) themes.
-      const is3d = caveHas3dScene(cave.theme);
-      const dec = is3d ? '' : cave.decor.map(id => { const d = caveDecorInfo(id); return d ? `<img class="cave-preview-decor-img decor-${escHtml(id)}" src="/assets/caves/${d.photo}" alt="${escHtml(d.label)}" onerror="this.style.display='none'" />` : ''; }).join('');
-      const furn = is3d ? '' : cave.furniture.map(id => { const f = caveFurnitureInfo(id); return f ? `<img class="cave-preview-decor-img furn-${escHtml(id)}" src="/assets/caves/${f.photo}" alt="${escHtml(f.label)}" onerror="this.style.display='none'" />` : ''; }).join('');
-      prev.innerHTML = `<span class="cave-preview-scene cave-theme-${cave.theme}"><span class="cave-preview-decor">${dec}${furn}</span><span class="cave-preview-caption"><span>${escHtml((caveThemeInfo(cave.theme) || {}).label || 'Cozy Cave')}</span><span>${pts.total} points</span></span></span>`;
+      // A room shows just its own 3D scene — same one-image rule as the
+      // themes, nothing pasted on top. Otherwise the theme scene, with
+      // decor/furniture only on the non-3D (graded) themes.
+      const room = caveRoomView ? caveRoomInfo(caveRoomView) : null;
+      if (room) {
+        prev.innerHTML = `<span class="cave-preview-scene cave-room-${escHtml(caveRoomView)}"><span class="cave-preview-caption"><span>${escHtml(room.label)}</span><span>${pts.total} points</span></span></span>`;
+      } else {
+        const is3d = caveHas3dScene(cave.theme);
+        const dec = is3d ? '' : cave.decor.map(id => { const d = caveDecorInfo(id); return d ? `<img class="cave-preview-decor-img decor-${escHtml(id)}" src="/assets/caves/${d.photo}" alt="${escHtml(d.label)}" onerror="this.style.display='none'" />` : ''; }).join('');
+        const furn = is3d ? '' : cave.furniture.map(id => { const f = caveFurnitureInfo(id); return f ? `<img class="cave-preview-decor-img furn-${escHtml(id)}" src="/assets/caves/${f.photo}" alt="${escHtml(f.label)}" onerror="this.style.display='none'" />` : ''; }).join('');
+        prev.innerHTML = `<span class="cave-preview-scene cave-theme-${cave.theme}"><span class="cave-preview-decor">${dec}${furn}</span><span class="cave-preview-caption"><span>${escHtml((caveThemeInfo(cave.theme) || {}).label || 'Cozy Cave')}</span><span>${pts.total} points</span></span></span>`;
+      }
     }
     // Furniture row (owned pieces only — tap to place up to 3).
     const furnBox = document.getElementById('cave-furniture-picks');
@@ -2284,6 +2333,13 @@ function renderCaveSetup () {
     if (!b || b.disabled) return;
     const id = b.dataset.furniture;
     cave = { ...cave, furniture: cave.furniture.includes(id) ? cave.furniture.filter(x => x !== id) : [...cave.furniture, id].slice(0, CAVE_MAX_FURNITURE) };
+    draw();
+  };
+  const roomBox = document.getElementById('cave-room-tabs');
+  if (roomBox) roomBox.onclick = e => {
+    const b = e.target.closest('[data-room]');
+    if (!b) return;
+    caveRoomView = b.dataset.room && caveShopOwns('room', b.dataset.room) ? b.dataset.room : null;
     draw();
   };
   const giftBox = document.getElementById('cave-gift-note');
@@ -2330,8 +2386,9 @@ function renderCaveShop () {
   const themeGrid = document.getElementById('cave-shop-themes');
   const decorGrid = document.getElementById('cave-shop-decor');
   const furnGrid = document.getElementById('cave-shop-furniture');
+  const roomGrid = document.getElementById('cave-shop-rooms');
   const pantryGrid = document.getElementById('cave-shop-pantry');
-  if (!themeGrid || !decorGrid || !furnGrid || !pantryGrid) return;
+  if (!themeGrid || !decorGrid || !furnGrid || !roomGrid || !pantryGrid) return;
   const pts = cavePoints();
   const cave = getCave();
   if (balanceEl) {
@@ -2342,16 +2399,20 @@ function renderCaveShop () {
     const owned = caveShopOwns(kind, id);
     const isTheme = kind === 'theme';
     const isFurniture = kind === 'furniture';
-    const active = isTheme ? cave.theme === id : isFurniture ? cave.furniture.includes(id) : cave.decor.includes(id);
+    const isRoom = kind === 'room';
+    // Rooms are never "in" the cave the way a theme or a piece is — they
+    // are extra spaces you walk into from the room tabs.
+    const active = isTheme ? cave.theme === id : isRoom ? false : isFurniture ? cave.furniture.includes(id) : cave.decor.includes(id);
     const imgStyle = item.filter ? ` style="filter:${item.filter}"` : '';
     const price = item.grizzly ? 'Grizzly' : `${item.price} pts`;
     const seasonal = item.seasonal ? `<span class="cave-shop-limited">Limited time · ${escHtml(caveSeasonalWindowLabel(item))}</span>` : '';
     const max = isFurniture ? CAVE_MAX_FURNITURE : CAVE_MAX_DECOR;
     const count = isFurniture ? cave.furniture.length : cave.decor.length;
-    const full = !isTheme && !active && count >= max;
+    const full = !isTheme && !isRoom && !active && count >= max;
     let action;
     if (owned && active) action = `<button type="button" class="btn-sm btn-secondary" disabled>✓ In your cave</button>`;
     else if (owned && full) action = `<button type="button" class="btn-sm btn-secondary" disabled>Cave full (${max} max)</button>`;
+    else if (owned && isRoom) action = `<button type="button" class="btn-sm btn-primary" data-shop-view="room:${id}">View it</button>`;
     else if (owned) action = `<button type="button" class="btn-sm btn-primary" data-shop-use="${kind}:${id}">Use it</button>`;
     else if (item.grizzly) action = `<button type="button" class="btn-sm btn-orange" data-shop-grizzly="${kind}:${id}">Grizzly</button>`;
     else if (pts.balance >= item.price) action = `<button type="button" class="btn-sm btn-primary" data-shop-buy="${kind}:${id}">Buy · ${item.price} pts</button>`;
@@ -2381,6 +2442,7 @@ function renderCaveShop () {
     .map(([id, t]) => card('theme', id, t)).join('');
   decorGrid.innerHTML = Object.entries(CAVE_SHOP_DECOR).map(([id, d]) => card('decor', id, d)).join('');
   furnGrid.innerHTML = Object.entries(CAVE_SHOP_FURNITURE).map(([id, f]) => card('furniture', id, f)).join('');
+  roomGrid.innerHTML = Object.entries(CAVE_SHOP_ROOMS).map(([id, r]) => card('room', id, r)).join('');
   pantryGrid.innerHTML = Object.entries(CAVE_PANTRY).map(([id, p]) => pantryCard(id, p)).join('');
 }
 function openCaveShop () {
@@ -2401,10 +2463,10 @@ document.addEventListener('click', e => {
   const buy = e.target.closest('[data-shop-buy]');
   if (buy) {
     const [kind, id] = buy.dataset.shopBuy.split(':');
-    const item = kind === 'theme' ? CAVE_SHOP_THEMES[id] : kind === 'decor' ? CAVE_SHOP_DECOR[id] : CAVE_SHOP_FURNITURE[id];
+    const item = kind === 'theme' ? CAVE_SHOP_THEMES[id] : kind === 'decor' ? CAVE_SHOP_DECOR[id] : kind === 'room' ? CAVE_SHOP_ROOMS[id] : CAVE_SHOP_FURNITURE[id];
     const res = buyCaveShopItem(kind, id);
     if (res.ok) {
-      showToast('It\'s yours!', `${item.label} is in your cave collection. Tap Use it to put it in your cave.`, 'success');
+      showToast('It\'s yours!', kind === 'room' ? `${item.label} is in your cave now. Tap View it to walk in.` : `${item.label} is in your cave collection. Tap Use it to put it in your cave.`, 'success');
     } else if (res.reason === 'points') {
       showToast('Not enough points yet', `You need ${res.need} more points for ${item.label}. Save a spot or come back tomorrow for your daily bonus.`, 'info');
     } else if (res.reason === 'seasonal') {
@@ -2419,11 +2481,21 @@ document.addEventListener('click', e => {
   const use = e.target.closest('[data-shop-use]');
   if (use) {
     const [kind, id] = use.dataset.shopUse.split(':');
-    const item = kind === 'theme' ? CAVE_SHOP_THEMES[id] : kind === 'decor' ? CAVE_SHOP_DECOR[id] : CAVE_SHOP_FURNITURE[id];
+    const item = kind === 'theme' ? CAVE_SHOP_THEMES[id] : kind === 'decor' ? CAVE_SHOP_DECOR[id] : kind === 'room' ? CAVE_SHOP_ROOMS[id] : CAVE_SHOP_FURNITURE[id];
     if (equipCaveShopItem(kind, id)) showToast('In your cave!', `${item.label} is now in your cave.`, 'success');
     else showToast('Your cave is full', kind === 'furniture' ? 'Remove a piece of furniture from your cave first, then come back.' : 'Remove a decoration from your cave first, then come back.', 'info');
     renderCaveShop();
     if (typeof renderCaveSetup === 'function') renderCaveSetup();
+    return;
+  }
+  // A room you own: walk straight into it from the shop.
+  const view = e.target.closest('[data-shop-view]');
+  if (view) {
+    const [kind, id] = view.dataset.shopView.split(':');
+    if (kind === 'room' && caveShopOwns('room', id)) {
+      closeCaveShop();
+      viewCaveRoom(id);
+    }
     return;
   }
   const pantryBuy = e.target.closest('[data-pantry-buy]');

@@ -67,6 +67,9 @@ const CAVE_DECOR_LABELS = { lights: 'Fairy lights', rug: 'Rug', posters: 'Poster
 // decor. The photo/label maps mirror friends.js CAVE_SHOP_FURNITURE.
 const CAVE_FURNITURE_PHOTOS = { couch: 'furn-couch.jpg', bed: 'furn-bed.jpg', table: 'furn-table.jpg', lamp: 'furn-lamp.jpg', fridge: 'furn-fridge.jpg', sink: 'furn-sink.jpg' };
 const CAVE_FURNITURE_LABELS = { couch: 'Couch', bed: 'Bed', table: 'Table', lamp: 'Lamp', fridge: 'Fridge', sink: 'Sink' };
+// Add-on rooms (Cave Shop): each room is one full 3D scene, like a theme.
+// The photo/label map mirrors friends.js CAVE_SHOP_ROOMS.
+const CAVE_ROOMS = { kitchen: { label: 'Kitchen', photo: 'scene-room-kitchen-3d.jpg' }, bedroom: { label: 'Bedroom', photo: 'scene-room-bedroom-3d.jpg' }, pantry: { label: 'Pantry', photo: 'scene-room-pantry-3d.jpg' }, games: { label: 'Game Room', photo: 'scene-room-games-3d.jpg' }, bath: { label: 'Bathroom', photo: 'scene-room-bath-3d.jpg' }, library: { label: 'Library', photo: 'scene-room-library-3d.jpg' } };
 function normalizeCave (raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
   const theme = CAVE_THEMES[src.theme || src.t] ? (src.theme || src.t) : 'cozy';
@@ -164,6 +167,15 @@ function page (res, status, { title, description, body, url = SITE, theme = 'coz
     body[data-cave-theme="royal"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(255,215,120,.30), rgba(90,60,0,.45)), url(/assets/caves/theme-cozy.jpg); }
     body[data-cave-theme="halloween"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-halloween-3d.jpg); }
     body[data-cave-theme="christmas"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-christmas-3d.jpg); }
+    /* Add-on rooms: one full 3D scene each, shown when a room tab is
+       active. A room never shows pasted decor or furniture. */
+    body[data-cave-room="kitchen"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-room-kitchen-3d.jpg); }
+    body[data-cave-room="bedroom"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-room-bedroom-3d.jpg); }
+    body[data-cave-room="pantry"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-room-pantry-3d.jpg); }
+    body[data-cave-room="games"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-room-games-3d.jpg); }
+    body[data-cave-room="bath"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-room-bath-3d.jpg); }
+    body[data-cave-room="library"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-room-library-3d.jpg); }
+    body[data-cave-room] .cave-decor { display: none; }
     body[data-cave-theme="cozy"] { background-image: linear-gradient(180deg, rgba(20,12,6,.45), rgba(10,8,6,.85)), url(/assets/caves/scene-cozy-3d.jpg); background-size: cover; background-position: center 25%; background-attachment: fixed; background-color: var(--bg); }
     body[data-cave-theme="forest"] { background-image: linear-gradient(180deg, rgba(10,20,12,.45), rgba(8,10,8,.85)), url(/assets/caves/scene-forest-3d.jpg); background-size: cover; background-position: center 25%; background-attachment: fixed; background-color: var(--bg); }
     body[data-cave-theme="neon"] { background-image: linear-gradient(180deg, rgba(20,12,40,.45), rgba(10,8,14,.85)), url(/assets/caves/scene-neon-3d.jpg); background-size: cover; background-position: center 25%; background-attachment: fixed; background-color: var(--bg); }
@@ -218,6 +230,11 @@ function page (res, status, { title, description, body, url = SITE, theme = 'coz
       box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), inset 0 -40px 80px rgba(0,0,0,.45), 0 12px 30px rgba(0,0,0,.35);
     }
     .cave-decor { position: absolute; inset: 0; }
+    /* Room tabs under the scene: Living Room + every room the owner has
+       earned. Tapping one swaps the scene to that room's 3D picture. */
+    .cave-room-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .cave-room-tab { border: 1px solid rgba(255,255,255,.18); background: transparent; color: var(--text); border-radius: 999px; padding: 7px 14px; font-size: .85rem; cursor: pointer; }
+    .cave-room-tab.on { background: var(--accent); border-color: transparent; color: #1b130b; font-weight: 800; }
     /* The scene is a room, not a row: big pieces take a third each
        (fireplace left, couch centre, bed right), small pieces sit on the
        floor in front of them, and z-index is the depth — the rug is the
@@ -341,6 +358,13 @@ module.exports = async function handler (req, res) {
     const savedCave = normalizeCave(saved.cave);
     const isDefaultCave = c => c.theme === 'cozy' && c.decor.length === 2 && c.decor[0] === 'lights' && c.decor[1] === 'plant' && !(c.furniture && c.furniture.length);
     const cave = !isDefaultCave(savedCave) ? savedCave : liveCave;
+    // Add-on rooms: the union of the saved profile (source of truth) and
+    // the live profile publish — rooms are only ever added, never removed,
+    // so the union is safe when one publish is stale. Unknown ids drop out.
+    const rooms = [...new Set([
+      ...(Array.isArray(saved.caveRooms) ? saved.caveRooms : []),
+      ...(Array.isArray(profile.profile?.rooms) ? profile.profile.rooms : []),
+    ].map(x => String(x)).filter(id => CAVE_ROOMS[id]))];
     // 3D-scene themes show just the one scene image — pasting decor or
     // furniture on top would rebuild the collage. Graded shop themes
     // still show the placed pieces.
@@ -452,6 +476,31 @@ module.exports = async function handler (req, res) {
   });
 })();
 </script>`;
+    // Room tabs: Living Room (the theme scene) plus every room the owner
+    // has earned. Tapping one swaps the scene to that room's 3D picture
+    // and the caption to the room's name. No rooms, no tabs.
+    const roomTabs = rooms.length ? `<div class="cave-room-tabs"><button type="button" class="cave-room-tab on" data-room="">Living Room</button>${rooms.map(id => `<button type="button" class="cave-room-tab" data-room="${id}">${esc(CAVE_ROOMS[id].label)}</button>`).join('')}</div>
+<script>
+// The caption sits below the tabs in the page, so wait for the whole
+// document before wiring the tabs up — running at parse time would find
+// no caption and bail out before attaching anything.
+document.addEventListener('DOMContentLoaded', function () {
+  var tabs = document.querySelectorAll('.cave-room-tab');
+  var label = document.getElementById('cave-caption-label');
+  var mainLabel = ${JSON.stringify(CAVE_THEME_LABELS[cave.theme] || 'Cozy Cave')};
+  var roomLabels = ${JSON.stringify(Object.fromEntries(rooms.map(id => [id, CAVE_ROOMS[id].label])))};
+  if (!tabs.length) return;
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      var room = tab.getAttribute('data-room');
+      if (room) document.body.setAttribute('data-cave-room', room);
+      else document.body.removeAttribute('data-cave-room');
+      tabs.forEach(function (t) { t.classList.toggle('on', t === tab); });
+      if (label) label.textContent = room ? roomLabels[room] : mainLabel;
+    });
+  });
+});
+</script>` : '';
     // The app's own profile-link format, so tapping Join follows them with these spots.
     const link = { v: 2, id: str(h.id, 40), u: name, picks, w: [], ts: Date.now() };
     const hash = Buffer.from(JSON.stringify(link), 'utf8').toString('base64');
@@ -485,7 +534,8 @@ module.exports = async function handler (req, res) {
     <h1>${esc(name)}'s food spots</h1>
     <div class="handle">@${esc(handle)}</div>
     <div class="cave-scene"><div class="cave-decor" aria-hidden="true">${decorRow}${furnitureRow}</div></div>
-    <div class="cave-caption"><span class="cave-theme">${esc(CAVE_THEME_LABELS[cave.theme])}</span>${pointsRow}</div>
+    ${roomTabs}
+    <div class="cave-caption"><span class="cave-theme" id="cave-caption-label">${esc(CAVE_THEME_LABELS[cave.theme])}</span>${pointsRow}</div>
     <p class="lead">Where ${esc(name)} eats and exactly what to order.</p>
   </header>
   ${voteBox}
