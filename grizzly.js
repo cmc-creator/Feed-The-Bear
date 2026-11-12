@@ -27,6 +27,7 @@ const GRIZZLY_PITCH = {
   review:      { title: 'Your foodie Year in Review', body: 'Your top spots, cuisines, and streaks, wrapped up and ready to share.' },
   friends:     { title: 'Eat with all your friends', body: "Cub follows one friend. Grizzly follows everyone, and shows where they go and what they order." },
   vote:        { title: 'End the "where should we eat" debate', body: 'Start a Dinner Vote: friends tap yes or no on your picks, no app needed, and the bear names the winner.' },
+  'cave-shop': { title: 'Grizzly caves are next-level', body: 'Grizzly unlocks the rare caves and decorations in the Cave Shop — Aurora Cave, the Royal Bear Suite, the crystal chandelier and the bear throne. Subscribe on the website and they are yours in the app.' },
   swipe:       { title: 'Find out what you are craving', body: 'Bear Swipe reads your swipes, names your craving, and finds it near you.' },
   pick:        { title: "Today's Pick, every meal", body: 'The bear picks a spot from your list for breakfast, lunch and dinner, and tells you why.' },
   // FREE_RESTAURANT_LIMIT lives in app.js, which loads before this file,

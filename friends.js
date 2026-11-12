@@ -90,6 +90,12 @@ const DEFAULT_CAVE = { theme: 'cozy', decor: ['lights', 'plant'] };
 // Cave points: earned by using the app, and they unlock new cave decor.
 // Derived from what you've actually done, so it can never double-count
 // and a fresh install credits everything you already did.
+// - total: activity points (spots, dishes, visits, lists).
+// - bonus: daily check-in bonuses (+5/day, stored in the profile).
+// - lifetime: total + bonus, never below the stored high-water mark, so
+//   deleting a spot never takes an unlock away.
+// - spent: points used in the Cave Shop (stored in the profile).
+// - balance: what you can spend right now (lifetime - spent, never below 0).
 const CAVE_POINTS = { spot: 10, dish: 5, visit: 5, list: 10 };
 function cavePoints () {
   const spots = (state.restaurants || []).filter(isAvailableSpot);
@@ -102,15 +108,20 @@ function cavePoints () {
     .filter(m => !m.createdBy || m.createdBy === window._ftbUid).length;
   const total = spots.length * CAVE_POINTS.spot + dishes * CAVE_POINTS.dish
     + visits * CAVE_POINTS.visit + lists * CAVE_POINTS.list;
-  return { total, spots: spots.length, dishes, visits, lists };
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
+  const bonus = Math.max(0, Math.floor(Number(profile.caveBonus) || 0));
+  const spent = Math.max(0, Math.floor(Number(profile.caveSpent) || 0));
+  const storedLifetime = Math.max(0, Math.floor(Number(profile.caveLifetime) || 0));
+  const lifetime = Math.max(total + bonus, storedLifetime);
+  return { total, spots: spots.length, dishes, visits, lists, bonus, spent, lifetime, balance: Math.max(0, lifetime - spent) };
 }
 // Unlocks are sticky: once a tier is earned it stays unlocked even if the
 // points total later drops (a deleted spot never takes your fireplace away).
 function caveUnlockedIds () {
   const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
   const unlocked = new Set(Array.isArray(profile.caveUnlocked) ? profile.caveUnlocked : []);
-  const total = cavePoints().total;
-  Object.entries(CAVE_DECOR).forEach(([id, d]) => { if ((d.points || 0) <= total) unlocked.add(id); });
+  const lifetime = cavePoints().lifetime;
+  Object.entries(CAVE_DECOR).forEach(([id, d]) => { if ((d.points || 0) <= lifetime) unlocked.add(id); });
   return unlocked;
 }
 function refreshCaveUnlocks () {
@@ -124,9 +135,9 @@ function refreshCaveUnlocks () {
   return fresh;
 }
 function nextCaveUnlock () {
-  const total = cavePoints().total;
+  const lifetime = cavePoints().lifetime;
   const locked = Object.entries(CAVE_DECOR)
-    .filter(([, d]) => (d.points || 0) > total)
+    .filter(([, d]) => (d.points || 0) > lifetime)
     .sort((a, b) => (a[1].points || 0) - (b[1].points || 0));
   if (!locked.length) return null;
   const [id, d] = locked[0];
@@ -134,12 +145,14 @@ function nextCaveUnlock () {
 }
 
 // Accepts the full form {theme, decor} or the short link form {t, d}.
+// Shop themes and decor are valid too (the shop catalogs are checked
+// alongside the free ones).
 function normalizeCave (raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
-  const theme = CAVE_THEMES[src.theme || src.t] ? (src.theme || src.t) : DEFAULT_CAVE.theme;
+  const theme = caveThemeInfo(src.theme || src.t) ? (src.theme || src.t) : DEFAULT_CAVE.theme;
   const list = Array.isArray(src.decor) ? src.decor : (Array.isArray(src.d) ? src.d : null);
   const decor = list === null ? [...DEFAULT_CAVE.decor]
-    : [...new Set(list.map(x => String(x)).filter(id => CAVE_DECOR[id]))].slice(0, CAVE_MAX_DECOR);
+    : [...new Set(list.map(x => String(x)).filter(id => caveDecorInfo(id)))].slice(0, CAVE_MAX_DECOR);
   return { theme, decor };
 }
 function getCave () {
@@ -157,14 +170,114 @@ function caveOf (data) {
 }
 function saveCave (cave) {
   const next = normalizeCave(cave);
+  // A shop theme you do not own can never be saved, even from a crafted
+  // link — it falls back to the cozy default. (Grizzly shop themes count
+  // as owned while the account is Grizzly.)
+  if (caveIsShopTheme(next.theme) && !caveShopOwns('theme', next.theme)) next.theme = DEFAULT_CAVE.theme;
   // A locked decoration can never be saved, even from a crafted link.
+  // Shop decorations need a purchase (or Grizzly) instead of a points tier.
   const unlocked = caveUnlockedIds();
-  next.decor = next.decor.filter(id => unlocked.has(id));
+  next.decor = next.decor.filter(id => caveIsShopDecor(id) ? caveShopOwns('decor', id) : unlocked.has(id));
   const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || { name: 'Foodie', avatar: DEFAULT_AVATAR, joinDate: new Date().toISOString() };
-  if (typeof saveUserProfile === 'function') saveUserProfile({ ...profile, cave: next });
+  if (typeof saveUserProfile === 'function') saveUserProfile({ ...profile, cave: next, caveLifetime: cavePoints().lifetime });
   // Friends see the new look: the live profile republishes (it dedupes itself).
   if (state.settings.shareLive && typeof fbPublishFriendProfile === 'function') fbPublishFriendProfile();
   return next;
+}
+
+/* ── Cave Shop: spend the points you earn on new caves and decor ─
+   Sims / Dreamlight Valley style: the shop sells looks, not power.
+   Points items are bought with the balance (lifetime - spent). Grizzly
+   items are never sold for points — they are a Grizzly perk, unlocked
+   automatically while the account is Grizzly, and the button opens the
+   usual Grizzly upgrade pitch (Stripe web checkout, never an in-app
+   purchase). Purchases live in the profile (caveOwnedThemes /
+   caveOwnedDecor) so they follow you to every device and the public
+   cave page can render them. Shop themes reuse the real cave photos
+   with a colour grade (photo + tint), so no new theme files are needed;
+   shop decor tiles are crops of the same real photos. */
+const CAVE_SHOP_THEMES = {
+  // price in points; grizzly items cost no points and need Grizzly.
+  midnight: { label: 'Midnight Den',       emoji: '🌙', photo: 'theme-forest.jpg', tint: 'rgba(15,15,50,.45)',  filter: 'hue-rotate(200deg) brightness(.7) saturate(1.2)',  price: 200, rarity: 'Rare',      grizzly: false },
+  golden:   { label: 'Golden Hour Cave',   emoji: '🌅', photo: 'theme-arch.jpg',   tint: 'rgba(255,170,60,.30)', filter: 'sepia(.6) saturate(1.6) brightness(1.05)',      price: 150, rarity: 'Common',    grizzly: false },
+  misty:    { label: 'Misty Hollow',       emoji: '🌫️', photo: 'theme-grotto.jpg', tint: 'rgba(200,220,220,.30)', filter: 'grayscale(.4) brightness(1.1) contrast(.9)',     price: 250, rarity: 'Rare',      grizzly: false },
+  ember:    { label: 'Ember Grotto',       emoji: '🔥', photo: 'theme-den.jpg',    tint: 'rgba(255,90,20,.30)',  filter: 'sepia(.5) saturate(2) hue-rotate(-15deg) brightness(.95)', price: 400, rarity: 'Epic',  grizzly: false },
+  aurora:   { label: 'Aurora Cave',        emoji: '🌌', photo: 'theme-cosmic.jpg', tint: 'rgba(80,255,170,.22)', filter: 'hue-rotate(90deg) saturate(1.6) brightness(1.05)', price: 0,   rarity: 'Epic',      grizzly: true },
+  royal:    { label: 'Royal Bear Suite',   emoji: '👑', photo: 'theme-cozy.jpg',   tint: 'rgba(255,215,120,.30)', filter: 'sepia(.45) saturate(1.8) brightness(1.08)',     price: 0,   rarity: 'Legendary', grizzly: true },
+};
+const CAVE_SHOP_DECOR = {
+  lantern:    { label: 'Lantern glow',      emoji: '🏮', photo: 'decor-lantern.jpg',    price: 50,  rarity: 'Common',    grizzly: false },
+  honeypot:   { label: 'Honey pot',         emoji: '🍯', photo: 'decor-honeypot.jpg',   price: 75,  rarity: 'Common',    grizzly: false },
+  picnic:     { label: 'Picnic basket',     emoji: '🧺', photo: 'decor-picnic.jpg',     price: 80,  rarity: 'Common',    grizzly: false },
+  mushroom:   { label: 'Mushroom patch',    emoji: '🍄', photo: 'decor-mushroom.jpg',   price: 100, rarity: 'Rare',      grizzly: false },
+  campfire:   { label: 'Campfire',          emoji: '🔥', photo: 'decor-campfire.jpg',   price: 125, rarity: 'Rare',      grizzly: false },
+  crystal:    { label: 'Crystal cluster',   emoji: '💎', photo: 'decor-crystal.jpg',    price: 150, rarity: 'Rare',      grizzly: false },
+  chandelier: { label: 'Crystal chandelier', emoji: '✨', photo: 'decor-chandelier.jpg', price: 0,   rarity: 'Epic',      grizzly: true },
+  throne:     { label: 'Bear throne',       emoji: '🪑', photo: 'decor-throne.jpg',     price: 0,   rarity: 'Legendary', grizzly: true },
+};
+const CAVE_SHOP_RARITY = { Common: '🤍', Rare: '💙', Epic: '💜', Legendary: '🧡' };
+function caveThemeInfo (id) { return CAVE_THEMES[id] || CAVE_SHOP_THEMES[id] || null; }
+function caveDecorInfo (id) { return CAVE_DECOR[id] || CAVE_SHOP_DECOR[id] || null; }
+function caveIsShopTheme (id) { return !!CAVE_SHOP_THEMES[id]; }
+function caveIsShopDecor (id) { return !!CAVE_SHOP_DECOR[id]; }
+// Grizzly members own every Grizzly shop item automatically, for as long
+// as they are Grizzly. Points items are owned only once bought.
+function caveShopOwns (kind, id) {
+  const item = kind === 'theme' ? CAVE_SHOP_THEMES[id] : CAVE_SHOP_DECOR[id];
+  if (!item) return false;
+  if (item.grizzly) return typeof hasGrizzly === 'function' && hasGrizzly();
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || {};
+  const key = kind === 'theme' ? 'caveOwnedThemes' : 'caveOwnedDecor';
+  return Array.isArray(profile[key]) && profile[key].includes(id);
+}
+// Buy a points item: validates the item, ownership, and the balance, then
+// deducts the price from the spendable balance (lifetime - spent) and
+// records the purchase. Returns {ok} or {ok:false, reason}. Spending
+// never touches lifetime, so the Fireplace / Shelf / Bar Cart unlocks
+// (based on lifetime) can never be lost by buying things.
+function buyCaveShopItem (kind, id) {
+  const catalog = kind === 'theme' ? CAVE_SHOP_THEMES : CAVE_SHOP_DECOR;
+  const item = catalog[id];
+  if (!item) return { ok: false, reason: 'unknown' };
+  if (item.grizzly) return { ok: false, reason: 'grizzly' };
+  if (caveShopOwns(kind, id)) return { ok: false, reason: 'owned' };
+  const pts = cavePoints();
+  if (pts.balance < item.price) return { ok: false, reason: 'points', need: item.price - pts.balance };
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || { name: 'Foodie', avatar: DEFAULT_AVATAR, joinDate: new Date().toISOString() };
+  const key = kind === 'theme' ? 'caveOwnedThemes' : 'caveOwnedDecor';
+  const owned = [...new Set([...(Array.isArray(profile[key]) ? profile[key] : []), id])];
+  if (typeof saveUserProfile === 'function') {
+    saveUserProfile({ ...profile, caveSpent: (Number(profile.caveSpent) || 0) + item.price, caveLifetime: pts.lifetime, [key]: owned });
+  }
+  return { ok: true };
+}
+// Equip a shop item you own: a theme becomes the cave theme, a decoration
+// joins the cave (up to 4). Returns false when it is not owned or, for
+// decorations, when the cave is already full.
+function equipCaveShopItem (kind, id) {
+  if (!caveShopOwns(kind, id)) return false;
+  const cave = getCave();
+  if (kind === 'theme') saveCave({ ...cave, theme: id });
+  else if (cave.decor.includes(id)) return true;
+  else if (cave.decor.length >= CAVE_MAX_DECOR) return false;
+  else saveCave({ ...cave, decor: [...cave.decor, id].slice(0, CAVE_MAX_DECOR) });
+  return true;
+}
+// Daily check-in: +5 points the first time the app opens each day, for a
+// signed-in user with a profile. The toast is the celebration. Runs once
+// per day per account (caveBonusDate), so reopening the app does not farm it.
+const CAVE_DAILY_BONUS = 5;
+function grantDailyBonus () {
+  if (!window._ftbUid) return false;
+  const profile = (typeof loadUserProfile === 'function' && loadUserProfile()) || null;
+  if (!profile) return false;
+  const today = new Date().toDateString();
+  if (profile.caveBonusDate === today) return false;
+  if (typeof saveUserProfile === 'function') {
+    saveUserProfile({ ...profile, caveBonus: (Number(profile.caveBonus) || 0) + CAVE_DAILY_BONUS, caveBonusDate: today, caveLifetime: cavePoints().lifetime });
+  }
+  if (typeof showToast === 'function') showToast('Daily bonus', `+${CAVE_DAILY_BONUS} cave points for stopping by! Come back tomorrow for more.`, 'success');
+  return true;
 }
 
 // The name friends see: the one you typed, else your Google first name.
@@ -1923,8 +2036,9 @@ function renderCaveSetup () {
     const pointsBox = document.getElementById('cave-points');
     if (pointsBox) {
       pointsBox.innerHTML = `<b>⭐ ${pts.total} points</b> <span>(${pts.spots} spot${pts.spots === 1 ? '' : 's'} · ${pts.dishes} dish${pts.dishes === 1 ? '' : 'es'} rated · ${pts.visits} visit${pts.visits === 1 ? '' : 's'} · ${pts.lists} list${pts.lists === 1 ? '' : 's'} shared)</span>`
+        + `<span class="cave-points-balance">💰 ${pts.balance} to spend in the <button type="button" class="cave-shop-link" id="cave-shop-open-link">Cave Shop</button></span>`
         + `<span class="cave-points-next">${next ? `Next unlock: ${next.emoji} ${next.label} at ${next.points} points` : '🎉 Every decoration unlocked!'}</span>`
-        + `<span class="cave-points-earn">Save a spot +${CAVE_POINTS.spot} · Rate a dish +${CAVE_POINTS.dish} · Log a visit +${CAVE_POINTS.visit} · Share a list +${CAVE_POINTS.list}</span>`;
+        + `<span class="cave-points-earn">Save a spot +${CAVE_POINTS.spot} · Rate a dish +${CAVE_POINTS.dish} · Log a visit +${CAVE_POINTS.visit} · Share a list +${CAVE_POINTS.list} · Daily visit +${CAVE_DAILY_BONUS}</span>`;
     }
     themeBox.innerHTML = Object.entries(CAVE_THEMES).map(([id, t]) =>
       `<button type="button" class="cave-theme-chip${cave.theme === id ? ' on' : ''}" data-theme="${id}"><img src="/assets/caves/${t.photo}" alt="" loading="lazy" /><span>${t.emoji} ${t.label}</span></button>`).join('');
@@ -1937,8 +2051,8 @@ function renderCaveSetup () {
     }).join('');
     const prev = document.getElementById('cave-setup-preview');
     if (prev) {
-      const dec = cave.decor.map(id => `<img class="cave-preview-decor-img" src="/assets/caves/${CAVE_DECOR[id].photo}" alt="${escHtml(CAVE_DECOR[id].emoji)} ${escHtml(CAVE_DECOR[id].label)}" />`).join('');
-      prev.innerHTML = `<span class="cave-preview-banner cave-theme-${cave.theme}"><span class="cave-preview-decor">${dec}</span><b>${escHtml(CAVE_THEMES[cave.theme].label)}</b></span>`;
+      const dec = cave.decor.map(id => { const d = caveDecorInfo(id); return d ? `<img class="cave-preview-decor-img" src="/assets/caves/${d.photo}" alt="${escHtml(d.emoji)} ${escHtml(d.label)}" onerror="this.style.display='none'" />` : ''; }).join('');
+      prev.innerHTML = `<span class="cave-preview-banner cave-theme-${cave.theme}"><span class="cave-preview-decor">${dec}</span><b>${escHtml((caveThemeInfo(cave.theme) || {}).label || 'Cozy Cave')}</b></span>`;
     }
   };
   themeBox.onclick = e => { const b = e.target.closest('[data-theme]'); if (!b) return; cave = { ...cave, theme: b.dataset.theme }; draw(); };
@@ -1958,10 +2072,109 @@ function renderCaveSetup () {
   if (saveBtn) saveBtn.onclick = () => {
     saveCave(cave);
     const unlockedNote = fresh.length ? ` You unlocked: ${fresh.map(id => `${CAVE_DECOR[id].emoji} ${CAVE_DECOR[id].label}`).join(', ')}!` : '';
-    showToast('Your cave is decorated!', `${CAVE_THEMES[cave.theme].label} theme, ${cave.decor.length} decoration${cave.decor.length === 1 ? '' : 's'}.${unlockedNote}`, 'success');
+    showToast('Your cave is decorated!', `${(caveThemeInfo(cave.theme) || {}).label || 'Cozy Cave'} theme, ${cave.decor.length} decoration${cave.decor.length === 1 ? '' : 's'}.${unlockedNote}`, 'success');
   };
+  const shopLink = document.getElementById('cave-shop-open-link');
+  if (shopLink) shopLink.onclick = () => openCaveShop();
+  const shopBtn = document.getElementById('cave-shop-open-btn');
+  if (shopBtn) shopBtn.onclick = () => openCaveShop();
   draw();
 }
+
+function closeFoodieFriends () {
+  document.getElementById('friends-overlay').classList.add('hidden');
+  maybeHideOverlay();
+}
+
+// ── Cave Shop ────────────────────────────────────────────────
+// Spend the points you earn using the app on new caves and decor.
+// Points items show their price; Grizzly items show the Grizzly badge
+// and open the usual upgrade pitch (Stripe web checkout, never an
+// in-app purchase). Owned items show "Owned" and a Use button that
+// equips them straight into your cave.
+function renderCaveShop () {
+  const overlay = document.getElementById('cave-shop-overlay');
+  if (!overlay) return;
+  const balanceEl = document.getElementById('cave-shop-balance');
+  const themeGrid = document.getElementById('cave-shop-themes');
+  const decorGrid = document.getElementById('cave-shop-decor');
+  if (!themeGrid || !decorGrid) return;
+  const pts = cavePoints();
+  const cave = getCave();
+  if (balanceEl) {
+    balanceEl.innerHTML = `<b>💰 ${pts.balance} points to spend</b><span>${pts.lifetime} earned all time · ${pts.spent} spent</span>`
+      + `<span class="cave-shop-earn">Save a spot +${CAVE_POINTS.spot} · Rate a dish +${CAVE_POINTS.dish} · Log a visit +${CAVE_POINTS.visit} · Share a list +${CAVE_POINTS.list} · Daily visit +${CAVE_DAILY_BONUS}</span>`;
+  }
+  const card = (kind, id, item) => {
+    const owned = caveShopOwns(kind, id);
+    const isTheme = kind === 'theme';
+    const active = isTheme ? cave.theme === id : cave.decor.includes(id);
+    const imgStyle = item.filter ? ` style="filter:${item.filter}"` : '';
+    const price = item.grizzly ? '🐻 Grizzly' : `⭐ ${item.price}`;
+    const full = !isTheme && !active && cave.decor.length >= CAVE_MAX_DECOR;
+    let action;
+    if (owned && active) action = `<button type="button" class="btn-sm btn-secondary" disabled>✓ In your cave</button>`;
+    else if (owned && full) action = `<button type="button" class="btn-sm btn-secondary" disabled>Cave full (4 max)</button>`;
+    else if (owned) action = `<button type="button" class="btn-sm btn-primary" data-shop-use="${kind}:${id}">Use it</button>`;
+    else if (item.grizzly) action = `<button type="button" class="btn-sm btn-orange" data-shop-grizzly="${kind}:${id}">🐻 Grizzly</button>`;
+    else if (pts.balance >= item.price) action = `<button type="button" class="btn-sm btn-primary" data-shop-buy="${kind}:${id}">Buy · ⭐ ${item.price}</button>`;
+    else action = `<button type="button" class="btn-sm btn-secondary" disabled>Need ${item.price - pts.balance} more</button>`;
+    return `<article class="cave-shop-item${owned ? ' owned' : ''}${item.grizzly ? ' grizzly-item' : ''}">
+      <img src="/assets/caves/${item.photo}" alt="${escHtml(item.emoji)} ${escHtml(item.label)}" loading="lazy"${imgStyle} onerror="this.style.display='none'" />
+      <div class="cave-shop-item-body"><b>${item.emoji} ${escHtml(item.label)}</b>
+      <span class="cave-shop-rarity">${CAVE_SHOP_RARITY[item.rarity] || ''} ${escHtml(item.rarity)}</span>
+      <span class="cave-shop-price">${price}</span></div>${action}</article>`;
+  };
+  themeGrid.innerHTML = Object.entries(CAVE_SHOP_THEMES).map(([id, t]) => card('theme', id, t)).join('');
+  decorGrid.innerHTML = Object.entries(CAVE_SHOP_DECOR).map(([id, d]) => card('decor', id, d)).join('');
+}
+function openCaveShop () {
+  const overlay = document.getElementById('cave-shop-overlay');
+  if (!overlay) return;
+  renderCaveShop();
+  overlay.classList.remove('hidden');
+  document.body.classList.add('overlay-open');
+}
+function closeCaveShop () {
+  document.getElementById('cave-shop-overlay')?.classList.add('hidden');
+  if (typeof maybeHideOverlay === 'function') maybeHideOverlay();
+}
+window.openCaveShop = openCaveShop;
+window.closeCaveShop = closeCaveShop;
+// Shop clicks are delegated on the overlay so a re-render never loses them.
+document.addEventListener('click', e => {
+  const buy = e.target.closest('[data-shop-buy]');
+  if (buy) {
+    const [kind, id] = buy.dataset.shopBuy.split(':');
+    const item = kind === 'theme' ? CAVE_SHOP_THEMES[id] : CAVE_SHOP_DECOR[id];
+    const res = buyCaveShopItem(kind, id);
+    if (res.ok) {
+      showToast('It\'s yours!', `${item.emoji} ${item.label} is in your cave collection. Tap Use it to put it in your cave.`, 'success');
+    } else if (res.reason === 'points') {
+      showToast('Not enough points yet', `You need ${res.need} more points for ${item.label}. Save a spot or come back tomorrow for your daily bonus.`, 'info');
+    } else if (res.reason === 'owned') {
+      showToast('Already yours', `${item.label} is already in your collection.`, 'info');
+    }
+    renderCaveShop();
+    if (typeof renderCaveSetup === 'function') renderCaveSetup();
+    return;
+  }
+  const use = e.target.closest('[data-shop-use]');
+  if (use) {
+    const [kind, id] = use.dataset.shopUse.split(':');
+    const item = kind === 'theme' ? CAVE_SHOP_THEMES[id] : CAVE_SHOP_DECOR[id];
+    if (equipCaveShopItem(kind, id)) showToast('In your cave!', `${item.emoji} ${item.label} is now in your cave.`, 'success');
+    else showToast('Your cave is full', 'Remove a decoration from your cave first, then come back.', 'info');
+    renderCaveShop();
+    if (typeof renderCaveSetup === 'function') renderCaveSetup();
+    return;
+  }
+  const grz = e.target.closest('[data-shop-grizzly]');
+  if (grz) {
+    if (typeof showGrizzlyUpsell === 'function') showGrizzlyUpsell('cave-shop');
+  }
+  if (e.target.closest('#cave-shop-close-btn')) closeCaveShop();
+});
 
 function closeFoodieFriends () {
   document.getElementById('friends-overlay').classList.add('hidden');

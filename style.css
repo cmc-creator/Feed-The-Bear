@@ -2345,6 +2345,34 @@ body.celebrate-glow::before {
 .cave-theme-grotto { background: radial-gradient(85% 90% at 50% 108%, rgba(110,210,200,.26), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-grotto.jpg); background-size: cover; background-position: center 30%; }
 .cave-theme-lookout { background: radial-gradient(85% 90% at 50% 108%, rgba(160,200,240,.24), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-lookout.jpg); background-size: cover; background-position: center 30%; }
 .cave-theme-arch { background: radial-gradient(85% 90% at 50% 108%, rgba(230,180,110,.28), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-arch.jpg); background-size: cover; background-position: center 30%; }
+/* Cave Shop themes: the same real cave photos, colour-graded with a tint
+   so each shop cave looks like a different place. */
+.cave-theme-midnight { background: radial-gradient(85% 90% at 50% 108%, rgba(90,110,255,.30), transparent 70%), linear-gradient(180deg, rgba(15,15,50,.45), rgba(5,5,20,.60)), url(/assets/caves/theme-forest.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-golden { background: radial-gradient(85% 90% at 50% 108%, rgba(255,170,60,.32), transparent 70%), linear-gradient(180deg, rgba(255,170,60,.30), rgba(120,60,0,.45)), url(/assets/caves/theme-arch.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-misty { background: radial-gradient(85% 90% at 50% 108%, rgba(200,220,220,.26), transparent 70%), linear-gradient(180deg, rgba(200,220,220,.30), rgba(120,140,140,.45)), url(/assets/caves/theme-grotto.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-ember { background: radial-gradient(85% 90% at 50% 108%, rgba(255,90,20,.32), transparent 70%), linear-gradient(180deg, rgba(255,90,20,.30), rgba(80,20,0,.50)), url(/assets/caves/theme-den.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-aurora { background: radial-gradient(85% 90% at 50% 108%, rgba(80,255,170,.28), transparent 70%), linear-gradient(180deg, rgba(80,255,170,.22), rgba(40,20,90,.50)), url(/assets/caves/theme-cosmic.jpg); background-size: cover; background-position: center 30%; }
+.cave-theme-royal { background: radial-gradient(85% 90% at 50% 108%, rgba(255,215,120,.32), transparent 70%), linear-gradient(180deg, rgba(255,215,120,.30), rgba(90,60,0,.45)), url(/assets/caves/theme-cozy.jpg); background-size: cover; background-position: center 30%; }
+.cave-points-balance { color: var(--gold); font-weight: 700; }
+.cave-shop-link { background: none; border: 0; padding: 0; font: inherit; color: var(--gold); font-weight: 800; text-decoration: underline; cursor: pointer; }
+
+/* ── Cave Shop ─────────────────────────────────────────────── */
+.cave-shop-card { max-width: 560px; }
+.cave-shop-hint { font-size: .82rem; color: var(--text-dim); margin: 4px 18px 10px; line-height: 1.45; }
+.cave-shop-balance { margin: 0 18px 12px; display: flex; flex-direction: column; gap: 2px; font-size: .85rem; line-height: 1.5; }
+.cave-shop-balance b { font-size: .95rem; color: var(--gold); }
+.cave-shop-earn { color: var(--text-dim); font-size: .78rem; }
+.cave-shop-section { margin: 0 18px 14px; }
+.cave-shop-section h3 { margin: 0 0 8px; font-size: .95rem; }
+.cave-shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.cave-shop-item { border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: var(--card, rgba(255,255,255,.03)); display: flex; flex-direction: column; }
+.cave-shop-item img { width: 100%; height: 92px; object-fit: cover; display: block; }
+.cave-shop-item-body { padding: 8px 10px 4px; display: flex; flex-direction: column; gap: 2px; font-size: .85rem; }
+.cave-shop-rarity { color: var(--text-dim); font-size: .78rem; }
+.cave-shop-price { font-weight: 700; color: var(--gold); font-size: .82rem; }
+.cave-shop-item .btn-sm { margin: 6px 10px 10px; }
+.cave-shop-item.owned { border-color: var(--gold); }
+.cave-shop-item.grizzly-item { border-style: dashed; }
 
 /* Byte Cub's chat: above everything, with his action buttons under a message. */
 .chat-panel { z-index: 300; }

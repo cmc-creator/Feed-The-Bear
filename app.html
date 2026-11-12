@@ -85,7 +85,19 @@
         <div class="cave-decor-row" id="cave-decor-picks" role="group" aria-label="Cave decorations"></div>
         <div class="cave-setup-preview" id="cave-setup-preview"></div>
         <button id="cave-save-btn" type="button" class="btn-primary" style="width:100%;margin-top:10px">Save my cave</button>
+        <button id="cave-shop-open-btn" type="button" class="btn-secondary" style="width:100%;margin-top:8px">🛍️ Cave Shop — spend points on new caves &amp; decor</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ── Cave Shop (spend points on new caves & decor) ───────── -->
+  <div id="cave-shop-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="cave-shop-title">
+    <div class="modal-card cave-shop-card">
+      <div class="modal-header"><h2 id="cave-shop-title">🛍️ Cave Shop</h2><button id="cave-shop-close-btn" class="icon-btn" aria-label="Close">✕</button></div>
+      <p class="cave-shop-hint">Spend the points you earn using the app on new caves and decorations. Rare finds are Grizzly-only.</p>
+      <div class="cave-shop-balance" id="cave-shop-balance"></div>
+      <div class="cave-shop-section"><h3>New caves</h3><div class="cave-shop-grid" id="cave-shop-themes"></div></div>
+      <div class="cave-shop-section"><h3>Decorations</h3><div class="cave-shop-grid" id="cave-shop-decor"></div></div>
     </div>
   </div>
 

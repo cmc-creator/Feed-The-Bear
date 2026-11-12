@@ -1346,6 +1346,8 @@ async function switchAccountData (uid, isCurrent, captured = captureAccountData(
   // Sign-in has settled: a returning user whose avatar picker opened before
   // auth resolved goes to the diary; a genuine new user gets the picker.
   if (typeof recheckProfileSetup === 'function') recheckProfileSetup();
+  // Daily check-in: +5 cave points the first time the app opens each day.
+  if (typeof grantDailyBonus === 'function') grantDailyBonus();
 }
 
 // Map tags saved from Discover ("steak_house", "mexican;pizza", "regional") read like a person wrote them.
