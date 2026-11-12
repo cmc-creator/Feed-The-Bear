@@ -238,6 +238,14 @@ const CAVE_SHOP_DECOR = {
   crystal:    { label: 'Crystal cluster',   emoji: '💎', photo: 'decor-crystal.jpg',    price: 150, rarity: 'Rare',      grizzly: false },
   chandelier: { label: 'Crystal chandelier', emoji: '✨', photo: 'decor-chandelier.jpg', price: 0,   rarity: 'Epic',      grizzly: true },
   throne:     { label: 'Bear throne',       emoji: '🪑', photo: 'decor-throne.jpg',     price: 0,   rarity: 'Legendary', grizzly: true },
+  // Luxury decorations: the aspirational stuff, bought with LOTS of
+  // points (never Grizzly) so a bear who has saved up can show it off.
+  // They place like any other decor on the graded themes, and never
+  // paste on top of a 3D scene — the one-image rule still holds.
+  goldenbear:   { label: 'Golden Bear Statue', emoji: '🐻', photo: 'decor-lux-goldenbear.jpg',   price: 800,  rarity: 'Legendary', grizzly: false, luxury: true },
+  marblehearth: { label: 'Marble Hearth',      emoji: '🏛️', photo: 'decor-lux-marblehearth.jpg', price: 1000, rarity: 'Legendary', grizzly: false, luxury: true },
+  candelabra:   { label: 'Golden Candelabra',   emoji: '🕯️', photo: 'decor-lux-candelabra.jpg',   price: 750,  rarity: 'Epic',      grizzly: false, luxury: true },
+  jeweledrug:   { label: 'Jeweled Rug',         emoji: '🧶', photo: 'decor-lux-jeweledrug.jpg',   price: 700,  rarity: 'Epic',      grizzly: false, luxury: true },
 };
 /* Furniture for the cave: real photos of furniture, bought with points
    like decor and placed in the scene. The bed is the Grizzly piece.
@@ -263,6 +271,13 @@ const CAVE_SHOP_ROOMS = {
   games:    { label: 'Game Room', photo: 'scene-room-games-3d.jpg',    price: 350, rarity: 'Epic', grizzly: false },
   bath:     { label: 'Bathroom',  photo: 'scene-room-bath-3d.jpg',     price: 300, rarity: 'Rare', grizzly: false },
   library:  { label: 'Library',   photo: 'scene-room-library-3d.jpg',  price: 450, rarity: 'Epic', grizzly: false },
+  // Luxury rooms: whole extra rooms for bears who have banked a lot of
+  // points. Same one-image 3D scenes, same room tabs, same caveRooms
+  // storage — only the price is aspirational. Never Grizzly.
+  royal:       { label: 'Royal Suite',  photo: 'scene-room-royal-3d.jpg',       price: 1500, rarity: 'Legendary', grizzly: false, luxury: true },
+  spa:         { label: 'Spa Retreat',  photo: 'scene-room-spa-3d.jpg',         price: 1200, rarity: 'Epic',      grizzly: false, luxury: true },
+  wine:        { label: 'Wine Cellar',  photo: 'scene-room-wine-3d.jpg',        price: 1000, rarity: 'Epic',      grizzly: false, luxury: true },
+  observatory: { label: 'Observatory',  photo: 'scene-room-observatory-3d.jpg', price: 2000, rarity: 'Legendary', grizzly: false, luxury: true },
 };
 function caveRoomInfo (id) { return CAVE_SHOP_ROOMS[id] || null; }
 function caveIsShopRoom (id) { return !!CAVE_SHOP_ROOMS[id]; }
@@ -2387,8 +2402,10 @@ function renderCaveShop () {
   const decorGrid = document.getElementById('cave-shop-decor');
   const furnGrid = document.getElementById('cave-shop-furniture');
   const roomGrid = document.getElementById('cave-shop-rooms');
+  const luxRoomGrid = document.getElementById('cave-shop-luxury-rooms');
+  const luxDecorGrid = document.getElementById('cave-shop-luxury-decor');
   const pantryGrid = document.getElementById('cave-shop-pantry');
-  if (!themeGrid || !decorGrid || !furnGrid || !roomGrid || !pantryGrid) return;
+  if (!themeGrid || !decorGrid || !furnGrid || !roomGrid || !luxRoomGrid || !luxDecorGrid || !pantryGrid) return;
   const pts = cavePoints();
   const cave = getCave();
   if (balanceEl) {
@@ -2417,10 +2434,10 @@ function renderCaveShop () {
     else if (item.grizzly) action = `<button type="button" class="btn-sm btn-orange" data-shop-grizzly="${kind}:${id}">Grizzly</button>`;
     else if (pts.balance >= item.price) action = `<button type="button" class="btn-sm btn-primary" data-shop-buy="${kind}:${id}">Buy · ${item.price} pts</button>`;
     else action = `<button type="button" class="btn-sm btn-secondary" disabled>Need ${item.price - pts.balance} more</button>`;
-    return `<article class="cave-shop-item${owned ? ' owned' : ''}${item.grizzly ? ' grizzly-item' : ''}">
+    return `<article class="cave-shop-item${owned ? ' owned' : ''}${item.grizzly ? ' grizzly-item' : ''}${item.luxury ? ' luxury-item' : ''}">
       <img src="/assets/caves/${item.photo}" alt="${escHtml(item.label)}" loading="lazy"${imgStyle} onerror="this.style.display='none'" />
       <div class="cave-shop-item-body"><b>${escHtml(item.label)}</b>
-      <span class="cave-shop-rarity rarity-${String(item.rarity || '').toLowerCase()}">${escHtml(item.rarity)}</span>${seasonal}
+      <span class="cave-shop-rarity rarity-${String(item.rarity || '').toLowerCase()}">${escHtml(item.rarity)}</span>${seasonal}${item.luxury ? '<span class="cave-shop-luxury">Luxury</span>' : ''}
       <span class="cave-shop-price">${price}</span></div>${action}</article>`;
   };
   // Pantry cards: each food costs 5 points and adds one to the pantry.
@@ -2440,9 +2457,13 @@ function renderCaveShop () {
   themeGrid.innerHTML = Object.entries(CAVE_SHOP_THEMES)
     .filter(([id, t]) => caveSeasonalAvailable(t) || caveShopOwns('theme', id))
     .map(([id, t]) => card('theme', id, t)).join('');
-  decorGrid.innerHTML = Object.entries(CAVE_SHOP_DECOR).map(([id, d]) => card('decor', id, d)).join('');
+  decorGrid.innerHTML = Object.entries(CAVE_SHOP_DECOR).filter(([, d]) => !d.luxury).map(([id, d]) => card('decor', id, d)).join('');
+  // Luxury rooms and decorations live in their own sections so the big
+  // prices read as aspirational, not as a mistake.
+  luxDecorGrid.innerHTML = Object.entries(CAVE_SHOP_DECOR).filter(([, d]) => d.luxury).map(([id, d]) => card('decor', id, d)).join('');
   furnGrid.innerHTML = Object.entries(CAVE_SHOP_FURNITURE).map(([id, f]) => card('furniture', id, f)).join('');
-  roomGrid.innerHTML = Object.entries(CAVE_SHOP_ROOMS).map(([id, r]) => card('room', id, r)).join('');
+  roomGrid.innerHTML = Object.entries(CAVE_SHOP_ROOMS).filter(([, r]) => !r.luxury).map(([id, r]) => card('room', id, r)).join('');
+  luxRoomGrid.innerHTML = Object.entries(CAVE_SHOP_ROOMS).filter(([, r]) => r.luxury).map(([id, r]) => card('room', id, r)).join('');
   pantryGrid.innerHTML = Object.entries(CAVE_PANTRY).map(([id, p]) => pantryCard(id, p)).join('');
 }
 function openCaveShop () {

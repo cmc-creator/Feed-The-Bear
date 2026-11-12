@@ -2390,6 +2390,11 @@ body.celebrate-glow::before {
 .cave-room-games { background: radial-gradient(85% 90% at 50% 108%, rgba(255,170,80,.30), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-room-games-3d.jpg); background-size: cover; background-position: center 30%; }
 .cave-room-bath { background: radial-gradient(85% 90% at 50% 108%, rgba(120,200,190,.26), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-room-bath-3d.jpg); background-size: cover; background-position: center 30%; }
 .cave-room-library { background: radial-gradient(85% 90% at 50% 108%, rgba(255,200,120,.30), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-room-library-3d.jpg); background-size: cover; background-position: center 30%; }
+/* Luxury rooms: same preview treatment, gold-leaning glow each. */
+.cave-room-royal { background: radial-gradient(85% 90% at 50% 108%, rgba(255,215,130,.34), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-room-royal-3d.jpg); background-size: cover; background-position: center 30%; }
+.cave-room-spa { background: radial-gradient(85% 90% at 50% 108%, rgba(255,200,150,.30), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-room-spa-3d.jpg); background-size: cover; background-position: center 30%; }
+.cave-room-wine { background: radial-gradient(85% 90% at 50% 108%, rgba(255,170,80,.30), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-room-wine-3d.jpg); background-size: cover; background-position: center 30%; }
+.cave-room-observatory { background: radial-gradient(85% 90% at 50% 108%, rgba(120,160,255,.30), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/scene-room-observatory-3d.jpg); background-size: cover; background-position: center 30%; }
 /* Room tabs under the cave setup preview: Living Room + owned rooms. */
 .cave-room-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .cave-room-tabs:empty { display: none; }
@@ -2434,6 +2439,10 @@ body.celebrate-glow::before {
 .cave-shop-item .btn-sm { margin: 6px 10px 10px; }
 .cave-shop-item.owned { border-color: var(--gold); }
 .cave-shop-item.grizzly-item { border-style: dashed; }
+/* Luxury items: a gold frame and badge so the big price reads as a
+   goal to save for, not a mistake. */
+.cave-shop-item.luxury-item { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold), 0 6px 18px rgba(0,0,0,.35); }
+.cave-shop-luxury { display: inline-block; font-size: .75rem; font-weight: 800; color: #1b130b; background: var(--gold, #ffd98a); border-radius: 999px; padding: 2px 8px; margin-top: 2px; text-transform: uppercase; letter-spacing: .04em; }
 
 /* Byte Cub's chat: above everything, with his action buttons under a message. */
 .chat-panel { z-index: 300; }
