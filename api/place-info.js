@@ -49,9 +49,12 @@ function safeHttpUrl (value) {
 }
 
 /* GET /api/place-info?mode=search&q=&lat=&lng=
-   Type-ahead for Add a spot: up to 5 real places matching what's typed,
-   near the user when we know where they are. Cached at the CDN per query
-   and rounded location, so repeated searches don't hit Google again. */
+   Type-ahead for Add a spot: up to 10 real places matching what's typed,
+   nearest first when we know where the user is (Google ranks by text
+   relevance, so a place right in front of you could be cut off behind
+   far-away exact matches — we fetch more and sort by distance). Cached
+   at the CDN per query and rounded location, so repeated searches don't
+   hit Google again. */
 const SEARCH_FIELDS = [
   'places.id', 'places.displayName', 'places.formattedAddress', 'places.shortFormattedAddress',
   'places.location', 'places.primaryTypeDisplayName', 'places.rating', 'places.userRatingCount', 'places.priceLevel',
@@ -62,7 +65,7 @@ async function searchPlaces (req, res, key) {
   const lat = parseFloat(req.query.lat);
   const lng = parseFloat(req.query.lng);
   if (q.length < 3) return res.status(400).json({ places: [], error: 'Type at least 3 letters' });
-  const body = { textQuery: q, maxResultCount: 5 };
+  const body = { textQuery: q, maxResultCount: 10 };
   if (Number.isFinite(lat) && Number.isFinite(lng)) {
     body.locationBias = { circle: { center: { latitude: lat, longitude: lng }, radius: 25000 } };
   }
@@ -89,6 +92,13 @@ async function searchPlaces (req, res, key) {
       reviews: Number(p.userRatingCount) || 0,
       priceLevel: PRICE[p.priceLevel] || 0,
     })).filter(p => p.name);
+    // Nearest first when we know where the user is: Google's text ranking
+    // can bury a place that's right in front of you. Stable sort, so ties
+    // and places without coordinates keep Google's order. Same shape out.
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      const dist = p => (Number.isFinite(p.lat) && Number.isFinite(p.lng) ? metersBetween(lat, lng, p.lat, p.lng) : Infinity);
+      places.sort((a, b) => dist(a) - dist(b));
+    }
     res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=86400');
     return res.status(200).json({ places });
   } catch (err) {

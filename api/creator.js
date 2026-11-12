@@ -46,9 +46,15 @@ const emojiFor = c => { const k = String(c || '').toLowerCase().trim(); return E
 // Bear Cave decor: the same themes and decorations the app offers in
 // Username & public page (friends.js). The cave rides in the live profile
 // (profile.cave, short form {t, d}); anything unknown falls back to cozy.
-const CAVE_THEMES = { cozy: '🧸', forest: '🐻', neon: '⚡', pastel: '🌸', witchy: '🔮', elf: '🧚', cute: '💖', mancave: '🛋️', beach: '🏖️', winter: '❄️', cosmic: '🌌', jungle: '🌿' };
+const CAVE_THEMES = { cozy: '🧸', forest: '🐻', neon: '⚡', pastel: '🌸', witchy: '🔮', elf: '🧚', cute: '💖', mancave: '🛋️', beach: '🏖️', winter: '❄️', cosmic: '🌌', jungle: '🌿', den: '🐾', grotto: '💧', lookout: '⛰️', arch: '🪨' };
 const CAVE_DECOR = { lights: '✨', rug: '🧶', posters: '🖼️', plant: '🪴', trophy: '🏆', candle: '🕯️', fireplace: '🔥', shelf: '📚', barcart: '🍷' };
-const CAVE_THEME_LABELS = { cozy: 'Cozy Cave', forest: 'Forest Cave', neon: 'Neon Cave', pastel: 'Pastel Cave', witchy: 'Witchy Cave', elf: 'Elf Cave', cute: 'Cute Cave', mancave: 'Man Cave', beach: 'Beach Cave', winter: 'Winter Cave', cosmic: 'Cosmic Cave', jungle: 'Jungle Cave' };
+const CAVE_THEME_LABELS = { cozy: 'Cozy Cave', forest: 'Forest Cave', neon: 'Neon Cave', pastel: 'Pastel Cave', witchy: 'Witchy Cave', elf: 'Elf Cave', cute: 'Cute Cave', mancave: 'Man Cave', beach: 'Beach Cave', winter: 'Winter Cave', cosmic: 'Cosmic Cave', jungle: 'Jungle Cave', den: 'Bear Den', grotto: 'Grotto', lookout: 'Mountain Lookout', arch: 'Stone Arch' };
+// Real cave photos (assets/caves/): each theme is a real photo, colour-graded
+// to fit the theme, and each decoration is a real photo tile. The emoji is
+// kept in the image alt text so the look is real but the name still reads.
+const CAVE_PHOTOS = { cozy: 'theme-cozy.jpg', forest: 'theme-forest.jpg', neon: 'theme-neon.jpg', pastel: 'theme-pastel.jpg', witchy: 'theme-witchy.jpg', elf: 'theme-elf.jpg', cute: 'theme-cute.jpg', mancave: 'theme-mancave.jpg', beach: 'theme-beach.jpg', winter: 'theme-winter.jpg', cosmic: 'theme-cosmic.jpg', jungle: 'theme-jungle.jpg', den: 'theme-den.jpg', grotto: 'theme-grotto.jpg', lookout: 'theme-lookout.jpg', arch: 'theme-arch.jpg' };
+const CAVE_DECOR_PHOTOS = { lights: 'decor-lights.jpg', rug: 'decor-rug.jpg', posters: 'decor-posters.jpg', plant: 'decor-plant.jpg', trophy: 'decor-trophy.jpg', candle: 'decor-candle.jpg', fireplace: 'decor-fireplace.jpg', shelf: 'decor-shelf.jpg', barcart: 'decor-barcart.jpg' };
+const CAVE_DECOR_LABELS = { lights: 'Fairy lights', rug: 'Rug', posters: 'Posters', plant: 'Plant', trophy: 'Trophy shelf', candle: 'Candles', fireplace: 'Stone fireplace', shelf: 'Cookbook shelf', barcart: 'Bar cart' };
 function normalizeCave (raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
   const theme = CAVE_THEMES[src.theme || src.t] ? (src.theme || src.t) : 'cozy';
@@ -105,6 +111,44 @@ function page (res, status, { title, description, body, url = SITE, theme = 'coz
     body[data-cave-theme="winter"] { --bg: #101c26; --card: #1b2c3a; --accent: #9fd8ff; --gold: #ffd98a; --glow: rgba(150, 205, 255, .24); --glow2: rgba(255, 195, 105, .20); --wood: #3d4a55; }
     body[data-cave-theme="cosmic"] { --bg: #0a0e26; --card: #171a42; --accent: #8fb8ff; --gold: #d9e4ff; --glow: rgba(140, 110, 255, .30); --glow2: rgba(70, 140, 255, .16); --wood: #241a3d; }
     body[data-cave-theme="jungle"] { --bg: #0d2410; --card: #17351c; --accent: #7ee081; --gold: #ffe08a; --glow: rgba(120, 230, 120, .22); --glow2: rgba(255, 190, 120, .14); --wood: #2e3d1e; }
+    body[data-cave-theme="den"] { --bg: #221610; --card: #2e2118; --accent: #ffb35c; --gold: #ffe0a8; --glow: rgba(255, 170, 80, .30); --glow2: rgba(255, 200, 120, .14); --wood: #4a3220; }
+    body[data-cave-theme="grotto"] { --bg: #0f2422; --card: #173632; --accent: #7fd8cf; --gold: #d8f2e8; --glow: rgba(110, 210, 200, .26); --glow2: rgba(90, 180, 220, .14); --wood: #2e3d3a; }
+    body[data-cave-theme="lookout"] { --bg: #1a2430; --card: #26344a; --accent: #a8c8e8; --gold: #ffe9a8; --glow: rgba(160, 200, 240, .24); --glow2: rgba(255, 220, 140, .14); --wood: #3d4a55; }
+    body[data-cave-theme="arch"] { --bg: #241d16; --card: #332a20; --accent: #e8b878; --gold: #ffe0a8; --glow: rgba(230, 180, 110, .28); --glow2: rgba(255, 200, 120, .14); --wood: #4a3a28; }
+    /* The cave itself is a real photo now: the theme picks the photo, shown
+       on the page background (dimmed) and on the cave scene (bright). */
+    body[data-cave-theme="cozy"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-cozy.jpg); }
+    body[data-cave-theme="forest"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-forest.jpg); }
+    body[data-cave-theme="neon"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-neon.jpg); }
+    body[data-cave-theme="pastel"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-pastel.jpg); }
+    body[data-cave-theme="witchy"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-witchy.jpg); }
+    body[data-cave-theme="elf"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-elf.jpg); }
+    body[data-cave-theme="cute"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-cute.jpg); }
+    body[data-cave-theme="mancave"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-mancave.jpg); }
+    body[data-cave-theme="beach"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-beach.jpg); }
+    body[data-cave-theme="winter"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-winter.jpg); }
+    body[data-cave-theme="cosmic"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-cosmic.jpg); }
+    body[data-cave-theme="jungle"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-jungle.jpg); }
+    body[data-cave-theme="den"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-den.jpg); }
+    body[data-cave-theme="grotto"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-grotto.jpg); }
+    body[data-cave-theme="lookout"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-lookout.jpg); }
+    body[data-cave-theme="arch"] .cave-scene { background-image: radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url(/assets/caves/theme-arch.jpg); }
+    body[data-cave-theme="cozy"] { background-image: linear-gradient(180deg, rgba(20,12,6,.45), rgba(10,8,6,.85)), url(/assets/caves/theme-cozy.jpg); background-size: cover; background-position: center 25%; background-attachment: fixed; background-color: var(--bg); }
+    body[data-cave-theme="forest"] { background-image: linear-gradient(180deg, rgba(10,20,12,.45), rgba(8,10,8,.85)), url(/assets/caves/theme-forest.jpg); background-size: cover; background-position: center 25%; background-attachment: fixed; background-color: var(--bg); }
+    body[data-cave-theme="neon"] { background-image: linear-gradient(180deg, rgba(20,12,40,.45), rgba(10,8,14,.85)), url(/assets/caves/theme-neon.jpg); background-size: cover; background-position: center 25%; background-attachment: fixed; background-color: var(--bg); }
+    body[data-cave-theme="pastel"] { background-image: linear-gradient(180deg, rgba(30,25,35,.45), rgba(12,10,14,.85)), url(/assets/caves/theme-pastel.jpg); background-size: cover; background-position: center 25%; background-attachment: fixed; background-color: var(--bg); }
+    body[data-cave-theme="witchy"] { background-image: linear-gradient(180deg, rgba(18,12,30,.45), rgba(8,8,14,.85)), url(/assets/caves/theme-witchy.jpg); background-size: cover; background-position: center 25%; background-attachment: fixed; background-color: var(--bg); }
+    body[data-cave-theme="elf"] { background-image: linear-gradient(180deg, rgba(12,26,18,.45), rgba(8,12,10,.85)), url(/assets/caves/theme-elf.jpg); background-size: cover; background-position: center 25%; background-attachment: fixed; background-color: var(--bg); }
+    body[data-cave-theme="cute"] { background-image: linear-gradient(180deg, rgba(35,20,30,.45), rgba(14,10,12,.85)), url(/assets/caves/theme-cute.jpg); background-size: cover; background-position: center 25%; background-attachment: fixed; background-color: var(--bg); }
+    body[data-cave-theme="mancave"] { background-image: linear-gradient(180deg, rgba(22,16,10,.45), rgba(10,8,6,.85)), url(/assets/caves/theme-mancave.jpg); background-size: cover; background-position: center 25%; background-attachment: fixed; background-color: var(--bg); }
+    body[data-cave-theme="beach"] { background-image: linear-gradient(180deg, rgba(14,32,38,.45), rgba(8,12,14,.85)), url(/assets/caves/theme-beach.jpg); background-size: cover; background-position: center 25%; background-attachment: fixed; background-color: var(--bg); }
+    body[data-cave-theme="winter"] { background-image: linear-gradient(180deg, rgba(12,22,30,.45), rgba(8,10,14,.85)), url(/assets/caves/theme-winter.jpg); background-size: cover; background-position: center 25%; background-attachment: fixed; background-color: var(--bg); }
+    body[data-cave-theme="cosmic"] { background-image: linear-gradient(180deg, rgba(10,12,30,.45), rgba(6,8,14,.85)), url(/assets/caves/theme-cosmic.jpg); background-size: cover; background-position: center 25%; background-attachment: fixed; background-color: var(--bg); }
+    body[data-cave-theme="jungle"] { background-image: linear-gradient(180deg, rgba(10,26,12,.45), rgba(8,12,8,.85)), url(/assets/caves/theme-jungle.jpg); background-size: cover; background-position: center 25%; background-attachment: fixed; background-color: var(--bg); }
+    body[data-cave-theme="den"] { background-image: linear-gradient(180deg, rgba(24,16,10,.45), rgba(10,8,6,.85)), url(/assets/caves/theme-den.jpg); background-size: cover; background-position: center 25%; background-attachment: fixed; background-color: var(--bg); }
+    body[data-cave-theme="grotto"] { background-image: linear-gradient(180deg, rgba(12,26,24,.45), rgba(8,12,12,.85)), url(/assets/caves/theme-grotto.jpg); background-size: cover; background-position: center 25%; background-attachment: fixed; background-color: var(--bg); }
+    body[data-cave-theme="lookout"] { background-image: linear-gradient(180deg, rgba(20,26,32,.45), rgba(8,10,14,.85)), url(/assets/caves/theme-lookout.jpg); background-size: cover; background-position: center 25%; background-attachment: fixed; background-color: var(--bg); }
+    body[data-cave-theme="arch"] { background-image: linear-gradient(180deg, rgba(26,20,14,.45), rgba(10,8,6,.85)), url(/assets/caves/theme-arch.jpg); background-size: cover; background-position: center 25%; background-attachment: fixed; background-color: var(--bg); }
     * { box-sizing: border-box; }
     body { margin: 0; color: var(--text); font: 500 1rem/1.45 system-ui, -apple-system, sans-serif;
       background:
@@ -127,14 +171,15 @@ function page (res, status, { title, description, body, url = SITE, theme = 'coz
         radial-gradient(85% 95% at 50% 108%, var(--glow), transparent 72%),
         linear-gradient(180deg, rgba(255,255,255,.055), rgba(0,0,0,.30)),
         var(--card);
+      background-size: cover; background-position: center 30%;
       box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), inset 0 -28px 55px rgba(0,0,0,.45), 0 12px 30px rgba(0,0,0,.35);
     }
     .cave-scene::after { content: ""; display: block; height: 9px; margin: 12px 8px 0; border-radius: 5px;
       background: linear-gradient(180deg, var(--wood), rgba(0,0,0,.45));
       box-shadow: 0 5px 10px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.12);
     }
-    .cave-decor { display: flex; justify-content: center; gap: 16px; font-size: 1.7rem; line-height: 1; }
-    .cave-decor span { filter: drop-shadow(0 7px 7px rgba(0,0,0,.6)); }
+    .cave-decor { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+    .cave-decor-img { width: 64px; height: 64px; object-fit: cover; border-radius: 12px; border: 2px solid rgba(255,255,255,.18); box-shadow: 0 6px 14px rgba(0,0,0,.55); }
     .cave-theme { text-align: center; color: var(--dim); font-size: .8rem; margin-top: 10px; }
     .cave-points { text-align: center; color: var(--gold); font-weight: 800; font-size: .9rem; margin-top: 6px; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
     .cave-vote { text-align: center; margin-top: 14px; }
@@ -156,6 +201,8 @@ function page (res, status, { title, description, body, url = SITE, theme = 'coz
     .cta a { display: block; max-width: 520px; margin: 0 auto; padding: 16px; border-radius: 16px; background: var(--accent); color: #1b130b; font-weight: 800; font-size: 1.05rem; text-align: center; text-decoration: none; }
     .cta small { display: block; text-align: center; color: var(--dim); font-size: .78rem; margin-top: 6px; }
     .home { display: block; text-align: center; margin-top: 24px; color: var(--gold); }
+    .cave-home-row { text-align: left; margin-bottom: 8px; }
+    .cave-home { display: inline-block; padding: 10px 18px; border-radius: 999px; background: var(--accent); color: #1b130b; font-weight: 800; font-size: 1rem; text-decoration: none; box-shadow: 0 6px 16px rgba(0,0,0,.4); }
   </style>
 </head>
 <body data-cave-theme="${esc(theme)}">
@@ -213,7 +260,7 @@ module.exports = async function handler (req, res) {
     const savedCave = normalizeCave(saved.cave);
     const isDefaultCave = c => c.theme === 'cozy' && c.decor.length === 2 && c.decor[0] === 'lights' && c.decor[1] === 'plant';
     const cave = !isDefaultCave(savedCave) ? savedCave : liveCave;
-    const decorRow = cave.decor.map(id => `<span>${CAVE_DECOR[id]}</span>`).join('');
+    const decorRow = cave.decor.map(id => `<span><img class="cave-decor-img" src="/assets/caves/${CAVE_DECOR_PHOTOS[id]}" alt="${esc(CAVE_DECOR[id])} ${esc(CAVE_DECOR_LABELS[id])}" /></span>`).join('');
     const livePts = Math.max(0, Math.floor(Number(profile.profile?.pts) || 0));
     const savedPts = Math.max(0, Math.floor(Number(saved.pts) || 0));
     const cavePts = livePts > 0 ? livePts : savedPts;
@@ -290,6 +337,7 @@ module.exports = async function handler (req, res) {
       url: `${SITE}/@${handle}`,
       theme: cave.theme,
       body: `<main>
+  <div class="cave-home-row"><a class="cave-home" href="/app.html">🏠 Home</a></div>
   <header>
     <img class="bear" src="${esc(photoSrc)}" alt="" />
     <h1>${esc(name)}'s food spots</h1>

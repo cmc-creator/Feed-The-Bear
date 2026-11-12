@@ -56,29 +56,33 @@ function buildProfileData () {
    rendered by api/creator.js on your page. Skipping setup leaves the
    cozy default, so the page always looks good. */
 const CAVE_THEMES = {
-  cozy:   { label: 'Cozy Cave',   emoji: '🧸' },
-  forest: { label: 'Forest Cave', emoji: '🐻' },
-  neon:   { label: 'Neon Cave',   emoji: '⚡' },
-  pastel: { label: 'Pastel Cave', emoji: '🌸' },
-  witchy: { label: 'Witchy Cave', emoji: '🔮' },
-  elf:    { label: 'Elf Cave',    emoji: '🧚' },
-  cute:   { label: 'Cute Cave',   emoji: '💖' },
-  mancave:{ label: 'Man Cave',    emoji: '🛋️' },
-  beach:  { label: 'Beach Cave',  emoji: '🏖️' },
-  winter: { label: 'Winter Cave', emoji: '❄️' },
-  cosmic: { label: 'Cosmic Cave', emoji: '🌌' },
-  jungle: { label: 'Jungle Cave', emoji: '🌿' },
+  cozy:   { label: 'Cozy Cave',   emoji: '🧸', photo: 'theme-cozy.jpg' },
+  forest: { label: 'Forest Cave', emoji: '🐻', photo: 'theme-forest.jpg' },
+  neon:   { label: 'Neon Cave',   emoji: '⚡', photo: 'theme-neon.jpg' },
+  pastel: { label: 'Pastel Cave', emoji: '🌸', photo: 'theme-pastel.jpg' },
+  witchy: { label: 'Witchy Cave', emoji: '🔮', photo: 'theme-witchy.jpg' },
+  elf:    { label: 'Elf Cave',    emoji: '🧚', photo: 'theme-elf.jpg' },
+  cute:   { label: 'Cute Cave',   emoji: '💖', photo: 'theme-cute.jpg' },
+  mancave:{ label: 'Man Cave',    emoji: '🛋️', photo: 'theme-mancave.jpg' },
+  beach:  { label: 'Beach Cave',  emoji: '🏖️', photo: 'theme-beach.jpg' },
+  winter: { label: 'Winter Cave', emoji: '❄️', photo: 'theme-winter.jpg' },
+  cosmic: { label: 'Cosmic Cave', emoji: '🌌', photo: 'theme-cosmic.jpg' },
+  jungle: { label: 'Jungle Cave', emoji: '🌿', photo: 'theme-jungle.jpg' },
+  den:    { label: 'Bear Den',    emoji: '🐾', photo: 'theme-den.jpg' },
+  grotto: { label: 'Grotto',      emoji: '💧', photo: 'theme-grotto.jpg' },
+  lookout:{ label: 'Mountain Lookout', emoji: '⛰️', photo: 'theme-lookout.jpg' },
+  arch:   { label: 'Stone Arch',  emoji: '🪨', photo: 'theme-arch.jpg' },
 };
 const CAVE_DECOR = {
-  lights:   { label: 'Fairy lights',    emoji: '✨', points: 0 },
-  rug:      { label: 'Rug',             emoji: '🧶', points: 0 },
-  posters:  { label: 'Posters',         emoji: '🖼️', points: 0 },
-  plant:    { label: 'Plant',           emoji: '🪴', points: 0 },
-  trophy:   { label: 'Trophy shelf',    emoji: '🏆', points: 0 },
-  candle:   { label: 'Candles',         emoji: '🕯️', points: 0 },
-  fireplace:{ label: 'Stone fireplace', emoji: '🔥', points: 50 },
-  shelf:    { label: 'Cookbook shelf',  emoji: '📚', points: 100 },
-  barcart:  { label: 'Bar cart',        emoji: '🍷', points: 250 },
+  lights:   { label: 'Fairy lights',    emoji: '✨', points: 0, photo: 'decor-lights.jpg' },
+  rug:      { label: 'Rug',             emoji: '🧶', points: 0, photo: 'decor-rug.jpg' },
+  posters:  { label: 'Posters',         emoji: '🖼️', points: 0, photo: 'decor-posters.jpg' },
+  plant:    { label: 'Plant',           emoji: '🪴', points: 0, photo: 'decor-plant.jpg' },
+  trophy:   { label: 'Trophy shelf',    emoji: '🏆', points: 0, photo: 'decor-trophy.jpg' },
+  candle:   { label: 'Candles',         emoji: '🕯️', points: 0, photo: 'decor-candle.jpg' },
+  fireplace:{ label: 'Stone fireplace', emoji: '🔥', points: 50, photo: 'decor-fireplace.jpg' },
+  shelf:    { label: 'Cookbook shelf',  emoji: '📚', points: 100, photo: 'decor-shelf.jpg' },
+  barcart:  { label: 'Bar cart',        emoji: '🍷', points: 250, photo: 'decor-barcart.jpg' },
 };
 const CAVE_MAX_DECOR = 4;
 const DEFAULT_CAVE = { theme: 'cozy', decor: ['lights', 'plant'] };
@@ -124,7 +128,9 @@ function nextCaveUnlock () {
   const locked = Object.entries(CAVE_DECOR)
     .filter(([, d]) => (d.points || 0) > total)
     .sort((a, b) => (a[1].points || 0) - (b[1].points || 0));
-  return locked.length ? { id: locked[0][0], ...locked[0][1] } : null;
+  if (!locked.length) return null;
+  const [id, d] = locked[0];
+  return { id, label: d.label, emoji: d.emoji, points: d.points };
 }
 
 // Accepts the full form {theme, decor} or the short link form {t, d}.
@@ -314,8 +320,9 @@ function buildInviteLink (ref = window._ftbUid || '') {
 }
 
 // Invites you've sent (newest first). Each has its own random code, so the
-// server can say when it was opened and who joined; the name you gave it
-// ("Mom", from your contacts or typed) never leaves this phone.
+// server can say when it was opened and who joined. The name you gave it
+// ("Mom", from your contacts or typed) is sent with the invite so it shows
+// on any phone you sign in on; only you ever see your invites list.
 const INVITES_SENT_KEY = 'ftb_invites_sent_v1';
 function getSentInvites () {
   try {
@@ -324,11 +331,11 @@ function getSentInvites () {
     // Older entries were just the date.
     return list.map(e => (typeof e === 'string' ? { at: e, code: '', name: '' } : e))
       .filter(e => e && typeof e.at === 'string')
-      .map(e => ({ at: e.at, code: /^[a-z0-9]{16,32}$/.test(e.code || '') ? e.code : '', name: String(e.name || '').slice(0, 40) }));
+      .map(e => ({ at: e.at, code: /^[a-z0-9]{16,32}$/.test(e.code || '') ? e.code : '', name: String(e.name || '').slice(0, 40), via: e.via === 'sms' ? 'sms' : 'share' }));
   } catch { return []; }
 }
 function noteInviteSent (entry = {}) {
-  const item = { at: new Date().toISOString(), code: entry.code || '', name: entry.name || '' };
+  const item = { at: new Date().toISOString(), code: entry.code || '', name: entry.name || '', via: entry.via === 'sms' ? 'sms' : 'share' };
   try { localStorage.setItem(INVITES_SENT_KEY, JSON.stringify([item, ...getSentInvites()].slice(0, 50))); } catch { /* private mode */ }
   if (!document.getElementById('friends-overlay')?.classList.contains('hidden')) renderFriendsList();
 }
@@ -360,7 +367,8 @@ function contactPicker () {
   return null;
 }
 
-// "Who's this invite for?" Resolves to the name ('' to skip it), or null if closed.
+// "Who's this invite for?" Resolves to { name, phone, via } ('share' or
+// 'sms'), or null if closed. A skipped name resolves with name ''.
 function askInviteRecipient (onSend) {
   return new Promise((resolve, reject) => {
     document.getElementById('invite-who')?.remove();
@@ -377,11 +385,15 @@ function askInviteRecipient (onSend) {
       <p class="invite-who-hint">So you can see when they open it and join. Only you see this name.</p>
       ${pick ? '<button type="button" class="btn-secondary invite-who-contacts">📇 Pick from contacts</button>' : ''}
       <input class="form-input invite-who-name" type="text" maxlength="40" placeholder="Their name" autocomplete="off" aria-label="Their name" />
+      <input class="form-input invite-who-phone" type="tel" maxlength="20" placeholder="Their phone number (optional)" autocomplete="off" inputmode="tel" aria-label="Their phone number" />
       <button type="submit" class="btn-primary invite-who-send">Send invite</button>
+      <button type="button" class="btn-secondary invite-who-text">📱 Text them the invite</button>
+      <p class="invite-who-hint">Texting opens your phone's messaging app with the invite ready to send — we never send it for you.</p>
       <button type="button" class="invite-who-skip">Skip</button>
     </form>`;
     document.body.appendChild(el);
     const input = el.querySelector('.invite-who-name');
+    const phoneInput = el.querySelector('.invite-who-phone');
     let finished = false;
     const done = val => {
       if (finished) return;
@@ -391,8 +403,10 @@ function askInviteRecipient (onSend) {
       try { resolve(val !== null && onSend ? onSend(val) : val); }
       catch (err) { reject(err); }
     };
-    el.querySelector('form').addEventListener('submit', e => { e.preventDefault(); done(input.value.trim().slice(0, 40)); });
-    el.querySelector('.invite-who-skip').addEventListener('click', () => done(''));
+    const who = via => ({ name: input.value.trim().slice(0, 40), phone: phoneInput.value.trim(), via });
+    el.querySelector('form').addEventListener('submit', e => { e.preventDefault(); done(who('share')); });
+    el.querySelector('.invite-who-text').addEventListener('click', () => done(who('sms')));
+    el.querySelector('.invite-who-skip').addEventListener('click', () => done({ name: '', phone: '', via: 'share' }));
     el.querySelector('.invite-who-close').addEventListener('click', () => done(null));
     el.addEventListener('click', e => { if (e.target === el) done(null); });
     el.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); done(null); } });
@@ -422,17 +436,22 @@ async function inviteFriend ({ ref = window._ftbUid || '' } = {}) {
 }
 
 async function sendFriendInvite (who, ref) {
+  const rec = typeof who === 'string' ? { name: who, phone: '', via: 'share' } : (who || {});
+  const name = String(rec.name || '').slice(0, 40);
+  const phone = String(rec.phone || '').replace(/[^\d+]/g, '').slice(0, 20);
+  const via = rec.via === 'sms' ? 'sms' : 'share';
   const data = buildProfileData();
   // Signed in: a code of its own, so this invite can be followed up.
   const code = window._ftbUid ? newInviteCode() : '';
   let url = buildInviteLink(ref);
   if (code) {
-    handleApi('POST', { body: { action: 'invite', code } }).catch(err => console.warn('Invite tracking unavailable:', err));
+    // The name rides along so the invite shows who it was for on any phone.
+    handleApi('POST', { body: { action: 'invite', code, name } }).catch(err => console.warn('Invite tracking unavailable:', err));
     const [base, hash] = url.split('#');
     url = `${base}${base.includes('?') ? '&' : '?'}i=${code}${hash ? `#${hash}` : ''}`;
   }
   const hasPicks = profileHasContent(data);
-  const hi = who ? `Hey ${who.split(/\s+/)[0]}! ` : '';
+  const hi = name ? `Hey ${name.split(/\s+/)[0]}! ` : '';
   // Says what the app is and exactly what tapping the link does.
   const text = hi + "I'm using Feed the Bear to save places to eat and what to order there. "
     + (hasPicks
@@ -440,11 +459,18 @@ async function sendFriendInvite (who, ref) {
       : 'Tap my link to join free and follow me, so we can share spots.')
     + (ref ? ' (You get 30 days of Grizzly free with it.)' : '');
   startSharingLive();
-  trackProductEvent('friend_invite', { withProfile: hasPicks, withRef: !!ref, named: !!who, tracked: !!code });
+  trackProductEvent('friend_invite', { withProfile: hasPicks, withRef: !!ref, named: !!name, tracked: !!code, via });
+  if (via === 'sms') {
+    // No SMS backend: open their own texting app with the invite ready to send.
+    // Record it first: opening the texting app can leave this page at once.
+    noteInviteSent({ code, name, via: 'sms' });
+    window.location.href = `sms:${phone}?&body=${encodeURIComponent(`${text} ${url}`)}`;
+    return;
+  }
   try {
     if (navigator.share) {
       await navigator.share({ title: 'Feed the Bear', text, url });
-      noteInviteSent({ code, name: who });
+      noteInviteSent({ code, name, via: 'share' });
       return;
     }
   } catch (err) {
@@ -453,7 +479,7 @@ async function sendFriendInvite (who, ref) {
   }
   try {
     await shareWithMenu({ title: 'Feed the Bear', text, url });
-    noteInviteSent({ code, name: who });
+    noteInviteSent({ code, name, via: 'share' });
   } catch (err) {
     if (err?.name !== 'AbortError') throw err;
   }
@@ -526,7 +552,7 @@ async function loadInviteStatus () {
     _inviteStatus = Object.fromEntries(data.invites.map(r => [r.code, r]));
     _serverInvites = data.invites
       .filter(r => r && /^[a-z0-9]{16,32}$/.test(r.code || ''))
-      .map(r => ({ at: String(r.at || ''), code: r.code, name: '' }));
+      .map(r => ({ at: String(r.at || ''), code: r.code, name: String(r.name || '').slice(0, 40), via: 'share' }));
     if (!document.getElementById('friends-overlay')?.classList.contains('hidden')) renderFriendsList();
   } catch { noteFriendsError('your invites', 0, {}); }
 }
@@ -1771,15 +1797,17 @@ function renderFriendsList () {
   const invites = [...local, ..._serverInvites.filter(e => !localCodes.has(e.code))]
     .sort((a, b) => String(b.at).localeCompare(String(a.at)));
   const shown = invites.slice(0, 15);
-  const invitesHtml = invites.length
-    ? `<div class="friends-section-title">Sent invites (${invites.length})</div>` + shown.map((e, i) => {
+  const invitesHtml = (invites.length || window._ftbUid)
+    ? `<div class="friends-section-title">Sent invites${invites.length ? ` (${invites.length})` : ''}</div>` + (invites.length
+    ? shown.map((e, i) => {
         const st = (e.code && _inviteStatus[e.code]) || {};
         const name = e.name || (st.joined ? st.u : '') || 'Invite';
         const when = fmtInviteDate(e.at);
+        const sentBy = e.via === 'sms' ? 'Texted' : 'Sent';
         const line = st.joined
-          ? `Joined${e.name && st.u ? ` as ${escHtml(st.u)}` : ''} · sent ${escHtml(when.toLowerCase())}`
-          : st.opened ? `Opened the link · hasn't joined yet · sent ${escHtml(when.toLowerCase())}`
-            : `Sent ${escHtml(when.toLowerCase())}${e.code ? ' · not opened yet' : ''}`;
+          ? `Joined${e.name && st.u ? ` as ${escHtml(st.u)}` : ''} · ${sentBy.toLowerCase()} ${escHtml(when.toLowerCase())}`
+          : st.opened ? `Opened the link · hasn't joined yet · ${sentBy.toLowerCase()} ${escHtml(when.toLowerCase())}`
+            : `${sentBy} ${escHtml(when.toLowerCase())}${e.code ? ' · not opened yet' : ''}`;
         const badge = st.joined
           ? (following.has(st.id)
               ? '<span class="friend-mutual" aria-label="You follow them">✓</span>'
@@ -1791,8 +1819,9 @@ function renderFriendsList () {
         </div>`;
       }).join('')
       + (invites.length > shown.length ? `<div class="friends-empty">and ${invites.length - shown.length} more</div>` : '')
+    : '<div class="friends-empty">No invites sent yet — tap “Invite a friend” above to send one.</div>')
     : '';
-  el.innerHTML = '<div class="foodie-social-start"><div><strong>Good food is better together</strong><p>Pick a spot, add a time, send your crew a plan.</p></div><button type="button" class="btn-primary fx-start-plan">Plan a food date</button></div>' + (pulseHtml + followingHtml + followersHtml + invitesHtml || (_followers === null && window._ftbUid
+  el.innerHTML = '<div class="foodie-social-start"><div><strong>Good food is better together</strong><p>Pick a spot, add a time, send your crew a plan.</p></div><button type="button" class="btn-primary fx-start-plan">Plan a food date</button></div>' + (invitesHtml + pulseHtml + followingHtml + followersHtml || (_followers === null && window._ftbUid
     ? '<div class="friends-empty">Loading your friends…</div>'
     : '<div class="friends-empty">No friends yet. Send an invite: when a friend joins from it, they show up here and you can follow each other.</div>'
       // Friends belong to an account: an empty list usually means a different (or new) one.
@@ -1898,18 +1927,18 @@ function renderCaveSetup () {
         + `<span class="cave-points-earn">Save a spot +${CAVE_POINTS.spot} · Rate a dish +${CAVE_POINTS.dish} · Log a visit +${CAVE_POINTS.visit} · Share a list +${CAVE_POINTS.list}</span>`;
     }
     themeBox.innerHTML = Object.entries(CAVE_THEMES).map(([id, t]) =>
-      `<button type="button" class="cave-theme-chip${cave.theme === id ? ' on' : ''}" data-theme="${id}">${t.emoji} ${t.label}</button>`).join('');
+      `<button type="button" class="cave-theme-chip${cave.theme === id ? ' on' : ''}" data-theme="${id}"><img src="/assets/caves/${t.photo}" alt="" loading="lazy" /><span>${t.emoji} ${t.label}</span></button>`).join('');
     decorBox.innerHTML = Object.entries(CAVE_DECOR).map(([id, d]) => {
       const on = cave.decor.includes(id);
       const locked = !unlocked.has(id);
       const disabled = !on && !locked && cave.decor.length >= CAVE_MAX_DECOR;
       const label = locked ? `🔒 ${d.label} · ${d.points} pts` : `${d.emoji} ${d.label}`;
-      return `<button type="button" class="cave-decor-chip${on ? ' on' : ''}${locked ? ' locked' : ''}" data-decor="${id}"${disabled ? ' disabled' : ''} title="${locked ? `Unlocks at ${d.points} points` : d.label}">${label}</button>`;
+      return `<button type="button" class="cave-decor-chip${on ? ' on' : ''}${locked ? ' locked' : ''}" data-decor="${id}"${disabled ? ' disabled' : ''} title="${locked ? `Unlocks at ${d.points} points` : d.label}"><img src="/assets/caves/${d.photo}" alt="" loading="lazy" /><span>${label}</span></button>`;
     }).join('');
     const prev = document.getElementById('cave-setup-preview');
     if (prev) {
-      const dec = cave.decor.map(id => CAVE_DECOR[id].emoji).join(' ');
-      prev.innerHTML = `<span class="cave-preview-banner cave-theme-${cave.theme}">${dec} <b>${escHtml(CAVE_THEMES[cave.theme].label)}</b> ${dec}</span>`;
+      const dec = cave.decor.map(id => `<img class="cave-preview-decor-img" src="/assets/caves/${CAVE_DECOR[id].photo}" alt="${escHtml(CAVE_DECOR[id].emoji)} ${escHtml(CAVE_DECOR[id].label)}" />`).join('');
+      prev.innerHTML = `<span class="cave-preview-banner cave-theme-${cave.theme}"><span class="cave-preview-decor">${dec}</span><b>${escHtml(CAVE_THEMES[cave.theme].label)}</b></span>`;
     }
   };
   themeBox.onclick = e => { const b = e.target.closest('[data-theme]'); if (!b) return; cave = { ...cave, theme: b.dataset.theme }; draw(); };

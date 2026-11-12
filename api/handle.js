@@ -144,7 +144,7 @@ module.exports = async function handler (req, res) {
         const live = await Promise.all(rows.map(r => (r.joinedId ? db.doc(`profiles/${r.joinedId}`).get().then(s => s.data()).catch(() => null) : null)));
         const invites = rows.map((r, i) => {
           const joined = !!(r.joinedAt && live[i]);
-          return { code: r.code, at: r.at || '', opened: !!(r.openedAt || r.joinedAt), joined, id: joined ? r.joinedId : '', u: joined ? String(live[i].u || r.joinedName || 'Friend').slice(0, 30) : '' };
+          return { code: r.code, at: r.at || '', name: String(r.name || '').slice(0, 40), opened: !!(r.openedAt || r.joinedAt), joined, id: joined ? r.joinedId : '', u: joined ? String(live[i].u || r.joinedName || 'Friend').slice(0, 30) : '' };
         });
         return res.status(200).json({ invites });
       }
@@ -169,7 +169,9 @@ module.exports = async function handler (req, res) {
       if (!CODE_RE.test(code)) return res.status(400).json({ error: 'Bad invite.' });
       const ref = db.doc(`invites/${code}`);
       if ((await ref.get()).data()) return res.status(409).json({ error: 'Try again.' });
-      await ref.set({ owner: uid, at: new Date().toISOString() });
+      // The name the inviter gave it ("Mom") so the invite shows who it was
+      // for on any phone they sign in on; only the inviter sees it.
+      await ref.set({ owner: uid, at: new Date().toISOString(), name: String(body.name || '').slice(0, 40) });
       return res.status(200).json({ ok: true });
     }
 
