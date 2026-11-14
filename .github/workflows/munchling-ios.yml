@@ -100,7 +100,7 @@ jobs:
           security set-keychain-settings -lut 21600 "$KC"
           security unlock-keychain -p munchci "$KC"
           security import "$SIGN/cert.p12" -k "$KC" -P munchci -T /usr/bin/codesign -T /usr/bin/security
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k ftbci "$KC" >/dev/null
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k munchci "$KC" >/dev/null
           security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
           for d in "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"; do
             mkdir -p "$d"; cp "$SIGN/profile.mobileprovision" "$d/$PROFILE_UUID.mobileprovision"
