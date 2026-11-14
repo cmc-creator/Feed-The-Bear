@@ -3,7 +3,7 @@
 // App Store profile for this run. Both are KEPT afterwards: deleting the
 // certificate revokes it, and Apple then rejects the uploaded binary as an
 // invalid signature (ITMS-90035) when the version is submitted for review.
-// Old NyxPrism CI certificates are removed only when the account hits the
+// Old Munchling CI certificates are removed only when the account hits the
 // certificate limit (see makeCertificate's 409 handling).
 //
 //   node asc-sign.js setup  <dir>   writes <dir>/key.pem's certificate as
@@ -52,7 +52,7 @@ async function makeCertificate (csr) {
     if (err.status !== 409) throw err;
     // Too many distribution certificates: remove ones these builds left behind.
     const list = await api('GET', '/v1/certificates?filter[certificateType]=DISTRIBUTION&limit=50');
-    const ours = list.data.filter(c => /NyxPrism CI/.test(c.attributes.csrContent || '') || /NyxPrism CI/.test(c.attributes.name || '') || c.attributes.displayName === 'NyxPrism CI');
+    const ours = list.data.filter(c => /Munchling CI/.test(c.attributes.csrContent || '') || /Munchling CI/.test(c.attributes.name || '') || c.attributes.displayName === 'Munchling CI');
     console.log(`Distribution certificate limit reached; removing ${ours.length} left over from earlier builds.`);
     for (const c of ours) await api('DELETE', `/v1/certificates/${c.id}`).catch(() => {});
     return api('POST', '/v1/certificates', body);
@@ -69,7 +69,7 @@ async function setup (dir) {
   const ids = await api('GET', `/v1/bundleIds?filter[identifier]=${encodeURIComponent(bundle)}&limit=5`);
   const bundleRes = ids.data.find(b => b.attributes.identifier === bundle);
   if (!bundleRes) throw new Error(`No App ID ${bundle} in Certificates, Identifiers & Profiles.`);
-  const name = `NyxPrism CI ${process.env.GITHUB_RUN_NUMBER || Date.now()}`;
+  const name = `Munchling CI ${process.env.GITHUB_RUN_NUMBER || Date.now()}`;
   const prof = await api('POST', '/v1/profiles', { data: {
     type: 'profiles',
     attributes: { name, profileType: 'IOS_APP_STORE' },
@@ -89,7 +89,7 @@ async function cleanup () {
   // Do NOT delete the certificate or profile: deleting the certificate
   // revokes it, and Apple then rejects this build's binary as an invalid
   // signature (ITMS-90035) when the version is submitted for review.
-  // The certificate stays valid for this build; old NyxPrism CI certificates
+  // The certificate stays valid for this build; old Munchling CI certificates
   // are removed only if the account hits the certificate limit.
   console.log('Keeping this build\'s certificate and profile so the binary stays valid through review.');
 }
