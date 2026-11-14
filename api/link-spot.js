@@ -212,6 +212,16 @@ module.exports = async function handler (req, res) {
     places = await findPlaces(guess?.name ? [guess.name, guess.city].filter(Boolean).join(', ') : (link ? '' : typed), lat, lng);
   }
 
+  // One line per lookup in the Vercel runtime logs, so a failed add can be
+  // diagnosed after the fact (public place names only, no user data).
+  console.log('[FTB] link-spot ' + JSON.stringify({
+    host: link ? allowedHost(hostOf(link)) : '',
+    caption: caption.length,
+    poi: poi?.name || '',
+    guess: guess?.name || '',
+    places: places.map(p => p.name),
+  }));
+
   res.setHeader('Cache-Control', 'private, max-age=0');
   return res.status(200).json({
     caption: caption.slice(0, 300),
