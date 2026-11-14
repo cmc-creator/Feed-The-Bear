@@ -1,0 +1,1 @@
+{"dependencies":{"@capacitor/android":"8.5.3","@capacitor/browser":"8.0.5","@capacitor/core":"8.5.3","@capacitor/ios":"8.5.3"},"description":"Android and iPhone apps: the live site in a native shell (server.url loads nyxmunchling.com).","devDependencies":{"@capacitor/cli":"8.5.3"},"name":"munchling-native","private":true,"scripts":{"sync":"cap sync"},"version":"1.0.0"}

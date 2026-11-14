@@ -1,0 +1,1 @@
+{"android":{"allowMixedContent":false},"appId":"com.nyxcollective.munchling","appName":"Munchling","server":{"allowNavigation":["www.nyxmunchling.com","nyxmunchling.com","checkout.stripe.com","billing.stripe.com","*.firebaseapp.com","accounts.google.com"],"androidScheme":"https","url":"https://www.nyxmunchling.com/app.html"},"webDir":"www"}
