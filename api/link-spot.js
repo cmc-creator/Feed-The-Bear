@@ -84,6 +84,9 @@ async function tiktokPost (link) {
       name: String(it.poi.name).slice(0, 100),
       address: String(it.poi.address || '').slice(0, 160),
       city: String(it.poi.city || '').slice(0, 80),
+      // What kind of tag this is: a venue ("Food and Drink") or just the
+      // area ("Place and Address" - a city or district tag).
+      kind: String(it.poi.ttTypeNameSuper || it.poi.category || '').slice(0, 60),
     } : null;
     const text = [it.desc, ...extra, ...stickers, it.author?.nickname, poi ? `Location: ${[poi.name, poi.address, poi.city].filter(Boolean).join(', ')}` : '']
       .filter(Boolean).map(s => String(s).trim()).join('\n').slice(0, 1500);
@@ -151,6 +154,13 @@ async function guessRestaurant (text) {
   } catch { return null; }
 }
 
+// Places also answers with areas (a city, a neighborhood) when the query
+// names one; those are not restaurants and must never be offered as spots.
+// An area result has an area type, or gives itself away with an address
+// that has no street number and no ratings at all ("Vancouver, BC, Canada").
+const AREA_TYPES = new Set(['locality', 'political', 'administrative_area_level_1', 'administrative_area_level_2', 'administrative_area_level_3', 'country', 'sublocality', 'sublocality_level_1', 'neighborhood', 'postal_code', 'postal_town', 'colloquial_area']);
+const isVenue = p => !AREA_TYPES.has(p.type) && (/\d/.test(p.address) || p.rating > 0 || p.reviews > 0);
+
 async function findPlaces (query, lat, lng) {
   const key = process.env.GOOGLE_PLACES_API_KEY;
   if (!key || !query) return [];
@@ -175,7 +185,7 @@ async function findPlaces (query, lat, lng) {
       type: p.primaryType || '',
       mapsUrl: /^https:\/\//.test(p.googleMapsUri || '') ? p.googleMapsUri : '',
       website: /^https?:\/\//.test(p.websiteUri || '') ? p.websiteUri : '',
-    })).filter(p => p.name);
+    })).filter(p => p.name && isVenue(p));
   } catch { return []; }
 }
 
@@ -202,14 +212,24 @@ module.exports = async function handler (req, res) {
   const text = [words, caption].filter(Boolean).join('\n');
   // A location-tagged TikTok names the place outright, so Places and Gemini
   // (just for the dish) run side by side; otherwise Gemini's guess is searched,
-  // and without one, plain typed text is searched as-is.
+  // and without one, plain typed text is searched as-is. But a tag is not
+  // always the venue: people also tag the city or district ("Place and
+  // Address"), and searching one of those returns the city itself as the
+  // "restaurant". An area tag only hints the city for the guess search.
   const poi = tiktok?.poi;
+  const areaPoi = !!poi && /place and address/i.test(poi.kind || '');
+  const venuePoi = poi && !areaPoi ? poi : null;
   let guess, places;
-  if (poi) {
-    [guess, places] = await Promise.all([guessRestaurant(text), findPlaces([poi.name, poi.address || poi.city].filter(Boolean).join(', '), lat, lng)]);
+  if (venuePoi) {
+    [guess, places] = await Promise.all([guessRestaurant(text), findPlaces([venuePoi.name, venuePoi.address || venuePoi.city].filter(Boolean).join(', '), lat, lng)]);
   } else {
     guess = await guessRestaurant(text);
-    places = await findPlaces(guess?.name ? [guess.name, guess.city].filter(Boolean).join(', ') : (link ? '' : typed), lat, lng);
+    const city = guess?.city || (areaPoi ? (poi.city || poi.name) : '');
+    places = await findPlaces(guess?.name ? [guess.name, city].filter(Boolean).join(', ') : (link ? '' : typed), lat, lng);
+    // The name alone can match an area instead of the venue; say "restaurant".
+    if (!places.length && guess?.name) {
+      places = await findPlaces([`${guess.name} restaurant`, city].filter(Boolean).join(', '), lat, lng);
+    }
   }
 
   // One line per lookup in the Vercel runtime logs, so a failed add can be
@@ -218,6 +238,7 @@ module.exports = async function handler (req, res) {
     host: link ? allowedHost(hostOf(link)) : '',
     caption: caption.length,
     poi: poi?.name || '',
+    poiKind: poi?.kind || '',
     guess: guess?.name || '',
     places: places.map(p => p.name),
   }));

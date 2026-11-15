@@ -5,6 +5,7 @@ const path = require('path');
 const { check, finish } = require('./lib');
 
 const fetched = [];
+const placeQueries = [];
 global.fetch = async (url, opts = {}) => {
   url = String(url);
   fetched.push(url);
@@ -13,6 +14,7 @@ global.fetch = async (url, opts = {}) => {
   const ttPage = item => ({ ok: true, status: 200, headers: { get: () => '' }, text: async () => '<html><script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">' + JSON.stringify({ __DEFAULT_SCOPE__: { 'webapp.video-detail': { itemInfo: { itemStruct: item } } } }) + '</script></html>' });
   if (url === 'https://www.tiktok.com/@/video/7312345678901234567') return ttPage({ desc: 'The best birria in Phoenix 🌮 @tacosch #phxfood', author: { nickname: 'phxeats' } });
   if (url === 'https://www.tiktok.com/@/video/7400000000000000001') return ttPage({ desc: 'must try 🤪 #foodtok', author: { nickname: 'barrett' }, poi: { name: 'Cocina Adamex', address: '416 N 7th Ave, Phoenix, AZ 85007', city: 'Phoenix' } });
+  if (url === 'https://www.tiktok.com/@/video/7400000000000000002') return ttPage({ desc: 'The best birria in Phoenix 🌮 @tacosch #phxfood', author: { nickname: 'phxeats' }, poi: { name: 'Phoenix', address: 'Phoenix, Arizona, USA', city: '', category: 'Place and Address', ttTypeNameSuper: 'Place and Address' } });
   if (url.startsWith('https://vm.tiktok.com/ZMgood')) return { ok: false, status: 301, headers: { get: h => (h === 'location' ? 'https://www.tiktok.com/@barrett/video/7400000000000000001?_r=1' : '') }, text: async () => '' };
   if (url.startsWith('https://vm.tiktok.com/')) return { ok: false, status: 301, headers: { get: h => (h === 'location' ? 'http://169.254.169.254/latest' : '') }, text: async () => '' };
   if (url.includes('instagram.com/p/')) return { ok: true, status: 200, headers: { get: () => '' }, text: async () => '<meta property="og:description" content="Pizzeria Bianco in Phoenix, still the best margherita" />' };
@@ -23,6 +25,8 @@ global.fetch = async (url, opts = {}) => {
   }
   if (url.includes('places.googleapis.com')) {
     const q = JSON.parse(opts.body).textQuery;
+    placeQueries.push(q);
+    if (q === 'CityOnly') return json({ places: [{ displayName: { text: 'CityOnly' }, formattedAddress: 'CityOnly, AZ, USA', location: { latitude: 33.45, longitude: -112.07 }, primaryType: 'locality', googleMapsUri: 'https://maps.google.com/?cid=2' }] });
     return json({ places: [{ displayName: { text: q.split(',')[0] }, formattedAddress: '1 Main St, Phoenix, AZ', location: { latitude: 33.45, longitude: -112.07 }, rating: 4.7, googleMapsUri: 'https://maps.google.com/?cid=1' }] });
   }
   throw new Error('unexpected fetch ' + url);
@@ -54,6 +58,11 @@ const call = q => new Promise(resolve => {
   r = await call("Check out barrett's video! #TikTok https://vm.tiktok.com/ZMgood/");
   check(r.places[0]?.name === 'Cocina Adamex' && /Adamex/.test(r.caption), `a shared TikTok short link is followed and its location tag names the place (${r.places[0]?.name})`);
   check(fetched.some(u => u === 'https://www.tiktok.com/@/video/7400000000000000001'), 'the short link resolves to the video page');
+  placeQueries.length = 0;
+  r = await call('https://www.tiktok.com/@phxeats/video/7400000000000000002');
+  check(r.places[0]?.name === 'Tacos Chiwas' && !placeQueries.some(q => /^Phoenix,/.test(q)), `a city-tagged TikTok searches the restaurant, not the city (${r.places[0]?.name}; queries: ${placeQueries.join(' | ')})`);
+  r = await call('CityOnly');
+  check(r.places.length === 0 && /could not tell/.test(r.error), 'a Places answer that is only a city is not offered as a restaurant');
   r = await call('https://www.instagram.com/p/C1abcDEF/');
   check(r.places[0]?.name === 'Pizzeria Bianco', 'an Instagram post is read from its share tags');
   r = await call('Pizzeria Bianco downtown');
