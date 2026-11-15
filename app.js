@@ -3753,7 +3753,7 @@ const PLAY_URL = 'https://play.google.com/store/apps/details?id=com.feedthebear.
    back to it never reloads. When a newer version is live (sw.js names it),
    refresh: quietly if nothing is open, else Byte Cub offers an Update button.
    APP_BUILD must match CACHE in sw.js (tests/version.test.js checks). */
-const APP_BUILD = 'ftb-v187';
+const APP_BUILD = 'ftb-v188';
 let _freshCheckedAt = 0;
 async function checkForNewBuild () {
   if (Date.now() - _freshCheckedAt < 5 * 60 * 1000 || !navigator.onLine) return;

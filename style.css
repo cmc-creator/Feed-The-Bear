@@ -10019,3 +10019,17 @@ body:has(.share-nudge, #save-diary-nudge, #rate-prompt, .photo-reveal) #toast-co
 .auth-apple-btn { width: 100%; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 8px; background: #fff; color: #000; border: 1px solid #fff; border-radius: var(--radius); font-family: var(--font); font-size: .92rem; font-weight: 600; cursor: pointer; margin-bottom: 8px; min-height: 44px; }
 .auth-apple-btn.hidden { display: none; }
 .auth-apple-btn:active { opacity: .85; }
+
+/* ── Safe-area top clearance ─────────────────────────────────
+   viewport-fit=cover lets the installed app draw edge-to-edge under
+   the status bar / notch, but .app-header never added the inset, so
+   the header and everything below it rode up under the clock.
+   env() is 0 in a normal browser tab, so this only adds room inside
+   the shell. The sticky filter bar follows on its own: app.js
+   measures the header height into --header-offset. */
+@media (max-width: 768px) {
+  .app-header { padding-top: calc(6px + env(safe-area-inset-top, 0px)); }
+}
+@media (min-width: 769px) {
+  .app-header { padding-top: env(safe-area-inset-top, 0px); }
+}
