@@ -1,0 +1,30 @@
+{
+  "background_color": "#0a0b0c",
+  "description": "Offline-first tactical survival and bug-out management: gear loadouts, encrypted vault, rotation tracking and comms plans.",
+  "display": "standalone",
+  "icons": [
+    {
+      "purpose": "any",
+      "sizes": "any",
+      "src": "icon.svg",
+      "type": "image/svg+xml"
+    }
+  ],
+  "lang": "en",
+  "name": "NyxSurvive",
+  "orientation": "portrait",
+  "scope": "./",
+  "share_target": {
+    "action": "index.html",
+    "enctype": "application/x-www-form-urlencoded",
+    "method": "GET",
+    "params": {
+      "text": "text",
+      "title": "title",
+      "url": "url"
+    }
+  },
+  "short_name": "NyxSurvive",
+  "start_url": "index.html",
+  "theme_color": "#0a0b0c"
+}

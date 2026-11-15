@@ -1,0 +1,1 @@
+{"android":{"allowMixedContent":false},"appId":"com.nyxcollective.nyxsurvive","appName":"NyxSurvive","server":{"allowNavigation":["www.nyxsurvive.com","nyxsurvive.com","checkout.stripe.com","billing.stripe.com","*.firebaseapp.com","accounts.google.com"],"androidScheme":"https"},"webDir":"www"}
