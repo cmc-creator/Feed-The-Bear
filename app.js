@@ -3753,7 +3753,7 @@ const PLAY_URL = 'https://play.google.com/store/apps/details?id=com.feedthebear.
    back to it never reloads. When a newer version is live (sw.js names it),
    refresh: quietly if nothing is open, else Byte Cub offers an Update button.
    APP_BUILD must match CACHE in sw.js (tests/version.test.js checks). */
-const APP_BUILD = 'ftb-v188';
+const APP_BUILD = 'ftb-v189';
 let _freshCheckedAt = 0;
 async function checkForNewBuild () {
   if (Date.now() - _freshCheckedAt < 5 * 60 * 1000 || !navigator.onLine) return;
@@ -4788,6 +4788,32 @@ function openMapsSearch (r) {
   const q = r.address || r.name;
   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`, '_blank', 'noopener');
 }
+
+/* Nearby / discovery cards: tapping a place opens it on Google Maps.
+   Cards carry data-place-google + data-place-* attributes; one delegated
+   listener covers every list. Taps on buttons or links inside a card
+   (Save, Add) keep their own behaviour and never trigger this. */
+function openPlaceOnGoogle (name, address, lat, lon) {
+  const q = [name, address].filter(Boolean).join(' ').trim()
+    || ((Number.isFinite(lat) && Number.isFinite(lon)) ? `${lat},${lon}` : '');
+  if (!q) return;
+  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`, '_blank', 'noopener');
+}
+document.addEventListener('click', e => {
+  const el = e.target.closest?.('[data-place-google]');
+  if (!el || e.target.closest('button, a')) return;
+  openPlaceOnGoogle(
+    el.dataset.placeName || '',
+    el.dataset.placeAddr || '',
+    el.dataset.placeLat ? Number(el.dataset.placeLat) : null,
+    el.dataset.placeLon ? Number(el.dataset.placeLon) : null
+  );
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const el = e.target.closest?.('[data-place-google]');
+  if (el) { e.preventDefault(); el.click(); }
+});
 
 /* ── Book a table / Order delivery ────────────────────────── */
 // Each service's own search for this spot. Once an affiliate program approves
@@ -7068,7 +7094,7 @@ function _discApplyFilters () {
   const safeAddress = escJsArg(saveAddress);
   const safeWebsite = escJsArg(r.website || '');
 
-  return `<div class="disc-card${r.saved ? ' disc-card-saved' : ''}">
+  return `<div class="disc-card${r.saved ? ' disc-card-saved' : ''}" data-place-google data-place-name="${escHtml(r.name)}" data-place-addr="${escHtml(saveAddress)}" data-place-lat="${Number.isFinite(r.lat) ? Number(r.lat) : ''}" data-place-lon="${Number.isFinite(r.lon) ? Number(r.lon) : ''}" role="link" tabindex="0" title="Open ${escHtml(r.name)} on Google Maps">
     <div class="disc-card-thumb" aria-hidden="true">${emoji}</div>
     <div class="disc-card-body">
       <div class="disc-card-name">${escHtml(r.name)}</div>
@@ -15945,7 +15971,7 @@ async function runDiscover () {
     const safeCuisine = escJsArg(row.cuisine || '');
     const safeAddress = escJsArg(row.address || '');
     const safeWebsite = escJsArg(row.website || '');
-    return `<div class="discover-item">
+    return `<div class="discover-item" data-place-google data-place-name="${escHtml(row.name || '')}" data-place-addr="${escHtml(row.address || '')}" data-place-lat="${Number.isFinite(row.lat) ? Number(row.lat) : ''}" data-place-lon="${Number.isFinite(row.lng) ? Number(row.lng) : ''}" role="link" tabindex="0" title="Open ${escHtml(row.name || '')} on Google Maps">
       <div class="discover-item-emoji">${cuisineEmoji(row.cuisine) || ''}</div>
       <div class="discover-item-body">
         <div class="discover-item-name">${escHtml(row.name)}</div>
@@ -16031,7 +16057,7 @@ async function runDiscover () {
     const elLat = Number.isFinite(el.lat ?? el.center?.lat) ? Number(el.lat ?? el.center?.lat) : null;
     const elLon = Number.isFinite(el.lon ?? el.center?.lon) ? Number(el.lon ?? el.center?.lon) : null;
 
-    return `<div class="discover-item">
+    return `<div class="discover-item" data-place-google data-place-name="${name}" data-place-addr="${escHtml(address)}" data-place-lat="${elLat == null ? '' : elLat}" data-place-lon="${elLon == null ? '' : elLon}" role="link" tabindex="0" title="Open ${name} on Google Maps">
       <div class="discover-item-emoji">${emoji}</div>
       <div class="discover-item-body">
         <div class="discover-item-name">${name}</div>

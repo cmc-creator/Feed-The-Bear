@@ -10033,3 +10033,7 @@ body:has(.share-nudge, #save-diary-nudge, #rate-prompt, .photo-reveal) #toast-co
 @media (min-width: 769px) {
   .app-header { padding-top: env(safe-area-inset-top, 0px); }
 }
+
+/* Nearby (Near You) and Smart Discovery result cards: tapping a card
+   opens the place on Google Maps (see openPlaceOnGoogle in app.js). */
+.disc-card, .discover-item { cursor: pointer; }
