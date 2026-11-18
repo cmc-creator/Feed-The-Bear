@@ -19,13 +19,30 @@
 # native/prepare-www.js. To refresh the pack, re-run that script
 # in the NyxSurvive repo and re-copy native/www/, plus the files
 # from native/ and assets/icons/ when they change.
+#
+# DURABLE SIGNING (changed 2026-11-17): the signing identity is no
+# longer minted fresh on every run. Before signing, the workflow
+# looks for the "ios-signing-store" branch in this repo, which
+# holds the shared distribution key + certificate + App Store
+# profile as numbered base64 pieces plus a SHA256SUMS fingerprint
+# file and the meta.env lines asc-sign.js prints. If the store is
+# there, the pieces are reassembled, the fingerprints are checked,
+# and that identity signs the build - no new certificate is made.
+# If the store is absent (the first run after this change), the
+# build mints one certificate exactly as before and then SAVES the
+# new key, certificate and profile to ios-signing-store so every
+# later build reuses them. That is what keeps the account under
+# Apple's 3-distribution-certificate cap for good. A fingerprint
+# mismatch stops the build loudly rather than silently minting.
 name: NyxSurvive iPhone app
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  # write (not read) so the "Save the signing identity" step can
+  # push the ios-signing-store branch. Nothing else pushes.
+  contents: write
 
 jobs:
   build:
@@ -38,6 +55,41 @@ jobs:
         working-directory: nyxsurvive-ios
     steps:
       - uses: actions/checkout@v4
+      - name: Check for a saved signing identity
+        id: storecheck
+        working-directory: .
+        run: |
+          if git ls-remote --exit-code --heads origin ios-signing-store >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "A saved signing identity exists on the ios-signing-store branch."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No ios-signing-store branch yet: this run mints one certificate and saves it."
+          fi
+      - uses: actions/checkout@v4
+        if: ${{ steps.storecheck.outputs.exists == 'true' }}
+        with:
+          ref: ios-signing-store
+          path: .signing-store
+      - name: Restore the saved signing identity
+        if: ${{ steps.storecheck.outputs.exists == 'true' }}
+        working-directory: .
+        run: |
+          set -euo pipefail
+          STORE="$GITHUB_WORKSPACE/.signing-store/ios-signing"
+          test -d "$STORE" || { echo "ios-signing-store branch has no ios-signing/ folder - refusing to guess."; exit 1; }
+          RESTORE="$RUNNER_TEMP/sign-restore"; mkdir -p "$RESTORE"
+          for f in key.pem cert.pem profile.mobileprovision; do
+            cat "$STORE/$f.b64."* > "$RESTORE/$f.b64"
+            /usr/bin/openssl base64 -d -A -in "$RESTORE/$f.b64" -out "$RESTORE/$f"
+            rm -f "$RESTORE/$f.b64"
+          done
+          cp "$STORE/SHA256SUMS" "$RESTORE/SHA256SUMS"
+          (cd "$RESTORE" && shasum -a 256 -c SHA256SUMS)
+          cp "$STORE/meta.env" "$RESTORE/meta.env"
+          echo "SIGN_RESTORE_DIR=$RESTORE" >> "$GITHUB_ENV"
+          echo "SIGN_RESTORED=true" >> "$GITHUB_ENV"
+          echo "Restored the shared signing identity; fingerprints verified. No new certificate will be made."
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
@@ -90,10 +142,18 @@ jobs:
           export KEY_FILE="$KEY"
           SIGN="$RUNNER_TEMP/sign"; mkdir -p "$SIGN"
 
-          # 1. A distribution certificate and App Store profile just for this build.
-          /usr/bin/openssl genrsa -out "$SIGN/key.pem" 2048
-          /usr/bin/openssl req -new -key "$SIGN/key.pem" -out "$SIGN/csr.pem" -subj "/CN=NyxSurvive CI/O=$TEAM_ID/C=US"
-          node "$GITHUB_WORKSPACE/nyxsurvive-ios/scripts/asc-sign.js" setup "$SIGN" | tee "$SIGN/out.txt"
+          # 1. A distribution certificate and App Store profile for this build:
+          #    the saved shared identity when one was restored, otherwise a
+          #    freshly minted pair (which the save step below then stores).
+          if [ "${SIGN_RESTORED:-}" = "true" ] && [ -f "$SIGN_RESTORE_DIR/key.pem" ]; then
+            cp "$SIGN_RESTORE_DIR/key.pem" "$SIGN_RESTORE_DIR/cert.pem" "$SIGN_RESTORE_DIR/profile.mobileprovision" "$SIGN/"
+            cp "$SIGN_RESTORE_DIR/meta.env" "$SIGN/out.txt"
+            echo "Signing with the saved shared identity ($(sed -n 's/^CERT_ID=//p' "$SIGN/out.txt"))."
+          else
+            /usr/bin/openssl genrsa -out "$SIGN/key.pem" 2048
+            /usr/bin/openssl req -new -key "$SIGN/key.pem" -out "$SIGN/csr.pem" -subj "/CN=NyxSurvive CI/O=$TEAM_ID/C=US"
+            node "$GITHUB_WORKSPACE/nyxsurvive-ios/scripts/asc-sign.js" setup "$SIGN" | tee "$SIGN/out.txt"
+          fi
           PROFILE_NAME=$(sed -n 's/^NAME=//p' "$SIGN/out.txt"); PROFILE_UUID=$(sed -n 's/^UUID=//p' "$SIGN/out.txt")
           export PROFILE_NAME
           echo "CERT_ID=$(sed -n 's/^CERT_ID=//p' "$SIGN/out.txt")" >> "$GITHUB_ENV"
@@ -138,6 +198,38 @@ jobs:
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" \
             -allowProvisioningUpdates -authenticationKeyPath "$KEY" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID" | tail -60
           echo "Sent build $BUILD to App Store Connect. It appears in TestFlight after Apple processes it (about 10-30 minutes)."
+      - name: Save the signing identity for future builds
+        if: ${{ steps.ship.outcome == 'success' && env.SIGN_RESTORED != 'true' }}
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          SIGN="$RUNNER_TEMP/sign"
+          test -f "$SIGN/key.pem" && test -f "$SIGN/cert.pem" && test -f "$SIGN/profile.mobileprovision" || { echo "Signing files missing - nothing to save."; exit 1; }
+          WORK="$RUNNER_TEMP/store-repo"; rm -rf "$WORK"; mkdir -p "$WORK"; cd "$WORK"
+          git init -q
+          git config user.email "actions@github.com"
+          git config user.name "github-actions"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git fetch -q --depth 1 origin ios-signing-store 2>/dev/null; then
+            git checkout -q -b ios-signing-store FETCH_HEAD
+          else
+            git checkout -q --orphan ios-signing-store
+          fi
+          mkdir -p ios-signing
+          rm -f ios-signing/*
+          for f in key.pem cert.pem profile.mobileprovision; do
+            /usr/bin/openssl base64 -A -in "$SIGN/$f" -out "$RUNNER_TEMP/$f.b64"
+            split -b 50000 -d -a 3 "$RUNNER_TEMP/$f.b64" "ios-signing/$f.b64."
+            rm -f "$RUNNER_TEMP/$f.b64"
+          done
+          (cd "$SIGN" && shasum -a 256 key.pem cert.pem profile.mobileprovision) > ios-signing/SHA256SUMS
+          cp "$SIGN/out.txt" ios-signing/meta.env
+          git add ios-signing
+          git commit -q -m "Save shared iOS signing identity (cert ${CERT_ID})"
+          git push -q origin ios-signing-store
+          echo "Saved the signing identity to the ios-signing-store branch; future builds reuse it."
       - name: Remove this build's certificate and profile
         if: ${{ always() && env.CERT_ID != '' }}
         working-directory: .
