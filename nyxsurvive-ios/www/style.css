@@ -345,6 +345,11 @@ input, select, textarea { font-family: var(--nx-mono); }
 }
 .nx-fbtn.nx-on { color: var(--nx-accent); border-color: var(--nx-accent); }
 
+/* ---------- readiness check-in ---------- */
+
+.nx-checkin-opts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.nx-checkin-opts .nx-fbtn { font-size: 14px; padding: 10px 14px; }
+
 /* ---------- hardware toggle ---------- */
 
 .nx-switch-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
@@ -926,3 +931,1675 @@ html[data-theme="blackout"] .nx-compass-sweep { display: none; }
   font-family: var(--nx-mono); font-size: 30px; font-weight: 700; color: var(--nx-accent);
   letter-spacing: 2px;
 }
+
+/* ============================================================
+   MODERNIZATION PASS (2026-11-15) - depth and finish, same law:
+   no rounded corners, chamfered edges, ONE accent per theme.
+   Everything below is layered over the base rules by cascade,
+   and every color derives from the theme variables, so all
+   five themes carry the treatment in their own palette.
+   Motion stays gated by body.nx-fx, and the reduced-motion
+   backstop above still flattens every animation/transition.
+   ============================================================ */
+
+/* ---------- backdrop: blueprint major grid + soft vignette ----------
+   The base body rule's plain 28px grid stays as the fallback;
+   this stack adds 140px major lines and a top vignette. Where
+   color-mix is unavailable the whole declaration is dropped
+   and the fallback grid stands. */
+body {
+  background-image:
+    radial-gradient(120% 85% at 50% 0%, transparent 56%, rgba(0,0,0,0.20) 100%),
+    linear-gradient(var(--nx-gridline) 1px, transparent 1px),
+    linear-gradient(90deg, var(--nx-gridline) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--nx-line) 60%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--nx-line) 60%, transparent) 1px, transparent 1px);
+  background-size: 100% 100%, 28px 28px, 28px 28px, 140px 140px, 140px 140px;
+  background-attachment: fixed, scroll, scroll, scroll, scroll;
+}
+
+/* ---------- panel depth ----------
+   clip-path eats outer box-shadows, so elevation rides on a
+   drop-shadow filter cut to the chamfered silhouette, plus an
+   inner bottom shade for a lit-from-above read. */
+.nx-panel, .nx-upsell {
+  box-shadow: var(--nx-panel-sh), inset 0 -18px 28px -20px rgba(0,0,0,0.55);
+  filter: drop-shadow(0 10px 20px rgba(0,0,0,0.30));
+}
+.nx-stat {
+  box-shadow: var(--nx-stat-sh), inset 0 -14px 22px -18px rgba(0,0,0,0.5);
+  filter: drop-shadow(0 5px 12px rgba(0,0,0,0.25));
+}
+html[data-theme="desert"] .nx-panel, html[data-theme="desert"] .nx-upsell,
+html[data-theme="whiteout"] .nx-panel, html[data-theme="whiteout"] .nx-upsell {
+  filter: drop-shadow(0 10px 20px rgba(31,26,16,0.16));
+}
+html[data-theme="desert"] .nx-stat, html[data-theme="whiteout"] .nx-stat {
+  filter: drop-shadow(0 5px 12px rgba(31,26,16,0.13));
+}
+html[data-theme="blackout"] .nx-panel, html[data-theme="blackout"] .nx-upsell,
+html[data-theme="blackout"] .nx-stat { filter: none; }
+
+/* sticky header casts a soft shadow over the content below */
+.nx-header { box-shadow: 0 12px 26px -14px rgba(0,0,0,0.55); }
+
+/* ---------- hero framing: reticle corners + glowing numerals ---------- */
+.nx-hero::before {
+  content: ""; position: absolute; inset: 7px; pointer-events: none;
+  opacity: 0.85;
+  background:
+    linear-gradient(var(--nx-accent), var(--nx-accent)) left top / 16px 2px,
+    linear-gradient(var(--nx-accent), var(--nx-accent)) left top / 2px 16px,
+    linear-gradient(var(--nx-accent), var(--nx-accent)) right top / 16px 2px,
+    linear-gradient(var(--nx-accent), var(--nx-accent)) right top / 2px 16px,
+    linear-gradient(var(--nx-accent), var(--nx-accent)) left bottom / 16px 2px,
+    linear-gradient(var(--nx-accent), var(--nx-accent)) left bottom / 2px 16px,
+    linear-gradient(var(--nx-accent), var(--nx-accent)) right bottom / 16px 2px,
+    linear-gradient(var(--nx-accent), var(--nx-accent)) right bottom / 2px 16px;
+  background-repeat: no-repeat;
+}
+#nx-days-ready, .nx-grid-days {
+  font-variant-numeric: tabular-nums;
+  text-shadow:
+    0 0 16px color-mix(in srgb, var(--nx-accent) 42%, transparent),
+    0 0 48px color-mix(in srgb, var(--nx-accent) 20%, transparent);
+}
+/* the landing page counter takes the same glow (shared sheet) */
+.nx-l-counter {
+  text-shadow:
+    0 0 22px color-mix(in srgb, var(--nx-accent) 30%, transparent),
+    0 0 60px color-mix(in srgb, var(--nx-accent) 14%, transparent);
+}
+
+/* ---------- nav + headers + hazard ---------- */
+/* active tab: the accent bar gains an inner under-glow */
+.nx-tab.nx-active {
+  box-shadow: inset 0 -3px 0 var(--nx-accent), inset 0 -16px 20px -14px var(--nx-accent);
+}
+/* section headers: the kicker diamond goes accent */
+.nx-h::before { background: var(--nx-accent); }
+/* hazard striping is reserved for alert / critical banners */
+#nx-alert-banner, #nx-incident-banner {
+  background-image: repeating-linear-gradient(-45deg, var(--nx-accent) 0 12px, transparent 12px, transparent 24px);
+  background-size: 100% 5px;
+  background-repeat: no-repeat;
+  background-position: 0 0;
+}
+
+/* ---------- primary CTA: accent glow + sheen sweep ---------- */
+.nx-btn-accent {
+  position: relative;
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--nx-accent) 38%, transparent));
+}
+body.nx-fx .nx-btn-accent::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(115deg, transparent 32%, rgba(255,255,255,0.38) 50%, transparent 68%);
+  transform: translateX(-130%);
+}
+body.nx-fx .nx-btn-accent:hover::after,
+body.nx-fx .nx-btn-accent:focus-visible::after {
+  transition: transform 0.55s ease;
+  transform: translateX(130%);
+}
+
+/* ---------- focus: sharp accent outline, never a soft ring ---------- */
+.nx-input:focus, .nx-select:focus, .nx-textarea:focus {
+  box-shadow: 0 0 0 1px var(--nx-accent), 0 0 14px color-mix(in srgb, var(--nx-accent) 22%, transparent);
+}
+button:focus-visible, a:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--nx-accent);
+  outline-offset: 1px;
+}
+
+/* ---------- motion: view entry + segmented fill (fx-gated) ---------- */
+@keyframes nx-view-in {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+body.nx-fx .nx-view.nx-on { animation: nx-view-in 0.26s ease both; }
+
+@keyframes nx-seg-in {
+  from { opacity: 0; transform: scaleX(0.3); }
+  to { opacity: 1; transform: scaleX(1); }
+}
+body.nx-fx .nx-seg i.nx-on {
+  animation: nx-seg-in 0.3s ease both;
+  transform-origin: left center;
+}
+body.nx-fx .nx-seg i.nx-on:nth-child(2) { animation-delay: 0.02s; }
+body.nx-fx .nx-seg i.nx-on:nth-child(3) { animation-delay: 0.04s; }
+body.nx-fx .nx-seg i.nx-on:nth-child(4) { animation-delay: 0.06s; }
+body.nx-fx .nx-seg i.nx-on:nth-child(5) { animation-delay: 0.08s; }
+body.nx-fx .nx-seg i.nx-on:nth-child(6) { animation-delay: 0.10s; }
+body.nx-fx .nx-seg i.nx-on:nth-child(7) { animation-delay: 0.12s; }
+body.nx-fx .nx-seg i.nx-on:nth-child(8) { animation-delay: 0.14s; }
+body.nx-fx .nx-seg i.nx-on:nth-child(9) { animation-delay: 0.16s; }
+body.nx-fx .nx-seg i.nx-on:nth-child(10) { animation-delay: 0.18s; }
+
+body.nx-fx .nx-btn { transition: background-color 0.15s ease, color 0.15s ease; }
+
+/* ============================================================
+   ESCALATION PASS (2026-11-15) - BIGGER AND BOLDER: the whole
+   type scale steps up, bars and brackets get heavier, panels
+   get room to breathe. Same law as everything above: no
+   rounded corners, chamfered edges, ONE accent per theme,
+   every color still derived from the theme variables so all
+   five themes carry it. Layered after the modernization pass
+   by cascade; nothing here changes behavior, data or copy.
+   ============================================================ */
+
+/* ---------- masthead: wordmark, badge and clock step up ---------- */
+.nx-header { border-bottom-width: 3px; padding-top: 12px; }
+.nx-brand-row { gap: 14px; }
+.nx-logo { width: 46px; height: 46px; font-size: 23px; }
+.nx-title { font-size: 33px; letter-spacing: 4px; }
+.nx-title .nx-tm { font-size: 13px; }
+.nx-subtitle { font-size: 12.5px; margin-top: 4px; }
+.nx-header-status { font-size: 12px; }
+.nx-header-status .nx-clock { font-size: 17px; }
+
+/* ---------- nav tabs: bigger, heavier, stronger active bar ---------- */
+.nx-nav { gap: 5px; padding-top: 12px; }
+.nx-tab {
+  font-size: 17.5px; font-weight: 700; letter-spacing: 2.5px;
+  padding: 12px 16px 11px 16px;
+}
+.nx-tab.nx-active {
+  box-shadow: inset 0 -4px 0 var(--nx-accent), inset 0 -20px 24px -14px var(--nx-accent);
+}
+
+/* ---------- headers and labels: heavier kickers, readable notes ---------- */
+.nx-h { font-size: 23px; letter-spacing: 3px; gap: 12px; }
+.nx-h::before { width: 12px; height: 12px; }
+.nx-h-note { font-size: 12.5px; margin-bottom: 14px; }
+.nx-section-sub { font-size: 17px; }
+.nx-stat-label { font-size: 15px; letter-spacing: 2.5px; }
+.nx-label { font-size: 13px; }
+
+/* ---------- stat cards: data numerals go big ---------- */
+.nx-stat { padding: 16px 16px 14px 16px; }
+.nx-stat-value { font-size: 36px; }
+.nx-stat-value .nx-unit { font-size: 16px; }
+.nx-stat-sub { font-size: 12px; }
+
+/* ---------- segmented blocks: chunky hardware bars ---------- */
+.nx-seg { gap: 5px; margin-top: 11px; }
+.nx-seg i { height: 16px; }
+
+/* ---------- buttons: taller, heavier, larger tap targets ---------- */
+.nx-btn {
+  font-size: 16.5px; font-weight: 700; letter-spacing: 2px;
+  padding: 13px 20px;
+}
+.nx-btn-small { font-size: 14px; padding: 8px 13px; }
+.nx-btn-accent {
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--nx-accent) 45%, transparent));
+}
+.nx-btn-row { gap: 10px; margin-top: 12px; }
+.nx-fbtn { font-size: 13px; padding: 8px 13px; }
+.nx-checkin-opts { gap: 10px; }
+.nx-checkin-opts .nx-fbtn { font-size: 16px; padding: 13px 16px; }
+.nx-input, .nx-select, .nx-textarea { font-size: 15.5px; padding: 11px 12px; }
+
+/* ---------- panels and layout: room to breathe ---------- */
+.nx-main { padding: 20px 14px 64px 14px; }
+.nx-panel { padding: 20px; margin-bottom: 16px; }
+.nx-panel-flat { padding: 16px; margin-bottom: 16px; }
+.nx-grid { gap: 14px; }
+
+/* ---------- hero: brackets get larger and thicker, glow deepens ----------
+   The numeral itself is an inline style in app.html (and in the
+   check-in assessment template in app.js); app.html carries the
+   clamp() scale, and the assessment span is matched structurally
+   below - it is the only span row that follows a stat label in
+   the check-in body, so steps are never touched. */
+.nx-hero::before {
+  inset: 9px;
+  background:
+    linear-gradient(var(--nx-accent), var(--nx-accent)) left top / 24px 3px,
+    linear-gradient(var(--nx-accent), var(--nx-accent)) left top / 3px 24px,
+    linear-gradient(var(--nx-accent), var(--nx-accent)) right top / 24px 3px,
+    linear-gradient(var(--nx-accent), var(--nx-accent)) right top / 3px 24px,
+    linear-gradient(var(--nx-accent), var(--nx-accent)) left bottom / 24px 3px,
+    linear-gradient(var(--nx-accent), var(--nx-accent)) left bottom / 3px 24px,
+    linear-gradient(var(--nx-accent), var(--nx-accent)) right bottom / 24px 3px,
+    linear-gradient(var(--nx-accent), var(--nx-accent)) right bottom / 3px 24px;
+  background-repeat: no-repeat;
+}
+#nx-days-ready, .nx-grid-days {
+  text-shadow:
+    0 0 20px color-mix(in srgb, var(--nx-accent) 50%, transparent),
+    0 0 56px color-mix(in srgb, var(--nx-accent) 26%, transparent);
+}
+#nx-checkin-body .nx-stat-label + div > span:first-child {
+  font-size: clamp(84px, 26vw, 104px) !important;
+}
+#nx-checkin-body .nx-stat-label + div > span:last-child {
+  font-size: 20px !important;
+}
+
+/* ---------- data text: the small dim lines step up ---------- */
+.nx-kv { font-size: 13.5px; }
+.nx-row-meta { font-size: 12.5px; }
+.nx-row-title { font-size: 18px; }
+.nx-row-weight { font-size: 18px; }
+.nx-log-line { font-size: 13.5px; }
+.nx-intel-item-detail { font-size: 12.5px; }
+
+/* ---------- big numerals elsewhere: grid-down, drill, compass ---------- */
+.nx-grid-days { font-size: 112px; }
+.nx-grid-line { font-size: 16.5px; }
+.nx-drill-clock { font-size: 64px; }
+.nx-drill-grade { font-size: 34px; }
+.nx-compass-deg { font-size: 46px; }
+
+/* ---------- landing: headline and counter scale up ---------- */
+.nx-l-h1 { font-size: clamp(52px, 12.5vw, 108px); }
+.nx-l-counter { font-size: clamp(84px, 20vw, 148px); }
+.nx-l-counter .nx-unit { font-size: clamp(18px, 4.5vw, 28px); }
+.nx-l-eyebrow { font-size: 13.5px; }
+
+/* ============================================================
+   IMAGERY + FX PASS (2026-11-15) - schematic art and motion.
+   All imagery is inline SVG in the equipment-manual line
+   style: stroke-only drawings painted from currentColor and
+   the theme variables, so one drawing recolors correctly in
+   all five themes and costs almost no weight. No raster, no
+   external assets. Panels stay chamfered; circles live only
+   inside instrument graphics (radar, vault door, map rings),
+   per the compass precedent. Every animation is gated by
+   body.nx-fx and flattened by the reduced-motion backstop;
+   Blackout kills the moving parts outright.
+   ============================================================ */
+
+/* ---------- dashboard hero: radar + topo backdrop ---------- */
+.nx-hero { overflow: hidden; } /* contains the scan sweep's travel */
+/* the accent sheen sweeps inside its button: without this, the
+   parked ::after (translateX(130%) while focused) inflates the
+   page's scrollable width on narrow screens */
+.nx-btn-accent { overflow: hidden; }
+.nx-hero-art {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  z-index: 0; pointer-events: none;
+}
+.nx-hero > *:not(.nx-hero-art):not(.nx-hero-scan) { position: relative; z-index: 1; }
+.nx-hero::before { z-index: 3; }
+.nx-radar-sweep { transform-box: view-box; transform-origin: 200px 118px; }
+body.nx-fx .nx-radar-sweep { animation: nx-sweep 6s linear infinite; }
+
+/* one scan sweep across the hero each time Command is entered */
+.nx-hero-scan {
+  position: absolute; top: 0; bottom: 0; left: 0; width: 84px; z-index: 2;
+  pointer-events: none; opacity: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--nx-accent) 16%, transparent), transparent);
+}
+@keyframes nx-hero-scan {
+  0% { left: -12%; opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { left: 104%; opacity: 0; }
+}
+body.nx-fx #view-command.nx-on .nx-hero-scan { animation: nx-hero-scan 1.15s ease-out 0.15s both; }
+
+/* the numeral flickers and settles as Command is entered */
+@keyframes nx-hero-flicker {
+  0% { opacity: 1; } 18% { opacity: 0.35; } 36% { opacity: 1; }
+  54% { opacity: 0.6; } 72% { opacity: 1; } 100% { opacity: 1; }
+}
+body.nx-fx #view-command.nx-on #nx-days-ready { animation: nx-hero-flicker 0.45s steps(6) 0.1s both; }
+
+/* ---------- check-in illustrations + assessment markers ---------- */
+.nx-checkin-art { text-align: center; margin: 12px 0 0 0; color: var(--nx-accent); }
+.nx-checkin-art svg { width: 92px; height: 92px; opacity: 0.92; }
+@keyframes nx-art-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+body.nx-fx .nx-checkin-art { animation: nx-art-in 0.35s ease both; }
+.nx-area-ic { display: inline-flex; color: var(--nx-accent); }
+.nx-area-ic svg { width: 21px; height: 21px; }
+
+/* ---------- gear row plates + empty-state art ---------- */
+.nx-row-ic {
+  flex: 0 0 auto; width: 40px; height: 40px; display: grid; place-items: center;
+  border: 1px solid var(--nx-line); background: var(--nx-input-bg); color: var(--nx-dim);
+}
+.nx-row-ic svg { width: 25px; height: 25px; }
+.nx-empty-art { display: block; margin-bottom: 9px; color: var(--nx-faint); }
+.nx-empty-art svg { display: block; width: 52px; height: 52px; }
+.nx-empty .nx-empty-art svg { margin: 0 auto; }
+
+/* ---------- vault door ---------- */
+.nx-vault-art {
+  display: block; width: 118px; height: 118px; margin: 2px auto 12px auto;
+  color: var(--nx-accent); opacity: 0.8;
+}
+.nx-vault-wheel { transform-box: fill-box; transform-origin: center; }
+body.nx-fx .nx-vault-wheel { animation: nx-sweep 26s linear infinite; }
+
+/* ---------- alerts grid map ---------- */
+.nx-map {
+  position: relative; height: 118px; margin: 0 0 12px 0; overflow: hidden;
+  border: 1px solid var(--nx-line); background-color: var(--nx-input-bg);
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--nx-line) 55%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--nx-line) 55%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.nx-map svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.nx-blip {
+  position: absolute; left: 63%; top: 32%; width: 9px; height: 9px;
+  margin: -4.5px 0 0 -4.5px; background: var(--nx-warn); display: none;
+}
+.nx-map.nx-live .nx-blip { display: block; }
+.nx-blip::after {
+  content: ""; position: absolute; inset: -1px;
+  border: 1.5px solid var(--nx-warn); opacity: 0;
+}
+@keyframes nx-blip-ping {
+  0% { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(3.4); opacity: 0; }
+}
+body.nx-fx .nx-map.nx-live .nx-blip::after { animation: nx-blip-ping 1.6s ease-out infinite; }
+
+/* ---------- comms signal bars ---------- */
+.nx-sig-row {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 12px; margin: 16px 0 8px 0;
+}
+.nx-sig { display: flex; align-items: flex-end; gap: 3px; height: 26px; padding-bottom: 2px; }
+.nx-sig i { width: 4px; background: var(--nx-line2); transform-origin: bottom; }
+.nx-sig i:nth-child(1) { height: 8px; }
+.nx-sig i:nth-child(2) { height: 14px; }
+.nx-sig i:nth-child(3) { height: 20px; }
+.nx-sig i:nth-child(4) { height: 12px; }
+.nx-sig i:nth-child(5) { height: 24px; }
+.nx-sig i:nth-child(6) { height: 16px; }
+.nx-sig i:nth-child(7) { height: 10px; }
+.nx-sig i:nth-child(8) { height: 18px; }
+.nx-sig i:nth-child(9) { height: 13px; }
+.nx-sig.nx-live i { background: var(--nx-accent); }
+@keyframes nx-eq { from { transform: scaleY(0.3); } to { transform: scaleY(1); } }
+body.nx-fx .nx-sig.nx-live i { animation: nx-eq 0.8s ease-in-out infinite alternate; }
+body.nx-fx .nx-sig.nx-live i:nth-child(2) { animation-duration: 0.62s; animation-delay: 0.08s; }
+body.nx-fx .nx-sig.nx-live i:nth-child(3) { animation-duration: 0.95s; animation-delay: 0.16s; }
+body.nx-fx .nx-sig.nx-live i:nth-child(4) { animation-duration: 0.7s; animation-delay: 0.05s; }
+body.nx-fx .nx-sig.nx-live i:nth-child(5) { animation-duration: 1.05s; animation-delay: 0.2s; }
+body.nx-fx .nx-sig.nx-live i:nth-child(6) { animation-duration: 0.66s; animation-delay: 0.12s; }
+body.nx-fx .nx-sig.nx-live i:nth-child(7) { animation-duration: 0.88s; animation-delay: 0.03s; }
+body.nx-fx .nx-sig.nx-live i:nth-child(8) { animation-duration: 0.74s; animation-delay: 0.18s; }
+body.nx-fx .nx-sig.nx-live i:nth-child(9) { animation-duration: 0.98s; animation-delay: 0.1s; }
+
+/* ---------- blackout: the moving parts die with the effects ---------- */
+html[data-theme="blackout"] .nx-radar-sweep,
+html[data-theme="blackout"] .nx-hero-scan { display: none; }
+html[data-theme="blackout"] .nx-vault-wheel,
+html[data-theme="blackout"] .nx-sig i,
+html[data-theme="blackout"] .nx-blip::after { animation: none !important; }
+
+/* ---------- landing: radar rings behind the counter ---------- */
+.nx-l-counter { position: relative; z-index: 0; }
+.nx-l-counter::before {
+  content: ""; position: absolute; left: 50%; top: 50%; z-index: -1;
+  width: min(86vw, 330px); aspect-ratio: 1; transform: translate(-50%, -56%);
+  border-radius: 50% !important; /* instrument graphic - the allowed circle */
+  background: repeating-radial-gradient(circle, transparent 0 33px, color-mix(in srgb, var(--nx-accent) 15%, transparent) 33px 34.5px);
+  pointer-events: none;
+}
+
+/* ---------- guided walkthrough ----------
+   Accent bracket frame around the real element + a briefing card
+   fixed at the bottom of the screen. The layer takes no taps
+   except on the card, so the tour never traps the app. Frame
+   settle and card slide ride body.nx-fx like every other motion;
+   the reduced-motion backstop above flattens both. */
+#nx-tour-layer { position: fixed; inset: 0; z-index: 150; pointer-events: none; }
+#nx-tour-frame {
+  position: fixed; display: none; pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--nx-accent) 38%, transparent);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--nx-accent) 16%, transparent);
+}
+body.nx-fx #nx-tour-frame { transition: top 0.28s ease, left 0.28s ease, width 0.28s ease, height 0.28s ease; }
+.nx-tfc { position: absolute; width: 24px; height: 24px; border: 0 solid var(--nx-accent); }
+.nx-tfc-tl { top: -3px; left: -3px; border-top-width: 3px; border-left-width: 3px; }
+.nx-tfc-tr { top: -3px; right: -3px; border-top-width: 3px; border-right-width: 3px; }
+.nx-tfc-bl { bottom: -3px; left: -3px; border-bottom-width: 3px; border-left-width: 3px; }
+.nx-tfc-br { bottom: -3px; right: -3px; border-bottom-width: 3px; border-right-width: 3px; }
+.nx-tour-card {
+  position: absolute; left: 12px; right: 12px; bottom: 12px; max-width: 620px; margin: 0 auto;
+  pointer-events: auto; background: var(--nx-panel); border: 1px solid var(--nx-line2);
+  clip-path: var(--nx-chamfer); padding: 18px 20px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
+}
+.nx-tour-body { line-height: 1.55; margin: 0 0 14px 0; font-size: 15.5px; }
+@keyframes nx-tour-in { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+body.nx-fx .nx-tour-card.nx-tour-in { animation: nx-tour-in 0.26s ease; }
+#nx-tour-back[disabled] { opacity: 0.4; }
+
+/* ============================================================
+   COMMAND-CENTER RESTYLE (2026-11-15) - owner-directed: metal
+   shine, more than two colors, homepage as a military / NASA
+   command center. The one-accent law is retired by the owner;
+   hazard orange stays primary and gains a semantic status
+   palette: cyan DATA for screens and readouts, green OK, amber
+   WARN, red ALERT - each theme defines its own values, Whiteout
+   and Desert in deep contrast-safe tones. Surfaces become
+   brushed-metal plates: layered gradients only (sheen, fine
+   brushing streaks, rivet dots), no raster, no assets. Type
+   scale, behavior and copy are untouched; chamfers and square
+   corners stay (circles only inside instruments and LED dots).
+   Every animation still rides body.nx-fx with the reduced-
+   motion backstop; Blackout keeps its battery posture.
+   ============================================================ */
+
+/* ---------- the palette + metal variables, per theme ---------- */
+:root {
+  --nx-data: #2fd4e8; --nx-ok: #3ddc74; --nx-warn: #ffb61e; --nx-alert: #ff3b30;
+  --nx-alert-ink: #ffffff;
+  --nx-metal-hi: rgba(255,255,255,0.13); --nx-metal-lo: rgba(0,0,0,0.26);
+  --nx-brush: rgba(255,255,255,0.014); --nx-rivet: #434854;
+  --nx-inset-sh: rgba(0,0,0,0.30);
+}
+html[data-theme="nightvision"] {
+  --nx-data: #7dffce; --nx-ok: #39ff6a; --nx-warn: #c8ffd9; --nx-alert: #ffffff;
+  --nx-alert-ink: #021204;
+  --nx-metal-hi: rgba(140,255,180,0.12); --nx-metal-lo: rgba(0,0,0,0.38);
+  --nx-brush: rgba(57,255,106,0.02); --nx-rivet: #1f6030;
+  --nx-inset-sh: rgba(0,0,0,0.45);
+}
+html[data-theme="desert"] {
+  --nx-data: #0b6b7a; --nx-ok: #2e7d1e; --nx-warn: #a86a00; --nx-alert: #b31b12;
+  --nx-alert-ink: #fff6ea;
+  --nx-metal-hi: rgba(255,255,255,0.55); --nx-metal-lo: rgba(46,33,19,0.13);
+  --nx-brush: rgba(46,33,19,0.02); --nx-rivet: #a68f5f;
+  --nx-inset-sh: rgba(46,33,19,0.16);
+}
+html[data-theme="whiteout"] {
+  --nx-data: #0a7d8c; --nx-ok: #177245; --nx-warn: #9a6200; --nx-alert: #c11f1f;
+  --nx-alert-ink: #ffffff;
+  --nx-metal-hi: rgba(255,255,255,0.65); --nx-metal-lo: rgba(22,32,42,0.09);
+  --nx-brush: rgba(22,32,42,0.016); --nx-rivet: #9fb0bc;
+  --nx-inset-sh: rgba(22,32,42,0.13);
+}
+html[data-theme="blackout"] {
+  --nx-data: #a07a63; --nx-ok: #679a4e; --nx-warn: #a87f24; --nx-alert: #e04848;
+  --nx-alert-ink: #f5e9e9;
+  --nx-metal-hi: rgba(255,255,255,0.05); --nx-metal-lo: rgba(0,0,0,0.45);
+  --nx-brush: rgba(255,255,255,0.008); --nx-rivet: #2e2e2e;
+  --nx-inset-sh: rgba(0,0,0,0.55);
+}
+
+/* ---------- brushed metal: panels, stats, flat panels ---------- */
+.nx-panel {
+  background-image:
+    radial-gradient(circle 3px at 15px 15px, var(--nx-rivet) 1.6px, rgba(0,0,0,0.25) 2.4px, transparent 3.4px),
+    radial-gradient(circle 3px at calc(100% - 15px) 15px, var(--nx-rivet) 1.6px, rgba(0,0,0,0.25) 2.4px, transparent 3.4px),
+    radial-gradient(circle 3px at 15px calc(100% - 15px), var(--nx-rivet) 1.6px, rgba(0,0,0,0.25) 2.4px, transparent 3.4px),
+    radial-gradient(circle 3px at calc(100% - 15px) calc(100% - 15px), var(--nx-rivet) 1.6px, rgba(0,0,0,0.25) 2.4px, transparent 3.4px),
+    linear-gradient(180deg, var(--nx-metal-hi), transparent 14%, transparent 86%, var(--nx-metal-lo)),
+    repeating-linear-gradient(90deg, var(--nx-brush) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, var(--nx-panel2), var(--nx-panel));
+}
+.nx-stat {
+  background-image:
+    linear-gradient(180deg, var(--nx-metal-hi), transparent 16%, transparent 88%, var(--nx-metal-lo)),
+    repeating-linear-gradient(90deg, var(--nx-brush) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, var(--nx-panel3), var(--nx-panel));
+}
+.nx-panel-flat {
+  background-image:
+    linear-gradient(180deg, var(--nx-metal-hi), transparent 18%, transparent 90%, var(--nx-metal-lo)),
+    linear-gradient(180deg, var(--nx-panel2), var(--nx-panel));
+}
+.nx-upsell {
+  background-image:
+    linear-gradient(180deg, var(--nx-metal-hi), transparent 14%, transparent 86%, var(--nx-metal-lo)),
+    repeating-linear-gradient(90deg, var(--nx-brush) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, var(--nx-panel2), var(--nx-panel));
+}
+
+/* ---------- masthead: a metal bar with a sheen ---------- */
+.nx-header {
+  background-image:
+    linear-gradient(180deg, var(--nx-metal-hi), transparent 42%, var(--nx-metal-lo)),
+    repeating-linear-gradient(90deg, var(--nx-brush) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, var(--nx-header-a), var(--nx-header-b));
+  box-shadow: inset 0 1px 0 var(--nx-metal-hi), 0 12px 26px -14px rgba(0,0,0,0.55);
+}
+.nx-logo {
+  background-image: linear-gradient(180deg, var(--nx-metal-hi), transparent 45%, var(--nx-metal-lo));
+  box-shadow: inset 0 1px 0 var(--nx-metal-hi), inset 0 -1px 0 rgba(0,0,0,0.3);
+}
+.nx-tab { background-image: linear-gradient(180deg, var(--nx-metal-hi), transparent 50%, var(--nx-metal-lo)); }
+/* the masthead clocks are console readouts: local in data cyan,
+   ZULU (UTC) beside it, smaller and dimmer */
+.nx-header-status .nx-clock { color: var(--nx-data); }
+.nx-zulu { color: var(--nx-data); opacity: 0.72; font-size: 11.5px; letter-spacing: 1.5px; }
+
+/* ---------- buttons + inputs: machined metal ---------- */
+.nx-btn {
+  background-image: linear-gradient(180deg, var(--nx-metal-hi), transparent 46%, var(--nx-metal-lo));
+  box-shadow: inset 0 1px 0 var(--nx-metal-hi), inset 0 -1px 0 rgba(0,0,0,0.3);
+}
+.nx-input, .nx-select, .nx-textarea {
+  background-image: linear-gradient(180deg, rgba(0,0,0,0.16), transparent 34%);
+  box-shadow: inset 0 2px 6px var(--nx-inset-sh), inset 0 -1px 0 var(--nx-metal-hi);
+}
+
+/* ---------- status LEDs ---------- */
+.nx-led {
+  display: block; width: 9px; height: 9px; flex: 0 0 auto;
+  border-radius: 50% !important; /* an instrument lamp - the allowed circle */
+  background: var(--nx-faint);
+}
+.nx-st-ok .nx-led, .nx-led-ok { background: var(--nx-ok); box-shadow: 0 0 9px color-mix(in srgb, var(--nx-ok) 60%, transparent), 0 0 2px var(--nx-ok); }
+.nx-st-warn .nx-led, .nx-led-warn { background: var(--nx-warn); box-shadow: 0 0 9px color-mix(in srgb, var(--nx-warn) 60%, transparent), 0 0 2px var(--nx-warn); }
+.nx-st-alert .nx-led, .nx-led-alert { background: var(--nx-alert); box-shadow: 0 0 9px color-mix(in srgb, var(--nx-alert) 60%, transparent), 0 0 2px var(--nx-alert); }
+.nx-st-data .nx-led, .nx-led-data { background: var(--nx-data); box-shadow: 0 0 9px color-mix(in srgb, var(--nx-data) 60%, transparent), 0 0 2px var(--nx-data); }
+.nx-st-dim .nx-led, .nx-led-dim { background: var(--nx-faint); box-shadow: none; opacity: 0.65; }
+@keyframes nx-led-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+body.nx-fx .nx-pulse-led .nx-led { animation: nx-led-pulse 1.25s ease-in-out infinite; }
+
+/* ---------- the status board: five stations over the hero ---------- */
+.nx-board {
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px; margin-bottom: 16px;
+}
+.nx-station {
+  border: 1px solid var(--nx-line); clip-path: var(--nx-chamfer-sm);
+  background-image:
+    linear-gradient(180deg, var(--nx-metal-hi), transparent 40%, var(--nx-metal-lo)),
+    linear-gradient(180deg, var(--nx-panel2), var(--nx-panel));
+  box-shadow: var(--nx-flat-sh);
+  padding: 8px 6px 7px; display: flex; flex-direction: column; gap: 5px;
+  min-width: 0; overflow: hidden;
+}
+.nx-station-top { display: flex; align-items: center; gap: 6px; }
+.nx-station-label {
+  font-family: var(--nx-head); font-weight: 700; font-size: 10.5px;
+  letter-spacing: 1.2px; text-transform: uppercase; color: var(--nx-dim);
+}
+.nx-station-val {
+  font-family: var(--nx-mono); font-size: 9.5px; letter-spacing: 0.2px;
+  color: var(--nx-text); white-space: nowrap;
+}
+.nx-st-ok .nx-station-val { color: var(--nx-ok); }
+.nx-st-warn .nx-station-val { color: var(--nx-warn); }
+.nx-st-alert .nx-station-val { color: var(--nx-alert); }
+.nx-st-data .nx-station-val { color: var(--nx-data); }
+.nx-st-dim .nx-station-val { color: var(--nx-dim); }
+
+/* ---------- main screen: the Days Ready console ---------- */
+.nx-hero {
+  background-image:
+    radial-gradient(circle 3.4px at 16px 16px, var(--nx-rivet) 2px, rgba(0,0,0,0.4) 3px, transparent 4.2px),
+    radial-gradient(circle 3.4px at calc(100% - 16px) 16px, var(--nx-rivet) 2px, rgba(0,0,0,0.4) 3px, transparent 4.2px),
+    radial-gradient(circle 3.4px at 16px calc(100% - 16px), var(--nx-rivet) 2px, rgba(0,0,0,0.4) 3px, transparent 4.2px),
+    radial-gradient(circle 3.4px at calc(100% - 16px) calc(100% - 16px), var(--nx-rivet) 2px, rgba(0,0,0,0.4) 3px, transparent 4.2px),
+    linear-gradient(180deg, color-mix(in srgb, var(--nx-data) 6%, var(--nx-panel2)), color-mix(in srgb, var(--nx-data) 2%, var(--nx-face)));
+  box-shadow: var(--nx-panel-sh),
+    inset 0 0 0 1px color-mix(in srgb, var(--nx-data) 30%, transparent),
+    inset 0 0 52px color-mix(in srgb, var(--nx-data) 7%, transparent),
+    inset 0 -18px 28px -20px rgba(0,0,0,0.55);
+}
+/* screen data inside the console reads cyan; the weakest link is
+   the one red thing on the board, because it is the problem */
+.nx-hero .nx-kv b { color: var(--nx-data); }
+#nx-days-gap b:first-of-type { color: var(--nx-data); }
+#nx-days-gap b:last-of-type { color: var(--nx-alert); }
+
+/* ---------- semantic color across the app ---------- */
+/* data numerals are screens now */
+.nx-stat-value { color: var(--nx-data); }
+/* expiry + alert badges tell the truth in the new palette */
+.nx-badge-ok { color: var(--nx-ok); }
+.nx-badge-over { background: var(--nx-alert); border-color: var(--nx-alert); color: var(--nx-alert-ink); }
+/* the alerts map is a screen; a live blip is red, and pings red */
+.nx-map { background-color: color-mix(in srgb, var(--nx-data) 4%, var(--nx-input-bg)); }
+.nx-map.nx-live { border-color: color-mix(in srgb, var(--nx-alert) 55%, var(--nx-line)); }
+.nx-blip { background: var(--nx-alert); }
+.nx-blip::after { border-color: var(--nx-alert); }
+/* a live signal meter is data, not accent */
+.nx-sig.nx-live i { background: var(--nx-data); }
+
+/* ---------- the walkthrough wears the new skin too ---------- */
+.nx-tour-card {
+  background-image:
+    linear-gradient(180deg, var(--nx-metal-hi), transparent 30%, var(--nx-metal-lo)),
+    repeating-linear-gradient(90deg, var(--nx-brush) 0 1px, transparent 1px 4px);
+}
+
+/* ---------- landing: same console, same metal ---------- */
+.nx-l-counter {
+  display: inline-block; padding: 16px 30px 12px;
+  color: var(--nx-data);
+  background-image:
+    radial-gradient(circle 3.4px at 16px 16px, var(--nx-rivet) 2px, rgba(0,0,0,0.4) 3px, transparent 4.2px),
+    radial-gradient(circle 3.4px at calc(100% - 16px) 16px, var(--nx-rivet) 2px, rgba(0,0,0,0.4) 3px, transparent 4.2px),
+    radial-gradient(circle 3.4px at 16px calc(100% - 16px), var(--nx-rivet) 2px, rgba(0,0,0,0.4) 3px, transparent 4.2px),
+    radial-gradient(circle 3.4px at calc(100% - 16px) calc(100% - 16px), var(--nx-rivet) 2px, rgba(0,0,0,0.4) 3px, transparent 4.2px),
+    linear-gradient(180deg, color-mix(in srgb, var(--nx-data) 6%, var(--nx-panel2)), color-mix(in srgb, var(--nx-data) 2%, var(--nx-face)));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--nx-data) 30%, transparent),
+    inset 0 0 52px color-mix(in srgb, var(--nx-data) 7%, transparent);
+  text-shadow:
+    0 0 22px color-mix(in srgb, var(--nx-data) 32%, transparent),
+    0 0 60px color-mix(in srgb, var(--nx-data) 15%, transparent);
+}
+.nx-l-leds {
+  display: flex; justify-content: center; flex-wrap: wrap;
+  gap: 10px 20px; margin: 18px auto 0 auto;
+}
+.nx-l-led-cell {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--nx-mono); font-size: 10.5px; letter-spacing: 2px;
+  color: var(--nx-dim); text-transform: uppercase;
+}
+.nx-l-led-cell .nx-led { width: 8px; height: 8px; }
+.nx-l-term {
+  background-image:
+    linear-gradient(180deg, var(--nx-metal-hi), transparent 14%, transparent 86%, var(--nx-metal-lo)),
+    repeating-linear-gradient(90deg, var(--nx-brush) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, var(--nx-panel2), var(--nx-panel));
+}
+.nx-l-term-bar i.nx-hot { box-shadow: 0 0 7px color-mix(in srgb, var(--nx-accent) 60%, transparent); }
+.nx-l-term-bar i:nth-child(2) { background: var(--nx-data); border-color: var(--nx-data); box-shadow: 0 0 7px color-mix(in srgb, var(--nx-data) 55%, transparent); }
+.nx-l-term-bar i:nth-child(3) { background: var(--nx-ok); border-color: var(--nx-ok); box-shadow: 0 0 7px color-mix(in srgb, var(--nx-ok) 55%, transparent); }
+.nx-l-trust div {
+  background-image: linear-gradient(180deg, var(--nx-metal-hi), transparent 50%, var(--nx-metal-lo));
+}
+
+/* ---------- shopping links + resupply (money build A) ----------
+   FIND IT / REPLACE buttons ride the standard small-button
+   hardware; the disclosure note is small mono dim text under
+   every surface that renders one. Resupply rows reuse the
+   checklist row, with a button cluster pinned after the text. */
+
+.nx-shop-note {
+  font-family: var(--nx-mono); font-size: 11px; line-height: 1.5;
+  color: var(--nx-dim); letter-spacing: 0.5px; margin: 10px 0 0 0;
+}
+.nx-check-btns {
+  display: inline-flex; gap: 8px; flex: 0 0 auto; align-items: center;
+  margin-left: auto;
+}
+/* Rows carrying buttons (First Orders, Resupply) may wrap: at
+   phone widths the button cluster drops to its own line instead
+   of pushing the row off-screen. Rows without buttons never
+   wrapped before and still never need to. */
+.nx-check-item { flex-wrap: wrap; }
+.nx-resupply-sel { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ============================================================
+   MONEY BUILD B (2026-11-15) - expiry radar, expiry watch,
+   weekly sitrep. App layer, nx- prefixed, painted entirely
+   from the shared status palette variables (--nx-ok / --nx-warn
+   / --nx-alert / --nx-dim) so every surface reads correctly in
+   all eleven themes. No animation of its own - nothing here
+   needs the fx gate.
+   ============================================================ */
+.nx-radar-days { font-family: var(--nx-mono); font-size: 13px; font-weight: 700; letter-spacing: 1px; white-space: nowrap; }
+.nx-radar-ok { color: var(--nx-ok); }
+.nx-radar-warn { color: var(--nx-warn); }
+.nx-radar-alert { color: var(--nx-alert); }
+.nx-radar-optin { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 12px; border: 1px solid var(--nx-line); padding: 10px 12px; }
+.nx-radar-optin-text { font-family: var(--nx-mono); font-size: 12px; letter-spacing: 1px; }
+.nx-weekly-delta { font-family: var(--nx-mono); font-weight: 700; font-size: 12.5px; letter-spacing: 1px; white-space: nowrap; }
+.nx-delta-ok { color: var(--nx-ok); }
+.nx-delta-alert { color: var(--nx-alert); }
+.nx-delta-dim { color: var(--nx-dim); }
+
+/* ============================================================
+   LANDING OVERHAUL (2026-11-15) - the marketing page rebuilt
+   as a full command-center surface: metal masthead with the
+   account doors up top, the live counter as the main screen,
+   a real app capture in a device frame, a status-board band,
+   THE SYSTEM plates, HOW IT WORKS, INTEL, PRICING with the
+   add-on strip, FAQ and a final CTA band. EVERY rule below is
+   scoped to body.nx-landing so the app can never regress;
+   colors ride the restyle variables (Command theme values,
+   the landing sets no data-theme). Chamfers stay, no rounded
+   corners, Rajdhani / JetBrains Mono throughout.
+   ============================================================ */
+
+/* ---------- masthead: metal bar, account doors up top ---------- */
+body.nx-landing .nx-lm-mast {
+  position: sticky; top: 0; z-index: 60;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--nx-line2);
+  background-image:
+    linear-gradient(180deg, var(--nx-metal-hi), transparent 42%, var(--nx-metal-lo)),
+    repeating-linear-gradient(90deg, var(--nx-brush) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, var(--nx-header-a), var(--nx-header-b));
+  box-shadow: inset 0 1px 0 var(--nx-metal-hi), 0 12px 26px -14px rgba(0,0,0,0.55);
+}
+body.nx-landing .nx-lm-brand {
+  display: inline-flex; align-items: center; gap: 10px;
+  text-decoration: none; color: var(--nx-text);
+}
+body.nx-landing .nx-lm-logo {
+  width: 34px; height: 34px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  font-family: var(--nx-head); font-weight: 700; font-size: 15px; letter-spacing: 1px;
+  color: var(--nx-accent);
+  background: var(--nx-panel3);
+  background-image: linear-gradient(180deg, var(--nx-metal-hi), transparent 45%, var(--nx-metal-lo));
+  border: 1px solid var(--nx-line2);
+  clip-path: var(--nx-chamfer-sm);
+  box-shadow: inset 0 1px 0 var(--nx-metal-hi), inset 0 -1px 0 rgba(0,0,0,0.3);
+}
+body.nx-landing .nx-lm-word {
+  font-family: var(--nx-head); font-weight: 700; font-size: 19px; letter-spacing: 3px;
+}
+body.nx-landing .nx-lm-tm { font-size: 9px; vertical-align: super; color: var(--nx-dim); letter-spacing: 0; }
+body.nx-landing .nx-lm-nav { display: flex; gap: 18px; margin-left: 10px; }
+body.nx-landing .nx-lm-nav a {
+  font-family: var(--nx-mono); font-size: 11.5px; letter-spacing: 2px;
+  color: var(--nx-dim); text-decoration: none;
+}
+body.nx-landing .nx-lm-nav a:hover { color: var(--nx-accent); }
+body.nx-landing .nx-lm-actions { display: flex; gap: 8px; margin-left: auto; }
+body.nx-landing .nx-lm-btn { font-size: 13.5px; padding: 8px 13px; white-space: nowrap; }
+@media (max-width: 900px) { body.nx-landing .nx-lm-nav { display: none; } }
+@media (max-width: 560px) {
+  body.nx-landing .nx-lm-actions { margin-left: 0; width: 100%; }
+  body.nx-landing .nx-lm-actions .nx-btn { flex: 1 1 0; text-align: center; padding-left: 6px; padding-right: 6px; }
+  body.nx-landing .nx-lm-word { font-size: 17px; letter-spacing: 2px; }
+}
+
+/* ---------- hero device frame: a real capture, machined bezel ---------- */
+body.nx-landing .nx-lm-device {
+  max-width: 372px; margin: 40px auto 6px auto; padding: 10px;
+  border: 1px solid var(--nx-line2);
+  clip-path: var(--nx-chamfer);
+  background-image:
+    radial-gradient(circle 3px at 15px 15px, var(--nx-rivet) 1.6px, rgba(0,0,0,0.25) 2.4px, transparent 3.4px),
+    radial-gradient(circle 3px at calc(100% - 15px) 15px, var(--nx-rivet) 1.6px, rgba(0,0,0,0.25) 2.4px, transparent 3.4px),
+    radial-gradient(circle 3px at 15px calc(100% - 15px), var(--nx-rivet) 1.6px, rgba(0,0,0,0.25) 2.4px, transparent 3.4px),
+    radial-gradient(circle 3px at calc(100% - 15px) calc(100% - 15px), var(--nx-rivet) 1.6px, rgba(0,0,0,0.25) 2.4px, transparent 3.4px),
+    linear-gradient(180deg, var(--nx-metal-hi), transparent 14%, transparent 86%, var(--nx-metal-lo)),
+    repeating-linear-gradient(90deg, var(--nx-brush) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, var(--nx-panel2), var(--nx-panel));
+  box-shadow: 0 24px 44px -18px rgba(0,0,0,0.65);
+}
+body.nx-landing .nx-lm-device-bar {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--nx-mono); font-size: 10px; letter-spacing: 2px; color: var(--nx-dim);
+  padding: 2px 2px 9px 2px;
+}
+body.nx-landing .nx-lm-device-bar i {
+  width: 9px; height: 9px; display: block; flex: 0 0 auto;
+  background: var(--nx-panel3); border: 1px solid var(--nx-line2);
+}
+body.nx-landing .nx-lm-device-bar i.nx-hot {
+  background: var(--nx-accent); border-color: var(--nx-accent);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--nx-accent) 60%, transparent);
+}
+body.nx-landing .nx-lm-device-bar i:nth-child(2) {
+  background: var(--nx-data); border-color: var(--nx-data);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--nx-data) 55%, transparent);
+}
+body.nx-landing .nx-lm-device-bar i:nth-child(3) {
+  background: var(--nx-ok); border-color: var(--nx-ok);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--nx-ok) 55%, transparent);
+}
+body.nx-landing .nx-lm-device-screen {
+  height: 452px; overflow: hidden;
+  border: 1px solid var(--nx-line);
+  background: #000;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nx-data) 22%, transparent);
+}
+body.nx-landing .nx-lm-device-screen img {
+  width: 100%; height: 100%; display: block;
+  object-fit: cover; object-position: top center;
+}
+body.nx-landing .nx-lm-device-cap {
+  font-family: var(--nx-mono); font-size: 10.5px; letter-spacing: 1.5px;
+  color: var(--nx-dim); text-align: center; padding-top: 9px;
+}
+@media (max-width: 560px) { body.nx-landing .nx-lm-device-screen { height: 396px; } }
+
+/* ---------- status strip: the board as a divider ---------- */
+body.nx-landing .nx-lm-band {
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px; max-width: 900px; margin: 30px auto 0 auto; padding: 0 12px;
+}
+body.nx-landing .nx-lm-station {
+  border: 1px solid var(--nx-line); clip-path: var(--nx-chamfer-sm);
+  background-image:
+    linear-gradient(180deg, var(--nx-metal-hi), transparent 40%, var(--nx-metal-lo)),
+    linear-gradient(180deg, var(--nx-panel2), var(--nx-panel));
+  box-shadow: var(--nx-flat-sh);
+  padding: 8px 6px 7px; display: flex; flex-direction: column; gap: 5px;
+  min-width: 0; overflow: hidden;
+}
+body.nx-landing .nx-lm-station-top {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--nx-head); font-weight: 700; font-size: 10.5px;
+  letter-spacing: 1.2px; text-transform: uppercase; color: var(--nx-dim);
+}
+body.nx-landing .nx-lm-station-top .nx-led { width: 8px; height: 8px; }
+body.nx-landing .nx-lm-station-val {
+  font-family: var(--nx-mono); font-size: 9.5px; letter-spacing: 0.2px;
+  color: var(--nx-dim); white-space: nowrap; text-transform: uppercase;
+}
+body.nx-landing .nx-lm-v-ok { color: var(--nx-ok); }
+body.nx-landing .nx-lm-v-warn { color: var(--nx-warn); }
+
+/* ---------- sections, plates, steps ---------- */
+body.nx-landing .nx-lm-sec { margin-top: 50px; }
+body.nx-landing .nx-lm-kicker {
+  font-family: var(--nx-mono); font-size: 12px; letter-spacing: 3px;
+  color: var(--nx-accent); text-transform: uppercase; margin: 0 0 5px 0;
+}
+body.nx-landing .nx-lm-h2 {
+  font-family: var(--nx-head); font-weight: 700; text-transform: uppercase;
+  font-size: clamp(26px, 5vw, 34px); letter-spacing: 2.5px; margin: 0 0 18px 0;
+}
+body.nx-landing .nx-lm-grid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(186px, 1fr));
+}
+body.nx-landing .nx-lm-steps {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+body.nx-landing .nx-lm-plate { padding: 16px; }
+body.nx-landing .nx-lm-icon { color: var(--nx-accent); margin-bottom: 10px; }
+body.nx-landing .nx-lm-icon svg { width: 34px; height: 34px; display: block; }
+body.nx-landing .nx-lm-step-num {
+  font-family: var(--nx-mono); font-weight: 700; font-size: 30px;
+  color: var(--nx-data); margin: 0 0 6px 0;
+  text-shadow: 0 0 16px color-mix(in srgb, var(--nx-data) 30%, transparent);
+}
+body.nx-landing .nx-lm-plate-cta { margin-top: 14px; }
+
+/* ---------- intel ---------- */
+body.nx-landing .nx-lm-intel-grid { display: grid; gap: 14px; }
+@media (min-width: 760px) {
+  body.nx-landing .nx-lm-intel-grid { grid-template-columns: 1.05fr 1fr; align-items: start; }
+}
+body.nx-landing .nx-lm-term-line {
+  font-family: var(--nx-mono); font-size: 12.5px; line-height: 1.9;
+  color: var(--nx-dim); margin: 0;
+}
+body.nx-landing .nx-lm-term-line b { color: var(--nx-text); }
+
+/* ---------- pricing: tiers, account note, add-on strip ---------- */
+body.nx-landing .nx-lm-tiers {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+body.nx-landing .nx-lm-price {
+  font-family: var(--nx-mono); font-size: 20px; letter-spacing: 1px; color: var(--nx-text);
+}
+body.nx-landing .nx-lm-note {
+  text-align: center; color: var(--nx-dim); font-size: 15.5px; line-height: 1.6;
+  max-width: 660px; margin: 18px auto 0 auto;
+}
+body.nx-landing .nx-lm-addons {
+  margin-top: 26px; padding: 14px 16px;
+  border: 1px solid var(--nx-line); clip-path: var(--nx-chamfer-sm);
+  background-image:
+    linear-gradient(180deg, var(--nx-metal-hi), transparent 18%, transparent 90%, var(--nx-metal-lo)),
+    linear-gradient(180deg, var(--nx-panel2), var(--nx-panel));
+  box-shadow: var(--nx-flat-sh);
+}
+body.nx-landing .nx-lm-addon-label {
+  font-family: var(--nx-mono); font-size: 11px; letter-spacing: 2px;
+  color: var(--nx-dim); text-transform: uppercase; margin: 0;
+}
+body.nx-landing .nx-lm-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 11px; }
+body.nx-landing .nx-lm-chip {
+  font-family: var(--nx-mono); font-size: 11.5px; letter-spacing: 0.5px;
+  color: var(--nx-dim); border: 1px solid var(--nx-line2);
+  padding: 7px 10px; background: rgba(0,0,0,0.22);
+}
+body.nx-landing .nx-lm-chip b { color: var(--nx-text); }
+body.nx-landing .nx-lm-chip-live { border-color: var(--nx-ok); }
+body.nx-landing .nx-lm-live-tag { color: var(--nx-ok); }
+body.nx-landing .nx-lm-addon-note {
+  font-family: var(--nx-mono); font-size: 11px; line-height: 1.6; letter-spacing: 0.5px;
+  color: var(--nx-warn); margin: 12px 0 0 0;
+}
+
+/* ---------- faq + final band ---------- */
+body.nx-landing .nx-lm-faq { padding: 16px 18px; margin-bottom: 10px; }
+body.nx-landing .nx-lm-faq h3 {
+  font-family: var(--nx-head); font-size: 17px; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase; margin: 0 0 6px 0;
+}
+body.nx-landing .nx-lm-faq p { color: var(--nx-dim); font-size: 15.5px; line-height: 1.6; margin: 0; }
+body.nx-landing .nx-lm-final {
+  text-align: center; margin: 54px 0 10px 0; padding: 32px 14px 26px;
+  border: 1px solid var(--nx-line2); clip-path: var(--nx-chamfer);
+  background-image:
+    linear-gradient(180deg, var(--nx-metal-hi), transparent 14%, transparent 86%, var(--nx-metal-lo)),
+    repeating-linear-gradient(90deg, var(--nx-brush) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, var(--nx-panel2), var(--nx-panel));
+}
+body.nx-landing .nx-lm-final-h {
+  font-family: var(--nx-head); font-weight: 700; text-transform: uppercase;
+  font-size: clamp(28px, 6vw, 40px); letter-spacing: 3px; margin: 0 0 18px 0;
+}
+
+/* ============================================================
+   CREATIVE THEMES (2026-11-15) - six MATERIAL themes.
+   Connie's verdict on the first five: the same terminal in
+   different colors. These six are different substances -
+   brass, glass, raw steel, camo canvas, concrete, drafting
+   paper - each with its own background treatment, panel
+   material, edge treatment and accent logic, built on the
+   same variable system (full set per theme, so nothing leaks
+   Command) plus structural rules. All texture and pattern
+   work is CSS gradients and inline SVG data patterns - no
+   new fonts, no external assets, offline-first intact.
+   Motion rides the body.nx-fx gate and the reduced-motion
+   backstop flattens it, same as every other layer.
+   ============================================================ */
+
+/* ---------- cog ornament (Brassworks hero) ----------
+   The element lives in the hero markup for every theme and
+   renders only under Brassworks. Rotation is defined only
+   under body.nx-fx, so the effects off-switch stills it and
+   the reduced-motion backstop flattens it. */
+.nx-cogs { display: none; }
+@keyframes nx-cog-spin { to { transform: rotate(360deg); } }
+@keyframes nx-cog-spin-r { to { transform: rotate(-360deg); } }
+html[data-theme="brassworks"] .nx-hero > .nx-cogs {
+  display: block; position: absolute; top: 8px; right: 10px;
+  width: 118px; height: 108px; z-index: 0; pointer-events: none;
+}
+html[data-theme="brassworks"] .nx-cog { position: absolute; display: block; }
+html[data-theme="brassworks"] .nx-cog-a { width: 84px; height: 84px; right: 0; top: 0; color: rgba(197,156,90,0.50); }
+html[data-theme="brassworks"] .nx-cog-b { width: 54px; height: 54px; right: 70px; top: 50px; color: rgba(184,115,51,0.55); }
+html[data-theme="brassworks"] body.nx-fx .nx-cog-a { animation: nx-cog-spin 26s linear infinite; }
+html[data-theme="brassworks"] body.nx-fx .nx-cog-b { animation: nx-cog-spin-r 17s linear infinite; }
+
+/* ---------- BRASSWORKS: steampunk brass and copper ----------
+   Deep brown-black, bronze panels with brass trim, pipe
+   double borders (inset pinstripe rings), brass bolt rivets,
+   a gear watermark worked into every panel, warm amber
+   accent, verdigris patina as the data color. */
+html[data-theme="brassworks"] {
+  --nx-bg: #171008; --nx-bg2: #1e1409;
+  --nx-panel: #241708; --nx-panel2: #2e1e0c; --nx-panel3: #3a2812;
+  --nx-line: #54401e; --nx-line2: #b08d57;
+  --nx-text: #f0e2c8; --nx-dim: #c2a878; --nx-faint: #8a744e;
+  --nx-accent: #ffb347; --nx-accent-dim: #7a4d12;
+  --nx-input-bg: #120b04; --nx-face: #0f0903; --nx-boot-bg: #0f0903;
+  --nx-header-a: #2e1e0c; --nx-header-b: #1e1409; --nx-hover: #3a2812;
+  --nx-gridline: rgba(255,179,71,0.035);
+  --nx-accent-hover: #ffc06b; --nx-accent-line: #b08d57; --nx-accent-ink: #241300;
+  --nx-warn: #ffb347; --nx-warn-ink: #241300;
+  --nx-seg-off: #33240f; --nx-seg-off-line: #120b04; --nx-seg-on-line: #7a4d12;
+  --nx-seg-plain: #a68a5a; --nx-needle-off: #a68a5a;
+  --nx-sweep: conic-gradient(from 0deg, rgba(255,179,71,0.30), rgba(255,179,71,0) 70deg);
+  --nx-panel-sh: inset 0 0 0 1px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,205,120,0.10);
+  --nx-flat-sh: inset 0 0 0 1px rgba(0,0,0,0.5);
+  --nx-stat-sh: inset 0 0 0 1px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,205,120,0.09);
+  --nx-row-sh: inset 0 0 0 1px rgba(0,0,0,0.45);
+  --nx-texture: repeating-linear-gradient(0deg, rgba(255,179,71,0.03) 0 1px, transparent 1px 3px);
+  --nx-overlay: radial-gradient(ellipse at center, transparent 52%, rgba(12,6,0,0.5) 100%);
+  --nx-err-text: #ffb59a; --nx-err-line: #8a4a1e;
+  --nx-soon-text: #ffd28a; --nx-soon-line: #7a5a14;
+  --nx-danger-line: #6e3413; --nx-danger-text: #ffab8a; --nx-danger-bg: #7a2e05;
+  --nx-data: #4fc3b3; --nx-ok: #9cc24a; --nx-warn: #ffb61e; --nx-alert: #ff5030;
+  --nx-alert-ink: #ffffff;
+  --nx-metal-hi: rgba(255,200,110,0.14); --nx-metal-lo: rgba(0,0,0,0.35);
+  --nx-brush: rgba(255,179,71,0.02); --nx-rivet: #b08d57;
+  --nx-inset-sh: rgba(0,0,0,0.4);
+}
+html[data-theme="brassworks"] .nx-panel {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23b08d57' stroke-opacity='0.09'%3E%3Ccircle cx='50' cy='50' r='29' stroke-width='8'/%3E%3Ccircle cx='50' cy='50' r='9' stroke-width='6'/%3E%3Cpath stroke-width='10' d='M50 4v15M50 81v15M4 50h15M81 50h15M17 17l11 11M72 72l11 11M83 17L72 28M28 72L17 83'/%3E%3C/g%3E%3C/svg%3E") no-repeat right -38px bottom -38px / 148px 148px,
+    radial-gradient(circle 3px at 15px 15px, var(--nx-rivet) 1.6px, rgba(0,0,0,0.3) 2.4px, transparent 3.4px),
+    radial-gradient(circle 3px at calc(100% - 15px) 15px, var(--nx-rivet) 1.6px, rgba(0,0,0,0.3) 2.4px, transparent 3.4px),
+    radial-gradient(circle 3px at 15px calc(100% - 15px), var(--nx-rivet) 1.6px, rgba(0,0,0,0.3) 2.4px, transparent 3.4px),
+    radial-gradient(circle 3px at calc(100% - 15px) calc(100% - 15px), var(--nx-rivet) 1.6px, rgba(0,0,0,0.3) 2.4px, transparent 3.4px),
+    linear-gradient(180deg, var(--nx-metal-hi), transparent 14%, transparent 86%, var(--nx-metal-lo)),
+    repeating-linear-gradient(90deg, var(--nx-brush) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, var(--nx-panel2), var(--nx-panel));
+  border-color: #8a6a34;
+  box-shadow: var(--nx-panel-sh), inset 0 0 0 1px rgba(176,141,87,0.30), inset 0 0 0 5px rgba(16,9,1,0.5), inset 0 0 0 6px rgba(176,141,87,0.45), inset 0 -18px 28px -20px rgba(0,0,0,0.55);
+}
+html[data-theme="brassworks"] .nx-stat, html[data-theme="brassworks"] .nx-upsell {
+  box-shadow: var(--nx-stat-sh), inset 0 0 0 1px rgba(176,141,87,0.28), inset 0 0 0 4px rgba(16,9,1,0.45), inset 0 0 0 5px rgba(176,141,87,0.40), inset 0 -14px 22px -18px rgba(0,0,0,0.5);
+}
+/* the hero is a brass gauge plate: radial lamp sheen over dark bronze */
+html[data-theme="brassworks"] .nx-hero {
+  background:
+    radial-gradient(circle 3px at 15px 15px, var(--nx-rivet) 1.6px, rgba(0,0,0,0.3) 2.4px, transparent 3.4px),
+    radial-gradient(circle 3px at calc(100% - 15px) 15px, var(--nx-rivet) 1.6px, rgba(0,0,0,0.3) 2.4px, transparent 3.4px),
+    radial-gradient(circle 3px at 15px calc(100% - 15px), var(--nx-rivet) 1.6px, rgba(0,0,0,0.3) 2.4px, transparent 3.4px),
+    radial-gradient(circle 3px at calc(100% - 15px) calc(100% - 15px), var(--nx-rivet) 1.6px, rgba(0,0,0,0.3) 2.4px, transparent 3.4px),
+    radial-gradient(115% 90% at 50% 0%, rgba(255,179,71,0.15), transparent 55%),
+    repeating-linear-gradient(90deg, var(--nx-brush) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, #33240f, #201304);
+  border-color: #b08d57;
+  box-shadow: var(--nx-panel-sh), inset 0 0 0 1px rgba(176,141,87,0.35), inset 0 0 0 5px rgba(16,9,1,0.5), inset 0 0 0 6px rgba(176,141,87,0.5), inset 0 -18px 28px -20px rgba(0,0,0,0.55);
+}
+
+/* ---------- NEON GLASS: frosted glass, neon edges ----------
+   Deep blue-black with cyan and magenta ambient glow; panels
+   are translucent glass (backdrop blur) with bright 1px neon
+   edges; cyan carries the data, magenta is the sparing second
+   light (logo mark, warnings, selection). */
+html[data-theme="neonglass"] {
+  --nx-bg: #04060f; --nx-bg2: #070b1a;
+  --nx-panel: #0a0f22; --nx-panel2: #0e1430; --nx-panel3: #131b3d;
+  --nx-line: #173a5e; --nx-line2: #00e5ff;
+  --nx-text: #f2f7ff; --nx-dim: #a9c6e8; --nx-faint: #6d90b8;
+  --nx-accent: #00e5ff; --nx-accent-dim: #065a6e;
+  --nx-input-bg: #060a18; --nx-face: #03040a; --nx-boot-bg: #02030a;
+  --nx-header-a: #0a1030; --nx-header-b: #04060f; --nx-hover: #12234a;
+  --nx-gridline: rgba(0,229,255,0.05);
+  --nx-accent-hover: #4deeff; --nx-accent-line: #0e7d99; --nx-accent-ink: #001318;
+  --nx-warn: #ff2ea6; --nx-warn-ink: #1c0010;
+  --nx-seg-off: #0d1734; --nx-seg-off-line: #02040c; --nx-seg-on-line: #0e7d99;
+  --nx-seg-plain: #7d9cc4; --nx-needle-off: #7d9cc4;
+  --nx-sweep: conic-gradient(from 0deg, rgba(0,229,255,0.30), rgba(0,229,255,0) 70deg);
+  --nx-panel-sh: inset 0 0 0 1px rgba(0,229,255,0.10), inset 0 1px 0 rgba(190,240,255,0.12);
+  --nx-flat-sh: inset 0 0 0 1px rgba(0,229,255,0.08);
+  --nx-stat-sh: inset 0 0 0 1px rgba(0,229,255,0.10), inset 0 1px 0 rgba(190,240,255,0.12);
+  --nx-row-sh: inset 0 0 0 1px rgba(0,229,255,0.06);
+  --nx-texture: none;
+  --nx-overlay: radial-gradient(600px 300px at 12% 0%, rgba(255,46,166,0.07), transparent 70%), radial-gradient(700px 420px at 88% 100%, rgba(0,229,255,0.07), transparent 70%);
+  --nx-err-text: #ff9ecb; --nx-err-line: #ff2ea6;
+  --nx-soon-text: #7df3ff; --nx-soon-line: #0e7d99;
+  --nx-danger-line: #8e1e5e; --nx-danger-text: #ff9ecb; --nx-danger-bg: #8e1060;
+  --nx-data: #00e5ff; --nx-ok: #2eff8a; --nx-warn: #ffb61e; --nx-alert: #ff3860;
+  --nx-alert-ink: #ffffff;
+  --nx-metal-hi: rgba(160,220,255,0.10); --nx-metal-lo: rgba(0,0,0,0.3);
+  --nx-brush: rgba(0,229,255,0.015); --nx-rivet: #16294d;
+  --nx-inset-sh: rgba(0,0,0,0.35);
+}
+html[data-theme="neonglass"] body {
+  background-color: #04060f;
+  background-image:
+    radial-gradient(90% 55% at 50% 0%, rgba(0,229,255,0.07), transparent 60%),
+    radial-gradient(60% 45% at 88% 100%, rgba(255,46,166,0.06), transparent 65%),
+    linear-gradient(rgba(0,229,255,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,0.05) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 28px 28px, 28px 28px;
+  background-attachment: fixed, fixed, scroll, scroll;
+}
+html[data-theme="neonglass"] .nx-panel,
+html[data-theme="neonglass"] .nx-stat,
+html[data-theme="neonglass"] .nx-upsell,
+html[data-theme="neonglass"] .nx-panel-flat {
+  background-color: rgba(13,20,44,0.52);
+  background-image: linear-gradient(180deg, rgba(160,220,255,0.10), rgba(160,220,255,0.02) 40%, rgba(255,46,166,0.04));
+  border-color: rgba(0,229,255,0.38);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  box-shadow: inset 0 0 0 1px rgba(0,229,255,0.07), inset 0 1px 0 rgba(190,240,255,0.14), 0 0 24px rgba(0,229,255,0.05);
+  filter: drop-shadow(0 10px 22px rgba(0,0,0,0.45));
+}
+html[data-theme="neonglass"] .nx-header {
+  background-image: linear-gradient(180deg, rgba(16,26,58,0.55), rgba(4,6,15,0.68));
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+}
+html[data-theme="neonglass"] #nx-days-ready {
+  color: #eafcff;
+  text-shadow: 0 0 16px rgba(0,229,255,0.55), 0 0 44px rgba(0,229,255,0.28);
+}
+html[data-theme="neonglass"] .nx-stat-value { text-shadow: 0 0 10px rgba(0,229,255,0.35); }
+html[data-theme="neonglass"] .nx-btn-accent {
+  box-shadow: 0 0 18px rgba(0,229,255,0.35), inset 0 1px 0 rgba(190,240,255,0.35);
+}
+html[data-theme="neonglass"] .nx-logo { color: #ff2ea6; border-color: rgba(255,46,166,0.5); }
+html[data-theme="neonglass"] ::selection { background: #ff2ea6; color: #1c0010; }
+
+/* ---------- FULL METAL: raw machined steel ----------
+   The strongest brush in the app, the biggest rivets, the
+   heaviest bevels - monochrome steel grays, machined not
+   painted, with hazard orange kept as the only accent.
+   The hero screen is smoked dark glass set into the plate. */
+html[data-theme="fullmetal"] {
+  --nx-bg: #08090a; --nx-bg2: #0d0e10;
+  --nx-panel: #1a1c1f; --nx-panel2: #222428; --nx-panel3: #2e3036;
+  --nx-line: #3a3d42; --nx-line2: #5a5e66;
+  --nx-text: #e3e6ea; --nx-dim: #9ba1a9; --nx-faint: #62676e;
+  --nx-accent: #ff7300; --nx-accent-dim: #8a4103;
+  --nx-input-bg: #0a0b0c; --nx-face: #08090a; --nx-boot-bg: #060708;
+  --nx-header-a: #1d1f23; --nx-header-b: #101214; --nx-hover: #2c2e33;
+  --nx-gridline: rgba(255,255,255,0.02);
+  --nx-accent-hover: #ff8321; --nx-accent-line: #a34e02; --nx-accent-ink: #140b00;
+  --nx-warn: #ff7300; --nx-warn-ink: #140b00;
+  --nx-seg-off: #26282c; --nx-seg-off-line: #0a0b0c; --nx-seg-on-line: #572a02;
+  --nx-seg-plain: #9aa0a8; --nx-needle-off: #6d727b;
+  --nx-sweep: conic-gradient(from 0deg, rgba(255,115,0,0.30), rgba(255,115,0,0) 70deg);
+  --nx-panel-sh: inset 0 0 0 1px rgba(0,0,0,0.65), inset 0 2px 0 rgba(255,255,255,0.10), inset 0 -2px 0 rgba(0,0,0,0.5);
+  --nx-flat-sh: inset 0 0 0 1px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07);
+  --nx-stat-sh: inset 0 0 0 1px rgba(0,0,0,0.65), inset 0 2px 0 rgba(255,255,255,0.09), inset 0 -2px 0 rgba(0,0,0,0.45);
+  --nx-row-sh: inset 0 0 0 1px rgba(0,0,0,0.55);
+  --nx-texture: repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 3px);
+  --nx-overlay: none;
+  --nx-err-text: #ffb59a; --nx-err-line: #7a3418;
+  --nx-soon-text: #ffd28a; --nx-soon-line: #7a5a14;
+  --nx-danger-line: #6e2413; --nx-danger-text: #ff9a7a; --nx-danger-bg: #7a1e05;
+  --nx-data: #38c8dc; --nx-ok: #3ddc74; --nx-warn: #ffb61e; --nx-alert: #ff3b30;
+  --nx-alert-ink: #ffffff;
+  --nx-metal-hi: rgba(255,255,255,0.22); --nx-metal-lo: rgba(0,0,0,0.42);
+  --nx-brush: rgba(255,255,255,0.035); --nx-rivet: #6a6e76;
+  --nx-inset-sh: rgba(0,0,0,0.5);
+}
+html[data-theme="fullmetal"] .nx-panel {
+  background:
+    radial-gradient(circle 4px at 16px 16px, var(--nx-rivet) 2.4px, rgba(0,0,0,0.4) 3.4px, transparent 4.6px),
+    radial-gradient(circle 4px at calc(100% - 16px) 16px, var(--nx-rivet) 2.4px, rgba(0,0,0,0.4) 3.4px, transparent 4.6px),
+    radial-gradient(circle 4px at 16px calc(100% - 16px), var(--nx-rivet) 2.4px, rgba(0,0,0,0.4) 3.4px, transparent 4.6px),
+    radial-gradient(circle 4px at calc(100% - 16px) calc(100% - 16px), var(--nx-rivet) 2.4px, rgba(0,0,0,0.4) 3.4px, transparent 4.6px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.030) 0 1px, transparent 1px 2px),
+    linear-gradient(90deg, rgba(255,255,255,0.06), transparent 26%, transparent 74%, rgba(0,0,0,0.22)),
+    linear-gradient(180deg, var(--nx-metal-hi), transparent 12%, transparent 88%, var(--nx-metal-lo)),
+    linear-gradient(180deg, var(--nx-panel2), var(--nx-panel));
+  border-color: var(--nx-line2);
+  box-shadow: var(--nx-panel-sh), inset 0 0 0 1px rgba(255,255,255,0.05), inset 0 -18px 28px -20px rgba(0,0,0,0.6);
+  filter: drop-shadow(0 12px 22px rgba(0,0,0,0.5));
+}
+html[data-theme="fullmetal"] .nx-hero {
+  background:
+    radial-gradient(120% 100% at 50% 0%, rgba(0,0,0,0.42), transparent 60%),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.024) 0 1px, transparent 1px 2px),
+    linear-gradient(180deg, #101214, #0a0b0c);
+  box-shadow: var(--nx-panel-sh), inset 0 0 0 1px rgba(255,255,255,0.05), inset 0 3px 14px rgba(0,0,0,0.6), inset 0 -18px 28px -20px rgba(0,0,0,0.6);
+}
+
+/* ---------- WOODLAND: camo field pattern, olive drab ----------
+   A real 4-tone woodland camo (inline SVG ellipses, kept
+   low-contrast so the olive panels and text stay readable)
+   under matte olive-drab panels with a khaki webbing band.
+   Khaki is the working accent; hazard orange is alerts only. */
+html[data-theme="woodland"] {
+  --nx-bg: #252d1f; --nx-bg2: #29301f;
+  --nx-panel: #3b4232; --nx-panel2: #434b38; --nx-panel3: #4e573f;
+  --nx-line: #59634a; --nx-line2: #77855f;
+  --nx-text: #ece7d4; --nx-dim: #c9c2a4; --nx-faint: #a8a37f;
+  --nx-accent: #c3b091; --nx-accent-dim: #6e6248;
+  --nx-input-bg: #2b3324; --nx-face: #20261a; --nx-boot-bg: #1c2216;
+  --nx-header-a: #454f39; --nx-header-b: #333b2a; --nx-hover: #4e573f;
+  --nx-gridline: rgba(236,231,212,0.03);
+  --nx-accent-hover: #d4c29e; --nx-accent-line: #8a7c58; --nx-accent-ink: #23200f;
+  --nx-warn: #ff7300; --nx-warn-ink: #140b00;
+  --nx-seg-off: #313927; --nx-seg-off-line: #1c2216; --nx-seg-on-line: #6e6248;
+  --nx-seg-plain: #b3ac8e; --nx-needle-off: #b3ac8e;
+  --nx-sweep: conic-gradient(from 0deg, rgba(195,176,145,0.28), rgba(195,176,145,0) 70deg);
+  --nx-panel-sh: inset 0 0 0 1px rgba(0,0,0,0.35), inset 0 1px 0 rgba(236,231,212,0.06);
+  --nx-flat-sh: inset 0 0 0 1px rgba(0,0,0,0.3);
+  --nx-stat-sh: inset 0 0 0 1px rgba(0,0,0,0.35), inset 0 1px 0 rgba(236,231,212,0.06);
+  --nx-row-sh: inset 0 0 0 1px rgba(0,0,0,0.28);
+  --nx-texture: none;
+  --nx-overlay: radial-gradient(ellipse at center, transparent 58%, rgba(10,14,6,0.35) 100%);
+  --nx-err-text: #ffb59a; --nx-err-line: #a34e02;
+  --nx-soon-text: #ffd28a; --nx-soon-line: #8a6d1f;
+  --nx-danger-line: #7a3a1e; --nx-danger-text: #ffab8a; --nx-danger-bg: #8a2f05;
+  --nx-data: #d8c690; --nx-ok: #7fae4c; --nx-warn: #ff9d1e; --nx-alert: #ff5a26;
+  --nx-alert-ink: #ffffff;
+  --nx-metal-hi: rgba(236,231,212,0.08); --nx-metal-lo: rgba(0,0,0,0.25);
+  --nx-brush: rgba(236,231,212,0.012); --nx-rivet: #77855f;
+  --nx-inset-sh: rgba(0,0,0,0.3);
+}
+html[data-theme="woodland"] body {
+  background-color: #252d1f;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280' viewBox='0 0 280 280'%3E%3Crect width='280' height='280' fill='%232b3423'/%3E%3Cellipse cx='70' cy='60' rx='58' ry='26' fill='%2339462c' transform='rotate(-18 70 60)'/%3E%3Cellipse cx='200' cy='44' rx='52' ry='22' fill='%234a3f2a' transform='rotate(12 200 44)'/%3E%3Cellipse cx='130' cy='130' rx='66' ry='28' fill='%231f2817' transform='rotate(8 130 130)'/%3E%3Cellipse cx='238' cy='150' rx='48' ry='24' fill='%2339462c' transform='rotate(-24 238 150)'/%3E%3Cellipse cx='52' cy='196' rx='54' ry='24' fill='%234a3f2a' transform='rotate(16 52 196)'/%3E%3Cellipse cx='180' cy='228' rx='62' ry='26' fill='%2339462c' transform='rotate(-10 180 228)'/%3E%3Cellipse cx='96' cy='262' rx='44' ry='18' fill='%231f2817'/%3E%3Cellipse cx='262' cy='252' rx='40' ry='20' fill='%231f2817' transform='rotate(20 262 252)'/%3E%3C/svg%3E");
+  background-size: 280px 280px;
+  background-attachment: scroll;
+}
+html[data-theme="woodland"] .nx-panel {
+  background:
+    linear-gradient(180deg, rgba(195,176,145,0.55) 0 3px, rgba(0,0,0,0.25) 3px 5px, transparent 5px),
+    radial-gradient(circle 3px at 15px 15px, var(--nx-rivet) 1.6px, rgba(0,0,0,0.3) 2.4px, transparent 3.4px),
+    radial-gradient(circle 3px at calc(100% - 15px) 15px, var(--nx-rivet) 1.6px, rgba(0,0,0,0.3) 2.4px, transparent 3.4px),
+    radial-gradient(circle 3px at 15px calc(100% - 15px), var(--nx-rivet) 1.6px, rgba(0,0,0,0.3) 2.4px, transparent 3.4px),
+    radial-gradient(circle 3px at calc(100% - 15px) calc(100% - 15px), var(--nx-rivet) 1.6px, rgba(0,0,0,0.3) 2.4px, transparent 3.4px),
+    linear-gradient(180deg, var(--nx-metal-hi), transparent 16%, transparent 88%, var(--nx-metal-lo)),
+    linear-gradient(180deg, var(--nx-panel2), var(--nx-panel));
+  filter: drop-shadow(0 8px 16px rgba(8,12,4,0.35));
+}
+html[data-theme="woodland"] .nx-h,
+html[data-theme="woodland"] .nx-title,
+html[data-theme="woodland"] .nx-upsell-title,
+html[data-theme="woodland"] .nx-feat-title { letter-spacing: 4px; }
+html[data-theme="woodland"] .nx-tab { letter-spacing: 2px; }
+
+/* ---------- BUNKER: poured concrete, hazard stripes ----------
+   Gray concrete panels (turbulence noise in the atmosphere
+   overlay), a 45-degree black/safety-yellow hazard stripe
+   across every panel head and divider rule, safety yellow
+   accent, stencil-tracked headers. Red stays red. */
+html[data-theme="bunker"] {
+  --nx-bg: #131416; --nx-bg2: #17181a;
+  --nx-panel: #26272a; --nx-panel2: #2e2f33; --nx-panel3: #3a3b40;
+  --nx-line: #45464c; --nx-line2: #5c5d64;
+  --nx-text: #e8e8e6; --nx-dim: #a9a9a4; --nx-faint: #74746e;
+  --nx-accent: #ffd21f; --nx-accent-dim: #7a6410;
+  --nx-input-bg: #101112; --nx-face: #0c0d0e; --nx-boot-bg: #0c0d0e;
+  --nx-header-a: #2e2f33; --nx-header-b: #1a1b1d; --nx-hover: #3a3b40;
+  --nx-gridline: rgba(255,255,255,0.025);
+  --nx-accent-hover: #ffdd4d; --nx-accent-line: #a8871a; --nx-accent-ink: #1c1800;
+  --nx-warn: #ffd21f; --nx-warn-ink: #1c1800;
+  --nx-seg-off: #2a2b2e; --nx-seg-off-line: #0c0d0e; --nx-seg-on-line: #7a6410;
+  --nx-seg-plain: #9a9a94; --nx-needle-off: #8a8a84;
+  --nx-sweep: conic-gradient(from 0deg, rgba(255,210,31,0.28), rgba(255,210,31,0) 70deg);
+  --nx-panel-sh: inset 0 0 0 1px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+  --nx-flat-sh: inset 0 0 0 1px rgba(0,0,0,0.45);
+  --nx-stat-sh: inset 0 0 0 1px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+  --nx-row-sh: inset 0 0 0 1px rgba(0,0,0,0.4);
+  --nx-texture: repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0 1px, transparent 1px 3px);
+  --nx-overlay: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  --nx-overlay-opacity: 0.04;
+  --nx-err-text: #ffb59a; --nx-err-line: #8a4a1e;
+  --nx-soon-text: #ffe27a; --nx-soon-line: #a8871a;
+  --nx-danger-line: #6e3413; --nx-danger-text: #ff9a7a; --nx-danger-bg: #7a1e05;
+  --nx-data: #d8d8d2; --nx-ok: #4cd964; --nx-warn: #ffd21f; --nx-alert: #ff3b30;
+  --nx-alert-ink: #ffffff;
+  --nx-metal-hi: rgba(255,255,255,0.07); --nx-metal-lo: rgba(0,0,0,0.3);
+  --nx-brush: rgba(255,255,255,0.01); --nx-rivet: #5c5d64;
+  --nx-inset-sh: rgba(0,0,0,0.4);
+}
+html[data-theme="bunker"] .nx-panel {
+  background:
+    repeating-linear-gradient(45deg, rgba(255,210,31,0.85) 0 14px, rgba(14,15,16,0.92) 14px 28px) top / 100% 7px no-repeat,
+    radial-gradient(circle 4px at 18px 24px, rgba(0,0,0,0.4) 2px, rgba(255,255,255,0.05) 2.8px, transparent 3.8px),
+    radial-gradient(circle 4px at calc(100% - 18px) 24px, rgba(0,0,0,0.4) 2px, rgba(255,255,255,0.05) 2.8px, transparent 3.8px),
+    radial-gradient(circle 4px at 18px calc(100% - 18px), rgba(0,0,0,0.4) 2px, rgba(255,255,255,0.05) 2.8px, transparent 3.8px),
+    radial-gradient(circle 4px at calc(100% - 18px) calc(100% - 18px), rgba(0,0,0,0.4) 2px, rgba(255,255,255,0.05) 2.8px, transparent 3.8px),
+    linear-gradient(180deg, var(--nx-metal-hi), transparent 16%, transparent 88%, var(--nx-metal-lo)),
+    linear-gradient(180deg, var(--nx-panel2), var(--nx-panel));
+}
+html[data-theme="bunker"] .nx-h {
+  letter-spacing: 3.5px; padding-bottom: 9px;
+  background-image: repeating-linear-gradient(45deg, rgba(255,210,31,0.7) 0 12px, rgba(14,15,16,0.85) 12px 24px);
+  background-size: 100% 5px; background-position: 0 100%; background-repeat: no-repeat;
+}
+html[data-theme="bunker"] .nx-divider {
+  border: none; height: 7px;
+  background: repeating-linear-gradient(45deg, rgba(255,210,31,0.8) 0 14px, rgba(14,15,16,0.9) 14px 28px);
+}
+html[data-theme="bunker"] .nx-tab { letter-spacing: 2px; }
+
+/* ---------- SCHEMATIC: blueprint drafting plate ----------
+   Engineering blue with a two-weight drafting grid and a
+   measurement-tick ruler along the top edge; panels a step
+   lighter with white 1px line work and registration crosses
+   at the corners instead of rivets; stat cards outlined in
+   dashed dimension lines; the hero reads as a drawing plate. */
+html[data-theme="schematic"] {
+  --nx-bg: #0d2c4c; --nx-bg2: #0f3357;
+  --nx-panel: #123a63; --nx-panel2: #16406c; --nx-panel3: #1b4a7d;
+  --nx-line: #3f74a8; --nx-line2: #6fa3cf;
+  --nx-text: #ffffff; --nx-dim: #bcd8f2; --nx-faint: #7fa8cc;
+  --nx-accent: #7ee7ff; --nx-accent-dim: #2a6a8a;
+  --nx-input-bg: #0a2743; --nx-face: #0a2743; --nx-boot-bg: #0a2743;
+  --nx-header-a: #16406c; --nx-header-b: #0f3357; --nx-hover: #1b4a7d;
+  --nx-gridline: rgba(255,255,255,0.06);
+  --nx-accent-hover: #a5efff; --nx-accent-line: #4aa8c8; --nx-accent-ink: #04222e;
+  --nx-warn: #ffcf4d; --nx-warn-ink: #2e2300;
+  --nx-seg-off: #16406c; --nx-seg-off-line: #0a2743; --nx-seg-on-line: #4aa8c8;
+  --nx-seg-plain: #9cc0e2; --nx-needle-off: #9cc0e2;
+  --nx-sweep: conic-gradient(from 0deg, rgba(126,231,255,0.30), rgba(126,231,255,0) 70deg);
+  --nx-panel-sh: inset 0 0 0 1px rgba(255,255,255,0.06);
+  --nx-flat-sh: inset 0 0 0 1px rgba(255,255,255,0.05);
+  --nx-stat-sh: inset 0 0 0 1px rgba(255,255,255,0.06);
+  --nx-row-sh: inset 0 0 0 1px rgba(255,255,255,0.04);
+  --nx-texture: none;
+  --nx-overlay: none;
+  --nx-err-text: #ffc4b3; --nx-err-line: #ff8a66;
+  --nx-soon-text: #ffe27a; --nx-soon-line: #c8a84a;
+  --nx-danger-line: #a34a2e; --nx-danger-text: #ffc4b3; --nx-danger-bg: #8a3a1e;
+  --nx-data: #7ee7ff; --nx-ok: #7dffb0; --nx-warn: #ffcf4d; --nx-alert: #ff7a66;
+  --nx-alert-ink: #33100a;
+  --nx-metal-hi: rgba(255,255,255,0.08); --nx-metal-lo: rgba(0,0,0,0.18);
+  --nx-brush: rgba(255,255,255,0.012); --nx-rivet: #6fa3cf;
+  --nx-inset-sh: rgba(0,0,0,0.25);
+}
+html[data-theme="schematic"] body {
+  background-color: #0d2c4c;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.4) 0 1px, transparent 1px 14px),
+    linear-gradient(rgba(255,255,255,0.10) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.10) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px);
+  background-size: 100% 12px, 140px 140px, 140px 140px, 28px 28px, 28px 28px;
+  background-repeat: repeat-x, repeat, repeat, repeat, repeat;
+  background-attachment: scroll;
+}
+html[data-theme="schematic"] .nx-panel {
+  background:
+    linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)) 8px 15px / 14px 1px no-repeat,
+    linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)) 15px 8px / 1px 14px no-repeat,
+    linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)) calc(100% - 22px) 15px / 14px 1px no-repeat,
+    linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)) calc(100% - 15px) 8px / 1px 14px no-repeat,
+    linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)) 8px calc(100% - 15px) / 14px 1px no-repeat,
+    linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)) 15px calc(100% - 22px) / 1px 14px no-repeat,
+    linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)) calc(100% - 22px) calc(100% - 15px) / 14px 1px no-repeat,
+    linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)) calc(100% - 15px) calc(100% - 22px) / 1px 14px no-repeat,
+    linear-gradient(180deg, var(--nx-panel2), var(--nx-panel));
+  border-color: rgba(215,238,255,0.55);
+  box-shadow: var(--nx-panel-sh);
+  filter: none;
+}
+html[data-theme="schematic"] .nx-stat { border: 1px dashed rgba(215,238,255,0.45); filter: none; }
+html[data-theme="schematic"] .nx-hero .nx-kv { border-top: 1px dashed rgba(255,255,255,0.35); padding-top: 8px; }
+html[data-theme="schematic"] .nx-h { letter-spacing: 3.5px; }
+
+/* ============================================================
+   BARCODE SCANNER (money build C) - a full-screen overlay in
+   the shared system: metal box, corner brackets from the tour
+   layer, one sweep line whose motion rides body.nx-fx like
+   every other animation (the reduced-motion backstop flattens
+   it too). All colors come from the shared variables, so the
+   overlay sits correctly in all eleven themes. Square corners
+   and chamfers only.
+   ============================================================ */
+#nx-scan {
+  position: fixed; inset: 0; z-index: 250;
+  background: rgba(4, 5, 7, 0.94);
+  display: flex; align-items: flex-start; justify-content: center;
+  overflow-y: auto; padding: 18px 12px 28px;
+}
+.nx-scan-box {
+  width: 100%; max-width: 460px; margin-top: 4vh;
+  background: var(--nx-panel); border: 1px solid var(--nx-line2);
+  clip-path: var(--nx-chamfer); padding: 18px 18px 16px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+}
+.nx-scan-frame {
+  position: relative; margin-top: 12px;
+  border: 1px solid var(--nx-line2); background: #000;
+  aspect-ratio: 4 / 3; overflow: hidden;
+}
+.nx-scan-frame video {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+.nx-scan-line {
+  position: absolute; left: 6%; right: 6%; top: 12%; height: 2px;
+  background: var(--nx-accent);
+  box-shadow: 0 0 12px var(--nx-accent);
+  opacity: 0.9; pointer-events: none;
+}
+body.nx-fx .nx-scan-line { animation: nx-scan-sweep 2.2s ease-in-out infinite alternate; }
+@keyframes nx-scan-sweep { from { top: 10%; } to { top: 86%; } }
+.nx-scan-status {
+  font-family: var(--nx-mono); font-size: 13px; letter-spacing: 1.5px;
+  color: var(--nx-dim); text-transform: uppercase;
+  margin: 14px 0 0; line-height: 1.7;
+}
+.nx-scan-fallback { margin-top: 12px; }
+.nx-scan-fallback .nx-field { display: block; margin-bottom: 10px; }
+
+/* ============================================================
+   SQUAD SYNC (money build D)
+   The export code sits in a chamfered frame on a fixed white
+   ground - a QR code needs real contrast in every theme, so
+   the code itself is always black on white (nx-qr.js paints
+   it that way); the frame and the carousel controls ride the
+   shared variables like everything else. Square corners only.
+   ============================================================ */
+.nx-squad-codebox {
+  margin-top: 12px; padding: 10px;
+  background: var(--nx-panel2, var(--nx-panel));
+  border: 1px solid var(--nx-line2);
+  clip-path: var(--nx-chamfer);
+  text-align: center;
+}
+#nx-squad-canvas {
+  display: block; margin: 0 auto;
+  width: 100%; max-width: 340px; height: auto;
+  background: #fff;
+  image-rendering: pixelated;
+}
+.nx-squad-paste { width: 100%; resize: vertical; }
+
+/* ============================================================
+   TACTICAL ADVISOR + AI QUICK-ADD (AI build)
+   The chat log reads like a terminal transcript: chamfered
+   turns, a mono speaker tag, the advisor's answers in the data
+   color. Everything wraps and min-widths are zeroed so the
+   panel holds at 360px in every theme. The photo confirm
+   overlay reuses the scanner overlay's frame (.nx-scan-box).
+   ============================================================ */
+#nx-advisor-panel { overflow: hidden; }
+#nx-adv-log { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.nx-adv-turn {
+  padding: 10px 12px; min-width: 0;
+  background: var(--nx-panel2, var(--nx-panel));
+  border: 1px solid var(--nx-line);
+  clip-path: var(--nx-chamfer);
+}
+.nx-adv-turn.nx-adv-user { border-color: var(--nx-line2); margin-left: 24px; }
+.nx-adv-turn.nx-adv-advisor { margin-right: 24px; }
+.nx-adv-who {
+  margin: 0 0 4px; font-family: var(--nx-mono); font-size: 11px;
+  letter-spacing: 2px; text-transform: uppercase; color: var(--nx-dim);
+}
+.nx-adv-advisor .nx-adv-who { color: var(--nx-data, var(--nx-accent)); }
+.nx-adv-text {
+  margin: 0; font-size: 14px; line-height: 1.55;
+  white-space: pre-wrap; overflow-wrap: break-word; min-width: 0;
+}
+.nx-adv-quick { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+.nx-adv-quick .nx-btn { flex: 1 1 150px; min-width: 0; }
+#nx-adv-form { margin-top: 10px; }
+.nx-adv-offer {
+  margin-top: 12px; padding: 10px 12px; min-width: 0;
+  border: 1px solid var(--nx-accent);
+  background: var(--nx-panel2, var(--nx-panel));
+  clip-path: var(--nx-chamfer);
+}
+.nx-adv-offer-text {
+  margin: 0 0 6px; font-family: var(--nx-mono); font-size: 12px;
+  letter-spacing: 1.5px; color: var(--nx-accent);
+}
+.nx-adv-offer-line { margin: 2px 0; font-size: 14px; overflow-wrap: break-word; min-width: 0; }
+
+#nx-photo {
+  position: fixed; inset: 0; z-index: 250;
+  background: rgba(4, 5, 7, 0.94);
+  display: flex; align-items: flex-start; justify-content: center;
+  overflow-y: auto; padding: 18px 12px 28px;
+}
+.nx-photo-row {
+  margin-top: 12px; padding: 12px; min-width: 0;
+  border: 1px solid var(--nx-line2);
+  background: var(--nx-panel2, var(--nx-panel));
+  clip-path: var(--nx-chamfer);
+}
+.nx-photo-row .nx-field { display: block; margin-bottom: 10px; min-width: 0; }
+.nx-photo-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0 10px; min-width: 0;
+}
+.nx-photo-row .nx-btn-row { margin-bottom: 0; }
+
+/* ---- Offline Map Packs (money build E) ----
+   State rows, status chips and the schematic SVG map. All
+   colors ride the theme variables, so every theme (metal,
+   glass, camo, blueprint) renders the same structure. */
+.nx-map-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 10px; margin-top: 8px; min-width: 0;
+  border: 1px solid var(--nx-line);
+  background: var(--nx-panel2, var(--nx-panel));
+  clip-path: var(--nx-chamfer);
+}
+.nx-map-name {
+  flex: 1 1 110px; min-width: 0;
+  font-family: var(--nx-mono); font-size: 14px; letter-spacing: 1.5px;
+  color: var(--nx-text); text-transform: uppercase;
+}
+.nx-map-chip {
+  font-family: var(--nx-mono); font-size: 11px; letter-spacing: 1.5px;
+  color: var(--nx-dim); border: 1px solid var(--nx-line);
+  padding: 3px 8px; white-space: nowrap;
+}
+.nx-map-chip-on { color: var(--nx-ok, #3ddc68); border-color: var(--nx-ok, #3ddc68); }
+.nx-map-chip-owned { color: var(--nx-data, #35c4ff); border-color: var(--nx-data, #35c4ff); }
+.nx-map-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.nx-map-actions .nx-btn { margin: 0; }
+#nx-maps-bundle { margin-top: 10px; }
+.nx-map-svg {
+  display: block; width: 100%; height: auto;
+  background: var(--nx-panel2, var(--nx-panel));
+  border: 1px solid var(--nx-line);
+}
+.nx-map-land {
+  fill: rgba(127, 140, 160, 0.13);
+  stroke: var(--nx-accent); stroke-width: 2.5; stroke-linejoin: round;
+}
+.nx-map-poi { fill: var(--nx-data, #35c4ff); }
+.nx-map-cap { fill: var(--nx-accent); }
+.nx-map-label {
+  fill: var(--nx-dim);
+  font-family: var(--nx-mono); font-size: 25px; letter-spacing: 1px;
+}
+.nx-map-cap-label { fill: var(--nx-text); }
+.nx-map-home { fill: var(--nx-ok, #3ddc68); stroke: var(--nx-bg, #0a0b0c); stroke-width: 1.5; }
+.nx-map-home-label {
+  fill: var(--nx-ok, #3ddc68);
+  font-family: var(--nx-mono); font-size: 25px; letter-spacing: 1px;
+}
+
+/* ---- Field Guide (offline reference library) ----
+   Category panels, topic rows and the open-topic detail.
+   Every color rides the theme variables, so all eleven
+   themes (metal, glass, camo, blueprint, whiteout,
+   blackout) render the same structure. No rounded
+   corners; chamfered edges like every other panel. */
+.nx-guide-alert {
+  font-family: var(--nx-mono); font-size: 12px; line-height: 1.55;
+  letter-spacing: 0.5px; color: var(--nx-text);
+  border: 1px solid var(--nx-alert, #ff3b30);
+  background: var(--nx-panel2, var(--nx-panel));
+  clip-path: var(--nx-chamfer);
+  padding: 10px 12px; margin: 0 0 12px 0;
+}
+#nx-guide-search { margin-bottom: 4px; }
+.nx-guide-cat { padding-bottom: 8px; }
+.nx-guide-cat-h {
+  font-size: 16px; font-weight: 700; letter-spacing: 2px;
+  text-transform: uppercase; margin: 0 0 6px 0;
+  display: flex; align-items: center; gap: 10px;
+}
+.nx-guide-cat-h::before {
+  content: ""; width: 8px; height: 8px; background: var(--nx-accent);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); flex: 0 0 auto;
+}
+.nx-guide-row {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  text-align: left; cursor: pointer;
+  padding: 10px; margin: 0 0 8px 0; min-width: 0;
+  border: 1px solid var(--nx-line);
+  background: var(--nx-panel2, var(--nx-panel));
+  clip-path: var(--nx-chamfer);
+  color: var(--nx-text);
+  font-family: var(--nx-mono); font-size: 14px; letter-spacing: 0.5px;
+}
+.nx-guide-row:hover, .nx-guide-row:focus { border-color: var(--nx-accent); }
+.nx-guide-row-t { flex: 1 1 auto; min-width: 0; }
+.nx-guide-row-go {
+  flex: 0 0 auto; font-size: 11px; letter-spacing: 1.5px;
+  color: var(--nx-accent); text-transform: uppercase; white-space: nowrap;
+}
+.nx-guide-crumb {
+  font-family: var(--nx-mono); font-size: 11px; letter-spacing: 1.5px;
+  color: var(--nx-dim); text-transform: uppercase; margin: 0 0 4px 0;
+}
+.nx-guide-topic-h {
+  font-size: 20px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; margin: 0 0 10px 0;
+}
+.nx-guide-sub {
+  font-size: 14px; font-weight: 700; letter-spacing: 2px;
+  text-transform: uppercase; margin: 14px 0 6px 0;
+}
+.nx-guide-sub-do { color: var(--nx-ok, #3ddc68); }
+.nx-guide-sub-dont { color: var(--nx-warn, #ffb61e); }
+.nx-guide-steps {
+  margin: 0 0 4px 0; padding-left: 22px;
+  font-family: var(--nx-mono); font-size: 13.5px; line-height: 1.6;
+  color: var(--nx-text);
+}
+.nx-guide-steps li { margin-bottom: 5px; }
+.nx-guide-help {
+  margin-top: 14px; padding: 10px 12px;
+  border: 1px solid var(--nx-alert, #ff3b30);
+  background: var(--nx-panel2, var(--nx-panel));
+  clip-path: var(--nx-chamfer);
+  font-family: var(--nx-mono); font-size: 13px; line-height: 1.6;
+  color: var(--nx-text);
+}
+.nx-guide-help-h {
+  display: block; font-size: 12px; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--nx-alert, #ff3b30); margin-bottom: 4px;
+}
+
+/* ============================================================
+   WELCOME SCREEN + HEADER ACCOUNT CHIP (2026-11-16) - the
+   in-app front door: a signed-out first run lands on a welcome
+   with sign-in up front, and the header carries a permanent
+   account chip, so sign-in is never buried in System again.
+   Theme variables only, so all eleven themes carry it; no new
+   animation, so the effects off-switch and reduced-motion
+   rules are respected by construction.
+   ============================================================ */
+
+#nx-welcome {
+  position: fixed; inset: 0; z-index: 120;
+  background: var(--nx-bg);
+  display: flex; align-items: center; justify-content: center;
+  padding: 18px; overflow-y: auto;
+}
+.nx-welcome-box {
+  width: min(520px, 94vw);
+  background: linear-gradient(180deg, var(--nx-panel2), var(--nx-panel));
+  border: 1px solid var(--nx-line2);
+  box-shadow: var(--nx-panel-sh);
+  clip-path: var(--nx-chamfer);
+  padding: 26px 24px;
+}
+.nx-welcome-brand { display: flex; align-items: center; gap: 12px; }
+.nx-welcome-word {
+  font-family: var(--nx-head); font-size: 27px; font-weight: 700;
+  letter-spacing: 3px; line-height: 1; text-transform: uppercase;
+}
+.nx-welcome-word .nx-tm { font-size: 11px; vertical-align: super; letter-spacing: 0; color: var(--nx-dim); }
+.nx-welcome-tag {
+  font-family: var(--nx-head); font-size: 30px; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase; line-height: 1.05;
+  color: var(--nx-accent); margin: 22px 0 8px 0;
+}
+.nx-welcome-line { font-size: 16px; line-height: 1.55; color: var(--nx-text); margin: 0; }
+.nx-welcome-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
+.nx-welcome-actions .nx-btn { width: 100%; }
+.nx-welcome-ghost {
+  background: none; border: none; cursor: pointer;
+  color: var(--nx-dim);
+  font-family: var(--nx-head); font-weight: 600; font-size: 15px;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  padding: 10px; text-decoration: underline; text-underline-offset: 4px;
+}
+.nx-welcome-ghost:hover { color: var(--nx-text); }
+.nx-welcome-note { margin-top: 16px; }
+
+.nx-chip {
+  flex: 0 1 auto; max-width: 44vw;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: var(--nx-panel3); color: var(--nx-text);
+  border: 1px solid var(--nx-line2);
+  padding: 8px 13px;
+  font-family: var(--nx-head); font-weight: 700; font-size: 14px;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  clip-path: var(--nx-chamfer-sm); cursor: pointer;
+}
+.nx-chip:hover { background: var(--nx-hover); }
+.nx-chip-accent { background: var(--nx-accent); border-color: var(--nx-accent-line); color: var(--nx-accent-ink); }
+.nx-chip-accent:hover { background: var(--nx-accent-hover); }

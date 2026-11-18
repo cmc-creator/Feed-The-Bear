@@ -30,6 +30,9 @@
 
   /* ---------------- constants ---------------- */
   var STATE_KEY = "nyxsurvive-v1";
+  // Set by loadState when this device already held a save before
+  // this boot - the welcome screen's "genuine first run" test.
+  var bootHadSave = false;
   var VAULT_KEY = "nyxsurvive-vault";
   var CATEGORIES = ["Water", "Food", "Shelter", "Fire", "Medical", "Comms", "Tools", "Clothing", "Defense", "Other"];
   var TIERS = { T1: "T1 - On Body", T2: "T2 - Bug-Out Bag", T3: "T3 - Cache / Home" };
@@ -72,6 +75,57 @@
   // Intel (saved social posts) has its own free cap: 10 cards.
   // Kept out of PLAN_CAPS, whose shape the Phase 2 suite pins.
   var INTEL_FREE_CAP = 10;
+  // Paid add-ons (money build D): one-time purchases that live
+  // BESIDE the plan tier, never inside it - Operator does not
+  // include them. The entitlement is server-owned exactly like
+  // the plan: the user doc carries an addons array the server
+  // alone writes (api/webhook.js), /api/subscription-status
+  // reports it, and state.addons is only this device's cache of
+  // the last proven list (see refreshPlanStatus). The owner
+  // unlock implies every add-on, derived at check time.
+  var KNOWN_ADDONS = ["qr-sync"];
+  /* Money build E: the Offline Map Packs live beside qr-sync
+   * in the same server-owned addons array - "map-pack-us" for
+   * the all-50 bundle and "map-pack-<code>" per state. The
+   * client mirror of the server's isKnownAddon (api/_admin.js)
+   * validates the same way: fixed ids, or the pattern with the
+   * code checked against the 50-state list, so a forged id in
+   * a synced save is dropped, never honored. */
+  var MAP_STATE_CODES = [
+    "al", "ak", "az", "ar", "ca", "co", "ct", "de", "fl", "ga",
+    "hi", "id", "il", "in", "ia", "ks", "ky", "la", "me", "md",
+    "ma", "mi", "mn", "ms", "mo", "mt", "ne", "nv", "nh", "nj",
+    "nm", "ny", "nc", "nd", "oh", "ok", "or", "pa", "ri", "sc",
+    "sd", "tn", "tx", "ut", "vt", "va", "wa", "wv", "wi", "wy"
+  ];
+  var MAP_STATES = [
+    ["al", "Alabama"], ["ak", "Alaska"], ["az", "Arizona"], ["ar", "Arkansas"],
+    ["ca", "California"], ["co", "Colorado"], ["ct", "Connecticut"], ["de", "Delaware"],
+    ["fl", "Florida"], ["ga", "Georgia"], ["hi", "Hawaii"], ["id", "Idaho"],
+    ["il", "Illinois"], ["in", "Indiana"], ["ia", "Iowa"], ["ks", "Kansas"],
+    ["ky", "Kentucky"], ["la", "Louisiana"], ["me", "Maine"], ["md", "Maryland"],
+    ["ma", "Massachusetts"], ["mi", "Michigan"], ["mn", "Minnesota"], ["ms", "Mississippi"],
+    ["mo", "Missouri"], ["mt", "Montana"], ["ne", "Nebraska"], ["nv", "Nevada"],
+    ["nh", "New Hampshire"], ["nj", "New Jersey"], ["nm", "New Mexico"], ["ny", "New York"],
+    ["nc", "North Carolina"], ["nd", "North Dakota"], ["oh", "Ohio"], ["ok", "Oklahoma"],
+    ["or", "Oregon"], ["pa", "Pennsylvania"], ["ri", "Rhode Island"], ["sc", "South Carolina"],
+    ["sd", "South Dakota"], ["tn", "Tennessee"], ["tx", "Texas"], ["ut", "Utah"],
+    ["vt", "Vermont"], ["va", "Virginia"], ["wa", "Washington"], ["wv", "West Virginia"],
+    ["wi", "Wisconsin"], ["wy", "Wyoming"]
+  ];
+  function isKnownAddonId(id) {
+    if (typeof id !== "string") return false;
+    if (KNOWN_ADDONS.indexOf(id) !== -1) return true;
+    if (id === "map-pack-us") return true;
+    var m = /^map-pack-([a-z]{2})$/.exec(id);
+    return !!m && MAP_STATE_CODES.indexOf(m[1]) !== -1;
+  }
+  // Map-pack entitlement (money build E): the owner derivation
+  // inside hasAddon covers the owner; the bundle implies every
+  // state; a state grant opens only its own state.
+  function hasMapPack(code) {
+    return hasAddon("map-pack-us") || hasAddon("map-pack-" + code);
+  }
   // Owner list mirrors Munchling's api/_admin.js OWNER_EMAILS.
   var OWNER_EMAILS = [
     'icequeen42426@gmail.com',
@@ -88,7 +142,15 @@
   // derived, never stored in the save.
   var AUTH_USER = null;
   function isOwnerEmail(email, emailVerified) {
-    return !!email && emailVerified === true &&
+    // Ownership rides on the Firebase-authenticated email alone.
+    // Firebase issues the session only to whoever holds the
+    // account credentials and enforces one account per email, so
+    // the signed-in email IS the proof of ownership. The
+    // emailVerified parameter is accepted (and ignored) so the
+    // call sites keep their shape: a verification email goes out
+    // at sign-up for hygiene, but an owner who never clicks it
+    // must not be locked out of their own app.
+    return !!email &&
       OWNER_EMAILS.indexOf(String(email).toLowerCase()) !== -1;
   }
   function isOwner() {
@@ -99,6 +161,18 @@
     return (p === "operator" || p === "lifetime") ? p : "free";
   }
   function isOperator() { return isOwner() || planTier() !== "free"; }
+  function sanitizeAddons(a) {
+    if (!Array.isArray(a)) return [];
+    var out = [];
+    a.forEach(function (x) {
+      if (isKnownAddonId(x) && out.indexOf(x) === -1) out.push(x);
+    });
+    return out;
+  }
+  function hasAddon(id) {
+    if (isOwner()) return true; // owner unlock covers every add-on
+    return Array.isArray(state.addons) && state.addons.indexOf(id) !== -1;
+  }
   function capBlocked(kind) {
     if (isOperator()) return false;
     if (kind === "crew") return state.crew.length >= PLAN_CAPS.crew;
@@ -157,6 +231,14 @@
     ]}
   ];
 
+  /* Kit locations (Ready.gov build): every gear item and store
+     carries one tag - where that kit lives. Home is the default
+     and the migration target for anything saved before the tag
+     existed. The Gear view filters on it; stores just wear the
+     label. */
+  var KIT_LOCS = ["Home", "Car", "Work", "Go-Bag"];
+  function kitLoc(v) { return KIT_LOCS.indexOf(v) >= 0 ? v : "Home"; }
+
   /* ---------------- weight + date utils ---------------- */
   function toLb(value, unit) {
     var v = Number(value) || 0;
@@ -204,38 +286,78 @@
       incident: null,
       pastIncidents: [],
       drillBest: null,  // { seconds, grade, at } - best completed evac drill
+      sitrepLog: [],    // weekly readiness snapshots: [{ date, daysReady, waterDays, foodDays }] - last 8, one per 7 days (money build B)
+      lastExpirySeen: [], // store ids that were DUE SOON / OVERDUE at the last boot check - drives the one-shot rotation notification
+      assessment: null, // readiness check-in answers (sanitizeAssessment shape); null until first run
+      firstOrders: [],  // generated action list from the check-in: [{ text, done, shopKey }] - rendered in Lists, outside checklistStats
+      resupplyTarget: 14, // days the Resupply panel in Lists plans against (7/14/30/60/90)
+      tourDone: false,  // guided walkthrough finished or skipped - once true it never auto-starts again
+      welcomeSeen: false, // welcome screen dismissed (any button) or a sign-in landed - once true it never auto-shows again
       intel: [],        // saved social posts: { id, url, host, title, summary, items: [{ kind, name, detail, converted }], addedAt }
       intelTasks: [],   // task strings converted from intel cards - the "Intel" checklist in Lists
       plan: "free",
+      addons: [],       // server-proven add-on ids (["qr-sync"]) - cache only; the server record rules (money build D)
+      advisorLog: [],   // tactical advisor chat: [{ role: "user" | "advisor", text }] - last 40 (AI build)
+      aiUse: { day: "", ask: 0, photo: 0 }, // free-tier AI day counters, keyed by local day (AI build)
+      meds: [],         // per-person medication log (Ready.gov build): [{ id, person, name, dose, supplyDays, refillBy, expiry }]
+      familyPlan: { outName: "", outPhone: "", rally2: "" }, // out-of-town contact + secondary meeting place, names only (Ready.gov build)
+      homeSystems: { water: "", gas: "", electric: "", propane: "" }, // shutoff location notes for this house (Ready.gov build)
+      cash: [],         // cash on hand (Ready.gov build): [{ id, amount, where }] - display only, never in Days Ready math
       _savedAt: 0,      // ms timestamp of the last local save (sync recency)
       ownerUid: null    // Firebase uid that owns this save, once claimed
     };
   }
 
-  function starterState() {
+  /* The app ships EMPTY - no starter seed, no sample loadout. The
+     first-run experience is the readiness check-in (further down):
+     the user's own answers become their crew, stores and first
+     orders. blankState is the factory for a fresh start and for
+     the Settings reset; existing users' saved data is never
+     touched by this change - only first-run behavior differs. */
+  function blankState() {
     var s = emptyState();
-    var exp = function (months) { return datePlusMonthsStr(months); };
-    s.gear = [
-      { id: uid(), name: "Pocket IFAK - trauma kit", category: "Medical", weightValue: 0.6, weightUnit: "lb", qty: 1, tier: "T1", env: ["Desert", "Urban"], assignedTo: "", location: "Belt pouch", expiry: exp(5) },
-      { id: uid(), name: "Multitool", category: "Tools", weightValue: 0.5, weightUnit: "lb", qty: 1, tier: "T1", env: ["Desert", "Cold", "Wet", "Urban"], assignedTo: "", location: "Pocket", expiry: null },
-      { id: uid(), name: "Hydration bladder 3L (full)", category: "Water", weightValue: 6.6, weightUnit: "lb", qty: 1, tier: "T2", env: ["Desert"], assignedTo: "", location: "BOB - main", expiry: null },
-      { id: uid(), name: "Squeeze water filter", category: "Water", weightValue: 0.2, weightUnit: "lb", qty: 1, tier: "T2", env: ["Wet", "Cold"], assignedTo: "", location: "BOB - front pouch", expiry: null },
-      { id: uid(), name: "2-person tent", category: "Shelter", weightValue: 4.8, weightUnit: "lb", qty: 1, tier: "T2", env: ["Cold", "Wet"], assignedTo: "", location: "BOB - bottom", expiry: null },
-      { id: uid(), name: "Sleeping bag 20F", category: "Shelter", weightValue: 2.9, weightUnit: "lb", qty: 1, tier: "T2", env: ["Cold"], assignedTo: "", location: "BOB - bottom", expiry: null },
-      { id: uid(), name: "Fire starter kit", category: "Fire", weightValue: 0.4, weightUnit: "lb", qty: 1, tier: "T2", env: ["Cold", "Wet"], assignedTo: "", location: "BOB - front pouch", expiry: null },
-      { id: uid(), name: "Change of clothes - sealed", category: "Clothing", weightValue: 1.8, weightUnit: "lb", qty: 1, tier: "T2", env: ["Desert", "Cold", "Wet", "Urban"], assignedTo: "", location: "BOB - main", expiry: null }
-    ];
-    s.stores = [
-      { id: uid(), kind: "Water", name: "Water brick - garage", amount: 10, unit: "gal", expiry: exp(8) },
-      { id: uid(), kind: "Food", name: "Rice bucket - pantry", amount: 25, unit: "lbs", expiry: exp(14), kcal: 41250 }
-    ];
-    s.comms = [
-      { id: uid(), label: "Family Net", freq: "GMRS CH 16", callsign: "NYX-1", purpose: "Primary crew check-in", checkin: "07:00 / 19:00" },
-      { id: uid(), label: "Weather", freq: "NOAA 162.400 MHz", callsign: "-", purpose: "Weather and alerts - receive only", checkin: "As needed" },
-      { id: uid(), label: "Ham Simplex", freq: "146.520 MHz", callsign: "NYX-1", purpose: "Regional simplex fallback", checkin: "20:00" }
-    ];
-    s.crew = [];
+    s.assessment = defaultAssessment();
+    s.firstOrders = [];
     return s;
+  }
+
+  function defaultAssessment() {
+    return {
+      done: false,
+      adults: 1, children: 0, pets: 0,
+      climate: "",   // Desert | Cold | Wet | Urban
+      water: "",     // none | g3 | g10 | g25 | g55 (gallons)
+      food: "",      // none | few | week | twoWeeks | month (days)
+      cook: null,    // true | false | null (unanswered)
+      medical: "",   // trauma | basic | none
+      gobag: "",     // packed | partial | none
+      comms: "",     // radios | phones | neither
+      concern: ""    // Power outage | Storms | Earthquake | Wildfire | Unrest | All of them
+    };
+  }
+
+  /* Runs inside normalizeState, which loadState() calls before the
+     check-in module's lookup tables exist - literals only here,
+     never the CHECKIN_* vars. */
+  function sanitizeAssessment(a) {
+    var d = defaultAssessment();
+    if (!a || typeof a !== "object") return d;
+    function num(v, lo, hi, fb) { v = Math.round(Number(v)); return isNaN(v) ? fb : clamp(v, lo, hi); }
+    function pick(v, list, fb) { return list.indexOf(v) >= 0 ? v : fb; }
+    return {
+      done: a.done === true,
+      adults: num(a.adults, 0, 30, 1),
+      children: num(a.children, 0, 30, 0),
+      pets: num(a.pets, 0, 30, 0),
+      climate: pick(a.climate, ["Desert", "Cold", "Wet", "Urban"], ""),
+      water: pick(a.water, ["none", "g3", "g10", "g25", "g55"], ""),
+      food: pick(a.food, ["none", "few", "week", "twoWeeks", "month"], ""),
+      cook: a.cook === true ? true : (a.cook === false ? false : null),
+      medical: pick(a.medical, ["trauma", "basic", "none"], ""),
+      gobag: pick(a.gobag, ["packed", "partial", "none"], ""),
+      comms: pick(a.comms, ["radios", "phones", "neither"], ""),
+      concern: pick(a.concern, ["Power outage", "Storms", "Earthquake", "Wildfire", "Unrest", "All of them"], "")
+    };
   }
 
   var state = loadState();
@@ -270,6 +392,96 @@
       }).slice(0, 500);
   }
 
+  // Weekly SITREP snapshots (money build B). An entry is kept
+  // only when its date parses as a local date and every reading
+  // is null or a finite number - daysReady() legitimately returns
+  // null components (no water stores yet is a real state, not
+  // corruption), while strings / NaN / objects are garbage from a
+  // hand-edited save and the entry is dropped. Last 8 win.
+  function sanitizeSitrepLog(list) {
+    if (!Array.isArray(list)) return [];
+    function numOrNull(v) { return typeof v === "number" && isFinite(v) ? v : null; }
+    return list.filter(function (e) {
+      if (!e || typeof e !== "object") return false;
+      if (typeof e.date !== "string" || !parseDateLocal(e.date)) return false;
+      return [e.daysReady, e.waterDays, e.foodDays].every(function (v) {
+        return v === null || (typeof v === "number" && isFinite(v));
+      });
+    }).map(function (e) {
+      return { date: e.date, daysReady: numOrNull(e.daysReady), waterDays: numOrNull(e.waterDays), foodDays: numOrNull(e.foodDays) };
+    }).slice(-8);
+  }
+
+  // Tactical advisor chat (AI build): only well-formed turns
+  // survive, capped at the last 40, so a hand-edited save can
+  // never break the panel. The log is ordinary app data - it
+  // syncs like everything else and never touches the vault.
+  function sanitizeAdvisorLog(list) {
+    if (!Array.isArray(list)) return [];
+    return list.filter(function (m) {
+      return m && typeof m === "object" && (m.role === "user" || m.role === "advisor") &&
+        typeof m.text === "string" && m.text;
+    }).map(function (m) { return { role: m.role, text: m.text.slice(0, 4000) }; }).slice(-40);
+  }
+
+  // Free-tier AI day counters (AI build): a local day string
+  // plus two bounded counts. A stale day is kept as-is here -
+  // aiUseToday() treats any day that is not today as zero.
+  function sanitizeAiUse(u) {
+    function count(v) { var n = Math.round(Number(v)); return isFinite(n) ? clamp(n, 0, 9999) : 0; }
+    if (!u || typeof u !== "object") return { day: "", ask: 0, photo: 0 };
+    return {
+      day: typeof u.day === "string" ? u.day.slice(0, 10) : "",
+      ask: count(u.ask), photo: count(u.photo)
+    };
+  }
+
+  // Ready.gov build sanitizers. Meds: only well-formed entries
+  // survive - a name is required, dates must parse as local
+  // dates or become null, supply is a bounded day count. The
+  // family plan and home systems are plain bounded strings.
+  // Cash: positive amounts only, rounded to cents.
+  function sanitizeDateOrNull(v) {
+    return typeof v === "string" && parseDateLocal(v) ? v : null;
+  }
+  function sanitizeMeds(list) {
+    if (!Array.isArray(list)) return [];
+    return list.filter(function (m) { return m && typeof m === "object" && typeof m.name === "string" && m.name; })
+      .map(function (m) {
+        var sup = Math.round(Number(m.supplyDays));
+        return {
+          id: typeof m.id === "string" && m.id ? m.id : uid(),
+          person: typeof m.person === "string" ? m.person.slice(0, 60) : "",
+          name: m.name.slice(0, 80),
+          dose: typeof m.dose === "string" ? m.dose.slice(0, 80) : "",
+          supplyDays: isFinite(sup) ? clamp(sup, 0, 3650) : 0,
+          refillBy: sanitizeDateOrNull(m.refillBy),
+          expiry: sanitizeDateOrNull(m.expiry)
+        };
+      }).slice(0, 200);
+  }
+  function sanitizeFamilyPlan(p) {
+    function str(v, n) { return typeof v === "string" ? v.slice(0, n) : ""; }
+    if (!p || typeof p !== "object") return { outName: "", outPhone: "", rally2: "" };
+    return { outName: str(p.outName, 80), outPhone: str(p.outPhone, 40), rally2: str(p.rally2, 120) };
+  }
+  function sanitizeHomeSystems(hs) {
+    function str(v) { return typeof v === "string" ? v.slice(0, 240) : ""; }
+    if (!hs || typeof hs !== "object") return { water: "", gas: "", electric: "", propane: "" };
+    return { water: str(hs.water), gas: str(hs.gas), electric: str(hs.electric), propane: str(hs.propane) };
+  }
+  function sanitizeCash(list) {
+    if (!Array.isArray(list)) return [];
+    return list.filter(function (c) { return c && typeof c === "object" && isFinite(Number(c.amount)) && Number(c.amount) > 0; })
+      .map(function (c) {
+        return {
+          id: typeof c.id === "string" && c.id ? c.id : uid(),
+          amount: Math.round(Number(c.amount) * 100) / 100,
+          where: typeof c.where === "string" ? c.where.slice(0, 80) : ""
+        };
+      }).slice(0, 100);
+  }
+
   // Shared shape check + default fill, used for the localStorage
   // save AND for a state arriving from the cloud doc, so both paths
   // accept exactly the same documents. Returns null when the value
@@ -284,7 +496,7 @@
     if (typeof parsed.settings.homeLat !== "number") parsed.settings.homeLat = 33.4484;
     if (typeof parsed.settings.homeLng !== "number") parsed.settings.homeLng = -112.0740;
     if (typeof parsed.settings.effects !== "boolean") parsed.settings.effects = true;
-    if (["command", "nightvision", "desert", "whiteout", "blackout"].indexOf(parsed.settings.theme) === -1) parsed.settings.theme = "command";
+    if (["command", "nightvision", "desert", "whiteout", "blackout", "brassworks", "neonglass", "fullmetal", "woodland", "bunker", "schematic"].indexOf(parsed.settings.theme) === -1) parsed.settings.theme = "command";
     if (typeof parsed.settings.sounds !== "boolean") parsed.settings.sounds = true;
     if (!Array.isArray(parsed.outbox)) parsed.outbox = [];
     if (!parsed.icsRoles || typeof parsed.icsRoles !== "object") parsed.icsRoles = {};
@@ -295,7 +507,35 @@
     parsed.intelTasks = Array.isArray(parsed.intelTasks)
       ? parsed.intelTasks.filter(function (t) { return typeof t === "string" && t; }).map(function (t) { return t.slice(0, 300); })
       : [];
+    parsed.assessment = sanitizeAssessment(parsed.assessment);
+    parsed.firstOrders = Array.isArray(parsed.firstOrders)
+      ? parsed.firstOrders.filter(function (o) { return o && typeof o.text === "string" && o.text; })
+          .map(function (o) {
+            return {
+              text: o.text.slice(0, 300), done: o.done === true,
+              shopKey: typeof o.shopKey === "string" && o.shopKey ? o.shopKey.slice(0, 40) : null
+            };
+          }).slice(0, 8)
+      : [];
+    parsed.resupplyTarget = [7, 14, 30, 60, 90].indexOf(Number(parsed.resupplyTarget)) >= 0 ? Number(parsed.resupplyTarget) : 14;
+    parsed.tourDone = parsed.tourDone === true;
+    parsed.welcomeSeen = parsed.welcomeSeen === true;
+    parsed.sitrepLog = sanitizeSitrepLog(parsed.sitrepLog);
+    parsed.lastExpirySeen = Array.isArray(parsed.lastExpirySeen)
+      ? parsed.lastExpirySeen.filter(function (x) { return typeof x === "string" && x; }).slice(0, 500)
+      : [];
     if (parsed.plan !== "operator" && parsed.plan !== "lifetime") parsed.plan = "free";
+    parsed.addons = sanitizeAddons(parsed.addons);
+    parsed.advisorLog = sanitizeAdvisorLog(parsed.advisorLog);
+    parsed.aiUse = sanitizeAiUse(parsed.aiUse);
+    parsed.meds = sanitizeMeds(parsed.meds);
+    parsed.familyPlan = sanitizeFamilyPlan(parsed.familyPlan);
+    parsed.homeSystems = sanitizeHomeSystems(parsed.homeSystems);
+    parsed.cash = sanitizeCash(parsed.cash);
+    // Kit location migration: anything saved before the tag
+    // existed lands on Home, for gear and stores alike.
+    parsed.gear = parsed.gear.map(function (g) { if (g && typeof g === "object") g.loc = kitLoc(g.loc); return g; });
+    parsed.stores = parsed.stores.map(function (s) { if (s && typeof s === "object") s.loc = kitLoc(s.loc); return s; });
     if (typeof parsed._savedAt !== "number") parsed._savedAt = 0;
     if (typeof parsed.ownerUid !== "string") parsed.ownerUid = null;
     return parsed;
@@ -305,13 +545,15 @@
     try {
       var raw = localStorage.getItem(STATE_KEY);
       if (!raw) {
-        var seed = starterState();
-        localStorage.setItem(STATE_KEY, JSON.stringify(seed));
-        return seed;
+        var fresh = blankState();
+        localStorage.setItem(STATE_KEY, JSON.stringify(fresh));
+        return fresh;
       }
-      return normalizeState(JSON.parse(raw)) || starterState();
+      var loaded = normalizeState(JSON.parse(raw));
+      if (loaded) bootHadSave = true;
+      return loaded || blankState();
     } catch (e) {
-      return starterState();
+      return blankState();
     }
   }
   // Write the state exactly as it stands (no timestamp bump) - used
@@ -370,6 +612,36 @@
     if (days <= 30) return { label: "DUE SOON", cls: "nx-badge-soon" };
     return { label: "OK", cls: "nx-badge-ok" };
   }
+  /* Money build B shares ONE expiry computation across the
+     rotation tracker, the Expiry Radar, the Command Expiry Watch
+     and the Weekly Sitrep: allExpiries() above (daysLeft math +
+     soonest-first sort). storeExpiries() is that same list cut
+     to stores, with the store kind riding along. */
+  function storeExpiries() {
+    return allExpiries().filter(function (r) { return r.kind === "store"; }).map(function (r) {
+      var s = state.stores.filter(function (x) { return x.id === r.refId; })[0];
+      return { kind: "store", refId: r.refId, id: r.refId, name: r.name, source: r.source,
+        storeKind: s ? s.kind : "", expiry: r.expiry, days: r.days };
+    });
+  }
+  function daysLeftText(days) {
+    if (days == null) return "NO DATE";
+    if (days < 0) return "OVERDUE BY " + Math.abs(days) + " DAY" + (Math.abs(days) === 1 ? "" : "S");
+    if (days === 0) return "DUE TODAY";
+    return "IN " + days + " DAY" + (days === 1 ? "" : "S");
+  }
+  // Radar palette: red at a week or less (or overdue), amber
+  // inside the 30-day DUE SOON window, green beyond it.
+  function radarDaysClass(days) {
+    if (days == null) return "nx-radar-warn";
+    if (days < 0 || days <= 7) return "nx-radar-alert";
+    if (days <= 30) return "nx-radar-warn";
+    return "nx-radar-ok";
+  }
+  function todayKeyLocal() {
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
   function crewName(id) {
     if (!id) return "UNASSIGNED";
     var m = state.crew.filter(function (c) { return c.id === id; })[0];
@@ -382,9 +654,56 @@
     return out;
   }
 
+  /* ---------------- schematic art ----------------
+     One consistent icon set in the equipment-manual line style:
+     stroke-only inline SVG in currentColor, so the CSS paints
+     them from the theme variables and all five themes recolor
+     the same drawings. No raster, no external assets, no text
+     inside the drawings. Big set on a 48 grid (illustrations),
+     small set on a 24 grid (row / area markers). Purely
+     presentational - nothing here touches data, flow or copy. */
+  function nxSvg(viewBox, sw, paths, cls) {
+    return "<svg class=\"" + cls + "\" viewBox=\"" + viewBox + "\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"" + sw +
+      "\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" aria-hidden=\"true\" focusable=\"false\">" + paths + "</svg>";
+  }
+  var ART_BIG = {
+    household: "<circle cx=\"12\" cy=\"11\" r=\"4\"/><circle cx=\"25\" cy=\"11\" r=\"4\"/><circle cx=\"37\" cy=\"17.5\" r=\"3.2\"/>" +
+      "<path d=\"M12 15v15M12 30l-5 12M12 30l5 12M5 21h14M25 15v15M25 30l-5 12M25 30l5 12M18 21h14M37 21v11M37 32l-4 10M37 32l4 10M31.5 25.5h11M3 44h42\"/>",
+    climate: "<circle cx=\"34\" cy=\"12\" r=\"4.6\"/>" +
+      "<path d=\"M34 3.5v2.6M34 17.9v2.6M25.5 12h2.6M39.9 12h2.6M28 6l1.8 1.8M40 6l-1.8 1.8M4 9h10M6 14h7M10 34h24a6 6 0 0 0-1.2-11.9A10 10 0 0 0 15.5 20 8.5 8.5 0 0 0 10 34Z M4 40h40M9 44h30\"/>",
+    water: "<path d=\"M15 9h18v31H15Z M20 9V5h8v4 M15 17l18 18M33 17L15 35\"/>",
+    food: "<path d=\"M8 19h32v21H8Z M8 26.5h32M8 34h32 M13 40v4M35 40v4 M14 9h6v10h-6Z\"/><circle cx=\"29\" cy=\"13.5\" r=\"4.5\"/><path d=\"M29 9V6\"/>",
+    cook: "<path d=\"M24 5c4.5 6 7.5 9.8 7.5 15a7.5 7.8 0 0 1-15 0C16.5 14.8 19.5 11 24 5Z\"/>" +
+      "<path d=\"M24 16c2 2.8 3.2 4.3 3.2 6.7a3.2 3.4 0 0 1-6.4 0C20.8 20.3 22 18.8 24 16Z M6 37h36M11 37v5M37 37v5M7 44h34\"/>",
+    medical: "<path d=\"M8 15h32v25H8Z M18 15V9h12v6 M24 21v12M18 27h12\"/>",
+    gobag: "<path d=\"M15 42V17a9 7 0 0 1 18 0v25Z M20 10.5a4 3.4 0 0 1 8 0 M19.5 26h9v10h-9Z M19.5 30.5h9 M15 21h-4v13h4M33 21h4v13h-4\"/>",
+    comms: "<path d=\"M17 15h15v26H17Z M21 15L14 4 M28 15v-1.5 M20 21h9M20 25h9 M20.5 30h8v5h-8Z M31 5.5a5 5 0 0 1 5 5 M31 1a9.5 9.5 0 0 1 9.5 9.5\"/><circle cx=\"28\" cy=\"11\" r=\"2.4\"/>",
+    concern: "<path d=\"M24 7l20 34H4Z M24 19v10\"/><circle cx=\"24\" cy=\"35\" r=\"1.7\" fill=\"currentColor\" stroke=\"none\"/>"
+  };
+  var ART_SM = {
+    droplet: "<path d=\"M12 3c0 0-6 6.6-6 10.5a6 6.5 0 0 0 12 0C18 9.6 12 3 12 3Z\"/>",
+    crate: "<path d=\"M4 10h16v9H4Z M4 14.5h16 M7.5 10V5.5H11V10\"/><circle cx=\"16\" cy=\"7.5\" r=\"2.2\"/>",
+    tent: "<path d=\"M12 4l9 15H3Z M12 11l4.5 8h-9Z\"/>",
+    flame: "<path d=\"M12 3c2.5 3.5 4.5 5.8 4.5 9.3a4.5 4.8 0 0 1-9 0C7.5 8.8 9.5 6.5 12 3Z\"/>",
+    medical: "<path d=\"M4 5.5h16V19H4Z M12 9v7M8.5 12.5h7\"/>",
+    comms: "<path d=\"M9 8.5h7V20H9Z M11 8.5L8.5 3.5 M17.8 5.2a4.6 4.6 0 0 1 4.6 4.6 M11 12h3M11 15h3\"/>",
+    wrench: "<path d=\"M15.2 4.3a4.3 4.3 0 0 0-5.8 5.5L4.3 15a2.2 2.2 0 1 0 3.1 3.1l5.2-5.1a4.3 4.3 0 0 0 5.5-5.8l-2.8 2.8-2.3-.7-.7-2.3Z\"/>",
+    shirt: "<path d=\"M8.6 4L4 7.6 6.4 11 9 9.9V20h6V9.9l2.6 1.1L20 7.6 15.4 4a3.4 3.4 0 0 1-6.8 0Z\"/>",
+    shield: "<path d=\"M12 3l7 2.4V11c0 4.8-2.9 8.2-7 9.9C7.9 19.2 5 15.8 5 11V5.4Z M9.2 11.6l2 2 3.6-3.8\"/>",
+    pack: "<path d=\"M7.5 20V9.8a4.5 4.5 0 0 1 9 0V20Z M10.3 5.6a1.8 1.8 0 0 1 3.4 0 M10 13.5h4V17h-4Z\"/>",
+    intel: "<path d=\"M5 6h14v13H5Z M8.6 15.4a4.8 4.8 0 0 1 0-6.8 M15.4 8.6a4.8 4.8 0 0 1 0 6.8\"/><circle cx=\"12\" cy=\"12\" r=\"1.3\" fill=\"currentColor\" stroke=\"none\"/>",
+    lists: "<path d=\"M6 5h12v15H6Z M9 3.8h6V7H9Z M9.2 11h5.6M9.2 14.2h5.6 M9.2 17.4l1.6 1.6 2.8-3\"/>"
+  };
+  function artBig(name) { return nxSvg("0 0 48 48", 2.4, ART_BIG[name] || "", "nx-art-big"); }
+  function artSm(name) { return nxSvg("0 0 24 24", 1.7, ART_SM[name] || "", "nx-art-sm"); }
+  var GEAR_ICONS = { Water: "droplet", Food: "crate", Shelter: "tent", Fire: "flame", Medical: "medical", Comms: "comms", Tools: "wrench", Clothing: "shirt", Defense: "shield", Other: "pack" };
+  var AREA_ICONS = { WATER: "droplet", FOOD: "crate", MEDICAL: "medical", COMMS: "comms", MOBILITY: "pack" };
+
   /* ---------------- navigation + clock ---------------- */
   var currentView = "command";
   function showView(name) {
+    closeScanner(); // never leak a live camera across a view switch
+    closePhotoConfirm(); // a half-confirmed photo list never follows the user around
     currentView = name;
     document.querySelectorAll(".nx-view").forEach(function (v) { v.classList.remove("nx-on"); });
     var el = $("view-" + name);
@@ -403,6 +722,8 @@
   function tickClock() {
     var el = $("nx-clock");
     if (el) el.textContent = new Date().toLocaleTimeString("en-GB", { hour12: false });
+    var z = $("nx-zulu");
+    if (z) z.textContent = new Date().toISOString().slice(11, 19) + " ZULU";
   }
 
   /* ---------------- days ready (flagship metric) ---------------- */
@@ -457,6 +778,45 @@
     };
   }
 
+  /* ---------------- pets + cash (Ready.gov build) ----------------
+     Pets eat too, but they are NOT people: pet readiness is its
+     own line and never touches the human Days Ready headline.
+     Pet food is logged as stores of kind "PetFood", in pounds.
+     The planning ration is 1.0 lb per pet per day - a large-dog
+     rate, deliberately conservative: smaller pets stretch the
+     same pounds further, never shorter. Pet count comes from
+     the check-in answers (pets live in the assessment, not the
+     crew list), falling back to crew members with the Pet role. */
+  var PET_FOOD_LB_PER_PET_DAY = 1.0;
+  function petHouseholdCount() {
+    var a = state.assessment;
+    if (a && typeof a.pets === "number" && a.pets > 0) return a.pets;
+    return petCount();
+  }
+  function petFoodLb() {
+    var lb = 0;
+    state.stores.forEach(function (s) {
+      if (s.kind !== "PetFood") return;
+      if (s.expiry && daysLeft(s.expiry) < 0) return; // expired pet food counts for nothing, same rule as people food
+      var u = String(s.unit || "").toLowerCase();
+      var amt = Number(s.amount) || 0;
+      if (u === "lb" || u === "lbs") lb += amt;
+      else if (u === "kg") lb += amt * 2.2046226;
+    });
+    return lb;
+  }
+  function petReadiness() {
+    var pets = petHouseholdCount();
+    var lb = petFoodLb();
+    return { pets: pets, lb: lb, days: pets > 0 ? lb / (pets * PET_FOOD_LB_PER_PET_DAY) : null };
+  }
+  /* Cash on hand: a readiness display, never a Days Ready
+     input. Cards and ATMs die with the grid; this is the money
+     that still moves. */
+  function cashTotal() {
+    return (Array.isArray(state.cash) ? state.cash : []).reduce(function (sum, c) { return sum + (Number(c.amount) || 0); }, 0);
+  }
+
   function renderDaysReady(fxA) {
     var d = daysReady();
     if (fxA && d.headline != null) countUp($("nx-days-ready"), d.headline, 1);
@@ -469,7 +829,17 @@
     var fLine = "FOOD <b>" + (d.foodDays == null ? "--" : fmt(d.foodDays, 1) + " DAYS") + "</b>" +
       (d.foodDays == null ? " - ADD CALORIES TO A FOOD STORE" : " (" + fmt(d.foodKcal, 0) + " KCAL)") +
       (d.foodExpired ? " <span class=\"nx-heavy\">// " + d.foodExpired + " STORE" + (d.foodExpired > 1 ? "S" : "") + " EXPIRED - NOT COUNTED</span>" : "");
-    $("nx-days-breakdown").innerHTML = wLine + "<br>" + fLine;
+    // Pets get their own line, only when the household has
+    // them - and it never feeds the headline above.
+    var pr = petReadiness();
+    var pLine = pr.pets > 0
+      ? "<br>PETS <b>" + (pr.lb > 0 ? fmt(pr.days, 1) + " DAYS" : "--") + "</b>" +
+        (pr.lb > 0
+          ? " (" + fmt(pr.lb, 1) + " LB PET FOOD // " + pr.pets + " PET" + (pr.pets > 1 ? "S" : "") + " AT " + fmt(PET_FOOD_LB_PER_PET_DAY, 1) + " LB/PET/DAY)"
+          : " - NO PET FOOD STORED FOR " + pr.pets + " PET" + (pr.pets > 1 ? "S" : ""))
+      : "";
+    var cLine = "<br>CASH ON HAND <b>$" + fmt(cashTotal(), 0) + "</b>";
+    $("nx-days-breakdown").innerHTML = wLine + "<br>" + fLine + pLine + cLine;
     $("nx-days-gap").innerHTML = d.headline == null
       ? "ADD WATER AND FOOD STORES IN THE ROTATE TAB TO COMPUTE YOUR NUMBER."
       : "GAP // <b>" + esc(d.gap) + "</b> // WEAKEST LINK: <b>" + esc((d.limiting || "").toUpperCase()) + "</b>";
@@ -530,8 +900,54 @@
         }).join("")
       : "<div class=\"nx-empty\">NOTHING WITH AN EXPIRY DATE. ADD DATES IN GEAR OR ROTATE.</div>";
 
+    renderHomeCards();
     renderRallyBox();
+    renderStatusBoard();
+    renderExpiryWatch();
+    renderWeeklySitrep();
+    renderAdvisor();
     if (fxA) nxDashAnimated = true;
+  }
+
+  /* ---------------- command-center status board ----------------
+     Presentational only: five station cells colored from the same
+     state the rest of the app already renders - Days Ready math,
+     the alerts cache, the broadcast outbox and the vault. No new
+     stored data; the board is recomputed on every render pass. */
+  function boardDays(days) {
+    if (days == null) return { cls: "nx-st-dim", val: "NO DATA" };
+    if (days <= 0) return { cls: "nx-st-alert", val: "EMPTY" };
+    if (days < 3) return { cls: "nx-st-alert", val: fmt(days, 1) + " DAYS" };
+    if (days < 7) return { cls: "nx-st-warn", val: fmt(days, 1) + " DAYS" };
+    return { cls: "nx-st-ok", val: fmt(days, 1) + " DAYS" };
+  }
+  function setCell(id, st) {
+    var cell = $(id);
+    if (!cell) return;
+    cell.className = "nx-station " + st.cls;
+    var v = cell.querySelector(".nx-station-val");
+    if (v) v.textContent = st.val;
+  }
+  // The alerts station logic, shared verbatim by the status
+  // board and the Weekly Sitrep's alerts line (money build B).
+  function alertsBoardState() {
+    if (!alertsCache || !alertsCache.alerts) return { cls: "nx-st-dim", val: "NO DATA" };
+    if (alertsCache.alerts.length) return { cls: "nx-st-alert nx-pulse-led", val: alertsCache.alerts.length + " ACTIVE" };
+    if (Date.now() - alertsCache.fetchedAt > STALE_MS) return { cls: "nx-st-warn", val: "STALE" };
+    return { cls: "nx-st-ok", val: "CLEAR" };
+  }
+  function renderStatusBoard() {
+    if (!$("nx-board")) return;
+    var d = daysReady();
+    setCell("nx-cell-water", boardDays(d.waterDays));
+    setCell("nx-cell-food", boardDays(d.foodDays));
+    setCell("nx-cell-alerts", alertsBoardState());
+    setCell("nx-cell-comms", state.outbox.length
+      ? { cls: "nx-st-data", val: state.outbox.length + " SENT" }
+      : { cls: "nx-st-dim", val: "NONE" });
+    setCell("nx-cell-vault", Vault.unlocked
+      ? { cls: "nx-st-ok", val: "OPEN" }
+      : Vault.blob ? { cls: "nx-st-warn", val: "SEALED" } : { cls: "nx-st-dim", val: "NOT SET" });
   }
 
   function primaryRally() {
@@ -571,6 +987,7 @@
   /* ---------------- gear catalog ---------------- */
   var gearTierFilter = "ALL";
   var gearCatFilter = "ALL";
+  var gearLocFilter = "ALL";
 
   function gearRowHtml(g, heaviestIds) {
     var lb = itemWeightLb(g);
@@ -578,9 +995,11 @@
     var meta = esc(g.category.toUpperCase()) + " // " + esc(TIERS[g.tier] || g.tier) + " // QTY " + (Number(g.qty) || 1) +
       " // " + fmt(Number(g.weightValue) || 0, 2) + " " + esc(g.weightUnit) + " EACH" +
       (g.location ? " // " + esc(g.location.toUpperCase()) : "") +
+      " // KIT: " + esc(kitLoc(g.loc).toUpperCase()) +
       " // CREW: " + esc(crewName(g.assignedTo)) +
       (g.expiry ? " // EXP " + esc(g.expiry) : "");
     return "<div class=\"nx-row\" data-gear-row=\"" + g.id + "\">" +
+      "<div class=\"nx-row-ic\">" + artSm(GEAR_ICONS[g.category] || "pack") + "</div>" +
       "<div class=\"nx-row-main\"><p class=\"nx-row-title\">" + esc(g.name) +
       (heaviestIds[g.id] ? " <span class=\"nx-heavy\">// HEAVIEST</span>" : "") + "</p>" +
       "<p class=\"nx-row-meta\">" + meta + "</p><div>" + tags + "</div></div>" +
@@ -626,6 +1045,7 @@
     var filtered = state.gear.filter(function (g) {
       if (gearTierFilter !== "ALL" && g.tier !== gearTierFilter) return false;
       if (gearCatFilter !== "ALL" && g.category !== gearCatFilter) return false;
+      if (gearLocFilter !== "ALL" && kitLoc(g.loc) !== gearLocFilter) return false;
       return true;
     });
 
@@ -642,7 +1062,7 @@
       group.slice().sort(function (a, b) { return itemWeightLb(b) - itemWeightLb(a); })
         .forEach(function (g) { html += gearRowHtml(g, heaviestIds); });
     });
-    $("nx-gear-list").innerHTML = html || "<div class=\"nx-empty\">NO GEAR MATCHES. ADD AN ITEM ABOVE OR CLEAR THE FILTERS.</div>";
+    $("nx-gear-list").innerHTML = html || "<div class=\"nx-empty\"><span class=\"nx-empty-art\">" + artSm("pack") + "</span>NO GEAR MATCHES. ADD AN ITEM ABOVE OR CLEAR THE FILTERS.</div>";
   }
 
   function resetGearForm() {
@@ -670,6 +1090,7 @@
         expiry: $("nx-g-expiry").value || null,
         assignedTo: $("nx-g-assigned").value || "",
         location: $("nx-g-location").value.trim(),
+        loc: kitLoc($("nx-g-loc").value),
         env: env
       };
       if (!data.name) return;
@@ -706,6 +1127,7 @@
         $("nx-g-qty").value = g.qty;
         $("nx-g-expiry").value = g.expiry || "";
         $("nx-g-location").value = g.location || "";
+        $("nx-g-loc").value = kitLoc(g.loc);
         renderGear(); // refresh assigned options before setting value
         $("nx-g-assigned").value = g.assignedTo || "";
         document.querySelectorAll("input[name='nx-g-env']").forEach(function (c) {
@@ -736,9 +1158,285 @@
         renderGear();
       });
     });
+    document.querySelectorAll("[data-loc-filter]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        gearLocFilter = b.getAttribute("data-loc-filter");
+        document.querySelectorAll("[data-loc-filter]").forEach(function (x) {
+          x.classList.toggle("nx-on", x === b);
+        });
+        renderGear();
+      });
+    });
     $("nx-gear-catfilter").addEventListener("change", function () {
       gearCatFilter = this.value;
       renderGear();
+    });
+  }
+
+  /* ---------------- expiry radar, expiry watch, weekly sitrep ----------------
+     Money build B - retention plumbing. One expiry computation
+     (allExpiries / storeExpiries) feeds three surfaces: the
+     Expiry Radar on top of Rotate, a compact Expiry Watch strip
+     on Command when something is overdue or inside 14 days, and
+     the Weekly Sitrep panel with its 7-day snapshot history.
+     Plus a best-effort rotation notification: permission is
+     never auto-prompted, a store alerts at most once (tracked
+     in state.lastExpirySeen), and every unsupported platform
+     degrades to silence. Free for all tiers. */
+
+  // The REPLACE button for a rotation row, shared by the tracker
+  // table and the radar so the two can never drift: a store row
+  // flagged DUE SOON or OVERDUE gets a shop button matched by
+  // store type; gear rows and other kinds get none.
+  function replaceBtnHtml(r) {
+    var st = expiryState(r.days);
+    if (r.kind !== "store" || (st.label !== "DUE SOON" && st.label !== "OVERDUE")) return "";
+    var sObj = state.stores.filter(function (x) { return x.id === r.refId; })[0];
+    if (sObj && sObj.kind === "Water") return shopBtnHtml("water-storage", "REPLACE");
+    if (sObj && sObj.kind === "Food") return shopBtnHtml("food-bucket", "REPLACE");
+    return "";
+  }
+
+  /* Meds on the radar (Ready.gov build): a med earns a row
+     when its expiry is inside the 30-day DUE SOON window (or
+     past it) OR its supply runs out within 14 days. The row's
+     day count is whichever deadline lands first. */
+  function medRadarRows() {
+    var rows = [];
+    (Array.isArray(state.meds) ? state.meds : []).forEach(function (m) {
+      var cands = [];
+      if (m.expiry) {
+        var ed = daysLeft(m.expiry);
+        if (ed != null && ed <= 30) cands.push({ days: ed, why: "EXP " + m.expiry });
+      }
+      if (typeof m.supplyDays === "number" && m.supplyDays <= 14) {
+        cands.push({ days: m.supplyDays, why: "SUPPLY RUNS OUT" });
+      }
+      if (!cands.length) return;
+      cands.sort(function (a, b) { return a.days - b.days; });
+      rows.push({
+        kind: "med", refId: m.id, name: m.name, days: cands[0].days,
+        meta: "MED" + (m.person ? " // " + String(m.person).toUpperCase() : "") + " // " + cands[0].why
+      });
+    });
+    return rows;
+  }
+
+  function renderRadar() {
+    var list = $("nx-radar-list");
+    if (!list) return;
+    // One merged, soonest-first list: store expiries plus the
+    // meds that qualify (medRadarRows). With no meds logged the
+    // rows are exactly the store rows the radar has always had.
+    var rows = storeExpiries().map(function (r) {
+      return { kind: "store", refId: r.refId, name: r.name, days: r.days, storeRow: r,
+        meta: (r.storeKind || "STORE").toUpperCase() + " // EXP " + r.expiry };
+    }).concat(medRadarRows());
+    rows.sort(function (a, b) { return (a.days == null ? 99999 : a.days) - (b.days == null ? 99999 : b.days); });
+    var anyReplace = false;
+    if (!rows.length) {
+      list.innerHTML = "<div class=\"nx-empty\">NO EXPIRY DATES SET - ADD DATES IN ROTATE TO ARM THE RADAR.</div>";
+    } else {
+      list.innerHTML = rows.slice(0, 5).map(function (r) {
+        var btn = r.storeRow ? replaceBtnHtml(r.storeRow) : "";
+        if (btn) anyReplace = true;
+        return "<div class=\"nx-row\"><div class=\"nx-row-main\"><p class=\"nx-row-title\">" + esc(r.name) + "</p>" +
+          "<p class=\"nx-row-meta\">" + esc(r.meta) + "</p></div>" +
+          "<div class=\"nx-row-side\"><span class=\"nx-radar-days " + radarDaysClass(r.days) + "\">" + esc(daysLeftText(r.days)) + "</span>" +
+          (btn ? "<div class=\"nx-btn-row\" style=\"justify-content:flex-end; margin-top:6px;\">" + btn + "</div>" : "") + "</div></div>";
+      }).join("");
+    }
+    var note = $("nx-radar-note");
+    if (note) note.innerHTML = anyReplace ? shopDisclosureHtml() : "";
+    // Notification opt-in: rendered only while permission is
+    // undecided. Granted hides it (alerts just work), denied
+    // hides it (the browser owns that answer), and platforms
+    // without the API render nothing at all.
+    var opt = $("nx-radar-alerts");
+    if (opt) {
+      var undecided = false;
+      try { undecided = typeof Notification !== "undefined" && Notification.permission === "default"; } catch (e) { undecided = false; }
+      opt.innerHTML = undecided
+        ? "<div class=\"nx-radar-optin\"><span class=\"nx-radar-optin-text\">GET ALERTED BEFORE STORES EXPIRE</span>" +
+          "<button type=\"button\" class=\"nx-btn nx-btn-small\" id=\"nx-radar-alerts-btn\">Enable Alerts</button></div>"
+        : "";
+    }
+  }
+
+  function renderExpiryWatch() {
+    var strip = $("nx-expiry-watch");
+    if (!strip) return;
+    var due = storeExpiries().filter(function (r) { return r.days != null && r.days <= 14; });
+    if (!due.length) { strip.style.display = "none"; return; }
+    var soonest = due[0];
+    var anyOver = due.some(function (r) { return r.days < 0; });
+    strip.style.display = "";
+    strip.style.borderColor = anyOver ? "var(--nx-alert)" : "var(--nx-warn)";
+    var txt = $("nx-expiry-watch-text");
+    txt.textContent = "EXPIRY WATCH // " + due.length + (due.length === 1 ? " STORE" : " STORES") +
+      " DUE - SOONEST: " + String(soonest.name).toUpperCase() + ", " + daysLeftText(soonest.days);
+    txt.style.color = anyOver ? "var(--nx-alert)" : "var(--nx-warn)";
+  }
+
+  /* Weekly snapshots: one per 7 days, taken at boot, only when
+     there is a number worth recording. The log is the report's
+     memory - the panel itself always reads live state. */
+  function maybeSnapshotSitrep() {
+    var d = daysReady();
+    if (d.headline == null) return false;
+    var log = Array.isArray(state.sitrepLog) ? state.sitrepLog : [];
+    if (log.length) {
+      var lastDate = parseDateLocal(log[log.length - 1].date);
+      if (lastDate) {
+        var age = Math.round((todayStart().getTime() - lastDate.getTime()) / 86400000);
+        if (age < 7) { state.sitrepLog = log; return false; }
+      }
+    }
+    log.push({ date: todayKeyLocal(), daysReady: d.headline, waterDays: d.waterDays, foodDays: d.foodDays });
+    state.sitrepLog = log.slice(-8);
+    return true;
+  }
+
+  /* The previous report to delta against: when the newest
+     snapshot is today's (taken at this boot or an earlier one),
+     the previous is the one before it; mid-week, the newest
+     snapshot IS the last report. A lone first snapshot has no
+     previous - that is the baseline case. */
+  function weeklySitrepData() {
+    var d = daysReady();
+    var today = todayKeyLocal();
+    var log = Array.isArray(state.sitrepLog) ? state.sitrepLog : [];
+    var prev = null;
+    if (log.length) {
+      var last = log[log.length - 1];
+      if (last.date === today) { if (log.length >= 2) prev = log[log.length - 2]; }
+      else prev = last;
+    }
+    var delta = null;
+    if (prev && d.headline != null && prev.daysReady != null) {
+      delta = Math.round((d.headline - prev.daysReady) * 10) / 10;
+    }
+    var lines = resupplyLines();
+    var expiring = storeExpiries().filter(function (r) { return r.days != null && r.days <= 30; });
+    return {
+      d: d, today: today, prev: prev, delta: delta,
+      resupply: lines, resupplyTicked: lines.filter(function (l) { return l.done; }).length,
+      expiring: expiring, overdueCount: expiring.filter(function (r) { return r.days < 0; }).length,
+      alertsVal: alertsBoardState().val
+    };
+  }
+  function sitrepResupplyText(w) {
+    if (!w.resupply.length) {
+      return "RESUPPLY: ALL CLEAR // DAYS READY " + (w.d.headline == null ? "--" : fmt(w.d.headline, 1)) +
+        " VS TARGET " + resupplyTarget() + " DAYS";
+    }
+    return "RESUPPLY: " + w.resupplyTicked + " OF " + w.resupply.length + " LINES TICKED // TARGET " + resupplyTarget() + " DAYS";
+  }
+  function sitrepExpiringText(w) {
+    if (!w.expiring.length) return "EXPIRING: NONE DUE WITHIN 30 DAYS";
+    return "EXPIRING: " + w.expiring.length + (w.expiring.length === 1 ? " STORE" : " STORES") +
+      " DUE WITHIN 30 DAYS" + (w.overdueCount ? " (" + w.overdueCount + " OVERDUE)" : "");
+  }
+  function sitrepDeltaText(delta) {
+    return (delta > 0 ? "+" : "") + fmt(delta, 1) + " VS LAST REPORT";
+  }
+  function buildWeeklySitrepText() {
+    var w = weeklySitrepData();
+    var d = w.d;
+    var lines = [];
+    lines.push("NYXSURVIVE // WEEKLY SITREP - " + w.today);
+    lines.push("DAYS READY: " + (d.headline == null ? "--" : fmt(d.headline, 1)) +
+      (w.delta != null ? " (" + sitrepDeltaText(w.delta) + ")" : " (BASELINE - FIRST REPORT)"));
+    lines.push("WATER: " + (d.waterDays == null ? "--" : fmt(d.waterDays, 1) + " DAYS") +
+      " // FOOD: " + (d.foodDays == null ? "--" : fmt(d.foodDays, 1) + " DAYS"));
+    lines.push(sitrepResupplyText(w));
+    lines.push(sitrepExpiringText(w));
+    if (state.drillBest) lines.push("BEST DRILL: GRADE " + state.drillBest.grade + " (" + fmtClock(state.drillBest.seconds) + ")");
+    lines.push("ALERTS: " + w.alertsVal);
+    return lines.join("\n");
+  }
+  function renderWeeklySitrep() {
+    var body = $("nx-weekly-body");
+    if (!body) return;
+    var w = weeklySitrepData();
+    var d = w.d;
+    var h = "<p class=\"nx-kv\" style=\"margin:0 0 2px 0;\">REPORT // " + esc(w.today) + "</p>";
+    h += "<p class=\"nx-kv\" style=\"margin:2px 0;\">DAYS READY <b>" + (d.headline == null ? "--" : fmt(d.headline, 1)) + "</b>";
+    if (w.delta != null) {
+      var cls = w.delta > 0 ? "nx-delta-ok" : w.delta < 0 ? "nx-delta-alert" : "nx-delta-dim";
+      h += " <span class=\"nx-weekly-delta " + cls + "\">" + esc(sitrepDeltaText(w.delta)) + "</span>";
+    }
+    h += "</p>";
+    if (w.delta == null) {
+      h += "<p class=\"nx-kv\" style=\"margin:2px 0;\">BASELINE SET - YOUR FIRST REPORT. THE NEXT ONE LANDS IN 7 DAYS.</p>";
+    }
+    h += "<p class=\"nx-kv\" style=\"margin:2px 0;\">WATER <b>" + (d.waterDays == null ? "--" : fmt(d.waterDays, 1) + " DAYS") +
+      "</b> // FOOD <b>" + (d.foodDays == null ? "--" : fmt(d.foodDays, 1) + " DAYS") + "</b></p>";
+    h += "<p class=\"nx-kv\" style=\"margin:2px 0;\">" + esc(sitrepResupplyText(w)) + "</p>";
+    h += "<p class=\"nx-kv\" style=\"margin:2px 0;\">" + esc(sitrepExpiringText(w)) + "</p>";
+    if (state.drillBest) {
+      h += "<p class=\"nx-kv\" style=\"margin:2px 0;\">BEST DRILL: GRADE <b>" + esc(state.drillBest.grade) + "</b> (" + fmtClock(state.drillBest.seconds) + ")</p>";
+    }
+    h += "<p class=\"nx-kv\" style=\"margin:2px 0;\">ALERTS: <b>" + esc(w.alertsVal) + "</b></p>";
+    body.innerHTML = h;
+  }
+  async function copyWeeklySitrep() {
+    var msg = buildWeeklySitrepText();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(msg);
+        showMsg($("nx-weekly-msg"), "WEEKLY SITREP COPIED TO CLIPBOARD - PASTE IT ANYWHERE.", "good");
+      } catch (e) {
+        showMsg($("nx-weekly-msg"), "CLIPBOARD BLOCKED ON THIS DEVICE - NOTHING COPIED.", "err");
+      }
+      return;
+    }
+    showMsg($("nx-weekly-msg"), "NO CLIPBOARD ON THIS DEVICE - NOTHING COPIED.", "err");
+  }
+
+  /* Rotation notifications, best-effort: at boot, stores that
+     are DUE SOON or OVERDUE and were not in lastExpirySeen are
+     newly due. Only an already-granted permission fires (never
+     an auto-prompt), exactly one notification names the count
+     and the soonest, and lastExpirySeen always advances so the
+     same store never alerts twice. iOS shells and old browsers
+     have no usable Notification / service worker path here and
+     stay silent by design. */
+  function checkExpiryNotifications() {
+    var due = storeExpiries().filter(function (r) { return r.days != null && r.days <= 30; });
+    var dueIds = due.map(function (r) { return r.id; });
+    var seen = Array.isArray(state.lastExpirySeen) ? state.lastExpirySeen : [];
+    var fresh = due.filter(function (r) { return seen.indexOf(r.id) < 0; });
+    var changed = seen.length !== dueIds.length || dueIds.some(function (id, i) { return seen[i] !== id; });
+    state.lastExpirySeen = dueIds;
+    if (fresh.length) {
+      try {
+        if (typeof Notification !== "undefined" && Notification.permission === "granted" && "serviceWorker" in navigator) {
+          var soonest = fresh[0];
+          var body = fresh.length + (fresh.length === 1 ? " STORE" : " STORES") + " NEWLY DUE - SOONEST: " +
+            String(soonest.name).toUpperCase() + ", " + daysLeftText(soonest.days);
+          navigator.serviceWorker.ready.then(function (reg) {
+            if (reg && reg.showNotification) reg.showNotification("NYXSURVIVE // ROTATION ALERT", { body: body });
+          }).catch(function () { /* no active worker - stay silent */ });
+        }
+      } catch (e) { /* notifications are a bonus, never a boot risk */ }
+    }
+    return changed;
+  }
+
+  function bindSitrep() {
+    var watch = $("nx-expiry-watch");
+    if (watch) watch.addEventListener("click", function () { showView("rotate"); });
+    var copyBtn = $("nx-weekly-copy");
+    if (copyBtn) copyBtn.addEventListener("click", function () { copyWeeklySitrep(); });
+    var radarPanel = $("nx-radar-panel");
+    if (radarPanel) radarPanel.addEventListener("click", function (ev) {
+      if (!ev.target.closest("#nx-radar-alerts-btn")) return;
+      if (typeof Notification === "undefined") return;
+      try {
+        var p = Notification.requestPermission(function () { renderAll(); });
+        if (p && typeof p.then === "function") p.then(function () { renderAll(); });
+      } catch (e) { /* denied or unsupported - the row resolves on the next render */ }
     });
   }
 
@@ -746,15 +1444,16 @@
   function renderStores() {
     var wrap = $("nx-store-list");
     if (!state.stores.length) {
-      wrap.innerHTML = "<div class=\"nx-empty\">NO STORES LOGGED. ADD WATER, FOOD, MEDS OR BATTERIES ABOVE.</div>";
+      wrap.innerHTML = "<div class=\"nx-empty\">NO STORES LOGGED. ADD WATER, FOOD, MEDS, BATTERIES OR PET FOOD ABOVE.</div>";
       return;
     }
     wrap.innerHTML = state.stores.map(function (s) {
       var kcalRow = s.kind === "Food"
         ? "<p class=\"nx-row-meta\">TOTAL KCAL <input type=\"number\" min=\"0\" step=\"1\" class=\"nx-cell\" style=\"width:110px; display:inline-block; font-family:var(--nx-mono);\" value=\"" + (s.kcal ? String(s.kcal) : "") + "\" placeholder=\"SET KCAL\" data-store-kcal=\"" + s.id + "\"></p>"
         : "";
+      var kindLabel = s.kind === "PetFood" ? "PET FOOD" : String(s.kind).toUpperCase();
       return "<div class=\"nx-row\"><div class=\"nx-row-main\"><p class=\"nx-row-title\">" + esc(s.name) + "</p>" +
-        "<p class=\"nx-row-meta\">" + esc(s.kind.toUpperCase()) + " // EXP " + esc(s.expiry || "NO DATE") + "</p>" + kcalRow + "</div>" +
+        "<p class=\"nx-row-meta\">" + esc(kindLabel) + " // EXP " + esc(s.expiry || "NO DATE") + " // AT " + esc(kitLoc(s.loc).toUpperCase()) + "</p>" + kcalRow + "</div>" +
         "<div class=\"nx-row-side\"><span class=\"nx-row-weight\">" + fmt(s.amount, 1) + "</span> <span class=\"nx-dim\">" + esc(s.unit) + "</span>" +
         "<div class=\"nx-btn-row\" style=\"justify-content:flex-end;\">" +
         "<button type=\"button\" class=\"nx-btn nx-btn-small nx-btn-danger\" data-store-del=\"" + s.id + "\">Del</button>" +
@@ -764,24 +1463,40 @@
 
   function renderRotation() {
     renderStores();
+    renderRadar();
+    renderMeds();
+    renderCash();
     var rows = allExpiries();
     var body = $("nx-rotation-body");
+    var anyReplace = false;
     if (!rows.length) {
       body.innerHTML = "<tr><td colspan=\"6\" class=\"nx-dim\" style=\"font-family:var(--nx-mono); font-size:12px;\">NOTHING WITH AN EXPIRY DATE YET.</td></tr>";
-      return;
+    } else {
+      body.innerHTML = rows.map(function (r) {
+        var st = expiryState(r.days);
+        var daysTxt = r.days == null ? "-" : (r.days < 0 ? r.days + " (PAST)" : String(r.days));
+        // A store flagged DUE SOON or OVERDUE gets a REPLACE shop
+        // button matched by store type (replaceBtnHtml, shared
+        // with the Expiry Radar); gear rows and healthy stores
+        // render exactly as before.
+        var replaceBtn = replaceBtnHtml(r);
+        if (replaceBtn) anyReplace = true;
+        return "<tr data-rot-row=\"" + r.kind + ":" + r.refId + "\">" +
+          "<td>" + esc(r.name) + "</td>" +
+          "<td class=\"nx-num\" style=\"color:var(--nx-dim);\">" + esc(r.source) + "</td>" +
+          "<td><input type=\"date\" class=\"nx-cell\" style=\"width:auto; font-family:var(--nx-mono);\" value=\"" + esc(r.expiry) + "\" data-rot-date=\"" + r.kind + ":" + r.refId + "\"></td>" +
+          "<td class=\"nx-num\">" + daysTxt + "</td>" +
+          "<td><span class=\"nx-badge " + st.cls + "\">" + st.label + "</span></td>" +
+          "<td style=\"white-space:nowrap;\"><button type=\"button\" class=\"nx-btn nx-btn-small\" data-rot-plus=\"" + r.kind + ":" + r.refId + "\">Rotate +6MO</button>" +
+          (replaceBtn ? " " + replaceBtn : "") + "</td>" +
+          "</tr>";
+      }).join("");
     }
-    body.innerHTML = rows.map(function (r) {
-      var st = expiryState(r.days);
-      var daysTxt = r.days == null ? "-" : (r.days < 0 ? r.days + " (PAST)" : String(r.days));
-      return "<tr data-rot-row=\"" + r.kind + ":" + r.refId + "\">" +
-        "<td>" + esc(r.name) + "</td>" +
-        "<td class=\"nx-num\" style=\"color:var(--nx-dim);\">" + esc(r.source) + "</td>" +
-        "<td><input type=\"date\" class=\"nx-cell\" style=\"width:auto; font-family:var(--nx-mono);\" value=\"" + esc(r.expiry) + "\" data-rot-date=\"" + r.kind + ":" + r.refId + "\"></td>" +
-        "<td class=\"nx-num\">" + daysTxt + "</td>" +
-        "<td><span class=\"nx-badge " + st.cls + "\">" + st.label + "</span></td>" +
-        "<td style=\"white-space:nowrap;\"><button type=\"button\" class=\"nx-btn nx-btn-small\" data-rot-plus=\"" + r.kind + ":" + r.refId + "\">Rotate +6MO</button></td>" +
-        "</tr>";
-    }).join("");
+    var shopNote = $("nx-rotate-shop-note");
+    if (shopNote) {
+      shopNote.textContent = anyReplace ? shopDisclosureText() : "";
+      shopNote.style.display = anyReplace ? "" : "none";
+    }
   }
 
   function setExpiry(kind, id, dateStr) {
@@ -792,6 +1507,13 @@
   }
 
   function bindRotation() {
+    // Pet food is counted in pounds (the readiness ration is
+    // lb per pet per day), so picking the Pet Food kind snaps
+    // the unit field to lbs instead of leaving a unit the pet
+    // math would ignore.
+    $("nx-s-kind").addEventListener("change", function () {
+      if ($("nx-s-kind").value === "PetFood") $("nx-s-unit").value = "lbs";
+    });
     $("nx-store-form").addEventListener("submit", function (ev) {
       ev.preventDefault();
       var name = $("nx-s-name").value.trim();
@@ -803,7 +1525,8 @@
         amount: Number($("nx-s-amount").value) || 0,
         unit: $("nx-s-unit").value.trim() || "units",
         expiry: $("nx-s-expiry").value || null,
-        kcal: Number($("nx-s-kcal").value) || 0
+        kcal: Number($("nx-s-kcal").value) || 0,
+        loc: kitLoc($("nx-s-loc").value)
       });
       saveState();
       ev.target.reset();
@@ -840,6 +1563,1222 @@
       var parts = input.getAttribute("data-rot-date").split(":");
       setExpiry(parts[0], parts[1], input.value || null);
     });
+  }
+
+  /* ---------------- medications + cash on hand (Ready.gov build) ----------------
+     Meds: a per-person prescription log riding the Rotate view.
+     Half of adults take a daily prescription and an emergency
+     is exactly when a refill is hardest - so supply days and
+     expiry dates are tracked here and surfaced on the Expiry
+     Radar (medRadarRows). Factual log only: names, doses,
+     dates. No advice, no recommendations. Free for all tiers.
+     Cash: stashes of small bills by location, summed onto the
+     Command readiness breakdown. Display only - cash never
+     enters the Days Ready math. */
+  function medState(m) {
+    var days = null;
+    if (m.expiry) { var ed = daysLeft(m.expiry); if (ed != null) days = ed; }
+    if (typeof m.supplyDays === "number") days = days == null ? m.supplyDays : Math.min(days, m.supplyDays);
+    return { days: days, st: expiryState(days) };
+  }
+
+  function renderMeds() {
+    var list = $("nx-med-list");
+    if (!list) return;
+    var dl = $("nx-med-person-list");
+    if (dl) dl.innerHTML = state.crew.map(function (c) { return "<option value=\"" + esc(c.name) + "\"></option>"; }).join("");
+    var meds = Array.isArray(state.meds) ? state.meds : [];
+    if (!meds.length) {
+      list.innerHTML = "<div class=\"nx-empty\">NO MEDS LOGGED. ADD THE HOUSEHOLD'S PRESCRIPTIONS ABOVE - WHO THEY BELONG TO, HOW MANY DAYS OF SUPPLY ARE ON HAND, AND THE DATES THAT MATTER.</div>";
+      return;
+    }
+    list.innerHTML = meds.map(function (m) {
+      var ms = medState(m);
+      var meta = (m.person ? esc(String(m.person).toUpperCase()) : "UNASSIGNED") +
+        (m.dose ? " // " + esc(String(m.dose).toUpperCase()) : "") +
+        " // SUPPLY " + (Number(m.supplyDays) || 0) + " DAYS" +
+        (m.refillBy ? " // REFILL BY " + esc(m.refillBy) : "") +
+        (m.expiry ? " // EXP " + esc(m.expiry) : "");
+      return "<div class=\"nx-row\"><div class=\"nx-row-main\"><p class=\"nx-row-title\">" + esc(m.name) + "</p>" +
+        "<p class=\"nx-row-meta\">" + meta + "</p></div>" +
+        "<div class=\"nx-row-side\"><span class=\"nx-badge " + ms.st.cls + "\">" + ms.st.label + "</span>" +
+        "<div class=\"nx-btn-row\" style=\"justify-content:flex-end;\">" +
+        "<button type=\"button\" class=\"nx-btn nx-btn-small\" data-med-edit=\"" + m.id + "\">Edit</button>" +
+        "<button type=\"button\" class=\"nx-btn nx-btn-small nx-btn-danger\" data-med-del=\"" + m.id + "\">Del</button>" +
+        "</div></div></div>";
+    }).join("");
+  }
+
+  function resetMedForm() {
+    $("nx-med-form").reset();
+    $("nx-med-id").value = "";
+    $("nx-med-form-title").textContent = "Medications";
+    $("nx-med-save").textContent = "Add Medication";
+    $("nx-med-cancel-edit").style.display = "none";
+  }
+
+  function bindMeds() {
+    $("nx-med-form").addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var name = $("nx-med-name").value.trim();
+      if (!name) return;
+      var data = {
+        person: $("nx-med-person").value.trim(),
+        name: name,
+        dose: $("nx-med-dose").value.trim(),
+        supplyDays: Math.max(0, Math.round(Number($("nx-med-supply").value) || 0)),
+        refillBy: $("nx-med-refill").value || null,
+        expiry: $("nx-med-expiry").value || null
+      };
+      var id = $("nx-med-id").value;
+      if (id) {
+        state.meds.forEach(function (m) { if (m.id === id) Object.assign(m, data); });
+      } else {
+        data.id = uid();
+        state.meds.push(data);
+      }
+      saveState();
+      resetMedForm();
+      renderAll();
+      sfxConfirm();
+    });
+    $("nx-med-cancel-edit").addEventListener("click", resetMedForm);
+    $("nx-med-list").addEventListener("click", function (ev) {
+      var editBtn = ev.target.closest("[data-med-edit]");
+      var delBtn = ev.target.closest("[data-med-del]");
+      if (editBtn) {
+        var m = state.meds.filter(function (x) { return x.id === editBtn.getAttribute("data-med-edit"); })[0];
+        if (!m) return;
+        $("nx-med-id").value = m.id;
+        $("nx-med-person").value = m.person || "";
+        $("nx-med-name").value = m.name;
+        $("nx-med-dose").value = m.dose || "";
+        $("nx-med-supply").value = m.supplyDays;
+        $("nx-med-refill").value = m.refillBy || "";
+        $("nx-med-expiry").value = m.expiry || "";
+        $("nx-med-form-title").textContent = "Edit Medication";
+        $("nx-med-save").textContent = "Save Changes";
+        $("nx-med-cancel-edit").style.display = "";
+        $("nx-med-name").focus();
+      }
+      if (delBtn) {
+        var delId = delBtn.getAttribute("data-med-del");
+        var item = state.meds.filter(function (x) { return x.id === delId; })[0];
+        if (item && window.confirm("Delete medication: " + item.name + "?")) {
+          state.meds = state.meds.filter(function (x) { return x.id !== delId; });
+          saveState();
+          renderAll();
+        }
+      }
+    });
+  }
+
+  function renderCash() {
+    var list = $("nx-cash-list");
+    if (!list) return;
+    var entries = Array.isArray(state.cash) ? state.cash : [];
+    list.innerHTML = entries.length
+      ? entries.map(function (c) {
+          return "<div class=\"nx-row\"><div class=\"nx-row-main\"><p class=\"nx-row-title\">" + esc(c.where || "UNMARKED STASH") + "</p>" +
+            "<p class=\"nx-row-meta\">CASH ON HAND</p></div>" +
+            "<div class=\"nx-row-side\"><span class=\"nx-row-weight\">$" + fmt(c.amount, 0) + "</span>" +
+            "<div class=\"nx-btn-row\" style=\"justify-content:flex-end;\">" +
+            "<button type=\"button\" class=\"nx-btn nx-btn-small nx-btn-danger\" data-cash-del=\"" + c.id + "\">Del</button>" +
+            "</div></div></div>";
+        }).join("")
+      : "<div class=\"nx-empty\">NO CASH LOGGED. SMALL BILLS IN THE GO-BAG AND AT HOME - LOG THEM HERE.</div>";
+    var total = $("nx-cash-total");
+    if (total) total.innerHTML = "TOTAL CASH ON HAND <b>$" + fmt(cashTotal(), 0) + "</b>";
+  }
+
+  function bindCash() {
+    $("nx-cash-form").addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var amount = Math.round((Number($("nx-cash-amount").value) || 0) * 100) / 100;
+      if (!(amount > 0)) {
+        showMsg($("nx-cash-msg"), "ENTER AN AMOUNT ABOVE ZERO.", "err");
+        return;
+      }
+      state.cash.push({ id: uid(), amount: amount, where: $("nx-cash-where").value.trim() });
+      saveState();
+      ev.target.reset();
+      renderAll();
+      sfxConfirm();
+    });
+    $("nx-cash-list").addEventListener("click", function (ev) {
+      var del = ev.target.closest("[data-cash-del]");
+      if (!del) return;
+      var id = del.getAttribute("data-cash-del");
+      var c = state.cash.filter(function (x) { return x.id === id; })[0];
+      if (c && window.confirm("Delete cash entry: $" + fmt(c.amount, 0) + (c.where ? " (" + c.where + ")" : "") + "?")) {
+        state.cash = state.cash.filter(function (x) { return x.id !== id; });
+        saveState();
+        renderAll();
+      }
+    });
+  }
+
+  /* ---------------- barcode scanning (money build C) ----------------
+     Point the camera at a barcode and the add form prefills - the
+     form stays the confirmation, exactly like the photo-AI pattern
+     in Munchling: prefill, the user edits, the user saves. Nothing
+     ever auto-saves, and the gear cap still bites because a scan
+     only fills the same form a manual add submits through.
+     Live path: getUserMedia + the platform BarcodeDetector.
+     Everywhere else (Safari / iOS, WebViews without the detector,
+     a denied camera) the overlay swaps to a type-the-number panel,
+     so scanning never dead-ends. The lookup itself is one function
+     against Open Food Facts - a data call made only on a scan, so
+     the offline-first shell never depends on it. */
+  // One scanner, two modes (money build D): "barcode" is the
+  // Build C flow above (target "store" | "gear"); "qr" is Squad
+  // Sync (target "squad") reading qr_code frames through the
+  // same overlay, the same camera discipline and the same
+  // detect loop - only the format list, the copy and what a
+  // decoded code does differ.
+  var scan = { target: null, mode: "barcode", stream: null, detector: null, timer: 0, active: false, busy: false };
+
+  function parseOffProduct(json) {
+    // Defensive parse of an Open Food Facts v2 response into the
+    // flat shape the prefill rules consume. Anything missing comes
+    // back null, never undefined, never a throw.
+    var out = { found: false, name: null, kcalPer100g: null, kcalServing: null, quantityGrams: null };
+    if (!json || json.status !== 1 || !json.product) return out;
+    var p = json.product;
+    var brand = typeof p.brands === "string" ? p.brands.split(",")[0].trim() : "";
+    var pname = typeof p.product_name === "string" ? p.product_name.trim() : "";
+    if (pname && brand && pname.toLowerCase().indexOf(brand.toLowerCase()) !== 0) {
+      out.name = (brand + " " + pname).replace(/\s+/g, " ").trim();
+    } else {
+      out.name = pname || brand || null;
+    }
+    var n = p.nutriments || {};
+    var k100 = Number(n["energy-kcal_100g"]);
+    if (isFinite(k100) && k100 > 0) out.kcalPer100g = k100;
+    var kserv = Number(n["energy-kcal_serving"]);
+    if (isFinite(kserv) && kserv > 0) out.kcalServing = kserv;
+    // Package size in grams: prefer the structured quantity fields,
+    // fall back to parsing the display string ("500 g", "1.5 kg").
+    var qty = Number(p.product_quantity), unit = String(p.product_quantity_unit || "").toLowerCase();
+    if (isFinite(qty) && qty > 0) {
+      if (unit === "g") out.quantityGrams = qty;
+      else if (unit === "kg") out.quantityGrams = qty * 1000;
+    }
+    if (out.quantityGrams == null && typeof p.quantity === "string") {
+      var m = p.quantity.match(/(\d+(?:[.,]\d+)?)\s*(kg|g)\b/i);
+      if (m) {
+        var v = parseFloat(m[1].replace(",", "."));
+        if (isFinite(v) && v > 0) out.quantityGrams = m[2].toLowerCase() === "kg" ? v * 1000 : v;
+      }
+    }
+    out.found = true;
+    return out;
+  }
+
+  function lookupBarcode(code) {
+    // The one lookup function. Resolves to a result object on every
+    // path - found, not found, HTTP error, network throw - and
+    // never rejects, so the scan flow can always land on a prefill.
+    var url = "https://world.openfoodfacts.org/api/v2/product/" + encodeURIComponent(code) + ".json";
+    return fetch(url, { headers: { "Accept": "application/json" } }).then(function (res) {
+      if (!res.ok) return { found: false, name: null, kcalPer100g: null, kcalServing: null, quantityGrams: null };
+      return res.json();
+    }).then(function (json) {
+      return parseOffProduct(json);
+    }).catch(function () {
+      return { found: false, name: null, kcalPer100g: null, kcalServing: null, quantityGrams: null };
+    });
+  }
+
+  function scanMsgEl(target) { return $(target === "gear" ? "nx-gear-msg" : "nx-store-msg"); }
+
+  function prefillFromBarcode(target, code, res) {
+    // The prefill rules. Store form, Food kind, gets the full
+    // treatment because its kcal field drives Food Days:
+    //   1. Package math when the pack size and per-100g energy are
+    //      both known - kcal = per-100g x grams / 100, amount 1,
+    //      unit "package". The most defensible single number: it
+    //      is the whole pack the user is logging.
+    //   2. Else the per-serving energy, which is also a whole-unit
+    //      figure the user can sanity-check against the label.
+    //   3. Else per-100g energy on its own - filled, but flagged
+    //      in the message as per-100g so the user scales it.
+    //   4. Found with no nutrition: name only, kcal left empty.
+    // Water / Meds / Batteries stores and gear take the name only.
+    // Not found (or offline): the name field carries
+    // "BARCODE <code>" so the code is never lost and the user
+    // edits it into the real name.
+    var msgEl = scanMsgEl(target);
+    if (target === "gear") {
+      var gName = $("nx-g-name");
+      if (res.found && res.name) {
+        gName.value = res.name.slice(0, 80);
+        showMsg(msgEl, "FILLED FROM BARCODE - CHECK THE DETAILS, THEN SAVE.", "good");
+      } else {
+        gName.value = ("BARCODE " + code).slice(0, 80);
+        showMsg(msgEl, "NOT IN THE DATABASE - DETAILS LEFT FOR YOU.", "err");
+      }
+      gName.focus();
+      return;
+    }
+    var sName = $("nx-s-name");
+    if (!res.found || !res.name) {
+      sName.value = ("BARCODE " + code).slice(0, 70);
+      showMsg(msgEl, "NOT IN THE DATABASE - DETAILS LEFT FOR YOU.", "err");
+      sName.focus();
+      return;
+    }
+    sName.value = res.name.slice(0, 70);
+    if ($("nx-s-kind").value !== "Food") {
+      showMsg(msgEl, "FILLED FROM BARCODE - CHECK THE DETAILS, THEN SAVE.", "good");
+      sName.focus();
+      return;
+    }
+    if (res.quantityGrams != null && res.kcalPer100g != null) {
+      $("nx-s-kcal").value = Math.round(res.kcalPer100g * res.quantityGrams / 100);
+      $("nx-s-amount").value = 1;
+      $("nx-s-unit").value = "package";
+      showMsg(msgEl, "FILLED FROM BARCODE - CHECK THE DETAILS, THEN SAVE.", "good");
+    } else if (res.kcalServing != null) {
+      $("nx-s-kcal").value = Math.round(res.kcalServing);
+      showMsg(msgEl, "FILLED FROM BARCODE - CHECK THE DETAILS, THEN SAVE.", "good");
+    } else if (res.kcalPer100g != null) {
+      $("nx-s-kcal").value = Math.round(res.kcalPer100g);
+      showMsg(msgEl, "FILLED FROM BARCODE - KCAL IS PER 100G - CHECK THE PACK SIZE BEFORE YOU SAVE.", "good");
+    } else {
+      showMsg(msgEl, "FILLED FROM BARCODE - NO CALORIE DATA FOUND - ADD KCAL BY HAND, THEN SAVE.", "good");
+    }
+    sName.focus();
+  }
+
+  function stopScanCamera() {
+    if (scan.timer) { clearTimeout(scan.timer); scan.timer = 0; }
+    if (scan.stream) {
+      scan.stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
+      scan.stream = null;
+    }
+    var v = $("nx-scan-video");
+    if (v) { try { v.srcObject = null; } catch (e) {} }
+    scan.detector = null;
+    scan.busy = false;
+  }
+
+  function closeScanner() {
+    stopScanCamera();
+    scan.active = false;
+    scan.target = null;
+    scan.mode = "barcode";
+    var ov = $("nx-scan");
+    if (ov) ov.style.display = "none";
+  }
+
+  function showScanFallback(note) {
+    stopScanCamera();
+    $("nx-scan-frame").style.display = "none";
+    $("nx-scan-fallback").style.display = "";
+    var isQr = scan.mode === "qr";
+    // The type-the-number row is a barcode affordance; a squad
+    // code is far too long to type, so QR mode points at the
+    // paste box in the Squad Sync panel instead.
+    var inp = $("nx-scan-manual"), lookupBtn = $("nx-scan-lookup"), fbLabel = $("nx-scan-fallback-label");
+    if (inp) inp.style.display = isQr ? "none" : "";
+    if (lookupBtn) lookupBtn.style.display = isQr ? "none" : "";
+    if (fbLabel) fbLabel.textContent = isQr ? "PASTE THE CODE TEXT IN THE SQUAD SYNC PANEL INSTEAD." : "TYPE THE NUMBER, THEN LOOK UP:";
+    $("nx-scan-status").textContent = note || (isQr
+      ? "NO CAMERA SCAN HERE - USE THE PASTE BOX IN THE SQUAD SYNC PANEL."
+      : "NO CAMERA SCAN HERE - TYPE THE NUMBER UNDER THE BARCODE.");
+    if (inp && !isQr) { inp.value = ""; setTimeout(function () { inp.focus(); }, 60); }
+  }
+
+  function onScanCode(code) {
+    if (scan.mode === "qr") {
+      // Squad codes are payload text: never whitespace-stripped
+      // (frame chunks split the JSON at arbitrary offsets) and
+      // the scanner stays open across frames - onScanSquad
+      // decides when the set is complete.
+      onScanSquad(String(code || ""));
+      return;
+    }
+    code = String(code || "").replace(/\s+/g, "");
+    if (!code) return;
+    var target = scan.target;
+    closeScanner();
+    lookupBarcode(code).then(function (res) { prefillFromBarcode(target, code, res); });
+  }
+
+  function startScanDetect() {
+    var video = $("nx-scan-video");
+    var tick = function () {
+      if (!scan.active || !scan.detector) return;
+      scan.timer = setTimeout(tick, 250);
+      if (scan.busy) return;
+      scan.busy = true;
+      scan.detector.detect(video).then(function (codes) {
+        scan.busy = false;
+        if (!scan.active) return;
+        if (codes && codes.length && codes[0].rawValue) onScanCode(codes[0].rawValue);
+      }).catch(function () { scan.busy = false; });
+    };
+    tick();
+  }
+
+  function openScanner(target, mode) {
+    scan.target = target;
+    scan.mode = mode === "qr" ? "qr" : "barcode";
+    scan.active = true;
+    $("nx-scan").style.display = "";
+    $("nx-scan-frame").style.display = "";
+    $("nx-scan-fallback").style.display = "none";
+    var title = $("nx-scan-title");
+    if (title) title.textContent = scan.mode === "qr" ? "SCAN A SQUAD CODE" : "POINT AT A BARCODE";
+    var kicker = $("nx-scan-kicker");
+    if (kicker) kicker.textContent = scan.mode === "qr" ? "Squad Sync" : "Barcode Scan";
+    $("nx-scan-status").textContent = "STARTING CAMERA...";
+    var canDetect = typeof window.BarcodeDetector === "function";
+    var canCamera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    if (!canDetect || !canCamera) { showScanFallback(); return; }
+    try {
+      scan.detector = new window.BarcodeDetector({
+        formats: scan.mode === "qr" ? ["qr_code"] : ["upc_a", "upc_e", "ean_13", "ean_8", "code_128"]
+      });
+    } catch (e) { scan.detector = null; showScanFallback(); return; }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function (stream) {
+      if (!scan.active) { // cancelled while the permission prompt was up
+        stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
+        return;
+      }
+      scan.stream = stream;
+      var video = $("nx-scan-video");
+      try { video.srcObject = stream; } catch (e) {}
+      if (video.play) { var p = video.play(); if (p && p.catch) p.catch(function () {}); }
+      $("nx-scan-status").textContent = scan.mode === "qr" ? "POINT THE CAMERA AT A SQUAD CODE." : "POINT THE CAMERA AT A BARCODE.";
+      startScanDetect();
+    }).catch(function () {
+      if (scan.active) showScanFallback(scan.mode === "qr"
+        ? "CAMERA UNAVAILABLE - USE THE PASTE BOX IN THE SQUAD SYNC PANEL."
+        : "CAMERA UNAVAILABLE - TYPE THE NUMBER UNDER THE BARCODE.");
+    });
+  }
+
+  function bindBarcode() {
+    $("nx-store-scan").addEventListener("click", function () { openScanner("store"); });
+    $("nx-gear-scan").addEventListener("click", function () { openScanner("gear"); });
+    $("nx-scan-cancel").addEventListener("click", closeScanner);
+    var runManual = function () { onScanCode($("nx-scan-manual").value); };
+    $("nx-scan-lookup").addEventListener("click", runManual);
+    $("nx-scan-manual").addEventListener("keydown", function (ev) { if (ev.key === "Enter") { ev.preventDefault(); runManual(); } });
+  }
+
+  /* ---------------- squad sync (money build D) ----------------
+     QR Squad Sync, a $9.99 one-time add-on (entitlement:
+     hasAddon("qr-sync"), server-owned - see the plan section).
+     One user shows a code carrying their crew + loadout; a
+     second user scans it and imports the lot with fresh ids.
+     The payload is crew + gear ONLY - never vault data, never
+     home-base coordinates, never emails or account ids (gear
+     assignments travel as an index into the payload's own crew
+     list, and entry ids are dropped entirely).
+     Payload: <8-hex FNV-1a checksum> ":" <compact JSON>
+       { v: 1,
+         c: [[name, role, notes], ...],
+         g: [[name, category, tier, weightValue, weightUnit,
+              qty, expiryOrNull, assignedCrewIndexOr-1,
+              location, envCsv], ...] }
+     A payload up to 1800 chars travels as ONE code. Bigger
+     loadouts split into frames of about 1780 payload chars,
+     each shown code carrying the text "NXS1 <i>/<n> " before
+     its chunk; the importer collects frames in any order until
+     the set completes, then the same checksum + version gate
+     runs. Corrupt or foreign codes are rejected with a clear
+     message and nothing is imported. */
+  var SQUAD_FRAME_MAX = 1800; // chars in a single code
+  var SQUAD_CHUNK = 1780;     // payload chars per frame
+  var SQUAD_MAX_FRAMES = 40;
+
+  function squadChecksum(s) {
+    var h = 0x811c9dc5;
+    for (var i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return ("0000000" + (h >>> 0).toString(16)).slice(-8);
+  }
+
+  function squadPayloadText() {
+    var idxById = {};
+    var c = state.crew.map(function (m, i) {
+      idxById[m.id] = i;
+      return [m.name || "", m.role || "Other", m.notes || ""];
+    });
+    var g = state.gear.map(function (it) {
+      var ai = (it.assignedTo && Object.prototype.hasOwnProperty.call(idxById, it.assignedTo)) ? idxById[it.assignedTo] : -1;
+      return [
+        it.name || "", it.category || "Other", it.tier || "T2",
+        Number(it.weightValue) || 0, it.weightUnit || "lb",
+        Math.max(1, Number(it.qty) || 1), it.expiry || null,
+        ai, it.location || "", (Array.isArray(it.env) ? it.env : []).join(",")
+      ];
+    });
+    var body = JSON.stringify({ v: 1, c: c, g: g });
+    return squadChecksum(body) + ":" + body;
+  }
+
+  function squadFrames() {
+    var full = squadPayloadText();
+    if (full.length <= SQUAD_FRAME_MAX) return [full];
+    var n = Math.ceil(full.length / SQUAD_CHUNK);
+    var frames = [];
+    for (var i = 0; i < n; i++) {
+      frames.push("NXS1 " + (i + 1) + "/" + n + " " + full.slice(i * SQUAD_CHUNK, (i + 1) * SQUAD_CHUNK));
+    }
+    return frames;
+  }
+
+  function squadParse(full) {
+    // The gate every completed payload passes before anything
+    // is imported: shape, checksum, version, structure.
+    if (typeof full !== "string" || full.indexOf(":") !== 8) return { error: "NOT A SQUAD CODE." };
+    var sum = full.slice(0, 8), body = full.slice(9);
+    if (!/^[0-9a-f]{8}$/.test(sum)) return { error: "NOT A SQUAD CODE." };
+    if (squadChecksum(body) !== sum) return { error: "CODE DAMAGED - THE CHECKSUM DOES NOT MATCH. SCAN IT AGAIN." };
+    var data = null;
+    try { data = JSON.parse(body); } catch (e) { return { error: "CODE DAMAGED - IT COULD NOT BE READ." }; }
+    if (!data || typeof data !== "object") return { error: "NOT A SQUAD CODE." };
+    if (data.v !== 1) return { error: "THIS CODE IS FROM A DIFFERENT VERSION OF SQUAD SYNC." };
+    if (!Array.isArray(data.c) || !Array.isArray(data.g)) return { error: "NOT A SQUAD CODE." };
+    return { complete: true, data: data };
+  }
+
+  /* Frame collector, shared by the camera path and the paste
+   * box. feed() answers { complete, data } when a payload is
+   * whole and validated, { partial, got, n } while frames are
+   * still missing, or { error } for anything else. A frame
+   * naming a different set size restarts the set - the newest
+   * export wins. */
+  var squadRx = { n: 0, parts: {} };
+  function squadCollectReset() { squadRx = { n: 0, parts: {} }; }
+  function squadCollect(text) {
+    text = String(text == null ? "" : text).trim();
+    if (!text) return { error: "NO CODE THERE - SCAN OR PASTE ONE FIRST." };
+    var m = text.match(/^NXS1\s+(\d+)\s*\/\s*(\d+)\s+([\s\S]+)$/);
+    if (m) {
+      var idx = Number(m[1]), n = Number(m[2]);
+      if (!(idx >= 1 && idx <= n) || n < 2 || n > SQUAD_MAX_FRAMES) {
+        return { error: "THAT FRAME DOES NOT LOOK RIGHT - SCAN IT AGAIN." };
+      }
+      if (squadRx.n !== n) squadRx = { n: n, parts: {} };
+      squadRx.parts[idx] = m[3];
+      var got = Object.keys(squadRx.parts).length;
+      if (got < n) return { partial: true, got: got, n: n };
+      var full = "";
+      for (var i = 1; i <= n; i++) full += squadRx.parts[i];
+      squadCollectReset();
+      return squadParse(full);
+    }
+    if (/^NXS1\b/.test(text)) return { error: "THAT SQUAD FRAME IS DAMAGED - SCAN IT AGAIN." };
+    return squadParse(text);
+  }
+
+  function squadSanitize(data) {
+    // Untrusted input: every field is re-clamped to the same
+    // shapes the crew / gear forms themselves produce.
+    function str(v, max) { return typeof v === "string" ? v.slice(0, max) : ""; }
+    function num(v, lo, hi, fb) { v = Number(v); return isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fb; }
+    var crew = [];
+    data.c.forEach(function (row) {
+      if (!Array.isArray(row)) return;
+      var name = str(row[0], 50);
+      if (!name) return;
+      crew.push({
+        name: name,
+        role: ["Adult", "Child", "Pet", "Other"].indexOf(row[1]) !== -1 ? row[1] : "Other",
+        notes: str(row[2], 140)
+      });
+    });
+    var gear = [];
+    data.g.forEach(function (row) {
+      if (!Array.isArray(row)) return;
+      var name = str(row[0], 80);
+      if (!name) return;
+      var env = typeof row[9] === "string"
+        ? row[9].split(",").filter(function (t) { return ENV_TAGS.indexOf(t) !== -1; })
+        : [];
+      gear.push({
+        name: name,
+        category: CATEGORIES.indexOf(row[1]) !== -1 ? row[1] : "Other",
+        tier: ["T1", "T2", "T3"].indexOf(row[2]) !== -1 ? row[2] : "T2",
+        weightValue: num(row[3], 0, 100000, 0),
+        weightUnit: ["lb", "oz", "kg", "g"].indexOf(row[4]) !== -1 ? row[4] : "lb",
+        qty: Math.round(num(row[5], 1, 9999, 1)),
+        expiry: typeof row[6] === "string" && /^\d{4}-\d{2}-\d{2}$/.test(row[6]) ? row[6] : null,
+        assignedIdx: Math.round(num(row[7], -1, 100000, -1)),
+        location: str(row[8], 60),
+        env: env
+      });
+    });
+    return { crew: crew, gear: gear };
+  }
+
+  function importSquadData(data) {
+    // MERGE, never replace: existing entries are untouched and
+    // every imported entry gets a fresh id. The free plan caps
+    // still bite (crew / gear) for non-Operators; whatever does
+    // not fit is counted and reported, never silently dropped.
+    var clean = squadSanitize(data);
+    var capped = !isOperator();
+    var crewRoom = capped ? Math.max(0, PLAN_CAPS.crew - state.crew.length) : Infinity;
+    var gearRoom = capped ? Math.max(0, PLAN_CAPS.gear - state.gear.length) : Infinity;
+    var idByIdx = {};
+    var addedCrew = 0, skippedCrew = 0, addedGear = 0, skippedGear = 0;
+    clean.crew.forEach(function (m, i) {
+      if (addedCrew >= crewRoom) { skippedCrew++; idByIdx[i] = null; return; }
+      var nm = { id: uid(), name: m.name, role: m.role, notes: m.notes };
+      state.crew.push(nm);
+      idByIdx[i] = nm.id;
+      addedCrew++;
+    });
+    clean.gear.forEach(function (g) {
+      if (addedGear >= gearRoom) { skippedGear++; return; }
+      state.gear.push({
+        id: uid(), name: g.name, category: g.category, tier: g.tier,
+        weightValue: g.weightValue, weightUnit: g.weightUnit, qty: g.qty,
+        expiry: g.expiry,
+        assignedTo: (g.assignedIdx >= 0 && idByIdx[g.assignedIdx]) ? idByIdx[g.assignedIdx] : "",
+        location: g.location, env: g.env
+      });
+      addedGear++;
+    });
+    saveState();
+    renderAll();
+    return { crew: addedCrew, gear: addedGear, skippedCrew: skippedCrew, skippedGear: skippedGear };
+  }
+
+  function squadImportMessage(r) {
+    var msg = "IMPORTED " + r.crew + " CREW, " + r.gear + " GEAR.";
+    var sk = [];
+    if (r.skippedCrew) sk.push(r.skippedCrew + " CREW SKIPPED AT THE FREE CAP");
+    if (r.skippedGear) sk.push(r.skippedGear + " GEAR SKIPPED AT THE FREE CAP");
+    if (sk.length) msg = "IMPORTED " + r.crew + " CREW, " + r.gear + " GEAR - " + sk.join(" - ") + ".";
+    return msg;
+  }
+
+  /* One feed for both import paths: feed a decoded code (or a
+   * pasted line) and the panel message reports the outcome -
+   * progress while frames are missing, the import summary on
+   * completion, the rejection reason otherwise. */
+  function feedSquadText(text) {
+    var res = squadCollect(text);
+    var msgEl = $("nx-squad-msg");
+    if (res.complete) {
+      var r = importSquadData(res.data);
+      if (msgEl) showMsg(msgEl, squadImportMessage(r), "good");
+    } else if (res.partial) {
+      if (msgEl) showMsg(msgEl, "GOT " + res.got + " OF " + res.n + " - KEEP SCANNING.", "");
+    } else if (msgEl) {
+      showMsg(msgEl, res.error || "NOT A SQUAD CODE.", "err");
+    }
+    return res;
+  }
+
+  /* The camera path: partial sets and foreign codes keep the
+   * scanner open with the status line as the report; only a
+   * completed, validated payload closes it and imports. */
+  function onScanSquad(text) {
+    var res = squadCollect(text);
+    if (res.complete) {
+      closeScanner();
+      var r = importSquadData(res.data);
+      var msgEl = $("nx-squad-msg");
+      if (msgEl) showMsg(msgEl, squadImportMessage(r), "good");
+    } else if (res.partial) {
+      $("nx-scan-status").textContent = "GOT " + res.got + " OF " + res.n + " - KEEP SCANNING.";
+    } else {
+      $("nx-scan-status").textContent = res.error || "NOT A SQUAD CODE.";
+    }
+  }
+
+  /* ---------------- squad sync panel ---------------- */
+  var squadUi = { frames: [], idx: 0 };
+
+  function drawSquadFrame() {
+    var cv = $("nx-squad-canvas");
+    if (!cv || !squadUi.frames.length) return;
+    if (window.NXQR) window.NXQR.draw(cv, squadUi.frames[squadUi.idx]);
+    var line = $("nx-squad-frame-line");
+    if (line) {
+      line.textContent = squadUi.frames.length > 1
+        ? "CODE " + (squadUi.idx + 1) + " OF " + squadUi.frames.length + " - THE OTHER PHONE SCANS EACH ONE IN ANY ORDER"
+        : "ONE CODE CARRIES THE WHOLE SQUAD";
+    }
+    var prev = $("nx-squad-prev"), next = $("nx-squad-next");
+    if (prev) prev.disabled = squadUi.idx <= 0;
+    if (next) next.disabled = squadUi.idx >= squadUi.frames.length - 1;
+  }
+
+  function showSquadCode() {
+    squadUi.frames = squadFrames();
+    squadUi.idx = 0;
+    var wrap = $("nx-squad-codewrap");
+    if (wrap) wrap.style.display = "";
+    drawSquadFrame();
+  }
+
+  function renderSquad() {
+    // Toggles + counts only: the panel markup is static and the
+    // canvas / paste box must survive renderAll untouched.
+    var locked = $("nx-squad-locked"), open = $("nx-squad-open");
+    if (!locked || !open) return;
+    var has = hasAddon("qr-sync");
+    locked.style.display = has ? "none" : "";
+    open.style.display = has ? "" : "none";
+    if (has) {
+      var line = $("nx-squad-counts");
+      if (line) line.textContent = state.crew.length + " CREW - " + state.gear.length + " GEAR";
+    }
+  }
+
+  function bindSquad() {
+    var show = $("nx-squad-show");
+    if (show) show.addEventListener("click", showSquadCode);
+    var prev = $("nx-squad-prev");
+    if (prev) prev.addEventListener("click", function () {
+      if (squadUi.idx > 0) { squadUi.idx--; drawSquadFrame(); }
+    });
+    var next = $("nx-squad-next");
+    if (next) next.addEventListener("click", function () {
+      if (squadUi.idx < squadUi.frames.length - 1) { squadUi.idx++; drawSquadFrame(); }
+    });
+    var imp = $("nx-squad-import");
+    if (imp) imp.addEventListener("click", function () {
+      squadCollectReset();
+      openScanner("squad", "qr");
+    });
+    var pasteBtn = $("nx-squad-paste-btn");
+    if (pasteBtn) pasteBtn.addEventListener("click", function () {
+      var ta = $("nx-squad-paste");
+      var lines = String(ta && ta.value || "").split(/\r?\n/);
+      squadCollectReset();
+      var last = null;
+      for (var i = 0; i < lines.length; i++) {
+        if (lines[i].trim()) last = feedSquadText(lines[i]);
+      }
+      if (!last) showMsg($("nx-squad-msg"), "PASTE A SQUAD CODE FIRST.", "err");
+      else if (last.complete && ta) ta.value = "";
+    });
+  }
+
+  /* ---------------- offline map packs (money build E) ----------------
+     Offline Map Packs, a per-state add-on: $9.99 per state or
+     $29.99 for all 50 (entitlement: hasMapPack(code),
+     server-owned - see the plan section). A pack is one small
+     static JSON on the site (maps/<code>.json: a simplified
+     state outline plus major-city POIs, generated at build
+     time from public-domain Census / GeoNames data by
+     scripts/gen-maps.js). It is NOT precached by the service
+     worker and NOT part of the native bundle: the add-on
+     unlocks a DOWNLOAD, the pack lands in IndexedDB on this
+     device, and from then on the map screen renders it with
+     zero connection. No external map tiles anywhere - the map
+     is an inline SVG schematic and the copy says so:
+     SCHEMATIC STATE MAP - NOT FOR NAVIGATION.
+     Viewing a downloaded pack needs no account and no
+     connection; downloading needs a connection, once. */
+
+  var MAP_DB_NAME = "nyxsurvive-maps";
+  var mapLocal = {};      // code -> true: packs present in IndexedDB (loaded async)
+  var mapOpenCode = null; // state code currently on the map screen
+
+  function mapDb() {
+    return new Promise(function (resolve, reject) {
+      if (!window.indexedDB) { reject(new Error("no-indexeddb")); return; }
+      var req = window.indexedDB.open(MAP_DB_NAME, 1);
+      req.onupgradeneeded = function () {
+        req.result.createObjectStore("packs", { keyPath: "code" });
+      };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error || new Error("idb-open")); };
+    });
+  }
+  function mapStore(db, mode) {
+    return db.transaction("packs", mode).objectStore("packs");
+  }
+  function mapPackGet(code) {
+    return mapDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var req = mapStore(db, "readonly").get(code);
+        req.onsuccess = function () { resolve(req.result || null); };
+        req.onerror = function () { reject(req.error || new Error("idb-get")); };
+      });
+    }).catch(function () { return null; });
+  }
+  function mapPackPut(pack) {
+    return mapDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var req = mapStore(db, "readwrite").put(pack);
+        req.onsuccess = function () { resolve(true); };
+        req.onerror = function () { reject(req.error || new Error("idb-put")); };
+      });
+    });
+  }
+  function mapPackRemove(code) {
+    return mapDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var req = mapStore(db, "readwrite").delete(code);
+        req.onsuccess = function () { resolve(true); };
+        req.onerror = function () { reject(req.error || new Error("idb-del")); };
+      });
+    });
+  }
+  function mapPackCodes() {
+    return mapDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var req = mapStore(db, "readonly").getAllKeys();
+        req.onsuccess = function () { resolve(req.result || []); };
+        req.onerror = function () { reject(req.error || new Error("idb-keys")); };
+      });
+    }).catch(function () { return []; });
+  }
+  async function refreshMapLocal() {
+    var codes = await mapPackCodes();
+    var next = {};
+    codes.forEach(function (c) { next[c] = true; });
+    mapLocal = next;
+    return mapLocal;
+  }
+
+  function mapStateName(code) {
+    for (var i = 0; i < MAP_STATES.length; i++) {
+      if (MAP_STATES[i][0] === code) return MAP_STATES[i][1];
+    }
+    return String(code || "").toUpperCase();
+  }
+  function mapPackUrl(code) { return apiUrl("/maps/" + code + ".json"); }
+
+  async function downloadMapPack(code) {
+    var msg = $("nx-maps-msg");
+    if (!hasMapPack(code)) {
+      showMsg(msg, mapStateName(code).toUpperCase() + " IS NOT UNLOCKED - BUY THE PACK OR THE ALL-50 BUNDLE FIRST.", "err");
+      return false;
+    }
+    showMsg(msg, "DOWNLOADING " + mapStateName(code).toUpperCase() + " PACK...", "");
+    try {
+      var res = await fetch(mapPackUrl(code));
+      if (!res.ok) throw new Error("http " + res.status);
+      var pack = await res.json();
+      if (!pack || pack.code !== code || !Array.isArray(pack.rings) || !pack.rings.length ||
+          !Array.isArray(pack.bbox) || !Array.isArray(pack.pois)) {
+        throw new Error("bad pack");
+      }
+      await mapPackPut(pack);
+      mapLocal[code] = true;
+      renderMaps();
+      showMsg(msg, mapStateName(code).toUpperCase() + " PACK ON DEVICE - IT NOW WORKS FULLY OFFLINE.", "good");
+      return true;
+    } catch (e) {
+      showMsg(msg, "DOWNLOAD FAILED - CHECK YOUR CONNECTION AND TRY AGAIN. DOWNLOADING IS THE ONLY STEP THAT NEEDS ONE.", "err");
+      return false;
+    }
+  }
+
+  async function deleteMapPack(code) {
+    try { await mapPackRemove(code); } catch (e) { /* the local flag drops either way */ }
+    delete mapLocal[code];
+    if (mapOpenCode === code) closeMapScreen();
+    renderMaps();
+    showMsg($("nx-maps-msg"), mapStateName(code).toUpperCase() + " PACK REMOVED FROM THIS DEVICE. THE ADD-ON IS STILL YOURS - DOWNLOAD IT AGAIN ANY TIME.", "");
+    return true;
+  }
+
+  /* The schematic renderer: an equirectangular projection of
+   * the pack bbox (longitude scaled by cos of the mid latitude
+   * so shapes stay honest), outline paths, POI dots with
+   * labels, the capital marked, and - only from this device's
+   * own settings - the home-base marker when it falls inside
+   * the state. Pure string building: no tiles, no network, no
+   * libraries. */
+  function mapSvg(pack) {
+    var bb = pack.bbox;
+    var midLat = (bb[1] + bb[3]) / 2 * Math.PI / 180;
+    var kx = Math.cos(midLat);
+    var spanX = Math.max(0.01, (bb[2] - bb[0]) * kx);
+    var spanY = Math.max(0.01, bb[3] - bb[1]);
+    var W = 1000, H = Math.max(200, Math.round(W * spanY / spanX));
+    function X(lng) { return ((lng - bb[0]) * kx / spanX * W).toFixed(1); }
+    function Y(lat) { return ((bb[3] - lat) / spanY * H).toFixed(1); }
+    var out = ['<svg class="nx-map-svg" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(pack.name) + ' schematic map">'];
+    pack.rings.forEach(function (ring) {
+      var d = "";
+      ring.forEach(function (p, i) { d += (i ? "L" : "M") + X(p[0]) + " " + Y(p[1]); });
+      out.push('<path class="nx-map-land" d="' + d + 'Z"/>');
+    });
+    (pack.pois || []).forEach(function (poi) {
+      var x = Number(X(poi.lng)), y = Number(Y(poi.lat));
+      out.push('<circle class="nx-map-poi' + (poi.cap ? " nx-map-cap" : "") + '" cx="' + x + '" cy="' + y + '" r="' + (poi.cap ? 9 : 6) + '"/>');
+    });
+    // Labels declutter: at state scale a metro cluster (the
+    // Phoenix valley cities, say) piles every name onto the
+    // same few pixels. Every city keeps its dot; a name is
+    // drawn only when it clears the names already placed.
+    // Capitals always label and claim their space first;
+    // the rest go largest-first (the pack order).
+    var labeled = [];
+    function labelFits(x, y) {
+      for (var i = 0; i < labeled.length; i++) {
+        if (Math.abs(labeled[i][0] - x) < 115 && Math.abs(labeled[i][1] - y) < 38) return false;
+      }
+      labeled.push([x, y]);
+      return true;
+    }
+    var poiOrder = (pack.pois || []).slice().sort(function (a, b) {
+      if (!!a.cap !== !!b.cap) return a.cap ? -1 : 1;
+      return (b.pop || 0) - (a.pop || 0);
+    });
+    poiOrder.forEach(function (poi) {
+      var x = Number(X(poi.lng)), y = Number(Y(poi.lat));
+      if (poi.cap) labeled.push([x, y]);
+      else if (!labelFits(x, y)) return;
+      out.push('<text class="nx-map-label' + (poi.cap ? " nx-map-cap-label" : "") + '" x="' + (x + 13) + '" y="' + (y + 5) + '">' + esc(poi.n) + "</text>");
+    });
+    var hLat = state.settings.homeLat, hLng = state.settings.homeLng;
+    if (typeof hLat === "number" && typeof hLng === "number" &&
+        hLng >= bb[0] && hLng <= bb[2] && hLat >= bb[1] && hLat <= bb[3]) {
+      var hx = Number(X(hLng)), hy = Number(Y(hLat));
+      out.push('<path class="nx-map-home" d="M' + hx + " " + (hy - 14) + " L" + (hx + 11) + " " + hy + " L" + hx + " " + (hy + 14) + " L" + (hx - 11) + " " + hy + 'Z"/>');
+      // The home base is usually IN the capital city, so its
+      // label would land exactly on that city's name. When a
+      // placed label sits where the home label wants to go,
+      // the home label drops below the diamond instead.
+      var homeLabelY = hy + 5;
+      for (var li = 0; li < labeled.length; li++) {
+        if (Math.abs(labeled[li][0] - hx) < 120 && Math.abs(labeled[li][1] - hy) < 40) { homeLabelY = hy + 40; break; }
+      }
+      out.push('<text class="nx-map-home-label" x="' + (hx + 16) + '" y="' + homeLabelY + '">HOME BASE</text>');
+    }
+    out.push("</svg>");
+    return out.join("");
+  }
+
+  async function openMapState(code) {
+    var pack = await mapPackGet(code);
+    if (!pack) {
+      showMsg($("nx-maps-msg"), mapStateName(code).toUpperCase() + " IS NOT ON THIS DEVICE - DOWNLOAD IT FIRST.", "err");
+      return false;
+    }
+    mapOpenCode = code;
+    var title = $("nx-map-screen-title");
+    if (title) title.textContent = pack.name + " - Offline Pack";
+    var box = $("nx-map-screen");
+    if (box) box.innerHTML = mapSvg(pack);
+    var panel = $("nx-map-screen-panel");
+    if (panel) {
+      panel.style.display = "";
+      if (panel.scrollIntoView) panel.scrollIntoView();
+    }
+    return true;
+  }
+  function closeMapScreen() {
+    mapOpenCode = null;
+    var panel = $("nx-map-screen-panel");
+    if (panel) panel.style.display = "none";
+    var box = $("nx-map-screen");
+    if (box) box.innerHTML = "";
+  }
+
+  function renderMaps() {
+    var locked = $("nx-maps-locked"), counts = $("nx-maps-counts");
+    if (!locked || !counts) return;
+    var bundle = $("nx-maps-bundle");
+    var owned = 0, onDevice = 0;
+    MAP_STATES.forEach(function (s) {
+      if (hasMapPack(s[0])) owned++;
+      if (mapLocal[s[0]]) onDevice++;
+    });
+    locked.style.display = owned ? "none" : "";
+    if (bundle) bundle.style.display = (hasAddon("map-pack-us") || isOwner()) ? "none" : "";
+    counts.textContent = owned + " OF 50 STATES UNLOCKED - " + onDevice + " ON THIS DEVICE";
+    var list = $("nx-maps-list");
+    if (!list) return;
+    var html = "";
+    MAP_STATES.forEach(function (s) {
+      var code = s[0], name = s[1];
+      var has = hasMapPack(code), local = !!mapLocal[code];
+      html += '<div class="nx-map-row" data-map-code="' + code + '">';
+      html += '<span class="nx-map-name">' + esc(name) + "</span>";
+      if (has && local) {
+        html += '<span class="nx-map-chip nx-map-chip-on">ON DEVICE</span>';
+        html += '<span class="nx-map-actions"><button type="button" class="nx-btn nx-btn-accent" data-map-open="' + code + '">Open</button>';
+        html += '<button type="button" class="nx-btn" data-map-delete="' + code + '">Delete</button></span>';
+      } else if (has) {
+        html += '<span class="nx-map-chip nx-map-chip-owned">OWNED</span>';
+        html += '<span class="nx-map-actions"><button type="button" class="nx-btn nx-btn-accent" data-map-download="' + code + '">Download</button></span>';
+      } else {
+        html += '<span class="nx-map-chip">$9.99</span>';
+        html += '<span class="nx-map-actions"><button type="button" class="nx-btn nx-buy-ui" data-map-buy="' + code + '">Buy</button></span>';
+      }
+      html += "</div>";
+    });
+    list.innerHTML = html;
+    if (mapOpenCode && !mapLocal[mapOpenCode]) closeMapScreen();
+  }
+
+  function bindMaps() {
+    var list = $("nx-maps-list");
+    if (list) list.addEventListener("click", function (ev) {
+      var t = ev.target;
+      if (!t.closest) return;
+      var buy = t.closest("[data-map-buy]");
+      if (buy) { startCheckout("map-pack-state", { state: buy.getAttribute("data-map-buy") }); return; }
+      var dl = t.closest("[data-map-download]");
+      if (dl) { downloadMapPack(dl.getAttribute("data-map-download")); return; }
+      var op = t.closest("[data-map-open]");
+      if (op) { openMapState(op.getAttribute("data-map-open")); return; }
+      var del = t.closest("[data-map-delete]");
+      if (del) { deleteMapPack(del.getAttribute("data-map-delete")); return; }
+    });
+    var bundleBtn = $("nx-maps-buy-us");
+    if (bundleBtn) bundleBtn.addEventListener("click", function () { startCheckout("map-pack-us"); });
+    var close = $("nx-map-close");
+    if (close) close.addEventListener("click", closeMapScreen);
+    // The on-device set is device storage, not save state:
+    // load it once at bind time, then keep the list honest.
+    refreshMapLocal().then(function () { renderMaps(); });
+  }
+
+  /* ---------------- field guide (offline reference) ----------------
+     First aid and survival reference library, bundled whole
+     into app.js: no network, no account, no plan gate - free
+     for every tier, riding the shell precache and the native
+     bundle like every other core asset. The content is a
+     memory aid for lay responders, written in-house as short
+     field steps: DO, DO NOT, and a GET HELP IF red-flag line.
+     It is not a substitute for training or professional care. */
+  var GUIDE_CATS = [
+    { name: "Bleeding and Wounds", topics: [
+      { t: "Severe bleeding and tourniquets",
+        "do": ["Call 911, or send a specific person to call and come back.", "Press hard on the wound with a clean cloth, pad or clothing. Use both hands and lean in.", "If blood soaks through, add more cloth on top and keep pressing - do not lift to check.", "For a deep wound, pack cloth tightly into it, then press on top.", "If trained and hard pressure is not stopping limb bleeding, place a tourniquet 2 to 3 inches above the wound, tighten until bleeding stops, and note the time.", "Keep the person lying down, warm and still until help arrives."],
+        "dont": ["Do not remove soaked cloth - add more on top.", "Do not loosen or remove a tourniquet once it is on.", "Do not use a thin cord or wire as a tourniquet - it cuts without stopping flow.", "Do not give food or drink - surgery may be needed."],
+        help: "Bleeding that will not slow after 10 minutes of hard pressure, blood spurting or pooling, or the person turning pale, sweaty, confused or faint. These are 911 signs - keep pressure on and do not leave them." },
+      { t: "Cleaning a wound",
+        "do": ["Wash your own hands first if you can.", "Rinse the wound under clean running water for several minutes to wash dirt out.", "Wash the skin around the wound with soap, keeping soap out of the cut itself.", "Pick out visible dirt or gravel with clean tweezers.", "Cover with a clean dressing or bandage and change it daily, or sooner if it gets wet or dirty.", "Ask a clinician about a tetanus shot if the wound is dirty and the last shot was over 5 years ago."],
+        "dont": ["Do not scrub inside a deep wound.", "Do not pour peroxide, alcohol or iodine into the wound - they damage healing tissue.", "Do not close a dirty wound with tape or glue - trapped dirt breeds infection."],
+        help: "You cannot get the dirt out, the wound is deep, gaping or on the face, or it came from a bite - animal or human bites always need medical care." },
+      { t: "Signs of wound infection",
+        "do": ["Check the wound daily for spreading redness, swelling, warmth or rising pain.", "Watch for pus, red streaks running away from the wound, and fever.", "Keep the wound clean and dry, and change dressings on schedule.", "Mark the edge of the redness with a pen and note the time - spreading past the line means it is getting worse.", "Seek care early - infections are far easier to treat in the first day."],
+        "dont": ["Do not wait and see on red streaks or fever - that is the infection moving.", "Do not squeeze or lance a swollen wound yourself."],
+        help: "Red streaks, fever over 100.4 F, swelling that keeps growing, or any infected wound in a person with diabetes or a weak immune system. Face, hand and joint infections are urgent too." }
+    ]},
+    { name: "CPR and Choking", topics: [
+      { t: "Adult CPR basics",
+        "do": ["Check response: shout and tap the shoulders. No response and no normal breathing means start.", "Call 911 on speakerphone, or send someone. Send a second person for an AED if one is nearby.", "Place the heel of one hand in the center of the chest, the other hand on top, arms straight.", "Push hard and fast: about 2 inches deep, 100 to 120 pushes a minute - the beat of a fast song.", "Let the chest come fully back up between pushes. Do not lean on it.", "If trained, give 2 breaths after every 30 pushes. If not, keep pushing without stopping.", "Use the AED the moment it arrives: turn it on and follow its voice prompts."],
+        "dont": ["Do not stop for more than a few seconds - every pause drops survival odds.", "Do not spend more than 10 seconds checking for a pulse.", "Do not be afraid of pushing hard - broken ribs heal, a stopped heart does not restart itself."],
+        help: "Always - CPR means 911 is on the way. Keep going until responders take over, an AED says to stop, or the person breathes normally and moves." },
+      { t: "Child CPR basics",
+        "do": ["Call 911 on speakerphone. If you are alone with no phone, do about 2 minutes of CPR first, then call.", "Push in the center of the chest about 2 inches deep, 100 to 120 a minute. Use one hand for a small child, two for a bigger one.", "For a baby, use two fingers in the center of the chest, about 1.5 inches deep.", "If trained, give 2 gentle breaths after every 30 pushes - just enough to make the chest rise.", "Use an AED when it arrives - child pads if available, adult pads are fine if not."],
+        "dont": ["Do not use full adult force on a small child.", "Do not leave a child to find a phone if you can call on speaker while you work.", "Do not blow hard into a baby - small puffs only."],
+        help: "Always - a child who needs CPR needs 911 and hospital care even if they revive. Keep going until responders take over." },
+      { t: "Choking - adult and child",
+        "do": ["Ask: are you choking? If they can speak and cough hard, let them cough and stay close.", "If they cannot speak or the cough is weak, lean them forward and give 5 firm blows between the shoulder blades with the heel of your hand.", "Then stand behind them, fist above the navel, and give 5 sharp inward and upward thrusts.", "Alternate 5 blows and 5 thrusts until the object clears or they go limp.", "For a baby under 1: face-down along your forearm, 5 back blows, then turn over and give 5 chest thrusts with two fingers.", "If they go limp, lower them to the ground, call 911 and start CPR. Look in the mouth before breaths and remove only what you can see."],
+        "dont": ["Do not do abdominal thrusts on a baby under 1 year old.", "Do not reach blindly into the mouth - you can push the object deeper.", "Do not slap the back of someone standing upright and coughing well - let the cough work."],
+        help: "The object will not clear, the person goes limp, or breathing stays noisy or strained after it clears - that needs 911 and a hospital check." }
+    ]},
+    { name: "Fractures, Sprains, Dislocations", topics: [
+      { t: "Broken bone basics",
+        "do": ["Keep the limb still and support it in the position you found it.", "Splint it: padding first, then something rigid - a board, rolled magazine or stick - tied above and below the break, not over it.", "Put ice wrapped in cloth on it for 15 to 20 minutes at a time to slow swelling.", "Check fingers or toes past the injury often: they should stay warm, pink and able to feel.", "For an arm, a sling made from a shirt or cloth keeps it supported against the body."],
+        "dont": ["Do not try to straighten a bent limb.", "Do not let the person put weight on a broken leg or foot.", "Do not tie a splint tight - tingling or color change means loosen it."],
+        help: "Bone poking through skin, a limb that is blue, cold or numb, heavy bleeding, or any injury to the head, neck, back or pelvis. Those are 911 calls." },
+      { t: "Sprains and strains",
+        "do": ["Rest the joint - stop using it.", "Ice it 15 to 20 minutes at a time, several times in the first two days.", "Wrap it snug with an elastic bandage, starting away from the heart and working toward it.", "Raise it above heart level when you can to drain swelling.", "Recheck in 48 hours - steady improvement is a good sign."],
+        "dont": ["Do not wrap so tight that fingers or toes tingle, pale or throb.", "Do not apply heat on the first day - it feeds swelling.", "Do not push through sharp pain to test it."],
+        help: "You cannot bear weight on it, the joint looks crooked, there is numbness, or it is no better after 2 to 3 days - that can be a break hiding as a sprain." },
+      { t: "Dislocation",
+        "do": ["Keep the joint completely still and support it with pillows or padding.", "Put ice wrapped in cloth on the joint.", "Check feeling, color and pulse in the hand or foot beyond the joint, and recheck often.", "Get to medical care - a dislocated joint needs to be put back by a professional."],
+        "dont": ["Do not try to pop the joint back in yourself.", "Do not let the person eat or drink much - sedation may be needed to fix it."],
+        help: "Always - every dislocation needs medical care. A hand or foot beyond the joint that is pale, cold or numb is an emergency." }
+    ]},
+    { name: "Burns", topics: [
+      { t: "Thermal burns",
+        "do": ["Cool the burn under cool running water for at least 20 minutes. This is the single most useful step.", "Remove rings, watches and loose clothing near the burn before swelling starts - unless fabric is stuck to the burn.", "Cover loosely with a clean non-stick dressing, or clean plastic wrap laid on, not wrapped tight.", "Treat pain with an over-the-counter pain reliever as directed.", "Keep the person warm overall - a large burn loses body heat fast."],
+        "dont": ["Do not use ice or iced water - it deepens the injury.", "Do not pop blisters - they are a sterile cover.", "Do not put butter, oils, toothpaste or creams on a fresh burn.", "Do not peel off clothing stuck to the burn."],
+        help: "A burn bigger than the person's palm, any burn on the face, hands, feet, joints or genitals, white, brown or charred skin, or a burn that circles a limb. Electrical and chemical burns always need care." },
+      { t: "Sunburn",
+        "do": ["Get out of the sun and stay out.", "Cool the skin with a cool shower or damp cloths.", "After cooling, use a plain moisturizer or aloe to keep skin from drying out.", "Drink extra water - burned skin pulls fluid from the body.", "Wear loose, soft clothing over the burn."],
+        "dont": ["Do not pop sunburn blisters.", "Do not go back out the next day thinking a base burn protects you.", "Do not use numbing sprays with benzocaine on small children."],
+        help: "Blistering over a large area, fever, chills, confusion, dizziness or signs of dehydration. A sunburned baby under 1 year old should be seen the same day." },
+      { t: "When a burn is serious",
+        "do": ["Treat burns from a fire in an enclosed space as an airway emergency - soot around the nose or mouth and a hoarse voice are danger signs.", "Cover a serious burn with a clean, dry cloth and get moving toward care.", "Keep the person warm and lying down for large burns.", "Call 911 for any burn larger than the person's palm that is deep, or any burn with trouble breathing."],
+        "dont": ["Do not delay care to finish dressing a serious burn - cover and go.", "Do not give a person with a large burn lots to drink - sips only."],
+        help: "Trouble breathing, burns on the face or airway, skin that looks white, brown, black or leathery, burns circling an arm or leg, or a burn in a baby, an older adult, or someone with diabetes." }
+    ]},
+    { name: "Heat and Cold", topics: [
+      { t: "Heat exhaustion",
+        "do": ["Stop all activity and move to shade or the coolest place available.", "Loosen or remove extra clothing.", "Cool the skin: wet cloths on the neck, armpits and groin, and fan them.", "Give small, steady sips of water or an electrolyte drink.", "Know the picture: heavy sweating, pale or clammy skin, nausea, cramps, headache, dizziness."],
+        "dont": ["Do not give drinks to someone who is vomiting or confused.", "Do not leave them alone - exhaustion can tip into heatstroke.", "Do not send them back out to finish the job."],
+        help: "Vomiting, confusion, fainting, or no clear improvement within 30 minutes of cooling and fluids. Those can be the start of heatstroke." },
+      { t: "Heatstroke",
+        "do": ["Call 911 first - heatstroke kills and minutes matter.", "Cool them fast, any way you can: cold water over the whole body is best. A tub, a hose, wet towels replaced constantly, plus fanning.", "Put ice packs wrapped in cloth at the neck, armpits and groin if water is limited.", "Know the picture: very hot skin, confusion or slurred speech, staggering, seizure, or passing out. Skin may be dry or sweaty.", "Keep cooling until help arrives or their thinking clears."],
+        "dont": ["Do not give fluids to someone confused or barely awake.", "Do not wait to see if they cool down on their own.", "Do not wrap them in dry blankets to stop shivering during cooling."],
+        help: "This is the emergency itself. Confusion, collapse or a seizure in the heat means 911 and aggressive cooling, right now." },
+      { t: "Hypothermia",
+        "do": ["Get them out of wind, rain and cold, and off cold ground.", "Remove wet clothing and wrap them in dry blankets, covering the head.", "Warm the core first - chest, neck and groin - with wrapped warm water bottles or body heat.", "Give warm, sweet drinks only if they are fully awake and can swallow.", "Know the picture: shivering, then shivering that stops, slurred speech, clumsiness, drowsiness, cold pale skin.", "Handle them gently - a very cold heart is irritable and rough handling can stop it."],
+        "dont": ["Do not use a hot bath, heating pads on high, or direct fire heat on cold skin.", "Do not rub arms and legs to warm them - it pushes cold blood to the core.", "Do not give alcohol."],
+        help: "Confusion, drowsiness, shivering that has stopped, or anyone found cold and unresponsive. That is 911 - keep handling gentle and keep warming the core." },
+      { t: "Frostbite",
+        "do": ["Get indoors and out of the wind.", "Rewarm the part in warm water - comfortable to your own uninjured hand, never hot - for 15 to 30 minutes until skin softens and color returns.", "Expect rewarming to hurt; pain relievers help.", "After rewarming, dress loosely and dry, with soft cloth between fingers or toes.", "Raise the part and protect it from pressure and cold."],
+        "dont": ["Do not rub the part, and never rub it with snow.", "Do not rewarm if the part could freeze again - refreezing does far worse damage. Walk out on frostbitten feet instead if you must.", "Do not use fire, a stove or engine heat to rewarm - numb skin burns without warning."],
+        help: "Skin that is white, gray or waxy, hard or wooden feeling, blisters after rewarming, or numbness that does not ease. Frostbite needs medical care the same day." }
+    ]},
+    { name: "Bites and Stings", topics: [
+      { t: "Snake bite",
+        "do": ["Move away from the snake. Do not try to catch or kill it - a photo from a safe distance helps medics.", "Keep the person still and calm - movement spreads venom faster.", "Keep the bitten limb still and at about heart level. Splint it like a fracture.", "Remove rings, watches and tight clothing near the bite before swelling starts.", "Note the time of the bite and mark the edge of swelling with a pen every 15 minutes.", "Get to a hospital as fast as you safely can - antivenom is the real treatment and only hospitals have it."],
+        "dont": ["Do not cut the bite or suck on it.", "Do not apply a tourniquet or a tight band.", "Do not put ice on it, and do not use electric shock.", "Do not give alcohol or painkillers with blood thinners unless medics say so."],
+        help: "Always - treat every snake bite as an emergency until a hospital clears it. Spreading swelling, trouble breathing, drooping eyelids, or a bite to the face or neck means 911." },
+      { t: "Spider bite",
+        "do": ["Wash the bite with soap and water.", "Put an ice pack wrapped in cloth on it, 15 minutes at a time.", "Keep the limb raised if it swells.", "Note what the spider looked like only if you saw it clearly and safely.", "Watch the bite for 24 to 48 hours for spreading redness or growing pain."],
+        "dont": ["Do not cut the bite or apply a tourniquet.", "Do not assume every bite is dangerous - most spider bites are minor and heal like any bug bite."],
+        help: "Spreading redness, muscle pain or stiffness, belly pain, fever, sweating, or trouble breathing - or a bite you believe came from a black widow or brown recluse." },
+      { t: "Bee and wasp stings",
+        "do": ["Scrape a bee stinger out sideways with a card edge or fingernail - speed matters more than method.", "Wash the area with soap and water.", "Ice it, wrapped in cloth, to slow swelling and pain.", "Use an antihistamine for itching and swelling if available.", "Watch the person for at least 30 minutes for allergy signs: widespread hives, swelling lips or tongue, wheezing, dizziness."],
+        "dont": ["Do not ignore a sting in the mouth or throat - swelling there blocks air. Get care fast.", "Do not wait out breathing trouble - that is anaphylaxis, see the Poisoning and Allergic Reaction section."],
+        help: "Any trouble breathing, swelling of the lips, tongue or face, widespread hives, dizziness or collapse after a sting. That is 911 and an epinephrine auto-injector if one is available." },
+      { t: "Tick removal",
+        "do": ["Use fine-tipped tweezers and grasp the tick as close to the skin as you can.", "Pull upward with steady, even pressure. Do not twist or jerk.", "If the mouthparts stay in, remove them with clean tweezers; if you cannot, leave them and see a clinician.", "Clean the bite and your hands with soap and water or alcohol.", "Note the date and keep the tick in a sealed container with a damp cotton ball, or take a clear photo, in case illness follows."],
+        "dont": ["Do not burn the tick, or coat it with oil, polish or alcohol gel to back it out - those do not work and waste time.", "Do not squeeze the tick's body while pulling."],
+        help: "A bullseye-shaped rash in the days or weeks after, fever, joint pain or a spreading rash. Tell the clinician about the tick and the date - early Lyme treatment works well." }
+    ]},
+    { name: "Water and Food Safety", topics: [
+      { t: "Purifying water",
+        "do": ["Best method: bring water to a rolling boil for 1 full minute - 3 minutes above about 6,500 feet.", "If it looks cloudy, strain it through a clean cloth or coffee filter first, whatever method you use.", "Chemical method: add 8 drops of plain unscented household bleach per gallon of clear water, stir, and wait 30 minutes. Double the drops for cloudy water and wait the same 30.", "A good filter plus disinfection beats either one alone - filters miss viruses, chemicals miss some parasites.", "Store treated water in clean, covered containers and mark the date."],
+        "dont": ["Do not drink from stagnant, oily or chemical-smelling water - treatment does not remove chemicals or fuel.", "Do not use scented bleach or bleach with added cleaners.", "Do not trust clear mountain water - looks mean nothing with germs."],
+        help: "Signs of severe dehydration - very dry mouth, no urination, dizziness on standing - or bloody diarrhea or high fever after drinking suspect water. Those need medical care." },
+      { t: "Storing food safely",
+        "do": ["Keep cold food at or below 40 F. Without power, a closed fridge holds cold about 4 hours, a full freezer about 48.", "Use the 2-hour rule: perishable food left out over 2 hours goes in the trash - 1 hour if it is over 90 F out.", "Store food sealed, off the ground, away from chemicals and fuel.", "Rotate stock: first in, first out. Write dates on cans and packages.", "When in doubt, throw it out - taste-testing suspect food is how people get sick."],
+        "dont": ["Do not eat from bulging, leaking or deeply dented cans.", "Do not refreeze thawed raw meat.", "Do not trust the smell test alone - the germs that cause food poisoning often have no smell."],
+        help: "Food poisoning symptoms that turn severe - see the food poisoning topic. In a long outage, err on the side of throwing food away." },
+      { t: "Food poisoning",
+        "do": ["Sip water or an electrolyte drink steadily - small sips if nausea is bad.", "Rest, and return to plain, bland food only when you feel able.", "Know the usual picture: cramps, nausea, vomiting, diarrhea, low fever, starting hours to a few days after the meal.", "Wash hands well and do not prepare food for others while sick.", "Most cases clear in 1 to 3 days with fluids and rest."],
+        "dont": ["Do not take anti-diarrhea medicine if there is blood in the stool or a high fever - it can trap the infection.", "Do not push big meals or alcohol while recovering."],
+        help: "Blood in stool or vomit, fever over 102 F, vomiting that will not let fluids stay down for 24 hours, signs of dehydration, or illness in a baby, an older adult, or someone pregnant or with a weak immune system." }
+    ]},
+    { name: "Shelter and Fire", topics: [
+      { t: "Emergency shelter",
+        "do": ["Pick dry ground out of the wind, away from dead standing trees, cliff edges and dry creek beds that can flash flood.", "Insulate from the ground first - branches, leaves, a pack, anything. Cold ground steals more heat than cold air.", "Build small: a shelter just big enough to lie in stays far warmer than a big one.", "Slope the rain layer so water runs off away from where you sleep, and dig no ditches in fragile ground - use natural drainage.", "If rescue is possible, mark the site: bright items, cleared patterns, anything that stands out from the air."],
+        "dont": ["Do not sleep directly on bare ground or rock.", "Do not shelter under a lone tall tree in a thunderstorm.", "Do not use a sealed tent with a flame inside - see carbon monoxide."],
+        help: "Shelter is treatment: if someone shows hypothermia signs - shivering that stops, confusion, slurred speech - shelter, dry wrapping and core warming come before everything else, and 911 if reachable." },
+      { t: "Fire safety",
+        "do": ["Clear a circle about 10 feet across down to bare dirt, and ring the fire with rocks.", "Keep the fire small - you need warmth and light, not a bonfire.", "Have water and loose dirt within reach before you light anything.", "Keep a clear space above the fire - no low branches or overhangs.", "When done: drown it, stir the ashes, drown again, then feel with the back of your hand. If it is too hot to touch, it is too hot to leave."],
+        "dont": ["Do not leave a fire unattended, even for a few minutes.", "Do not burn trash, plastic or treated wood - the smoke is toxic.", "Do not build a fire on peat, thick leaf litter or dry grass roots - it can smolder underground and spread."],
+        help: "A fire that escapes its ring is a 911 call made early, not late. Burns go to the Burns section - cool running water for 20 minutes is the first move." },
+      { t: "Carbon monoxide",
+        "do": ["Know the sources: generators, grills, camp stoves, heaters and engines. Carbon monoxide is invisible and has no smell.", "Run generators and grills outside only, well away from windows - never in a garage, tent or vehicle.", "If a CO alarm sounds, or several people indoors get headache, nausea and dizziness at the same time, get everyone out to fresh air and call 911.", "Vent any space where fuel burns, and keep vents clear of snow and debris.", "Wait for the fire department to clear the building before going back in."],
+        "dont": ["Do not ignore a headache that hits everyone in the house during an outage - that pattern is the warning.", "Do not sleep in a running vehicle for warmth.", "Do not re-enter a building that set off a CO alarm to grab belongings."],
+        help: "Confusion, fainting, chest pain or anyone found unresponsive in a space with a fuel-burning appliance. That is 911 - get them to fresh air if you can do it without entering the same air yourself." }
+    ]},
+    { name: "Signaling and Rescue", topics: [
+      { t: "SOS signals",
+        "do": ["Three of anything means distress, worldwide: 3 whistle blasts, 3 flashes, 3 shots, 3 fires in a triangle. Repeat with a pause between sets.", "By day, make smoke: green leaves or a little oil on a fire makes dark smoke that carries for miles.", "By night, a bright fire is the signal - have fuel ready to make it flare when you hear an engine.", "Build ground signals where they can be seen from the air: rocks, logs or gear forming SOS letters at least 10 feet tall, in open ground with contrast against the surface.", "Save phone battery: a text often gets through on a signal too weak for a call, and airplane mode between attempts saves power."],
+        "dont": ["Do not wander away from your signal site to look for help - rescuers search where signals were seen.", "Do not burn through all your fire fuel on the first night if rescue may take days."],
+        help: "If any call or text can reach 911, send your location first and signal second. Injuries and exposure come before signaling - treat, shelter, then signal." },
+      { t: "Signal mirror and whistle",
+        "do": ["A mirror flash can be seen 10 miles or more in sun. Hold the mirror near your eye, stretch your other hand out and make a V with two fingers, put the target in the V, and tilt the mirror until the light spot crosses your fingers.", "Sweep the flash slowly across aircraft or distant people, in bursts of three.", "A whistle carries much farther than a voice and costs no strength. Blow in sets of three, then listen.", "At night, flash a light in sets of three the same way."],
+        "dont": ["Do not shout for hours - you will lose your voice and your water. The whistle does the work.", "Do not flash a mirror randomly - aim each burst at something that might see it."],
+        help: "Signaling is how help finds you, but it is second in line: stop bleeding, treat for cold or heat, and get shelter first, then settle in to signal in a steady rhythm." },
+      { t: "Staying found when lost",
+        "do": ["Use STOP: Sit down. Think. Observe. Plan. Panic walking is how lost people get more lost.", "Once you realize you are lost, stay put. Searchers start from your last known point and work outward.", "Make yourself easy to find: bright clothing out, noise in sets of three, a cleared visible spot.", "Ration energy and food - water matters more. Drink when thirsty rather than saving it all.", "If you truly must move, leave clear markers of your direction: arrows of sticks, notes, anything dated and obvious."],
+        "dont": ["Do not keep walking on hope - most lost people are found within a few miles of where they were last seen.", "Do not split a group. More people together are warmer, calmer and easier to spot."],
+        help: "Before any trip: tell someone your route and when to expect you, and agree that overdue means they call for help. That one habit starts more successful rescues than any gear." }
+    ]},
+    { name: "Poisoning and Allergic Reaction", topics: [
+      { t: "Anaphylaxis and epinephrine",
+        "do": ["Know the picture: trouble breathing, tight throat, swelling lips or tongue, widespread hives, dizziness or collapse after a food, sting or medicine.", "Use an epinephrine auto-injector immediately - press it firmly into the outer thigh, through clothing if needed, and hold for the time printed on the device.", "Call 911 right after the injection, or send someone while you inject.", "Lay the person down with legs raised. If breathing is easier sitting up, let them sit - but do not let them stand or walk.", "If there is no improvement in 5 to 15 minutes and you have a second injector, use it.", "Even if they recover fully, they still need a hospital - reactions can rebound hours later."],
+        "dont": ["Do not wait to see if it passes - epinephrine early is what saves lives in anaphylaxis.", "Do not give an antihistamine instead of epinephrine. Antihistamines are for itching, not airways.", "Do not let the person drive themselves."],
+        help: "Always 911. Anaphylaxis is the emergency - injector first, call second, hospital every time, even when the person feels fine afterward." },
+      { t: "Common poisons",
+        "do": ["Call Poison Control in the US at 1-800-222-1222 for guidance - free, 24 hours. Call 911 instead if the person is unconscious, seizing or struggling to breathe.", "Keep the container or label - knowing exactly what it was changes the treatment.", "For fumes, get to fresh air without breathing the fumes yourself.", "For poison on skin or in eyes, rinse with running water for 15 to 20 minutes and remove contaminated clothing.", "For a swallowed pill mix-up, note what, how much and when, and have it ready to tell Poison Control."],
+        "dont": ["Do not make the person vomit unless Poison Control or 911 tells you to - some poisons burn worse coming back up.", "Do not give food, drink or home antidotes unless directed.", "Do not mix cleaning chemicals when cleaning up a spill - bleach plus ammonia or acids makes poison gas."],
+        help: "Unconsciousness, seizures, trouble breathing, blue lips, or a child who swallowed unknown pills, button batteries or magnets. Batteries and magnets are time-critical emergencies - 911, do not wait for symptoms." }
+    ]}
+  ];
+  var guideQuery = "";
+  var guideOpenKey = null; // "catIdx:topicIdx" while a topic is open
+
+  function guideTopicTotal() {
+    var n = 0;
+    GUIDE_CATS.forEach(function (c) { n += c.topics.length; });
+    return n;
+  }
+  function renderGuide() {
+    var list = $("nx-guide-list"), count = $("nx-guide-count");
+    if (!list) return;
+    var q = guideQuery.trim().toLowerCase();
+    var shown = 0;
+    var html = "";
+    GUIDE_CATS.forEach(function (cat, ci) {
+      var rows = "";
+      cat.topics.forEach(function (topic, ti) {
+        if (q && (cat.name + " " + topic.t).toLowerCase().indexOf(q) === -1) return;
+        shown++;
+        rows += '<button type="button" class="nx-guide-row" data-guide-open="' + ci + ":" + ti + '">'
+          + '<span class="nx-guide-row-t">' + esc(topic.t) + "</span>"
+          + '<span class="nx-guide-row-go">Open</span></button>';
+      });
+      if (rows) {
+        html += '<div class="nx-panel nx-guide-cat"><h3 class="nx-guide-cat-h">' + esc(cat.name) + "</h3>" + rows + "</div>";
+      }
+    });
+    if (!shown) {
+      html = '<div class="nx-panel"><p class="nx-h-note" style="margin:0;">NO TOPICS MATCH THAT SEARCH. CLEAR THE SEARCH TO SEE THE FULL GUIDE.</p></div>';
+    }
+    list.innerHTML = html;
+    if (count) count.textContent = shown + " OF " + guideTopicTotal() + " TOPICS - " + GUIDE_CATS.length + " SECTIONS - FULLY OFFLINE, FREE FOR EVERYONE";
+    var detail = $("nx-guide-topic");
+    if (detail) detail.style.display = guideOpenKey ? "" : "none";
+    list.style.display = guideOpenKey ? "none" : "";
+  }
+  function openGuideTopic(key) {
+    var parts = String(key || "").split(":");
+    var cat = GUIDE_CATS[Number(parts[0])];
+    var topic = cat && cat.topics[Number(parts[1])];
+    if (!topic) return false;
+    guideOpenKey = key;
+    var body = $("nx-guide-topic-body");
+    if (body) {
+      var html = '<p class="nx-guide-crumb">' + esc(cat.name) + "</p>";
+      html += '<h3 class="nx-guide-topic-h">' + esc(topic.t) + "</h3>";
+      html += '<h4 class="nx-guide-sub nx-guide-sub-do">Do</h4><ol class="nx-guide-steps">';
+      topic["do"].forEach(function (s) { html += "<li>" + esc(s) + "</li>"; });
+      html += "</ol>";
+      html += '<h4 class="nx-guide-sub nx-guide-sub-dont">Do Not</h4><ul class="nx-guide-steps">';
+      topic["dont"].forEach(function (s) { html += "<li>" + esc(s) + "</li>"; });
+      html += "</ul>";
+      html += '<div class="nx-guide-help"><span class="nx-guide-help-h">Get Help If</span>' + esc(topic.help) + "</div>";
+      html += '<p class="nx-h-note" style="margin:12px 0 0 0;">REFERENCE ONLY - CALL 911 FIRST WHEN YOU CAN. A FIRST AID COURSE IS WORTH MORE THAN ANY PAGE, THIS ONE INCLUDED.</p>';
+      body.innerHTML = html;
+    }
+    renderGuide();
+    var panel = $("nx-guide-topic");
+    if (panel && panel.scrollIntoView) panel.scrollIntoView({ block: "start" });
+    return true;
+  }
+  function closeGuideTopic() {
+    guideOpenKey = null;
+    renderGuide();
+  }
+  function bindGuide() {
+    var search = $("nx-guide-search");
+    if (search) search.addEventListener("input", function () {
+      guideQuery = search.value;
+      guideOpenKey = null;
+      renderGuide();
+    });
+    var list = $("nx-guide-list");
+    if (list) list.addEventListener("click", function (ev) {
+      var t = ev.target;
+      if (!t.closest) return;
+      var row = t.closest("[data-guide-open]");
+      if (row) openGuideTopic(row.getAttribute("data-guide-open"));
+    });
+    var back = $("nx-guide-back");
+    if (back) back.addEventListener("click", closeGuideTopic);
   }
 
   /* ---------------- encrypted vault (WebCrypto AES-GCM) ---------------- */
@@ -984,6 +2923,7 @@
       }
     }
     renderRallyBox();
+    renderStatusBoard();
   }
 
   function bindVault() {
@@ -1092,6 +3032,46 @@
   }
 
   /* ---------------- comms plan ---------------- */
+  /* ---------------- family plan (Ready.gov build) ----------------
+     The household plan on one card: where you meet, and who
+     outside the area everyone checks in with when local lines
+     fail. Names only - no coordinates ever live in this data.
+     The primary rally point itself stays sealed in the vault;
+     this panel shows its name when the vault is open and says
+     so plainly when it is not. */
+  function renderFamilyPlan() {
+    var line = $("nx-family-primary");
+    if (!line) return;
+    var rally = primaryRally();
+    line.innerHTML = "PRIMARY RALLY POINT: <b>" + (rally
+      ? esc(String(rally.title).toUpperCase())
+      : (Vault.blob ? "SEALED IN THE VAULT - UNLOCK IT TO SEE THE NAME" : "NOT SET - SEAL ONE IN THE VAULT")) + "</b>";
+    var r2 = $("nx-fam-rally2"), on = $("nx-fam-outname"), op = $("nx-fam-outphone");
+    if (r2 && document.activeElement !== r2 && document.activeElement !== on && document.activeElement !== op) {
+      var fp = state.familyPlan || { outName: "", outPhone: "", rally2: "" };
+      r2.value = fp.rally2 || "";
+      on.value = fp.outName || "";
+      op.value = fp.outPhone || "";
+    }
+  }
+
+  function bindFamilyPlan() {
+    var form = $("nx-family-form");
+    if (!form) return;
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      state.familyPlan = {
+        rally2: $("nx-fam-rally2").value.trim(),
+        outName: $("nx-fam-outname").value.trim(),
+        outPhone: $("nx-fam-outphone").value.trim()
+      };
+      saveState();
+      renderAll();
+      showMsg($("nx-family-msg"), "FAMILY PLAN SAVED. IT PRINTS IN THE GO-BOOK.", "good");
+      sfxConfirm();
+    });
+  }
+
   function renderComms() {
     var body = $("nx-comms-body");
     if (!state.comms.length) {
@@ -1107,6 +3087,7 @@
       }).join("");
     }
     renderBroadcastMeta();
+    renderFamilyPlan();
   }
 
   function bindComms() {
@@ -1171,6 +3152,8 @@
 
   function renderBroadcast() {
     renderBroadcastMeta();
+    var sig = $("nx-bc-sig");
+    if (sig) sig.classList.toggle("nx-live", state.outbox.length > 0);
     var wrap = $("nx-outbox-list");
     if (!wrap) return;
     if (!state.outbox.length) {
@@ -1385,7 +3368,8 @@
   /* ---------------- checklists ---------------- */
   function renderLists() {
     var cs = checklistStats();
-    $("nx-lists-total").innerHTML = "OVERALL READINESS <b>" + cs.pct + "%</b> // " + cs.done + " OF " + cs.total + " ITEMS CONFIRMED ACROSS ALL LISTS";
+    $("nx-lists-total").innerHTML = (cs.done === 0 ? "<span class=\"nx-empty-art\">" + artSm("lists") + "</span>" : "") +
+      "OVERALL READINESS <b>" + cs.pct + "%</b> // " + cs.done + " OF " + cs.total + " ITEMS CONFIRMED ACROSS ALL LISTS";
     $("nx-lists-wrap").innerHTML = CHECKLISTS.map(function (list) {
       var saved = state.checklists[list.id] || {};
       var done = list.items.filter(function (_, i) { return saved[i]; }).length;
@@ -1397,7 +3381,7 @@
       }).join("");
       return "<h3 class=\"nx-section-sub\">" + esc(list.title) + " - " + done + "/" + list.items.length + "</h3>" +
         "<div class=\"nx-seg\" style=\"margin:0 0 10px 0;\">" + segHtml((done / list.items.length) * 100, false) + "</div>" + items;
-    }).join("") + intelChecklistHtml();
+    }).join("") + intelChecklistHtml() + shutoffsChecklistHtml() + firstOrdersChecklistHtml();
   }
 
   /* The fourth checklist is not a constant like the other
@@ -1422,6 +3406,34 @@
       "<div class=\"nx-seg\" style=\"margin:0 0 10px 0;\">" + segHtml((done / state.intelTasks.length) * 100, false) + "</div>" + items;
   }
 
+  /* Know Your Shutoffs (Ready.gov build): a standing list in
+   * the same special-list shape as Intel - ticks live in
+   * state.checklists under "shutoffs" and stay out of
+   * checklistStats, so Readiness keeps measuring the three
+   * scenario lists it has always measured. The location notes
+   * themselves live in the Home Systems panel in System. */
+  var SHUTOFF_ITEMS = [
+    "Locate the main water shutoff and tag the valve",
+    "Locate the gas shutoff at the meter",
+    "Keep a wrench or pliers with the kit that fits the valves",
+    "Locate the electric breaker panel and label the main breaker",
+    "Locate the propane tank valve (if this house has one)",
+    "Walk every adult in the house through all the shutoffs"
+  ];
+  function shutoffsChecklistHtml() {
+    var saved = state.checklists["shutoffs"] || {};
+    var done = SHUTOFF_ITEMS.filter(function (_, i) { return saved[i]; }).length;
+    var items = SHUTOFF_ITEMS.map(function (text, i) {
+      var checked = !!saved[i];
+      return "<label class=\"nx-check-item" + (checked ? " nx-done" : "") + "\">" +
+        "<input type=\"checkbox\" data-list=\"shutoffs\" data-idx=\"" + i + "\"" + (checked ? " checked" : "") + ">" +
+        "<span class=\"nx-check-text\">" + esc(text) + "</span></label>";
+    }).join("");
+    return "<h3 class=\"nx-section-sub\">Know Your Shutoffs - " + done + "/" + SHUTOFF_ITEMS.length + "</h3>" +
+      "<p class=\"nx-h-note\" style=\"margin:0 0 10px 0;\">WHERE THE VALVES AND PANELS LIVE IN THIS HOUSE IS LOGGED IN SYSTEM // HOME SYSTEMS.</p>" +
+      "<div class=\"nx-seg\" style=\"margin:0 0 10px 0;\">" + segHtml((done / SHUTOFF_ITEMS.length) * 100, false) + "</div>" + items;
+  }
+
   function bindLists() {
     $("nx-lists-wrap").addEventListener("change", function (ev) {
       var box = ev.target.closest("[data-list]");
@@ -1430,11 +3442,782 @@
       var idx = box.getAttribute("data-idx");
       if (!state.checklists[listId]) state.checklists[listId] = {};
       state.checklists[listId][idx] = box.checked;
+      if (listId === "firstOrders" && Array.isArray(state.firstOrders) && state.firstOrders[idx]) state.firstOrders[idx].done = box.checked;
       if (box.checked) sfxConfirm();
       saveState();
       renderLists();
       renderDashboard();
     });
+  }
+
+  /* ---------------- shopping links + resupply orders ----------------
+     One link layer for every "go buy the thing that closes this
+     gap" surface: First Orders rows, Rotate REPLACE buttons and
+     the Resupply panel. Links are Amazon SEARCH links built from
+     curated queries - never a specific product page, never a
+     price. When Connie has an Amazon Associates tag it goes in
+     NX_SHOP_TAG and every link starts carrying it; empty means
+     plain links and the plainer disclosure. Free for all tiers:
+     the links are the monetization, so nothing here is capped.
+     On iOS the buttons carry .nx-buy-ui and hide with every other
+     buy surface, and openShop refuses outright (Guideline 3.1.1,
+     same rule as checkout). */
+  var NX_SHOP_TAG = ""; // Connie's Amazon Associates tag goes here when she has one; empty = plain links.
+  var SHOP_CATALOG = {
+    "water-storage":    { label: "Water storage containers", query: "WaterBrick 3 gallon water storage" },
+    "water-barrel":     { label: "55 gallon water barrel", query: "55 gallon water storage barrel" },
+    "water-filter":     { label: "Water filter", query: "Sawyer MINI water filter" },
+    "water-filter-home": { label: "Home water filter system", query: "Berkey water filter system" },
+    "food-bucket":      { label: "Freeze-dried food bucket", query: "Mountain House freeze dried food bucket" },
+    "food-supply":      { label: "Emergency food supply", query: "Augason Farms emergency food supply" },
+    "power-station":    { label: "Portable power station", query: "Jackery portable power station" },
+    "lantern":          { label: "Solar lantern", query: "solar lantern LED rechargeable" },
+    "headlamp":         { label: "Headlamp", query: "LED headlamp rechargeable" },
+    "trauma-kit":       { label: "Trauma kit (IFAK)", query: "trauma kit IFAK first aid" },
+    "tourniquet":       { label: "Tourniquet", query: "CAT tourniquet" },
+    "radios":           { label: "GMRS radios", query: "Midland GMRS two way radios" },
+    "fire":             { label: "Fire starter kit", query: "ferro rod fire starter kit" },
+    "tent":             { label: "Tent", query: "2 person camping tent" },
+    "sleeping-bag":     { label: "Sleeping bag", query: "20 degree sleeping bag" },
+    "multitool":        { label: "Multitool", query: "multitool pocket knife" },
+    "gobag":            { label: "Survival backpack kit", query: "emergency survival backpack kit" },
+    "stove":            { label: "Camp stove", query: "portable camping stove" },
+    "batteries":        { label: "Lithium AA batteries", query: "AA lithium batteries" },
+    "pet-food":         { label: "Pet food", query: "dry pet food bulk bag" }
+  };
+  // tagOverride exists so the suites can prove the tag path
+  // without editing the shipped (empty) tag.
+  function shopUrl(query, tagOverride) {
+    var tag = tagOverride === undefined ? NX_SHOP_TAG : tagOverride;
+    return "https://www.amazon.com/s?k=" + encodeURIComponent(query) + (tag ? "&tag=" + encodeURIComponent(tag) : "");
+  }
+  function openShop(query) {
+    if (IS_IOS_APP) return; // iOS shell: no pointers out to a sale, same as checkout
+    window.open(shopUrl(query), "_blank", "noopener");
+  }
+  function shopBtnHtml(shopKey, label) {
+    var entry = SHOP_CATALOG[shopKey];
+    if (!entry) return "";
+    return "<button type=\"button\" class=\"nx-btn nx-btn-small nx-shop-btn nx-buy-ui\" data-shop-key=\"" + esc(shopKey) +
+      "\" title=\"" + esc(entry.label) + "\">" + esc(label || "FIND IT") + "</button>";
+  }
+  function shopDisclosureText() {
+    return NX_SHOP_TAG
+      ? "Shopping links open Amazon. Buying through them supports NyxSurvive at no extra cost to you."
+      : "Shopping links open Amazon search for the named item.";
+  }
+  function shopDisclosureHtml() {
+    return "<p class=\"nx-shop-note nx-buy-ui\">" + esc(shopDisclosureText()) + "</p>";
+  }
+
+  /* Resupply Orders: First Orders made permanent. Same math
+     (calcNeeds / calcGap over Days Ready), planned against the
+     user's own target instead of the fixed 14 days. Lines tick
+     in state.checklists["resupply"] keyed by line id and mirror
+     onto the generated line objects, exactly the First Orders
+     mechanism, and stay out of checklistStats the same way. */
+  var RESUPPLY_TARGETS = [7, 14, 30, 60, 90];
+  function resupplyTarget() {
+    return RESUPPLY_TARGETS.indexOf(state.resupplyTarget) >= 0 ? state.resupplyTarget : 14;
+  }
+  function gearText() {
+    return state.gear.map(function (g) { return String(g.name || "") + " " + String(g.category || ""); }).join(" | ").toLowerCase();
+  }
+  function hasFiltration() {
+    var re = /filter|purif|sawyer|berkey|lifestraw|steripen/;
+    if (re.test(gearText())) return true;
+    return state.stores.some(function (s) { return re.test(String(s.name || "").toLowerCase()); });
+  }
+  function hasMedicalKit() {
+    if (state.gear.some(function (g) { return g.category === "Medical"; })) return true;
+    return /ifak|trauma|first[- ]?aid|med[- ]?kit|tourniquet/.test(gearText());
+  }
+  function hasRadios() {
+    if (state.comms.length > 0) return true;
+    if (state.gear.some(function (g) { return g.category === "Comms"; })) return true;
+    return /radio|gmrs|walkie|ham/.test(gearText());
+  }
+  function hasGoBag() {
+    if (state.gear.some(function (g) { return g.tier === "T2"; })) return true;
+    if (/go[- ]?bag|bug[- ]?out/.test(gearText())) return true;
+    return !!(state.assessment && state.assessment.done && state.assessment.gobag === "packed");
+  }
+  function hasLightSource() {
+    return /lantern|headlamp|flashlight|torch|lamp/.test(gearText());
+  }
+  function resupplyLines() {
+    var target = resupplyTarget();
+    var hh = householdSize();
+    var gap = calcGap(calcNeeds(hh, target));
+    var saved = state.checklists["resupply"] || {};
+    var lines = [];
+    function line(id, text, shopKey, add) {
+      lines.push({ id: id, text: text, shopKey: shopKey || null, add: add || null, done: !!saved[id] });
+    }
+    if (gap.shortWater > 0) {
+      var big = gap.shortWater >= 40;
+      var barrels = Math.ceil(gap.shortWater / 55);
+      var cont = big
+        ? "about " + barrels + " x 55-gal barrel" + (barrels > 1 ? "s" : "")
+        : "about " + Math.ceil(gap.shortWater / 3) + " x 3-gal water bricks";
+      line("water", "Store " + fmt(gap.shortWater, 1) + " more gallons of water to hold " + target + " days - " + cont,
+        big ? "water-barrel" : "water-storage", "water");
+    }
+    if (gap.shortFoodKcal > 0) {
+      var buckets = Math.max(1, Math.ceil((gap.shortFoodKcal / 2000) / 30));
+      line("food", "Add food - about " + Math.ceil(gap.shortFoodKcal / (hh * 2000)) + " more days of calories for your household (" +
+        fmt(gap.shortFoodKcal, 0) + " kcal) - roughly " + buckets + " x 30-day freeze-dried bucket" + (buckets > 1 ? "s" : "") +
+        ", estimate only, check label calories", "food-bucket", "food");
+    }
+    if (!hasFiltration()) line("filter", "Add water filtration - a filter turns found water into drinking water", "water-filter");
+    if (!hasMedicalKit()) line("trauma", "Add a trauma kit - bleeding control, not just bandages", "trauma-kit");
+    if (!hasRadios()) line("radios", "Get two GMRS radios and pick a family channel", "radios");
+    if (!hasGoBag()) line("gobag", "Pack a go-bag for each adult - one packed bag per adult, staged by the door", "gobag");
+    if (!hasLightSource()) line("light", "Add a light source - a lantern or headlamp for grid-down nights", "lantern");
+    // Pets (Ready.gov build): a pet line rides the same target
+    // math - pounds needed for the target window minus pounds
+    // on hand. Only when the household actually has pets.
+    var pr = petReadiness();
+    if (pr.pets > 0) {
+      var needLb = pr.pets * PET_FOOD_LB_PER_PET_DAY * target;
+      if (pr.lb < needLb) {
+        line("petfood", "Add pet food - about " + Math.ceil(needLb - pr.lb) + " lb to hold " + pr.pets +
+          " pet" + (pr.pets > 1 ? "s" : "") + " for " + target + " days", "pet-food", "petfood");
+      }
+    }
+    return lines;
+  }
+
+  /* + ADD STORE on the water/food lines files the shortfall as a
+     real store, in the exact shapes the check-in writes (amount +
+     unit for water, amount in days + total kcal for food, expiry
+     null). A repeat tap tops the same resupply store up instead
+     of stacking duplicates. */
+  function addResupplyStore(kind) {
+    var target = resupplyTarget();
+    var hh = householdSize();
+    var gap = calcGap(calcNeeds(hh, target));
+    if (kind === "water") {
+      var gal = Math.ceil(gap.shortWater);
+      if (gal <= 0) return;
+      var w = state.stores.filter(function (s) { return s.kind === "Water" && s.name === "Stored water - resupply"; })[0];
+      if (w) { w.amount = (Number(w.amount) || 0) + gal; w.unit = "gal"; w.kcal = 0; }
+      else state.stores.push({ id: uid(), kind: "Water", name: "Stored water - resupply", amount: gal, unit: "gal", expiry: null, kcal: 0 });
+    } else if (kind === "food") {
+      var kcal = Math.round(gap.shortFoodKcal);
+      if (kcal <= 0) return;
+      var f = state.stores.filter(function (s) { return s.kind === "Food" && s.name === "Stored food - resupply"; })[0];
+      if (f) {
+        f.kcal = (Number(f.kcal) || 0) + kcal;
+        f.amount = Math.round((f.kcal / (hh * 2000)) * 10) / 10;
+        f.unit = "days";
+      } else {
+        state.stores.push({ id: uid(), kind: "Food", name: "Stored food - resupply", amount: Math.round((kcal / (hh * 2000)) * 10) / 10, unit: "days", expiry: null, kcal: kcal });
+      }
+    } else if (kind === "petfood") {
+      var pr = petReadiness();
+      if (pr.pets <= 0) return;
+      var shortLb = Math.ceil(pr.pets * PET_FOOD_LB_PER_PET_DAY * target - pr.lb);
+      if (shortLb <= 0) return;
+      var pf = state.stores.filter(function (s) { return s.kind === "PetFood" && s.name === "Stored pet food - resupply"; })[0];
+      if (pf) { pf.amount = (Number(pf.amount) || 0) + shortLb; pf.unit = "lbs"; }
+      else state.stores.push({ id: uid(), kind: "PetFood", name: "Stored pet food - resupply", amount: shortLb, unit: "lbs", expiry: null, kcal: 0, loc: "Home" });
+    } else return;
+    saveState();
+    renderAll();
+  }
+
+  function renderResupply() {
+    var wrap = $("nx-resupply-wrap");
+    if (!wrap) return;
+    var target = resupplyTarget();
+    var d = daysReady();
+    var lines = resupplyLines();
+    var h = "<div class=\"nx-resupply-sel\">" + RESUPPLY_TARGETS.map(function (t) {
+      return "<button type=\"button\" class=\"nx-fbtn" + (t === target ? " nx-on" : "") + "\" data-resupply-target=\"" + t + "\">" + t + " DAYS</button>";
+    }).join("") + "</div>" +
+      "<p class=\"nx-kv\" style=\"margin:12px 0 4px 0;\">DAYS READY <b>" + (d.headline == null ? "--" : fmt(d.headline, 1)) + "</b> // TARGET <b>" + target + " DAYS</b></p>";
+    if (!lines.length) {
+      h += "<p class=\"nx-kv\" style=\"margin:6px 0 0 0;\">STANDING STRONG - NOTHING DUE. YOUR NUMBER MEETS YOUR TARGET.</p>";
+    } else {
+      h += lines.map(function (ln) {
+        var btns = "";
+        if (ln.add) btns += "<button type=\"button\" class=\"nx-btn nx-btn-small\" data-resupply-add=\"" + ln.add + "\">+ ADD STORE</button>";
+        if (ln.shopKey) btns += shopBtnHtml(ln.shopKey, "FIND IT");
+        return "<label class=\"nx-check-item" + (ln.done ? " nx-done" : "") + "\">" +
+          "<input type=\"checkbox\" data-list=\"resupply\" data-idx=\"" + ln.id + "\"" + (ln.done ? " checked" : "") + ">" +
+          "<span class=\"nx-check-text\">" + esc(ln.text) + "</span>" +
+          (btns ? "<span class=\"nx-check-btns\">" + btns + "</span>" : "") + "</label>";
+      }).join("");
+      if (lines.some(function (l) { return !!l.shopKey; })) h += shopDisclosureHtml();
+    }
+    wrap.innerHTML = h;
+  }
+
+  function bindResupply() {
+    // One delegated click path for every shopping surface plus
+    // the Resupply controls. Shop and add buttons live inside
+    // checklist <label>s, so their clicks are preventDefaulted:
+    // a FIND IT tap must never tick the row's checkbox.
+    document.addEventListener("click", function (ev) {
+      var shopBtn = ev.target.closest("[data-shop-key]");
+      if (shopBtn) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        var entry = SHOP_CATALOG[shopBtn.getAttribute("data-shop-key")];
+        if (entry) openShop(entry.query);
+        return;
+      }
+      var addBtn = ev.target.closest("[data-resupply-add]");
+      if (addBtn) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        addResupplyStore(addBtn.getAttribute("data-resupply-add"));
+        return;
+      }
+      var tBtn = ev.target.closest("[data-resupply-target]");
+      if (tBtn) {
+        var t = Number(tBtn.getAttribute("data-resupply-target"));
+        if (RESUPPLY_TARGETS.indexOf(t) >= 0 && t !== state.resupplyTarget) {
+          state.resupplyTarget = t;
+          saveState();
+          renderResupply();
+        }
+      }
+    });
+    var panel = $("nx-resupply-panel");
+    if (panel) panel.addEventListener("change", function (ev) {
+      var box = ev.target.closest("[data-list=\"resupply\"]");
+      if (!box) return;
+      if (!state.checklists["resupply"]) state.checklists["resupply"] = {};
+      state.checklists["resupply"][box.getAttribute("data-idx")] = box.checked;
+      if (box.checked) sfxConfirm();
+      saveState();
+      renderResupply();
+      renderDashboard();
+    });
+  }
+
+  /* ---------------- readiness check-in + first orders ----------------
+     The first-run experience. The app ships empty; on first run
+     this questionnaire opens on its own and finds out how
+     prepared the user actually is. The answers are the user's
+     own data, not sample data: household counts become real
+     crew entries (tagged checkinRole so a retake updates them
+     in place instead of duplicating), stored water and food
+     become real stores named "Stored water - check-in" and
+     "Stored food - check-in", and the gaps become FIRST ORDERS
+     - a generated action checklist (state.firstOrders) rendered
+     in Lists alongside the scenario lists but kept OUT of
+     checklistStats, exactly like the Intel checklist. Skipping
+     leaves the app empty and a persistent card on Command until
+     the check-in is completed. */
+  var CHECKIN_WATER_GAL = { none: 0, g3: 3, g10: 10, g25: 25, g55: 55 };
+  var CHECKIN_FOOD_DAYS = { none: 0, few: 3, week: 7, twoWeeks: 14, month: 30 };
+  var CHECKIN_STORE_WATER = "Stored water - check-in";
+  var CHECKIN_STORE_FOOD = "Stored food - check-in";
+  var FIRST_ORDERS_TARGET_DAYS = 14;
+
+  var CHECKIN_STEPS = [
+    { key: "household", title: "Your Household", sub: "WHO RIDES OUT THE EMERGENCY WITH YOU? DAYS READY IS COMPUTED PER PERSON - THESE COUNTS BECOME YOUR CREW." },
+    { key: "climate", title: "Home Climate", sub: "THE GROUND YOUR GEAR HAS TO WORK IN. PICK THE DOMINANT ONE." },
+    { key: "water", title: "Stored Water", sub: "DRINKING WATER ON HAND RIGHT NOW - BOTTLES, JUGS, BARRELS, ALL OF IT." },
+    { key: "food", title: "Stored Food", sub: "FOOD SET ASIDE BEYOND THE EVERYDAY PANTRY. BE HONEST - THE MATH USES IT." },
+    { key: "cook", title: "Cook Without Power", sub: "GRID DOWN, STOVE DEAD. CAN YOU STILL MAKE A HOT MEAL?" },
+    { key: "medical", title: "Medical", sub: "YOUR MEDICAL COVERAGE AT HOME RIGHT NOW." },
+    { key: "gobag", title: "Go-Bag", sub: "A PACKED BAG YOU CAN GRAB ON THE WAY OUT. ONE PER ADULT IS THE STANDARD." },
+    { key: "comms", title: "Comms", sub: "WHEN THE PHONES DIE, HOW DOES YOUR CREW TALK?" },
+    { key: "concern", title: "Biggest Concern", sub: "THE SCENARIO YOU LOSE SLEEP OVER. IT GOES ON YOUR RECORD." }
+  ];
+  var CHECKIN_OPTIONS = {
+    climate: ["Desert", "Cold", "Wet", "Urban"].map(function (c) { return { v: c, label: c.toUpperCase() }; }),
+    water: [
+      { v: "none", label: "NONE" },
+      { v: "g3", label: "ABOUT 3 GAL" },
+      { v: "g10", label: "ABOUT 10 GAL" },
+      { v: "g25", label: "ABOUT 25 GAL" },
+      { v: "g55", label: "55 GAL OR MORE" }
+    ],
+    food: [
+      { v: "none", label: "NONE SET ASIDE" },
+      { v: "few", label: "A FEW DAYS" },
+      { v: "week", label: "ABOUT A WEEK" },
+      { v: "twoWeeks", label: "ABOUT 2 WEEKS" },
+      { v: "month", label: "A MONTH OR MORE" }
+    ],
+    cook: [
+      { v: "yes", label: "YES" },
+      { v: "no", label: "NO" }
+    ],
+    medical: [
+      { v: "trauma", label: "TRAUMA KIT" },
+      { v: "basic", label: "BASIC FIRST AID" },
+      { v: "none", label: "NONE" }
+    ],
+    gobag: [
+      { v: "packed", label: "PACKED" },
+      { v: "partial", label: "PARTIAL" },
+      { v: "none", label: "NONE" }
+    ],
+    comms: [
+      { v: "radios", label: "RADIOS - GMRS OR HAM" },
+      { v: "phones", label: "PHONES ONLY" },
+      { v: "neither", label: "NEITHER" }
+    ],
+    concern: ["Power outage", "Storms", "Earthquake", "Wildfire", "Unrest", "All of them"].map(function (c) { return { v: c, label: c.toUpperCase() }; })
+  };
+
+  var checkin = { open: false, step: 0, answers: null, hadDone: false };
+
+  function openCheckin() {
+    // Remember whether this run is a retake: the walkthrough only
+    // auto-starts after a FIRST completion, never after a retake.
+    checkin.hadDone = !!(state.assessment && state.assessment.done);
+    if (!checkin.answers || (state.assessment && state.assessment.done)) {
+      checkin.answers = sanitizeAssessment(state.assessment);
+    }
+    checkin.step = 0;
+    checkin.open = true;
+    showView("checkin");
+    renderCheckin();
+  }
+  function closeCheckin() {
+    if (!checkin.open) return;
+    checkin.open = false;
+    if (currentView === "checkin") showView("command");
+  }
+  function maybeOpenCheckin() {
+    if (!state.assessment || !state.assessment.done) openCheckin();
+  }
+
+  /* Crew: entries the check-in created carry checkinRole
+     ("Adult" / "Child"). A retake keeps the first N of them
+     (renames and notes survive), drops extras, and appends new
+     ones named "Adult 1..n" / "Child 1..n". Crew the user added
+     by hand is never touched. Pets stay out of the crew list -
+     they are recorded in the assessment only, per the model. */
+  function checkinCrewSync(a) {
+    var created = [];
+    ["Adult", "Child"].forEach(function (role) {
+      var want = role === "Adult" ? a.adults : a.children;
+      var mine = state.crew.filter(function (c) { return c.checkinRole === role; });
+      var keepIds = {};
+      mine.slice(0, want).forEach(function (c) { keepIds[c.id] = true; });
+      for (var i = mine.length; i < want; i++) {
+        created.push({ id: uid(), name: role + " " + (i + 1), role: role, notes: "", checkinRole: role });
+      }
+      state.crew.forEach(function (c) {
+        if (c.checkinRole === role && !keepIds[c.id]) {
+          state.gear.forEach(function (g) { if (g.assignedTo === c.id) g.assignedTo = ""; });
+        }
+      });
+      state.crew = state.crew.filter(function (c) { return c.checkinRole !== role || keepIds[c.id]; });
+    });
+    state.crew = state.crew.concat(created);
+  }
+
+  /* Stores: exactly one water and one food store carry the
+     check-in names. A retake updates them in place (or removes
+     them when the new answer is zero) - never duplicates. */
+  function checkinStoreSync(a) {
+    var hh = Math.max(1, a.adults + a.children);
+    syncOne("Water", CHECKIN_STORE_WATER, CHECKIN_WATER_GAL[a.water] || 0, function (gal) {
+      return { amount: gal, unit: "gal", kcal: 0 };
+    });
+    syncOne("Food", CHECKIN_STORE_FOOD, (CHECKIN_FOOD_DAYS[a.food] || 0) * hh * 2000, function (kcal, days) {
+      return { amount: days, unit: "days", kcal: kcal };
+    });
+    function syncOne(kind, name, value, fields) {
+      var idx = -1;
+      state.stores.forEach(function (s, i) { if (idx < 0 && s.name === name && s.kind === kind) idx = i; });
+      if (value > 0) {
+        var f = fields(value, CHECKIN_FOOD_DAYS[a.food] || 0);
+        if (idx >= 0) {
+          var s = state.stores[idx];
+          Object.keys(f).forEach(function (k) { s[k] = f[k]; });
+          s.expiry = null;
+        } else {
+          var ns = { id: uid(), kind: kind, name: name, expiry: null };
+          Object.keys(f).forEach(function (k) { ns[k] = f[k]; });
+          state.stores.push(ns);
+        }
+      } else if (idx >= 0) state.stores.splice(idx, 1);
+    }
+  }
+
+  /* First Orders: the teaching step. Every order closes a real
+     gap, computed with the need-calculator math against a
+     14-day target, in fix-first order. Capped at 8. */
+  function firstOrdersList(a) {
+    var orders = [];
+    var hh = Math.max(1, a.adults + a.children);
+    var gap = calcGap(calcNeeds(hh, FIRST_ORDERS_TARGET_DAYS));
+    if (gap.shortWater > 0) orders.push({ text: "Store " + fmt(gap.shortWater, 1) + " more gallons of water - 1 gal per person per day for 14 days", shopKey: gap.shortWater >= 40 ? "water-barrel" : "water-storage" });
+    if (gap.shortFoodKcal > 0) orders.push({ text: "Add food - about " + Math.ceil(gap.shortFoodKcal / (hh * 2000)) + " more days of calories for your household (" + fmt(gap.shortFoodKcal, 0) + " kcal)", shopKey: "food-bucket" });
+    if (a.cook === false) orders.push({ text: "Get a way to cook without power - a camp stove and fuel", shopKey: "stove" });
+    if (a.medical === "none") orders.push({ text: "Add a trauma kit - bleeding control, not just bandages", shopKey: "trauma-kit" });
+    else if (a.medical === "basic") orders.push({ text: "Upgrade basic first aid to a trauma kit", shopKey: "trauma-kit" });
+    if (a.gobag === "none") orders.push({ text: "Pack a go-bag for each adult", shopKey: "gobag" });
+    else if (a.gobag === "partial") orders.push({ text: "Finish the go-bags - one packed bag per adult, staged by the door", shopKey: "gobag" });
+    if (a.comms && a.comms !== "radios") orders.push({ text: "Get two GMRS radios and pick a family channel", shopKey: "radios" });
+    if (state.settings.homeLat === 33.4484 && state.settings.homeLng === -112.0740) {
+      orders.push({ text: "Set your home base in System so weather alerts cover your area", shopKey: null });
+    }
+    var hasRealNames = state.crew.some(function (c) { return !c.checkinRole; });
+    var hasRally = state.comms.length > 0 || !!primaryRally();
+    if (!hasRealNames || !hasRally) orders.push({ text: "Add names and a rally point for your crew", shopKey: null });
+    // Pets last (Ready.gov build): a real gap, but it queues
+    // behind the human orders and yields to the standing cap
+    // of 8 when a household has bigger holes to fill first.
+    if (a.pets > 0 && petFoodLb() <= 0) {
+      orders.push({ text: "Stock pet food - " + a.pets + " pet" + (a.pets > 1 ? "s" : "") + " eat too - about " +
+        Math.ceil(a.pets * PET_FOOD_LB_PER_PET_DAY * FIRST_ORDERS_TARGET_DAYS) + " lb covers " + FIRST_ORDERS_TARGET_DAYS + " days", shopKey: "pet-food" });
+    }
+    return orders.slice(0, 8);
+  }
+
+  function applyCheckin(a) {
+    checkinCrewSync(a);
+    checkinStoreSync(a);
+    a.done = true;
+    state.assessment = a;
+    var prevDone = {};
+    (Array.isArray(state.firstOrders) ? state.firstOrders : []).forEach(function (o) { if (o && o.done) prevDone[o.text] = true; });
+    state.firstOrders = firstOrdersList(a).map(function (o) { return { text: o.text, done: !!prevDone[o.text], shopKey: o.shopKey || null }; });
+    // Ticks recorded against the old list carry over by text.
+    var saved = state.checklists["firstOrders"] || {};
+    var fresh = {};
+    state.firstOrders.forEach(function (o, i) { if (o.done) fresh[i] = true; });
+    state.checklists["firstOrders"] = fresh;
+    saveState();
+  }
+
+  function assessmentAreas(a) {
+    var d = daysReady();
+    function area(label, pct, line) { return { label: label, pct: pct, line: line }; }
+    var areas = [
+      area("WATER", d.waterDays == null ? 0 : clamp((d.waterDays / FIRST_ORDERS_TARGET_DAYS) * 100, 0, 100),
+        d.waterDays == null ? "NO WATER STORED" : fmt(d.waterDays, 1) + " DAYS ON HAND"),
+      area("FOOD", d.foodDays == null ? 0 : clamp((d.foodDays / FIRST_ORDERS_TARGET_DAYS) * 100, 0, 100),
+        d.foodDays == null ? "NO FOOD COUNTED" : fmt(d.foodDays, 1) + " DAYS ON HAND"),
+      area("MEDICAL", a.medical === "trauma" ? 100 : a.medical === "basic" ? 50 : 0,
+        a.medical === "trauma" ? "TRAUMA KIT ON HAND" : a.medical === "basic" ? "BASIC FIRST AID ONLY" : a.medical === "none" ? "NO MEDICAL KIT" : "NOT ANSWERED"),
+      area("COMMS", a.comms === "radios" ? 100 : a.comms === "phones" ? 40 : 0,
+        a.comms === "radios" ? "RADIOS ON HAND" : a.comms === "phones" ? "PHONES ONLY - DEAD WHEN THE GRID IS" : a.comms === "neither" ? "NO COMMS PLAN" : "NOT ANSWERED"),
+      area("MOBILITY", a.gobag === "packed" ? 100 : a.gobag === "partial" ? 50 : 0,
+        a.gobag === "packed" ? "GO-BAG PACKED" : a.gobag === "partial" ? "GO-BAG PARTIAL" : a.gobag === "none" ? "NO GO-BAG" : "NOT ANSWERED")
+    ];
+    // A sixth area appears only for pet households (Ready.gov
+    // build) - pet-less households keep the original five.
+    if (a.pets > 0) {
+      var pr = petReadiness();
+      areas.push(area("PETS", pr.lb > 0 ? clamp((pr.days / FIRST_ORDERS_TARGET_DAYS) * 100, 0, 100) : 0,
+        pr.lb > 0 ? fmt(pr.days, 1) + " DAYS OF PET FOOD" : "NO PET FOOD STORED"));
+    }
+    return areas;
+  }
+
+  function checkinStepHtml() {
+    var a = checkin.answers;
+    var step = CHECKIN_STEPS[checkin.step];
+    var key = step.key;
+    var h = "<p class=\"nx-stat-label\">Readiness Check-In // Step " + (checkin.step + 1) + " of " + CHECKIN_STEPS.length + "</p>" +
+      "<div class=\"nx-seg\">" + segHtml(((checkin.step + 1) / CHECKIN_STEPS.length) * 100, false) + "</div>" +
+      "<div class=\"nx-checkin-art\">" + artBig(key) + "</div>" +
+      "<h2 class=\"nx-h\" style=\"margin-top:14px;\">" + esc(step.title) + "</h2>" +
+      "<p class=\"nx-h-note\">" + esc(step.sub) + "</p>";
+    if (key === "household") {
+      h += [["adults", "ADULTS"], ["children", "CHILDREN"], ["pets", "PETS - RECORDED, NOT IN THE DAYS MATH"]].map(function (row) {
+        return "<div class=\"nx-switch-row\" style=\"justify-content:space-between; margin:12px 0;\">" +
+          "<div style=\"font-weight:700; letter-spacing:2px;\">" + row[1] + "</div>" +
+          "<div class=\"nx-btn-row\" style=\"margin:0;\">" +
+          "<button type=\"button\" class=\"nx-btn nx-btn-small\" data-checkin-step=\"" + row[0] + "\" data-delta=\"-1\">-</button>" +
+          "<span class=\"nx-row-weight\" id=\"nx-checkin-n-" + row[0] + "\" style=\"min-width:36px; text-align:center;\">" + a[row[0]] + "</span>" +
+          "<button type=\"button\" class=\"nx-btn nx-btn-small\" data-checkin-step=\"" + row[0] + "\" data-delta=\"1\">+</button>" +
+          "</div></div>";
+      }).join("") +
+      "<p class=\"nx-h-note\" style=\"margin-top:10px;\">CREW ENTRIES ARE CREATED FROM THESE COUNTS - RENAME THEM IN THE CREW TAB.</p>";
+    } else {
+      var cur = key === "cook" ? (a.cook === true ? "yes" : a.cook === false ? "no" : "") : a[key];
+      h += "<div class=\"nx-checkin-opts\">" + CHECKIN_OPTIONS[key].map(function (o) {
+        return "<button type=\"button\" class=\"nx-fbtn" + (cur === o.v ? " nx-on" : "") + "\" data-checkin-opt=\"" + esc(o.v) + "\">" + esc(o.label) + "</button>";
+      }).join("") + "</div>";
+    }
+    var last = checkin.step === CHECKIN_STEPS.length - 1;
+    h += "<div class=\"nx-btn-row\" style=\"margin-top:18px;\">" +
+      (checkin.step > 0 ? "<button type=\"button\" class=\"nx-btn\" id=\"nx-checkin-back\">Back</button>" : "") +
+      "<button type=\"button\" class=\"nx-btn nx-btn-accent\" id=\"nx-checkin-next\">" + (last ? "See Assessment" : "Next") + "</button>" +
+      "<button type=\"button\" class=\"nx-btn\" id=\"nx-checkin-skipq\">Skip Question</button>" +
+      "<button type=\"button\" class=\"nx-btn\" id=\"nx-checkin-exit\">Skip for Now</button>" +
+      "</div>";
+    return h;
+  }
+
+  function checkinAssessmentHtml() {
+    var a = checkin.answers;
+    var d = daysReady();
+    var h = "<p class=\"nx-stat-label\">Assessment // Readiness Check-In Complete</p>" +
+      "<div style=\"display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-top:4px;\">" +
+      "<span style=\"font-family:var(--nx-mono); font-size:62px; font-weight:700; line-height:1;\">" + (d.headline == null ? "--" : fmt(d.headline, 1)) + "</span>" +
+      "<span style=\"font-family:var(--nx-mono); font-size:16px; color:var(--nx-dim);\">DAYS READY</span></div>" +
+      "<p class=\"nx-kv\" style=\"margin:6px 0 0 0;\">HOUSEHOLD: <b>" + d.household + "</b>" +
+      (a.pets ? " // +" + a.pets + " PET" + (a.pets > 1 ? "S" : "") : "") +
+      (a.climate ? " // CLIMATE: <b>" + esc(a.climate.toUpperCase()) + "</b>" : "") +
+      (a.concern ? " // BIGGEST CONCERN: <b>" + esc(a.concern.toUpperCase()) + "</b>" : "") + "</p>";
+    h += assessmentAreas(a).map(function (ar) {
+      return "<div style=\"margin-top:12px;\"><div class=\"nx-switch-row\" style=\"justify-content:space-between;\">" +
+        "<span style=\"display:inline-flex; align-items:center; gap:8px;\"><span class=\"nx-area-ic\">" + artSm(AREA_ICONS[ar.label] || "pack") + "</span>" +
+        "<span class=\"nx-stat-label\">" + ar.label + "</span></span><span class=\"nx-row-meta\">" + esc(ar.line) + "</span></div>" +
+        "<div class=\"nx-seg\" style=\"margin-top:4px;\">" + segHtml(ar.pct, false) + "</div></div>";
+    }).join("");
+    var orders = state.firstOrders || [];
+    h += "<h3 class=\"nx-section-sub\" style=\"margin-top:18px;\">First Orders - Your Gaps, In Order</h3>";
+    h += orders.length
+      ? "<p class=\"nx-h-note\">FILED AS A CHECKLIST IN THE LISTS TAB. WORK THEM TOP DOWN - EACH ONE CLOSES A REAL GAP.</p>" +
+        orders.map(function (o, i) { return "<p class=\"nx-kv\" style=\"margin:2px 0;\"><b>" + (i + 1) + ".</b> " + esc(o.text) + "</p>"; }).join("")
+      : "<p class=\"nx-kv\">NO GAPS FOUND AGAINST THE 14-DAY TARGET. HOLD THE LINE - ROTATE STORES AND KEEP THE CREW DRILLED.</p>";
+    h += "<div class=\"nx-btn-row\" style=\"margin-top:16px;\"><button type=\"button\" class=\"nx-btn nx-btn-accent\" id=\"nx-checkin-done\">Enter Command</button></div>";
+    return h;
+  }
+
+  function renderCheckin() {
+    if (!checkin.open) return;
+    var body = $("nx-checkin-body");
+    if (!body) return;
+    body.innerHTML = checkin.step >= CHECKIN_STEPS.length ? checkinAssessmentHtml() : checkinStepHtml();
+  }
+
+  function renderHomeCards() {
+    var cCard = $("nx-checkin-card");
+    if (cCard) cCard.style.display = (!state.assessment || !state.assessment.done) ? "" : "none";
+    var pCard = $("nx-priority-card");
+    if (!pCard) return;
+    var orders = Array.isArray(state.firstOrders) ? state.firstOrders : [];
+    var next = null;
+    for (var i = 0; i < orders.length; i++) { if (!orders[i].done) { next = orders[i]; break; } }
+    if (!orders.length || !next) { pCard.style.display = "none"; return; }
+    var doneCount = orders.filter(function (o) { return o.done; }).length;
+    pCard.style.display = "";
+    $("nx-priority-text").textContent = next.text;
+    $("nx-priority-count").textContent = "FIRST ORDERS // " + doneCount + " OF " + orders.length + " COMPLETE";
+  }
+
+  /* First Orders render in Lists next to the scenario lists,
+     ticked in state.checklists under "firstOrders" and mirrored
+     onto state.firstOrders[i].done (the dashboard priority card
+     reads the mirror). Kept out of checklistStats, same as
+     Intel: Readiness measures the original 30 scenario items. */
+  function firstOrdersChecklistHtml() {
+    var orders = Array.isArray(state.firstOrders) ? state.firstOrders : [];
+    if (!orders.length) return "";
+    var saved = state.checklists["firstOrders"] || {};
+    function isDone(o, i) { return saved[i] !== undefined ? !!saved[i] : !!o.done; }
+    var done = orders.filter(isDone).length;
+    var items = orders.map(function (o, i) {
+      var checked = isDone(o, i);
+      return "<label class=\"nx-check-item" + (checked ? " nx-done" : "") + "\">" +
+        "<input type=\"checkbox\" data-list=\"firstOrders\" data-idx=\"" + i + "\"" + (checked ? " checked" : "") + ">" +
+        "<span class=\"nx-check-text\">" + esc(o.text) + "</span>" +
+        (o.shopKey ? "<span class=\"nx-check-btns\">" + shopBtnHtml(o.shopKey, "FIND IT") + "</span>" : "") + "</label>";
+    }).join("");
+    return "<h3 class=\"nx-section-sub\">First Orders - " + done + "/" + orders.length + "</h3>" +
+      "<p class=\"nx-h-note\" style=\"margin:0 0 10px 0;\">GENERATED FROM YOUR READINESS CHECK-IN AGAINST A 14-DAY TARGET. RETAKE THE CHECK-IN IN SYSTEM TO REGENERATE.</p>" +
+      "<div class=\"nx-seg\" style=\"margin:0 0 10px 0;\">" + segHtml((done / orders.length) * 100, false) + "</div>" + items +
+      (orders.some(function (o) { return !!o.shopKey; }) ? shopDisclosureHtml() : "");
+  }
+
+  function bindCheckin() {
+    var body = $("nx-checkin-body");
+    if (body) body.addEventListener("click", function (ev) {
+      var stepBtn = ev.target.closest("[data-checkin-step]");
+      if (stepBtn) {
+        var field = stepBtn.getAttribute("data-checkin-step");
+        var delta = Number(stepBtn.getAttribute("data-delta")) || 0;
+        checkin.answers[field] = clamp((Number(checkin.answers[field]) || 0) + delta, 0, field === "adults" ? 20 : 15);
+        var n = $("nx-checkin-n-" + field);
+        if (n) n.textContent = checkin.answers[field];
+        return;
+      }
+      var opt = ev.target.closest("[data-checkin-opt]");
+      if (opt) {
+        var key = CHECKIN_STEPS[checkin.step].key;
+        var v = opt.getAttribute("data-checkin-opt");
+        if (key === "cook") checkin.answers.cook = v === "yes";
+        else checkin.answers[key] = v;
+        renderCheckin();
+        return;
+      }
+      if (ev.target.closest("#nx-checkin-next") || ev.target.closest("#nx-checkin-skipq")) {
+        if (ev.target.closest("#nx-checkin-next")) sfxConfirm();
+        if (checkin.step >= CHECKIN_STEPS.length - 1) {
+          applyCheckin(checkin.answers);
+          checkin.step = CHECKIN_STEPS.length;
+          renderAll();
+        } else checkin.step++;
+        renderCheckin();
+        return;
+      }
+      if (ev.target.closest("#nx-checkin-back")) { if (checkin.step > 0) checkin.step--; renderCheckin(); return; }
+      if (ev.target.closest("#nx-checkin-exit")) { closeCheckin(); renderAll(); return; }
+      if (ev.target.closest("#nx-checkin-done")) {
+        var firstCompletion = !checkin.hadDone;
+        closeCheckin(); renderAll();
+        if (firstCompletion && !state.tourDone) startTour();
+        return;
+      }
+    });
+    var startBtn = $("nx-checkin-start");
+    if (startBtn) startBtn.addEventListener("click", function () { openCheckin(); });
+    var priBtn = $("nx-priority-btn");
+    if (priBtn) priBtn.addEventListener("click", function () { showView("lists"); });
+    var retake = $("nx-checkin-retake");
+    if (retake) retake.addEventListener("click", function () { openCheckin(); });
+  }
+
+  /* ---------------- guided walkthrough ----------------
+     A nine-stop tour that teaches the app itself, right after the
+     readiness check-in has taught the user's situation. It
+     auto-starts once - when a first-run user taps Enter Command
+     on the check-in assessment - and FINISH or SKIP TOUR sets
+     state.tourDone so it never auto-starts again. Two manual
+     doors stay open: TAKE THE WALKTHROUGH on the dashboard
+     check-in card (for users who skipped the check-in) and
+     REPLAY WALKTHROUGH in System (anyone, any time). Each step
+     switches to the real view, scrolls the real element into
+     view and brackets it with an accent frame that tracks the
+     element on a rAF loop; the briefing card rides at the bottom
+     of the screen. The layer is pointer-events-none except the
+     card, so the tour never traps the app. */
+  var tour = { active: false, step: 0, raf: 0, targetEl: null };
+
+  var TOUR_STEPS = [
+    {
+      title: "COMMAND // YOUR NUMBER",
+      body: "This is Days Ready - how long your household lasts on the water and food you have stored. The app works out water days and food days separately, and the smaller number wins. Expired stores never count, so the number only trusts what is still good.",
+      resolve: function () { return { view: "command", el: $("nx-hero-panel") }; }
+    },
+    {
+      title: "FIRST ORDERS // YOUR STARTER LIST",
+      body: "Your check-in answers became a starter checklist: the gaps between what you have and a 14-day target, in the order to close them. It lives in the Lists tab - tick items off as you do them. The card here on Command always shows your next order.",
+      resolve: function () {
+        var card = $("nx-priority-card");
+        if (card && card.style.display !== "none") return { view: "command", el: card };
+        return { view: "lists", el: $("nx-lists-panel") };
+      }
+    },
+    {
+      title: "GEAR // WHAT YOU OWN",
+      body: "Log the gear you actually own. Give it a category, an honest weight and a tier - on your body, in your bug-out bag, or cached at home. The form on this tab is where it starts: fill it in and hit Add Item.",
+      resolve: function () { return { view: "gear", el: $("nx-gear-panel") }; }
+    },
+    {
+      title: "ROTATE // STORES AND EXPIRY DATES",
+      body: "Bulk stores live here: water, food, meds, batteries. Log each one with its expiry date - this is the data Days Ready runs on. The rotation tracker below flags anything due inside 30 days, and anything past its date, so nothing quietly expires on the shelf.",
+      resolve: function () { return { view: "rotate", el: $("nx-rotate-panel") }; }
+    },
+    {
+      title: "ALERTS // WEATHER AND EARTHQUAKES",
+      body: "Real National Weather Service alerts and USGS earthquakes near your home base. Tap Refresh Alerts when you have signal. Offline, the last good fetch stays on screen - and once it is over 3 hours old it is marked STALE, so old data never poses as live.",
+      resolve: function () { return { view: "alerts", el: $("nx-alerts-panel") }; }
+    },
+    {
+      title: "VAULT // SEALED STORAGE",
+      body: "The vault holds plans, rally points and document notes, encrypted on this device with a passphrase only you know. It seals itself every time the app loads. Choose a passphrase you will not forget - there is no reset and no recovery if it is lost.",
+      resolve: function () { return { view: "vault", el: $("nx-vault-panel") }; }
+    },
+    {
+      title: "CREW AND COMMS // YOUR PEOPLE",
+      body: "Add everyone in your household here. Crew size drives the Days Ready math, so every adult and child counts. Your rally point is a vault entry, kept sealed; your radio channels and crew broadcasts live one tab over, in Comms.",
+      resolve: function () { return { view: "crew", el: $("nx-crew-panel") }; }
+    },
+    {
+      title: "INTEL // IDEAS FROM THE FEED",
+      body: "See a loadout, a storage trick or a drill in a post? Share it into NyxSurvive, or paste the link here. The post is saved as a field note, and the gear and steps it names can be filed into your catalog or a checklist with one tap.",
+      resolve: function () { return { view: "intel", el: $("nx-intel-panel") }; }
+    },
+    {
+      title: "SYSTEM // YOUR STATION",
+      body: "Themes, effects and sounds live on this tab, along with the Retake Readiness Check-In and a Replay Walkthrough button if you want this tour again. Accounts are optional - everything core works fully offline, no sign-in required.",
+      resolve: function () { return { view: "system", el: $("nx-settings-panel") }; }
+    }
+  ];
+
+  function tourPlaceFrame() {
+    var frame = $("nx-tour-frame");
+    if (!frame) return;
+    var el = tour.targetEl;
+    if (!tour.active || !el || !el.getClientRects().length) { frame.style.display = "none"; return; }
+    var r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) { frame.style.display = "none"; return; }
+    frame.style.display = "block";
+    frame.style.left = (r.left - 7) + "px";
+    frame.style.top = (r.top - 7) + "px";
+    frame.style.width = (r.width + 14) + "px";
+    frame.style.height = (r.height + 14) + "px";
+  }
+
+  function tourTrack() {
+    if (!tour.active) return;
+    tourPlaceFrame();
+    tour.raf = requestAnimationFrame(tourTrack);
+  }
+
+  function tourShowStep(i) {
+    tour.step = clamp(i, 0, TOUR_STEPS.length - 1);
+    var s = TOUR_STEPS[tour.step];
+    var r = s.resolve();
+    tour.targetEl = r.el;
+    if (currentView !== r.view) showView(r.view);
+    $("nx-tour-kicker").textContent = "Walkthrough // Step " + (tour.step + 1) + " of " + TOUR_STEPS.length;
+    $("nx-tour-title").textContent = s.title;
+    $("nx-tour-body").textContent = s.body;
+    $("nx-tour-seg").innerHTML = segHtml(((tour.step + 1) / TOUR_STEPS.length) * 100, false);
+    $("nx-tour-back").disabled = tour.step === 0;
+    $("nx-tour-next").textContent = tour.step === TOUR_STEPS.length - 1 ? "Finish" : "Next";
+    var card = $("nx-tour-card");
+    if (card && fxAnimate()) {
+      card.classList.remove("nx-tour-in");
+      void card.offsetWidth;
+      card.classList.add("nx-tour-in");
+    }
+    if (tour.targetEl) tour.targetEl.scrollIntoView({ block: "center", behavior: fxAnimate() ? "smooth" : "auto" });
+    tourPlaceFrame();
+  }
+
+  function startTour() {
+    if (tour.active) return;
+    if (checkin.open) closeCheckin();
+    tour.active = true;
+    var layer = $("nx-tour-layer");
+    if (layer) layer.style.display = "";
+    tourShowStep(0);
+    tourTrack();
+  }
+
+  function endTour() {
+    if (!tour.active) return;
+    tour.active = false;
+    cancelAnimationFrame(tour.raf);
+    var layer = $("nx-tour-layer");
+    if (layer) layer.style.display = "none";
+    if (!state.tourDone) { state.tourDone = true; saveState(); }
+  }
+
+  function bindTour() {
+    var next = $("nx-tour-next");
+    if (next) next.addEventListener("click", function () {
+      if (tour.step >= TOUR_STEPS.length - 1) { endTour(); showView("command"); }
+      else tourShowStep(tour.step + 1);
+    });
+    var back = $("nx-tour-back");
+    if (back) back.addEventListener("click", function () { if (tour.step > 0) tourShowStep(tour.step - 1); });
+    var skip = $("nx-tour-skip");
+    if (skip) skip.addEventListener("click", function () { endTour(); });
+    var start = $("nx-tour-start");
+    if (start) start.addEventListener("click", function () { startTour(); });
+    var replay = $("nx-tour-replay");
+    if (replay) replay.addEventListener("click", function () { startTour(); });
+    window.addEventListener("resize", function () { if (tour.active) tourPlaceFrame(); });
   }
 
   /* ---------------- intel: saved social posts ----------------
@@ -1592,7 +4375,7 @@
     if (!wrap) return;
     wrap.innerHTML = state.intel.length
       ? state.intel.map(intelCardHtml).join("")
-      : "<div class=\"nx-empty\">NO INTEL YET. PASTE A POST LINK ABOVE - TIKTOK, INSTAGRAM, YOUTUBE, FACEBOOK OR ANY PAGE.</div>";
+      : "<div class=\"nx-empty\"><span class=\"nx-empty-art\">" + artSm("intel") + "</span>NO INTEL YET. PASTE A POST LINK ABOVE - TIKTOK, INSTAGRAM, YOUTUBE, FACEBOOK OR ANY PAGE.</div>";
   }
 
   function convertIntelItem(card, idx) {
@@ -1697,6 +4480,480 @@
     })();
   }
 
+  /* ---------------- tactical advisor + AI quick-add ----------------
+     The AI build. Two surfaces, one Gemini connection (the key
+     that already powers Intel, server-side only):
+       1. The Tactical Advisor on Command: a chat panel that
+          answers from the user's own readiness numbers. The
+          context it sends is built from counts and categories
+          ONLY - days ready, water / food days, household size,
+          expiring store names + kinds, gear counts by category,
+          the gap lists, open First Orders and Resupply lines.
+          Vault contents, home-base coordinates, crew names,
+          emails and account ids are never read into it (the
+          route re-whitelists server-side as a second wall).
+          Answers can carry supply orders, filed into First
+          Orders on one tap, and a log offer when the user says
+          they bought something - a LOG IT tap files the real
+          store entry, nothing is written before the tap.
+       2. AI Quick-Add: a PHOTO button on the store and gear
+          forms. The photo goes to /api/photo-id; what comes
+          back renders as a confirm-each list of prefilled rows
+          in an overlay. Estimate, prefill, confirm or edit -
+          nothing ever auto-saves (the Munchling pattern, same
+          as Build C's barcode prefill).
+     Tiers: free gets 5 advisor questions and 5 photo IDs a day
+     (client counters in state.aiUse; the routes hold a higher
+     soft cap as a backstop). Operator and owner are unlimited.
+     Signed out or offline, both surfaces say so plainly and the
+     manual paths are untouched. */
+  var AI_FREE_DAILY = 5;
+  var advisorBusy = false;
+  var advisorPending = { orders: [], logOffer: null };
+
+  function aiUseToday() {
+    var today = todayKeyLocal();
+    var u = state.aiUse;
+    if (!u || u.day !== today) return { day: today, ask: 0, photo: 0 };
+    return { day: today, ask: u.ask || 0, photo: u.photo || 0 };
+  }
+  function aiCanUse(kind) {
+    if (isOperator()) return true;
+    var u = aiUseToday();
+    return (kind === "photo" ? u.photo : u.ask) < AI_FREE_DAILY;
+  }
+  function aiRecordUse(kind) {
+    var u = aiUseToday();
+    if (kind === "photo") u.photo += 1; else u.ask += 1;
+    state.aiUse = u;
+    saveState();
+  }
+  function aiLeft(kind) {
+    var u = aiUseToday();
+    return Math.max(0, AI_FREE_DAILY - (kind === "photo" ? u.photo : u.ask));
+  }
+
+  /* The ONLY thing the advisor ever sees: counts and categories
+     computed from the same helpers the dashboard runs on. Store
+     names appear solely in the expiring list (the user's own
+     item names, per spec); gear travels as category counts. */
+  function advisorContext() {
+    var d = daysReady();
+    var byCat = {};
+    CATEGORIES.forEach(function (c) { byCat[c] = 0; });
+    state.gear.forEach(function (g) {
+      if (byCat[g.category] != null) byCat[g.category] += Math.max(1, Number(g.qty) || 1);
+    });
+    var gaps = [];
+    if (!hasFiltration()) gaps.push("water filtration");
+    if (!hasMedicalKit()) gaps.push("trauma / medical kit");
+    if (!hasRadios()) gaps.push("radios / comms");
+    if (!hasGoBag()) gaps.push("go-bag");
+    if (!hasLightSource()) gaps.push("light source");
+    return {
+      daysReady: d.headline,
+      waterDays: d.waterDays,
+      foodDays: d.foodDays,
+      waterGal: Math.round(d.waterGal * 10) / 10,
+      foodKcal: Math.round(d.foodKcal),
+      household: d.household,
+      expiring: storeExpiries().filter(function (r) { return r.days != null && r.days <= 90; }).slice(0, 6)
+        .map(function (r) { return { name: r.name, kind: r.storeKind, daysLeft: r.days }; }),
+      gearByCategory: byCat,
+      gearTotal: state.gear.length,
+      gearGaps: gaps,
+      firstOrders: (state.firstOrders || []).filter(function (o) { return !o.done; })
+        .map(function (o) { return o.text; }).slice(0, 8),
+      resupply: resupplyLines().map(function (l) { return l.text; }).slice(0, 8)
+    };
+  }
+
+  function advisorCountText() {
+    if (isOperator()) return isOwner() ? "OWNER - UNLIMITED QUESTIONS" : "OPERATOR - UNLIMITED QUESTIONS";
+    return "FREE TIER: " + aiLeft("ask") + " OF " + AI_FREE_DAILY + " QUESTIONS LEFT TODAY // " +
+      aiLeft("photo") + " OF " + AI_FREE_DAILY + " PHOTO IDS LEFT TODAY - OPERATOR IS UNLIMITED, SEE SYSTEM // PLAN";
+  }
+
+  function renderAdvisor() {
+    var log = $("nx-adv-log");
+    if (!log) return;
+    var msgs = Array.isArray(state.advisorLog) ? state.advisorLog : [];
+    log.innerHTML = msgs.length
+      ? msgs.map(function (m) {
+          return "<div class=\"nx-adv-turn nx-adv-" + m.role + "\">" +
+            "<p class=\"nx-adv-who\">" + (m.role === "user" ? "You" : "Advisor") + "</p>" +
+            "<p class=\"nx-adv-text\">" + esc(m.text) + "</p></div>";
+        }).join("")
+      : "<p class=\"nx-h-note\" style=\"margin:0;\">NO QUESTIONS YET. TRY A QUICK ASK BELOW, OR TYPE YOUR OWN - INCLUDING WHAT YOU JUST BOUGHT.</p>";
+    var act = $("nx-adv-actions");
+    if (act) {
+      var h = "";
+      if (advisorPending.orders.length) {
+        h += "<div class=\"nx-adv-offer\"><p class=\"nx-adv-offer-text\">THE ADVISOR SUGGESTED " +
+          advisorPending.orders.length + " ORDER" + (advisorPending.orders.length === 1 ? "" : "S") + ":</p>" +
+          advisorPending.orders.map(function (o) { return "<p class=\"nx-adv-offer-line\">- " + esc(o) + "</p>"; }).join("") +
+          "<div class=\"nx-btn-row\"><button type=\"button\" class=\"nx-btn nx-btn-small nx-btn-accent\" id=\"nx-adv-add-orders\">Add to First Orders</button></div></div>";
+      }
+      if (advisorPending.logOffer) {
+        var o = advisorPending.logOffer;
+        h += "<div class=\"nx-adv-offer\"><p class=\"nx-adv-offer-text\">LOG THIS PURCHASE?</p>" +
+          "<p class=\"nx-adv-offer-line\">" + esc(o.name) + " - " + fmt(o.amount, 1) + " " + esc(o.unit) +
+          " (" + esc(o.kind.toUpperCase()) + (o.kcal ? ", " + fmt(o.kcal, 0) + " KCAL" : "") + ")</p>" +
+          "<div class=\"nx-btn-row\"><button type=\"button\" class=\"nx-btn nx-btn-small nx-btn-accent\" id=\"nx-adv-log-it\">Log It</button>" +
+          "<button type=\"button\" class=\"nx-btn nx-btn-small\" id=\"nx-adv-log-skip\">Skip</button></div></div>";
+      }
+      act.innerHTML = h;
+    }
+    var count = $("nx-adv-count");
+    if (count) count.textContent = advisorCountText();
+  }
+
+  /* File the advisor's suggested orders into First Orders -
+     append-only through the same shape the check-in writes, so
+     existing ticks (keyed by index) stay aligned; capped at 8
+     like check-in generation, duplicates by text skipped. */
+  function addAdvisorOrders() {
+    var msg = $("nx-adv-msg");
+    if (!advisorPending.orders.length) return;
+    var existing = {};
+    state.firstOrders.forEach(function (o) { existing[o.text] = true; });
+    var added = 0;
+    advisorPending.orders.forEach(function (text) {
+      text = String(text || "").slice(0, 300);
+      if (!text || existing[text]) return;
+      if (state.firstOrders.length >= 8) return;
+      state.firstOrders.push({ text: text, done: false, shopKey: null });
+      existing[text] = true;
+      added += 1;
+    });
+    advisorPending.orders = [];
+    saveState();
+    renderAll();
+    if (added) showMsg(msg, "ADDED " + added + " ORDER" + (added === 1 ? "" : "S") + " TO FIRST ORDERS - FIND THEM IN LISTS.", "good");
+    else showMsg(msg, "NOTHING NEW TO ADD - THOSE ORDERS ARE ALREADY FILED, OR FIRST ORDERS IS FULL AT 8.", "err");
+    if (added) sfxConfirm();
+  }
+
+  /* File the log offer as a real store entry - the same shape
+     the store form submits. Only ever runs on the LOG IT tap. */
+  function logAdvisorOffer() {
+    var msg = $("nx-adv-msg");
+    var o = advisorPending.logOffer;
+    if (!o) return;
+    state.stores.push({
+      id: uid(), kind: o.kind, name: o.name, amount: o.amount,
+      unit: o.unit, expiry: null, kcal: o.kcal || 0
+    });
+    advisorPending.logOffer = null;
+    saveState();
+    renderAll();
+    showMsg(msg, "LOGGED: " + o.name.toUpperCase() + " - " + fmt(o.amount, 1) + " " + o.unit.toUpperCase() + ".", "good");
+    sfxConfirm();
+  }
+
+  async function askAdvisor(rawQuestion) {
+    var msg = $("nx-adv-msg");
+    var question = String(rawQuestion || "").trim().slice(0, 500);
+    if (!question || advisorBusy) return;
+    if (!authUser) {
+      showMsg(msg, "SIGN IN (SYSTEM TAB) TO ASK THE ADVISOR - IT RUNS ON YOUR ACCOUNT.", "err");
+      return;
+    }
+    if (!aiCanUse("ask")) {
+      showMsg(msg, "FREE TIER: " + AI_FREE_DAILY + " ADVISOR QUESTIONS A DAY - YOURS RESET TOMORROW. OPERATOR IS UNLIMITED - SEE SYSTEM // PLAN.", "err");
+      return;
+    }
+    advisorBusy = true;
+    var btn = $("nx-adv-send");
+    if (btn) { btn.disabled = true; btn.textContent = "Thinking..."; }
+    showMsg(msg, "ADVISOR IS READING YOUR NUMBERS...", "");
+    state.advisorLog.push({ role: "user", text: question });
+    state.advisorLog = state.advisorLog.slice(-40);
+    saveState();
+    renderAdvisor();
+    try {
+      var token = await authUser.getIdToken();
+      var res = await fetch(apiUrl("/api/ask"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ question: question, context: advisorContext() })
+      });
+      var out = null;
+      try { out = await res.json(); } catch (e) { out = null; }
+      if (res.status === 429) {
+        showMsg(msg, String((out && out.error) || "Daily advisor cap reached - try again tomorrow.").toUpperCase(), "err");
+        return;
+      }
+      if (!res.ok || !out || !out.ok) throw new Error((out && out.error) || ("HTTP " + res.status));
+      if (out.degraded || !out.reply) {
+        showMsg(msg, "ADVISOR OFFLINE - THE AI SERVICE DID NOT ANSWER. YOUR NUMBERS ARE SAFE; TRY AGAIN IN A BIT.", "err");
+        return;
+      }
+      aiRecordUse("ask");
+      state.advisorLog.push({ role: "advisor", text: String(out.reply).slice(0, 4000) });
+      state.advisorLog = state.advisorLog.slice(-40);
+      advisorPending = {
+        orders: (Array.isArray(out.orders) ? out.orders : []).filter(function (o) { return typeof o === "string" && o; }).slice(0, 5),
+        logOffer: (out.logOffer && typeof out.logOffer === "object" && STORE_KINDS.indexOf(out.logOffer.kind) >= 0 &&
+          typeof out.logOffer.name === "string" && out.logOffer.name) ? {
+            kind: out.logOffer.kind, name: out.logOffer.name.slice(0, 70),
+            amount: Math.max(0, Number(out.logOffer.amount) || 0) || 1,
+            unit: typeof out.logOffer.unit === "string" && out.logOffer.unit ? out.logOffer.unit.slice(0, 16) : "units",
+            kcal: Math.max(0, Math.round(Number(out.logOffer.kcal) || 0))
+          } : null
+      };
+      saveState();
+      renderAdvisor();
+      showMsg(msg, "", "");
+      sfxConfirm();
+    } catch (e) {
+      showMsg(msg, "ADVISOR OFFLINE - CHECK YOUR CONNECTION AND TRY AGAIN.", "err");
+    } finally {
+      advisorBusy = false;
+      if (btn) { btn.disabled = false; btn.textContent = "Ask"; }
+    }
+  }
+
+  /* ---------------- AI quick-add: photo ID ---------------- */
+  var photoBusy = false;
+  var photoItems = []; // identified items awaiting per-row confirm
+
+  /* Downscale on-device before anything ships: longest side
+     1024px, JPEG. Falls back to the raw file if the platform
+     cannot decode it - the route caps the size either way. */
+  function fileToPhotoPayload(file) {
+    return new Promise(function (resolve) {
+      var fallback = function () {
+        var reader = new FileReader();
+        reader.onload = function () {
+          var s = String(reader.result || "");
+          var comma = s.indexOf(",");
+          resolve({ image: comma >= 0 ? s.slice(comma + 1) : s, mime: file.type || "image/jpeg" });
+        };
+        reader.onerror = function () { resolve(null); };
+        reader.readAsDataURL(file);
+      };
+      var url;
+      try { url = URL.createObjectURL(file); } catch (e) { fallback(); return; }
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var scale = Math.min(1, 1024 / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
+          var w = Math.max(1, Math.round((img.naturalWidth || 1) * scale));
+          var h = Math.max(1, Math.round((img.naturalHeight || 1) * scale));
+          var canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+          URL.revokeObjectURL(url);
+          var data = canvas.toDataURL("image/jpeg", 0.82);
+          resolve({ image: data.slice(data.indexOf(",") + 1), mime: "image/jpeg" });
+        } catch (e) { URL.revokeObjectURL(url); fallback(); }
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); fallback(); };
+      img.src = url;
+    });
+  }
+
+  function photoRowHtml(it, idx) {
+    if (it.kind === "gear") {
+      return "<div class=\"nx-photo-row\" data-photo-row=\"" + idx + "\">" +
+        "<p class=\"nx-adv-who\">Gear // " + esc(it.category) + "</p>" +
+        "<label class=\"nx-field\"><span class=\"nx-label\">Name</span>" +
+          "<input class=\"nx-input\" data-photo-name maxlength=\"70\" value=\"" + esc(it.name) + "\"></label>" +
+        "<div class=\"nx-photo-grid\">" +
+        "<label class=\"nx-field\"><span class=\"nx-label\">Qty</span>" +
+          "<input class=\"nx-input\" data-photo-qty type=\"number\" min=\"1\" step=\"1\" value=\"" + it.qty + "\"></label>" +
+        "<label class=\"nx-field\"><span class=\"nx-label\">Category</span>" +
+          "<select class=\"nx-select\" data-photo-cat>" + CATEGORIES.map(function (c) {
+            return "<option value=\"" + c + "\"" + (c === it.category ? " selected" : "") + ">" + c + "</option>";
+          }).join("") + "</select></label></div>" +
+        "<div class=\"nx-btn-row\"><button type=\"button\" class=\"nx-btn nx-btn-small nx-btn-accent\" data-photo-add=\"" + idx + "\">Add Gear</button></div></div>";
+    }
+    return "<div class=\"nx-photo-row\" data-photo-row=\"" + idx + "\">" +
+      "<p class=\"nx-adv-who\">Store // " + esc(it.storeKind) + "</p>" +
+      "<label class=\"nx-field\"><span class=\"nx-label\">Name</span>" +
+        "<input class=\"nx-input\" data-photo-name maxlength=\"70\" value=\"" + esc(it.name) + "\"></label>" +
+      "<div class=\"nx-photo-grid\">" +
+      "<label class=\"nx-field\"><span class=\"nx-label\">Type</span>" +
+        "<select class=\"nx-select\" data-photo-skind>" + STORE_KINDS.map(function (k) {
+          return "<option value=\"" + k + "\"" + (k === it.storeKind ? " selected" : "") + ">" + k + "</option>";
+        }).join("") + "</select></label>" +
+      "<label class=\"nx-field\"><span class=\"nx-label\">Amount</span>" +
+        "<input class=\"nx-input\" data-photo-amount type=\"number\" min=\"0\" step=\"0.1\" value=\"" + it.amount + "\"></label>" +
+      "<label class=\"nx-field\"><span class=\"nx-label\">Unit</span>" +
+        "<input class=\"nx-input\" data-photo-unit maxlength=\"16\" value=\"" + esc(it.unit) + "\"></label>" +
+      "<label class=\"nx-field\"><span class=\"nx-label\">Total kcal (food)</span>" +
+        "<input class=\"nx-input\" data-photo-kcal type=\"number\" min=\"0\" step=\"1\" value=\"" + (it.kcal || "") + "\" placeholder=\"0\"></label></div>" +
+      "<div class=\"nx-btn-row\"><button type=\"button\" class=\"nx-btn nx-btn-small nx-btn-accent\" data-photo-add=\"" + idx + "\">Add Store</button></div></div>";
+  }
+
+  function renderPhotoItems() {
+    var wrap = $("nx-photo-list");
+    if (!wrap) return;
+    wrap.innerHTML = photoItems.length
+      ? photoItems.map(function (it, i) { return photoRowHtml(it, i); }).join("")
+      : "<p class=\"nx-h-note\" style=\"margin:0;\">NOTHING LEFT TO CONFIRM.</p>";
+  }
+
+  function openPhotoConfirm(items) {
+    photoItems = items;
+    renderPhotoItems();
+    showMsg($("nx-photo-msg"), "", "");
+    $("nx-photo").style.display = "";
+  }
+  function closePhotoConfirm() {
+    photoItems = [];
+    var ov = $("nx-photo");
+    if (ov) ov.style.display = "none";
+  }
+
+  /* File one confirmed row through the real add paths - the
+     store shape the store form writes, the gear shape the gear
+     form writes, gear cap enforced exactly like the form. */
+  function addPhotoItem(idx, rowEl) {
+    var msg = $("nx-photo-msg");
+    var it = photoItems[idx];
+    if (!it || !rowEl) return;
+    var name = rowEl.querySelector("[data-photo-name]").value.trim().slice(0, 70);
+    if (!name) { showMsg(msg, "THE NAME IS EMPTY - FIX IT OR CLOSE AND SKIP THE ITEM.", "err"); return; }
+    if (it.kind === "gear") {
+      if (capBlocked("gear")) {
+        showMsg(msg, "FREE TIER GEAR CAP: " + PLAN_CAPS.gear + " ITEMS. OPERATOR REMOVES EVERY CAP - SEE SYSTEM // PLAN.", "err");
+        return;
+      }
+      state.gear.push({
+        id: uid(), name: name,
+        category: rowEl.querySelector("[data-photo-cat]").value,
+        tier: "T3", weightValue: 0, weightUnit: "lb",
+        qty: Math.max(1, Number(rowEl.querySelector("[data-photo-qty]").value) || 1),
+        expiry: null, assignedTo: "", location: "", env: []
+      });
+    } else {
+      state.stores.push({
+        id: uid(),
+        kind: rowEl.querySelector("[data-photo-skind]").value,
+        name: name,
+        amount: Number(rowEl.querySelector("[data-photo-amount]").value) || 0,
+        unit: rowEl.querySelector("[data-photo-unit]").value.trim().slice(0, 16) || "units",
+        expiry: null,
+        kcal: Number(rowEl.querySelector("[data-photo-kcal]").value) || 0
+      });
+    }
+    photoItems.splice(idx, 1);
+    saveState();
+    renderAll();
+    renderPhotoItems();
+    showMsg(msg, "FILED: " + name.toUpperCase() + ".", "good");
+    sfxConfirm();
+  }
+
+  async function runPhotoId(file, target) {
+    var msg = $(target === "gear" ? "nx-gear-msg" : "nx-store-msg");
+    if (!file || photoBusy) return;
+    if (!authUser) {
+      showMsg(msg, "SIGN IN (SYSTEM TAB) TO USE PHOTO ID - IT RUNS ON YOUR ACCOUNT.", "err");
+      return;
+    }
+    if (!aiCanUse("photo")) {
+      showMsg(msg, "FREE TIER: " + AI_FREE_DAILY + " PHOTO IDS A DAY - YOURS RESET TOMORROW. OPERATOR IS UNLIMITED - SEE SYSTEM // PLAN.", "err");
+      return;
+    }
+    photoBusy = true;
+    showMsg(msg, "PHOTO ID IS READING THE PHOTO...", "");
+    try {
+      var payload = await fileToPhotoPayload(file);
+      if (!payload) throw new Error("unreadable photo");
+      var token = await authUser.getIdToken();
+      var res = await fetch(apiUrl("/api/photo-id"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ image: payload.image, mime: payload.mime, target: target })
+      });
+      var out = null;
+      try { out = await res.json(); } catch (e) { out = null; }
+      if (res.status === 429) {
+        showMsg(msg, String((out && out.error) || "Daily photo ID cap reached - try again tomorrow.").toUpperCase(), "err");
+        return;
+      }
+      if (!res.ok || !out || !out.ok) throw new Error((out && out.error) || ("HTTP " + res.status));
+      if (out.degraded) {
+        showMsg(msg, "PHOTO ID OFFLINE - THE AI SERVICE DID NOT ANSWER. THE FORM STILL WORKS BY HAND.", "err");
+        return;
+      }
+      aiRecordUse("photo");
+      var items = (Array.isArray(out.items) ? out.items : []).map(function (raw) {
+        if (!raw || typeof raw !== "object" || typeof raw.name !== "string" || !raw.name) return null;
+        return {
+          kind: raw.kind === "gear" ? "gear" : "store",
+          storeKind: STORE_KINDS.indexOf(raw.storeKind) >= 0 ? raw.storeKind : "Food",
+          category: CATEGORIES.indexOf(raw.category) >= 0 ? raw.category : "Other",
+          name: raw.name.slice(0, 70),
+          amount: Math.max(0, Number(raw.amount) || 0) || 1,
+          unit: typeof raw.unit === "string" && raw.unit ? raw.unit.slice(0, 16) : "units",
+          kcal: Math.max(0, Math.round(Number(raw.kcal) || 0)),
+          qty: Math.max(1, Math.round(Number(raw.qty) || 1))
+        };
+      }).filter(Boolean).slice(0, 12);
+      if (!items.length) {
+        showMsg(msg, "PHOTO ID FOUND NOTHING LOGGABLE IN THAT PHOTO - ENTER IT BY HAND.", "err");
+        return;
+      }
+      showMsg(msg, "PHOTO ID FOUND " + items.length + " ITEM" + (items.length === 1 ? "" : "S") + " - CONFIRM EACH ONE.", "good");
+      openPhotoConfirm(items);
+      sfxConfirm();
+    } catch (e) {
+      showMsg(msg, "PHOTO ID OFFLINE - CHECK YOUR CONNECTION. THE FORM STILL WORKS BY HAND.", "err");
+    } finally {
+      photoBusy = false;
+    }
+  }
+
+  function bindAdvisor() {
+    var form = $("nx-adv-form");
+    if (form) form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var input = $("nx-adv-input");
+      var q = input.value;
+      input.value = "";
+      askAdvisor(q);
+    });
+    document.querySelectorAll("[data-adv-q]").forEach(function (b) {
+      b.addEventListener("click", function () { askAdvisor(b.getAttribute("data-adv-q")); });
+    });
+    var actions = $("nx-adv-actions");
+    if (actions) actions.addEventListener("click", function (ev) {
+      if (ev.target.closest("#nx-adv-add-orders")) { addAdvisorOrders(); return; }
+      if (ev.target.closest("#nx-adv-log-it")) { logAdvisorOffer(); return; }
+      if (ev.target.closest("#nx-adv-log-skip")) {
+        advisorPending.logOffer = null;
+        renderAdvisor();
+      }
+    });
+    var storeBtn = $("nx-store-photo-btn"), gearBtn = $("nx-gear-photo-btn");
+    if (storeBtn) storeBtn.addEventListener("click", function () { $("nx-store-photo").click(); });
+    if (gearBtn) gearBtn.addEventListener("click", function () { $("nx-gear-photo").click(); });
+    var storeInput = $("nx-store-photo"), gearInput = $("nx-gear-photo");
+    if (storeInput) storeInput.addEventListener("change", function () {
+      var f = storeInput.files && storeInput.files[0];
+      storeInput.value = "";
+      if (f) runPhotoId(f, "store");
+    });
+    if (gearInput) gearInput.addEventListener("change", function () {
+      var f = gearInput.files && gearInput.files[0];
+      gearInput.value = "";
+      if (f) runPhotoId(f, "gear");
+    });
+    var photoList = $("nx-photo-list");
+    if (photoList) photoList.addEventListener("click", function (ev) {
+      var addBtn = ev.target.closest("[data-photo-add]");
+      if (!addBtn) return;
+      var rowEl = addBtn.closest("[data-photo-row]");
+      addPhotoItem(Number(addBtn.getAttribute("data-photo-add")), rowEl);
+    });
+    var closeBtn = $("nx-photo-close");
+    if (closeBtn) closeBtn.addEventListener("click", closePhotoConfirm);
+  }
+
   /* ---------------- emergency alerts (NWS + USGS) ---------------- */
   var ALERTS_CACHE_KEY = "nyxsurvive-alerts-cache";
   var STALE_MS = 3 * 60 * 60 * 1000; // 3 hours
@@ -1725,6 +4982,7 @@
   }
 
   function renderAlertBanner() {
+    renderStatusBoard();
     var banner = $("nx-alert-banner");
     var text = $("nx-alert-banner-text");
     if (!banner || !text) return;
@@ -1762,6 +5020,8 @@
     var list = $("nx-alerts-list");
     var quakes = $("nx-quakes-list");
     if (!status || !list || !quakes) return;
+    var mapEl = $("nx-alerts-map");
+    if (mapEl) mapEl.classList.toggle("nx-live", !!(alertsCache && alertsCache.alerts && alertsCache.alerts.length > 0));
 
     if (!alertsCache) {
       status.textContent = "NO ALERT DATA - OFFLINE WITH NO CACHE, OR NOT FETCHED YET. CONNECT AND REFRESH.";
@@ -1895,6 +5155,22 @@
         : (state.settings.effects === false ? "ON // HELD OFF BY TERMINAL EFFECTS" : "ON");
     }
     renderThemePicker();
+    renderHomeSystems();
+  }
+
+  /* Home Systems (Ready.gov build): the shutoff location
+     notes form in System. Filled from state on every render
+     unless the user is mid-edit in one of its fields - the
+     same focus guard Station Settings uses. */
+  function renderHomeSystems() {
+    var w = $("nx-hs-water"), g = $("nx-hs-gas"), e = $("nx-hs-electric"), p = $("nx-hs-propane");
+    if (!w) return;
+    if (document.activeElement === w || document.activeElement === g || document.activeElement === e || document.activeElement === p) return;
+    var hs = state.homeSystems || { water: "", gas: "", electric: "", propane: "" };
+    w.value = hs.water || "";
+    g.value = hs.gas || "";
+    e.value = hs.electric || "";
+    p.value = hs.propane || "";
   }
 
   function buildExport() {
@@ -1954,6 +5230,20 @@
       refreshAlerts();
     });
 
+    var hsForm = $("nx-homesys-form");
+    if (hsForm) hsForm.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      state.homeSystems = {
+        water: $("nx-hs-water").value.trim(),
+        gas: $("nx-hs-gas").value.trim(),
+        electric: $("nx-hs-electric").value.trim(),
+        propane: $("nx-hs-propane").value.trim()
+      };
+      saveState();
+      sfxConfirm();
+      showMsg($("nx-homesys-msg"), "HOME SYSTEMS SAVED. WORK THE KNOW YOUR SHUTOFFS LIST IN THE LISTS TAB.", "good");
+    });
+
     $("nx-export-btn").addEventListener("click", function () {
       var payload = JSON.stringify(buildExport(), null, 2);
       var blob = new Blob([payload], { type: "application/json" });
@@ -1994,11 +5284,11 @@
     });
 
     $("nx-reset-btn").addEventListener("click", function () {
-      if (!window.confirm("Reset to starter data? Your gear, stores, comms, crew and lists are replaced by the starter set. The vault is NOT touched.")) return;
-      state = starterState();
+      if (!window.confirm("Reset to a blank slate? Your gear, stores, comms, crew and lists are erased and the terminal starts empty. The vault is NOT touched.")) return;
+      state = blankState();
       saveState();
       renderAll();
-      showMsg($("nx-system-msg"), "STARTER DATA RESTORED.", "good");
+      showMsg($("nx-system-msg"), "BLANK SLATE. RUN THE READINESS CHECK-IN FROM COMMAND TO BEGIN AGAIN.", "good");
     });
 
     var wipeArmed = false, wipeTimer = null;
@@ -2020,7 +5310,7 @@
       wipeArmed = false;
       btn.textContent = "Wipe Everything";
       btn.classList.remove("nx-armed");
-      state = emptyState();
+      state = blankState();
       saveState();
       try { localStorage.removeItem(VAULT_KEY); localStorage.removeItem(ALERTS_CACHE_KEY); } catch (e) { /* ignore */ }
       alertsCache = null;
@@ -2479,6 +5769,44 @@
         }).join("") + "</tbody></table>"
       : "<p>NO CHANNELS IN THE COMMS PLAN.</p>";
 
+    /* Family Plan (Ready.gov build): the household card -
+       who is in the house, where you meet, who outside the
+       area you check in with, the meds that matter and the
+       cash on hand. Names and places only: coordinates never
+       print, in this section or any other. */
+    h += "<h2>Family Plan</h2>";
+    h += state.crew.length
+      ? "<table><thead><tr><th>Household Member</th><th>Role</th></tr></thead><tbody>" +
+        state.crew.map(function (c) {
+          return "<tr><td>" + esc(c.name) + "</td><td>" + esc(c.role) + "</td></tr>";
+        }).join("") + "</tbody></table>"
+      : "<p>NO CREW LOGGED.</p>";
+    var fp = state.familyPlan || { outName: "", outPhone: "", rally2: "" };
+    var primaryRallyEntry = Vault.unlocked ? primaryRally() : null;
+    h += "<p>PRIMARY MEETING PLACE: <b>" + (primaryRallyEntry
+      ? esc(primaryRallyEntry.title)
+      : (Vault.blob ? "SEALED IN VAULT - UNLOCK IN APP" : "NOT SET")) + "</b></p>";
+    h += "<p>SECONDARY MEETING PLACE: <b>" + (fp.rally2 ? esc(fp.rally2) : "NOT SET") + "</b></p>";
+    h += "<p>OUT-OF-TOWN CONTACT: <b>" + (fp.outName
+      ? esc(fp.outName) + (fp.outPhone ? " // " + esc(fp.outPhone) : "")
+      : "NOT SET") + "</b></p>";
+    h += "<p>COMMS CHANNELS: " + (state.comms.length
+      ? state.comms.map(function (c) { return esc(c.label); }).join(", ")
+      : "NONE SET") + "</p>";
+    var meds = Array.isArray(state.meds) ? state.meds : [];
+    h += "<h3>Medications</h3>";
+    h += meds.length
+      ? "<ul>" + meds.map(function (m) {
+          return "<li>" + esc(m.person || "UNASSIGNED") + " - " + esc(m.name) +
+            (m.dose ? " (" + esc(m.dose) + ")" : "") + " - " + (Number(m.supplyDays) || 0) + " DAYS SUPPLY" +
+            (m.expiry ? " // EXP " + esc(m.expiry) : "") + "</li>";
+        }).join("") + "</ul>"
+      : "<p>NO MEDS LOGGED.</p>";
+    var cashEntries = Array.isArray(state.cash) ? state.cash : [];
+    h += "<p>CASH ON HAND: <b>$" + fmt(cashTotal(), 0) + "</b>" + (cashEntries.length
+      ? " - " + cashEntries.map(function (c) { return esc(c.where || "UNMARKED") + ": $" + fmt(c.amount, 0); }).join(" // ")
+      : "") + "</p>";
+
     h += "<h2>Scenario Checklists</h2>";
     CHECKLISTS.forEach(function (list) {
       var saved = state.checklists[list.id] || {};
@@ -2696,6 +6024,13 @@
    * once it has moved on, so a slow response can never resurrect
    * a signed-in state after sign-out. */
   var authSession = 0;
+  /* Set by an explicit sign-out and cleared by the next explicit
+   * sign-in (or handleSignedIn). While set, an auth-listener fire
+   * carrying a user is treated as a stale persisted session, not
+   * a sign-in: it is signed straight back out instead of
+   * resurrecting the session. In-memory only - a fresh boot with
+   * a persisted session is still a normal sign-in. */
+  var explicitSignOut = false;
   var cloudSyncTimer = null;
   var lastSyncAt = 0;
   var syncState = "local"; // local | pending | syncing | synced | error
@@ -2846,7 +6181,12 @@
        * refreshPlanStatus re-proves it right after. */
       var cached = readPlanCache(user.uid);
       if (cached) state.plan = cached;
+      var cachedObj = readPlanCacheObj(user.uid);
+      if (cachedObj && Array.isArray(cachedObj.addons)) state.addons = sanitizeAddons(cachedObj.addons);
       persistLocal();
+      // A completed check-in in the cloud copy ends any first-run
+      // overlay this fresh device opened before the sync landed.
+      if (state.assessment && state.assessment.done) closeCheckin();
       /* The vault follows the same winner as the state. The
        * cloud value is ciphertext, copied byte for byte; it is
        * never decrypted here - Vault.load() just re-reads the
@@ -2867,17 +6207,34 @@
   }
 
   /* ---------------- plan proof ---------------- */
-  function readPlanCache(uid) {
+  function readPlanCacheObj(uid) {
     try {
       var raw = localStorage.getItem(PLAN_CACHE_KEY);
       if (!raw) return null;
       var c = JSON.parse(raw);
-      if (c && c.uid === uid && (c.tier === "operator" || c.tier === "lifetime")) return c.tier;
+      if (c && c.uid === uid) return c;
     } catch (e) {}
     return null;
   }
-  function writePlanCache(uid, tier) {
-    try { localStorage.setItem(PLAN_CACHE_KEY, JSON.stringify({ uid: uid, tier: tier })); } catch (e) {}
+  function readPlanCache(uid) {
+    var c = readPlanCacheObj(uid);
+    if (c && (c.tier === "operator" || c.tier === "lifetime")) return c.tier;
+    return null;
+  }
+  function writePlanCache(uid, tier, addons) {
+    try {
+      var c = { uid: uid, tier: tier };
+      // The add-on list rides the same cache entry (money build
+      // D): written whenever the server proves it, read back on
+      // a cloud load exactly like the tier. Older entries simply
+      // have no addons key and read as none proven yet.
+      if (Array.isArray(addons)) c.addons = sanitizeAddons(addons);
+      else {
+        var prev = readPlanCacheObj(uid);
+        if (prev && Array.isArray(prev.addons)) c.addons = sanitizeAddons(prev.addons);
+      }
+      localStorage.setItem(PLAN_CACHE_KEY, JSON.stringify(c));
+    } catch (e) {}
   }
   /* The tier is server-authoritative: only a successful
    * /api/subscription-status answer (or the locally derived
@@ -2898,6 +6255,7 @@
       state.plan = "lifetime";
       writePlanCache(user.uid, "lifetime");
       persistLocal();
+      renderSquad();
       return;
     }
     try {
@@ -2910,13 +6268,23 @@
       if (!authUser || authUser !== user || session !== authSession) return;
       var tier = (out.plan === "operator" || out.plan === "lifetime") ? out.plan : "free";
       state.plan = tier;
-      writePlanCache(user.uid, tier);
+      // Add-ons are proven by the same answer (money build D).
+      // A response without an addons array (an older deployment)
+      // leaves the cached list standing, same offline rule as
+      // the tier: only a proven answer moves it.
+      if (Array.isArray(out.addons)) state.addons = sanitizeAddons(out.addons);
+      writePlanCache(user.uid, tier, state.addons);
       persistLocal();
+      // A refresh can land outside the sign-in render path
+      // (e.g. returning from checkout): re-gate the Squad Sync
+      // panel against the newly proven add-on list right away.
+      renderSquad();
     } catch (e) { /* keep the cached tier */ }
   }
 
   /* ---------------- sign-in / sign-out ---------------- */
   async function handleSignedIn(user) {
+    explicitSignOut = false;
     authUser = user;
     AUTH_USER = { email: user.email || "", emailVerified: user.emailVerified === true };
     var session = ++authSession;
@@ -2934,7 +6302,7 @@
           uid: state.ownerUid, state: state, vault: localStorage.getItem(VAULT_KEY)
         }));
       } catch (e) {}
-      state = emptyState();
+      state = blankState();
       state.ownerUid = user.uid;
       persistLocal();
       try { localStorage.removeItem(VAULT_KEY); } catch (e) {}
@@ -2980,15 +6348,36 @@
     if (session !== authSession || !authUser || authUser.uid !== user.uid) return;
     renderAccount();
     renderAll();
+    // The welcome question settles with the sign-in: a signed-in
+    // user never sees the welcome, it counts as seen from now
+    // on (on the final, possibly cloud-loaded state), and the
+    // deferred first-run check-in gets its turn. This also
+    // closes a welcome that is open in front of a sign-in that
+    // completes by any path, Google included.
+    welcomeSettled = true;
+    markWelcomeSeen();
+    closeWelcome();
+    runDeferredCheckin();
   }
   async function signUpWithEmail(email, password) {
+    explicitSignOut = false;
     var fb = await ensureFirebase();
     if (!fb) throw new Error("Accounts are not switched on yet.");
     var cred = await nxAuth().createUserWithEmailAndPassword(email, password);
+    /* Hygiene: ask Firebase to verify the new email address.
+     * Fire-and-forget - nothing in the app waits on verification
+     * (see isOwnerEmail), and a failed send must never fail the
+     * sign-up, so errors are swallowed on purpose. */
+    try {
+      if (cred.user && typeof cred.user.sendEmailVerification === "function") {
+        cred.user.sendEmailVerification().catch(function () {});
+      }
+    } catch (e) {}
     await handleSignedIn(cred.user);
     return cred.user;
   }
   async function signInWithEmail(email, password) {
+    explicitSignOut = false;
     var fb = await ensureFirebase();
     if (!fb) throw new Error("Accounts are not switched on yet.");
     var cred = await nxAuth().signInWithEmailAndPassword(email, password);
@@ -3006,6 +6395,7 @@
    * dead-ending. Returns the user, or null when a redirect is
    * taking the page away. */
   async function signInWithGoogle() {
+    explicitSignOut = false;
     var fb = await ensureFirebase();
     if (!fb) throw new Error("Accounts are not switched on yet.");
     var provider = new window.firebase.auth.GoogleAuthProvider();
@@ -3033,12 +6423,27 @@
      * call, and bump authSession so in-flight sign-in work cannot
      * resurrect the session. Unlike a gated app, NyxSurvive does
      * NOT wipe local data or redirect anywhere on sign-out: the
-     * save on this device stays fully usable signed out, and the
-     * cached tier stands (see the offline rule in
-     * refreshPlanStatus). */
+     * save on this device stays fully usable signed out.
+     *
+     * The cached tier does NOT stand through an explicit
+     * sign-out: PLAN_CACHE_KEY is dropped and state.plan /
+     * state.addons fall back to free, so the device reads as
+     * fully signed out - a paid tier standing after sign-out
+     * reads as "still signed in". The offline rule still
+     * protects a SIGNED-IN user's cached tier across boots and
+     * offline use (see refreshPlanStatus); an explicit sign-out
+     * ends the session AND its cached tier on this device. The
+     * server-side plan in Firestore is untouched and re-proves
+     * on the next sign-in - state.plan here is only a display
+     * cache. */
+    explicitSignOut = true;
     authSession++;
     authUser = null;
     AUTH_USER = null;
+    try { localStorage.removeItem(PLAN_CACHE_KEY); } catch (e) {}
+    state.plan = "free";
+    state.addons = [];
+    persistLocal();
     if (cloudSyncTimer) { clearTimeout(cloudSyncTimer); cloudSyncTimer = null; }
     syncState = "local";
     renderAccount();
@@ -3046,10 +6451,11 @@
     try {
       var fb = await ensureFirebase();
       if (fb && nxAuth()) {
-        await Promise.race([
-          nxAuth().signOut(),
-          new Promise(function (resolve) { setTimeout(resolve, 4000); })
-        ]);
+        // Awaited directly: the compat SDK clears its local
+        // persistence before resolving, no network needed - a
+        // timeout race here could leave the persisted session
+        // alive to resurrect the sign-in on the next boot.
+        await nxAuth().signOut();
       }
     } catch (e) { /* session may already be gone - local state is cleared regardless */ }
     authUser = null;
@@ -3059,10 +6465,15 @@
   }
 
   /* ---------------- checkout ---------------- */
-  /* planKey: monthly | yearly | lifetime | founding - the exact
-   * keys api/checkout.js prices server-side. The client never
-   * names an amount. */
-  async function startCheckout(planKey) {
+  /* planKey: monthly | yearly | lifetime | founding for plans,
+   * or an add-on key (qr-sync, money build D; map-pack-us and
+   * map-pack-state, money build E) - the exact keys
+   * api/checkout.js prices server-side. The client never names
+   * an amount, and every key rides this same flow, iOS refusal
+   * and native hand-off included. extra carries the one
+   * server-validated parameter a SKU may need (the state code
+   * for map-pack-state) and nothing else. */
+  async function startCheckout(planKey, extra) {
     if (IS_IOS_APP) {
       // App Store Guideline 3.1.1: no selling inside the iPhone
       // app and no route out of the app to a sale. Refuse with a
@@ -3103,7 +6514,7 @@
       var res = await fetch(apiUrl("/api/checkout"), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ plan: planKey, uid: authUser.uid })
+        body: JSON.stringify(Object.assign({ plan: planKey, uid: authUser.uid }, extra || {}))
       });
       var out = await res.json().catch(function () { return {}; });
       if (!res.ok) { showMsg(msg, String(out.error || "Checkout did not start - try again in a bit.").toUpperCase(), "err"); return; }
@@ -3112,6 +6523,108 @@
     } catch (e) {
       showMsg(msg, "CHECKOUT DID NOT START - CHECK YOUR CONNECTION AND TRY AGAIN.", "err");
     }
+  }
+
+  /* ---------------- welcome screen ----------------
+     The in-app front door (2026-11-16): a signed-out first run
+     lands on a welcome with SIGN IN up front instead of dropping
+     straight into Command with sign-in buried in the System tab
+     - the same direction the website landing page took, applied
+     inside the app itself (and the standing rule from now on:
+     sign in / sign up easy to see at the top, on every surface).
+     Accounts stay OPTIONAL, as designed: Continue dismisses the
+     welcome and the app works fully signed out.
+     The decision is made ONCE, when the first auth state settles:
+       - a signed-in boot never shows it and counts it as seen
+         (settled inside handleSignedIn, on the final state);
+       - a ?join= visit routes to the account panel itself, so
+         the welcome never stacks on top of it;
+       - a local-only deployment (no accounts backend) has
+         nothing to sign in to, so it never shows;
+       - the first-run check-in auto-open is DEFERRED until the
+         welcome question settles, so the welcome always comes
+         first: it opens after Continue, or after a sign-in
+         completes. Backing out of the account panel does not
+         bring the welcome (or the check-in) back - the header
+         chip and the Command check-in card are the standing
+         paths from there. */
+  var welcomeOpen = false;
+  var welcomeSettled = false;
+  var checkinPending = false; // deferred first-run check-in auto-open
+  var joinVisit = false;
+
+  function welcomeShouldShow() {
+    if (!firebaseConfigured()) return false;
+    if (state.welcomeSeen) return false;
+    if (joinVisit) return false;
+    if (IS_NATIVE_APP || window.Capacitor) return true; // installed app: every fresh install gets a front door
+    // Web: a genuine first run only - no earlier save on this
+    // device and the readiness check-in never completed.
+    return !bootHadSave && !(state.assessment && state.assessment.done);
+  }
+  function showWelcome() {
+    var w = $("nx-welcome");
+    if (!w) return;
+    w.style.display = "";
+    welcomeOpen = true;
+  }
+  function closeWelcome() {
+    var w = $("nx-welcome");
+    if (w) w.style.display = "none";
+    welcomeOpen = false;
+  }
+  function markWelcomeSeen() {
+    if (!state.welcomeSeen) { state.welcomeSeen = true; saveState(); }
+  }
+  function runDeferredCheckin() {
+    if (!checkinPending) return;
+    checkinPending = false;
+    maybeOpenCheckin();
+  }
+  /* Signed-out settle point: called on the first auth-listener
+   * fire without a user, and when there is no auth backend to
+   * wait for. The signed-in path settles in handleSignedIn. */
+  function settleWelcome() {
+    if (welcomeSettled) return;
+    welcomeSettled = true;
+    if (authUser) { closeWelcome(); runDeferredCheckin(); return; }
+    if (welcomeShouldShow()) { showWelcome(); return; }
+    runDeferredCheckin();
+  }
+  /* The one route to the account panel, shared by the landing
+   * deep link, the welcome buttons and the header chip: land on
+   * System with the panel scrolled into view, in the requested
+   * mode (signin is the panel default). */
+  function goToAccountPanel(mode) {
+    if (mode) setAccountMode(mode);
+    showView("system");
+    var scrollPanel = function () {
+      var panel = $("nx-account-panel");
+      if (panel && panel.scrollIntoView) panel.scrollIntoView({ block: "start" });
+    };
+    if (window.requestAnimationFrame) requestAnimationFrame(scrollPanel);
+    setTimeout(scrollPanel, 500); // again once any overlay has lifted
+  }
+  function bindWelcome() {
+    var signin = $("nx-welcome-signin"), signup = $("nx-welcome-signup"), cont = $("nx-welcome-continue");
+    if (signin) signin.addEventListener("click", function () {
+      markWelcomeSeen(); closeWelcome();
+      // checkinPending is left standing on purpose: if the
+      // sign-in completes, handleSignedIn runs the deferred
+      // check-in on the final state; if the user backs out,
+      // nothing re-opens it this visit.
+      goToAccountPanel("signin");
+    });
+    if (signup) signup.addEventListener("click", function () {
+      markWelcomeSeen(); closeWelcome();
+      goToAccountPanel("signup");
+    });
+    if (cont) cont.addEventListener("click", function () {
+      markWelcomeSeen(); closeWelcome();
+      runDeferredCheckin();
+    });
+    var chip = $("nx-acct-chip");
+    if (chip) chip.addEventListener("click", function () { goToAccountPanel(); });
   }
 
   /* ---------------- account panel ---------------- */
@@ -3123,6 +6636,16 @@
     if (syncState === "error") return "OFFLINE - LOCAL ONLY, RETRIES ON NEXT SAVE";
     if (syncState === "pending") return "SYNC PENDING";
     return "SYNCING";
+  }
+  /* Header chip label for a signed-in non-owner: the email,
+   * truncated hard so the masthead never wraps on a phone, with
+   * the tier appended when the account holds one. Owners get
+   * the standing OWNER - LIFETIME label instead. */
+  function accountChipLabel() {
+    var em = (authUser && authUser.email) || "ACCOUNT";
+    if (em.length > 18) em = em.slice(0, 17) + "...";
+    var tier = planTier();
+    return tier === "free" ? em : em + " - " + tier.toUpperCase();
   }
   function renderAccount() {
     var local = $("nx-acct-local"), out = $("nx-acct-out"), inBox = $("nx-acct-in");
@@ -3140,6 +6663,21 @@
       if (sy) sy.innerHTML = "SYNC: <b>" + esc(syncStatusText()) + "</b>";
       var ownerBox = $("nx-acct-owner");
       if (ownerBox) ownerBox.style.display = isOwner() ? "" : "none";
+    }
+    // The header chip renders from here so it can never drift
+    // out of sync with the panel: accent SIGN IN while signed
+    // out, the account identity while signed in.
+    var chip = $("nx-acct-chip");
+    if (chip) {
+      if (authUser) {
+        chip.textContent = isOwner() ? "OWNER - LIFETIME" : accountChipLabel();
+        chip.classList.remove("nx-chip-accent");
+        chip.title = (authUser.email || "") + " - " + (isOwner() ? "OWNER - LIFETIME" : planTier().toUpperCase());
+      } else {
+        chip.textContent = "SIGN IN";
+        chip.classList.add("nx-chip-accent");
+        chip.title = "Sign in or create an account";
+      }
     }
   }
   function bindAccount() {
@@ -3232,7 +6770,7 @@
     renderAccount();
     ensureFirebase().then(function (fb) {
       renderAccount();
-      if (!fb || !nxAuth()) return; // local-only deployment - nothing else to do
+      if (!fb || !nxAuth()) { settleWelcome(); return; } // local-only deployment - no auth state to wait for
       // A Google redirect sign-in (native shells) lands back
       // here: surface its error instead of letting it vanish.
       try {
@@ -3241,11 +6779,22 @@
       } catch (e) { /* no redirect in flight */ }
       nxAuth().onAuthStateChanged(function (user) {
         if (user) {
+          if (explicitSignOut) {
+            // The user explicitly signed out but a persisted
+            // session still fired: do NOT resurrect the sign-in.
+            // Sign it straight back out and keep the signed-out
+            // UI standing.
+            try { nxAuth().signOut(); } catch (e) {}
+            renderAccount();
+            renderPlan();
+            return;
+          }
           if (!authUser || authUser.uid !== user.uid) {
             handleSignedIn(user);
           } else {
             AUTH_USER = { email: user.email || "", emailVerified: user.emailVerified === true };
             renderAccount();
+            settleWelcome();
           }
         } else {
           if (authUser) {
@@ -3256,13 +6805,14 @@
           }
           renderAccount();
           renderPlan();
+          settleWelcome();
         }
       });
-    }).catch(function () { renderAccount(); });
+    }).catch(function () { renderAccount(); settleWelcome(); });
   }
 
   /* ---------------- Phase 3B: themes ----------------
-     Five structural variants keyed off data-theme on <html>
+     Eleven structural variants keyed off data-theme on <html>
      (stamped pre-paint by the inline script in app.html, then
      owned here). The landing page and admin page never set the
      attribute, so they always render Command. */
@@ -3271,10 +6821,16 @@
     { id: "nightvision", name: "Night Vision", desc: "Phosphor green through the NVG lens - glow, vignette, heavy scanlines." },
     { id: "desert", name: "Desert Ops", desc: "Sun-bleached sand, stencil type, dust grain. Built for glare." },
     { id: "whiteout", name: "Whiteout", desc: "Arctic light, flat panels. Maximum readability in full daylight." },
-    { id: "blackout", name: "Blackout", desc: "True black, dim red, effects minimized. Maximum battery, minimum signature." }
+    { id: "blackout", name: "Blackout", desc: "True black, dim red, effects minimized. Maximum battery, minimum signature." },
+    { id: "brassworks", name: "Brassworks", desc: "Steampunk brass and copper - cogs, pipe trim, amber gauges. The machine room." },
+    { id: "neonglass", name: "Neon Glass", desc: "Frosted glass over a dark grid, edges lit cyan and magenta. Night city." },
+    { id: "fullmetal", name: "Full Metal", desc: "Raw machined steel, heavy bevels, smoked glass. Nothing painted - everything milled." },
+    { id: "woodland", name: "Woodland", desc: "Camo pattern under olive drab, khaki stencil type. Issued for the treeline." },
+    { id: "bunker", name: "Bunker", desc: "Poured concrete, hazard stripes, safety yellow. Built to take a hit." },
+    { id: "schematic", name: "Schematic", desc: "Blueprint drafting plate - white line work on engineering blue. Every dimension marked." }
   ];
   var THEME_IDS = THEMES.map(function (t) { return t.id; });
-  var THEME_META = { command: "#0a0b0c", nightvision: "#020503", desert: "#e6dbc2", whiteout: "#eef1f4", blackout: "#000000" };
+  var THEME_META = { command: "#0a0b0c", nightvision: "#020503", desert: "#e6dbc2", whiteout: "#eef1f4", blackout: "#000000", brassworks: "#171008", neonglass: "#04060f", fullmetal: "#0b0c0d", woodland: "#232a1e", bunker: "#17181a", schematic: "#0d2c4c" };
   function currentTheme() {
     var t = state.settings && state.settings.theme;
     return THEME_IDS.indexOf(t) !== -1 ? t : "command";
@@ -3536,7 +7092,15 @@
     $("nx-grid-breakdown").innerHTML =
       "WATER <b>" + (d.waterDays == null ? "--" : fmt(d.waterDays, 1) + " DAYS") + "</b>" +
       " // FOOD <b>" + (d.foodDays == null ? "--" : fmt(d.foodDays, 1) + " DAYS") + "</b>" +
-      " // HOUSEHOLD <b>" + d.household + "</b>";
+      " // HOUSEHOLD <b>" + d.household + "</b>" +
+      " // CASH <b>$" + fmt(cashTotal(), 0) + "</b>";
+    var cashNote = $("nx-grid-cash-note");
+    if (cashNote) {
+      var ct = cashTotal();
+      cashNote.innerHTML = ct > 0
+        ? "WHEN THE GRID IS DOWN, CARD READERS AND ATMS ARE DOWN WITH IT. CASH ON HAND: <b>$" + fmt(ct, 0) + "</b> - THE ONLY MONEY THAT STILL MOVES."
+        : "WHEN THE GRID IS DOWN, CARD READERS AND ATMS ARE DOWN WITH IT. CASH ON HAND IS THE ONLY MONEY THAT STILL MOVES - LOG YOURS IN ROTATE.";
+    }
     var rally = primaryRally();
     $("nx-grid-rally").innerHTML = "RALLY: <b>" + (rally
       ? esc(String(rally.title).toUpperCase())
@@ -3753,7 +7317,11 @@
     renderComms();
     renderBroadcast();
     renderCrew();
+    renderSquad();
+    renderMaps();
+    renderGuide();
     renderLists();
+    renderResupply();
     renderIntel();
     renderAlerts();
     renderSettings();
@@ -3763,6 +7331,61 @@
     renderAccount();
     renderGridDown();
     renderDrill();
+    renderCheckin();
+  }
+
+  /* Account panel mode: the panel carries one shared email +
+     password form with two actions, so the "mode" is which
+     action is primary. Sign-in is the default (and the shipped
+     markup); sign-up promotes Create Account to the accent
+     button and switches the password field to new-password
+     autocomplete so password managers offer to save it. */
+  var acctMode = "signin";
+  function setAccountMode(mode) {
+    acctMode = mode === "signup" ? "signup" : "signin";
+    var panel = $("nx-account-panel");
+    if (panel) panel.setAttribute("data-acct-mode", acctMode);
+    var signinBtn = $("nx-acct-signin"), signupBtn = $("nx-acct-signup");
+    if (signinBtn && signupBtn) {
+      signinBtn.classList.toggle("nx-btn-accent", acctMode === "signin");
+      signupBtn.classList.toggle("nx-btn-accent", acctMode === "signup");
+    }
+    var pw = $("nx-acct-password");
+    if (pw) pw.setAttribute("autocomplete", acctMode === "signup" ? "new-password" : "current-password");
+  }
+  /* Landing deep link: app.html?join=signup / ?join=signin.
+     Lands on the System view with the account panel in the
+     matching mode and scrolls it into view; the param is
+     stripped via replaceState so a reload boots normally.
+     Returns true when a join was handled - a join visit skips
+     the first-run check-in auto-open for that visit only (the
+     check-in card still waits on Command and the check-in
+     itself works normally afterward). No param, no change. */
+  function handleJoinParam() {
+    var join = null;
+    try { join = new URLSearchParams(window.location.search).get("join"); } catch (e) { join = null; }
+    if (join !== "signup" && join !== "signin") return false;
+    try {
+      var u = new URL(window.location.href);
+      u.searchParams.delete("join");
+      window.history.replaceState(null, "", u.pathname + u.search + u.hash);
+    } catch (e) { /* the mode still applies even if the URL cannot be rewritten */ }
+    goToAccountPanel(join);
+    return true;
+  }
+
+  /* A post shared into the app carries ?url= / ?text= params;
+   * handleShareParams (below in init order) files it in Intel
+   * and its view switch lands last on purpose. Detecting the
+   * visit here lets init keep the check-in behavior for shares
+   * exactly as it was: the check-in opens, the share lands on
+   * top - the welcome deferral does not apply to shares. */
+  function shareVisit() {
+    try {
+      var params = new URLSearchParams(window.location.search);
+      if (params.get("url")) return true;
+      return !!intelUrlFromText(params.get("text") || "");
+    } catch (e) { return false; }
   }
 
   function init() {
@@ -3772,28 +7395,52 @@
     bindSyncToggle();
     bindGear();
     bindRotation();
+    bindMeds();
+    bindCash();
+    bindBarcode();
+    bindSquad();
+    bindMaps();
+    bindGuide();
     bindVault();
     bindComms();
+    bindFamilyPlan();
     bindBroadcast();
     bindCrew();
     bindCompass();
     bindLists();
+    bindResupply();
+    bindCheckin();
+    bindSitrep();
+    bindTour();
     bindIntel();
+    bindAdvisor();
     bindAlerts();
     bindICS();
     bindCalc();
     bindGoBook();
     bindSystem();
     bindAccount();
+    bindWelcome();
     bindPhase4();
     tickClock();
     setInterval(tickClock, 1000);
     applyTheme(); // stamps data-theme + meta color; also applies the fx gate
     nxDashAnimated = true; // hold the count-ups until the boot lifts
+    // Money build B boot duties: take the weekly snapshot if one
+    // is due, and run the rotation-notification check. Both are
+    // silent when there is nothing to do; persist only on change.
+    var sitrepDirty = maybeSnapshotSitrep();
+    var expiryDirty = checkExpiryNotifications();
+    if (sitrepDirty || expiryDirty) saveState();
     renderAll();
     initAuth(); // resolves async; local-only deployments stay silent
     refreshAlerts(); // one fetch attempt per app load; cache covers offline
-    handleShareParams(); // a post shared into the app files itself in Intel
+    joinVisit = handleJoinParam(); // a landing sign-up / sign-in deep link beats the check-in auto-open for this visit only
+    if (!joinVisit) {
+      if (shareVisit()) maybeOpenCheckin(); // a share keeps the old order: check-in opens, the share switch lands on top
+      else checkinPending = true; // first run: the check-in auto-open waits until the welcome question settles (see settleWelcome)
+    }
+    handleShareParams(); // a post shared into the app files itself in Intel - its view switch lands last on purpose, so a share beats the check-in auto-open
     runBoot(function () { nxDashAnimated = false; renderDashboard(); });
     if ("serviceWorker" in navigator && /^https?:$/.test(window.location.protocol)) {
       navigator.serviceWorker.register("sw.js").catch(function () { /* offline shell is a bonus, not a requirement */ });
@@ -3809,12 +7456,150 @@
     calcNeeds: calcNeeds,
     calcGap: calcGap,
     planTier: planTier,
+    accountMode: function () { return acctMode; },
     isOperator: isOperator,
     isOwner: isOwner,
     capBlocked: capBlocked,
     caps: PLAN_CAPS,
     intelCap: INTEL_FREE_CAP,
     buildGoBook: buildGoBook,
+    // Readiness check-in surface for the suites: open/close the
+    // flow, read the answers and the generated orders.
+    checkin: {
+      open: openCheckin,
+      close: closeCheckin,
+      flow: function () { return checkin; },
+      answers: function () { return state.assessment; },
+      orders: function () { return state.firstOrders; },
+      areas: function () { return assessmentAreas(sanitizeAssessment(state.assessment)); }
+    },
+    // Guided walkthrough surface for the suites.
+    tour: {
+      start: startTour,
+      end: endTour,
+      active: function () { return tour.active; },
+      step: function () { return tour.step; },
+      steps: function () { return TOUR_STEPS.length; }
+    },
+    // Shopping links + Resupply surface for the suites: the URL
+    // builder (with the tag override the tag test needs), the
+    // catalog, the generated lines and the quick-add.
+    shop: {
+      url: shopUrl,
+      open: openShop,
+      catalog: SHOP_CATALOG,
+      disclosure: shopDisclosureText
+    },
+    resupply: {
+      lines: resupplyLines,
+      addStore: addResupplyStore,
+      target: resupplyTarget
+    },
+    // Money build B surface: the shared store-expiry list, the
+    // watch subset, the weekly snapshot log and report text, and
+    // the notification check, so the suites can drive them.
+    weekly: {
+      text: buildWeeklySitrepText,
+      log: function () { return state.sitrepLog; },
+      radar: storeExpiries,
+      watch: function () { return storeExpiries().filter(function (r) { return r.days != null && r.days <= 14; }); },
+      notifyCheck: checkExpiryNotifications,
+      snapshot: maybeSnapshotSitrep
+    },
+    // Money build C surface: the barcode lookup + parse (one
+    // function, always resolves), the prefill rules and the
+    // scanner controls, so the suites can drive them with the
+    // camera and the OFF fetch stubbed.
+    barcode: {
+      lookup: lookupBarcode,
+      parse: parseOffProduct,
+      prefill: prefillFromBarcode,
+      open: openScanner,
+      close: closeScanner,
+      active: function () { return scan.active; }
+    },
+    // Money build D surface: the squad payload + frames, the
+    // shared collector, the import and the add-on gate, so the
+    // suites can drive export/import without a camera.
+    squad: {
+      payload: squadPayloadText,
+      frames: squadFrames,
+      collect: squadCollect,
+      feed: feedSquadText,
+      importData: importSquadData,
+      hasAddon: hasAddon,
+      addons: function () { return state.addons.slice(); },
+      reset: squadCollectReset,
+      show: showSquadCode,
+      frame: function () { return { idx: squadUi.idx, count: squadUi.frames.length }; }
+    },
+    // Money build E surface: Offline Map Packs - the
+    // entitlement helper, the on-device (IndexedDB) store and
+    // the download / open / delete flow, so the suites can
+    // drive the whole lifecycle without a network.
+    maps: {
+      states: MAP_STATES,
+      has: hasMapPack,
+      url: mapPackUrl,
+      download: downloadMapPack,
+      remove: deleteMapPack,
+      open: openMapState,
+      close: closeMapScreen,
+      openCode: function () { return mapOpenCode; },
+      get: mapPackGet,
+      codes: mapPackCodes,
+      refreshLocal: refreshMapLocal,
+      local: function () { return Object.keys(mapLocal).sort(); },
+      svg: mapSvg
+    },
+    // Field Guide surface: the bundled offline reference -
+    // category and topic counts, open/back, and the search
+    // filter, so the suites can drive it like a user.
+    guide: {
+      cats: function () { return GUIDE_CATS.length; },
+      topics: guideTopicTotal,
+      data: function () { return GUIDE_CATS; },
+      open: openGuideTopic,
+      close: closeGuideTopic,
+      openKey: function () { return guideOpenKey; },
+      search: function (q) { guideQuery = String(q || ""); guideOpenKey = null; renderGuide(); }
+    },
+    // Ready.gov build surface: pet readiness, the med radar
+    // rows, cash, and the new state shapes, so the suites can
+    // prove the math and the sanitizers directly.
+    readygov: {
+      pet: petReadiness,
+      petDays: function () { return petReadiness().days; },
+      petLbPerDay: PET_FOOD_LB_PER_PET_DAY,
+      medRadar: medRadarRows,
+      medState: medState,
+      cashTotal: cashTotal,
+      familyPlan: function () { return state.familyPlan; },
+      homeSystems: function () { return state.homeSystems; },
+      shutoffItems: SHUTOFF_ITEMS,
+      kitLoc: kitLoc,
+      kitLocs: KIT_LOCS,
+      stats: checklistStats
+    },
+    // AI build surface: the advisor context (so the suites can
+    // prove the privacy rule against the real builder), the ask
+    // flow, the pending orders / log offer, the day counters and
+    // the photo confirm list.
+    advisor: {
+      context: advisorContext,
+      ask: askAdvisor,
+      canUse: aiCanUse,
+      left: aiLeft,
+      useToday: aiUseToday,
+      pending: function () { return advisorPending; },
+      addOrders: addAdvisorOrders,
+      logIt: logAdvisorOffer,
+      freeDaily: AI_FREE_DAILY,
+      photoItems: function () { return photoItems.slice(); },
+      openPhoto: openPhotoConfirm,
+      closePhoto: closePhotoConfirm,
+      photoOpen: function () { var ov = $("nx-photo"); return !!ov && ov.style.display !== "none"; }
+    },
     // Phase 3B surface: themes, sitrep, sound pack state and the
     // evac drill controls, so the suites can drive them directly.
     themes: THEME_IDS,
@@ -3829,6 +7614,14 @@
       setStep: drillSetStep,
       active: function () { return drill.active; },
       steps: DRILL_STEPS.length
+    },
+    // Welcome screen surface for the suites: whether the front
+    // door is on screen, whether it has been seen for good, and
+    // whether the boot decision has been made yet.
+    welcome: {
+      visible: function () { return welcomeOpen; },
+      seen: function () { return state.welcomeSeen === true; },
+      settled: function () { return welcomeSettled; }
     },
     // Phase 3A accounts surface for the test suites: configured
     // flag, the live auth user, the exact sync payload (so tests
@@ -3848,6 +7641,7 @@
       signUpWithEmail: signUpWithEmail,
       signInWithGoogle: signInWithGoogle,
       signOut: signOutUser,
+      explicitSignOut: function () { return explicitSignOut; },
       startCheckout: startCheckout,
       refreshPlanStatus: refreshPlanStatus
     }
@@ -3861,6 +7655,12 @@
       saveState();
       renderAll();
       return state.plan;
+    };
+    window.NXS.setAddons = function (a) {
+      state.addons = sanitizeAddons(a);
+      saveState();
+      renderAll();
+      return state.addons;
     };
     window.NXS.setTheme = function (t) {
       setTheme(t);

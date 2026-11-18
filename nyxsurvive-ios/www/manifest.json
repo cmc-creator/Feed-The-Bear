@@ -5,6 +5,12 @@
   "icons": [
     {
       "purpose": "any",
+      "sizes": "1024x1024",
+      "src": "/assets/icons/icon-1024.png",
+      "type": "image/png"
+    },
+    {
+      "purpose": "any",
       "sizes": "any",
       "src": "icon.svg",
       "type": "image/svg+xml"

@@ -1,11 +1,12 @@
 /* NyxSurvive service worker - caches the app shell so the app
    installs and opens with zero connection. Data itself lives in
    localStorage and never passes through here. */
-var NX_CACHE = "nyxsurvive-shell-v5";
+var NX_CACHE = "nyxsurvive-shell-v24";
 var NX_SHELL = [
   "./",
   "index.html",
   "app.js",
+  "nx-qr.js",
   "style.css",
   "manifest.json",
   "icon.svg"
@@ -40,6 +41,12 @@ self.addEventListener("fetch", function (event) {
   // the env vars were set) would strand the app in local-only
   // mode forever. Account data always goes to the network.
   if (new URL(event.request.url).pathname.indexOf("/api/") === 0) return;
+  // Map packs are never cached here either (money build E):
+  // IndexedDB is their one store of truth, so a downloaded
+  // pack's lifecycle (download, delete) is never shadowed by
+  // a stale service-worker copy. Pack fetches go to the
+  // network; once downloaded, the app reads IndexedDB only.
+  if (new URL(event.request.url).pathname.indexOf("/maps/") === 0) return;
   event.respondWith(
     caches.match(event.request, { ignoreSearch: true }).then(function (hit) {
       if (hit) return hit;

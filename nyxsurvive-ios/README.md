@@ -36,37 +36,42 @@ shipping an unsigned build.
 
 ## BEFORE THE FIRST BUILD
 
-a) CERTIFICATE SLOT. The workflow creates a fresh distribution
-   certificate for each build and keeps it (deleting it would revoke
-   the signature on the uploaded binary). This Apple account holds
-   at most 3 distribution certificates, and all 3 slots are
-   currently taken by the apps in review (NyxPrism, Feed the Bear,
-   Munchling). While all 3 stand, Apple rejects the new certificate
-   (409) and the build fails at the signing step. NEVER revoke a
-   certificate whose app is in review - revoking invalidates that
-   app's submitted binary (ITMS-90035). Run the first NyxSurvive
-   build only once a slot is free (an app approved and released,
-   or its certificate legitimately retired). The signing script's
-   409 fallback only removes leftover "NyxSurvive CI" certificates,
-   never the other apps'.
+a) CERTIFICATE SLOT + DURABLE SIGNING. The workflow no longer
+   mints a fresh certificate per build. It reuses ONE shared
+   distribution identity (key + certificate + App Store profile)
+   stored as numbered base64 pieces on the "ios-signing-store"
+   branch of this repo (folder ios-signing/, with a SHA256SUMS
+   fingerprint file and meta.env). A run first checks that branch:
+   if the store is there, the pieces are reassembled, the
+   fingerprints verified, and that identity signs - no new
+   certificate is made. If the store is absent, the run mints one
+   certificate and saves the identity to the branch for every
+   later run. Apple's cap is 3 distribution certificates for the
+   whole account; the first NyxSurvive mint needs one free slot,
+   which comes from retiring NyxPrism's original certificate
+   (Connie approved 2026-11-17; NyxPrism is live, and retiring a
+   live app's certificate does not affect the store app - see
+   BUILD-RUN-SHEET.md in this pack for the exact browser steps).
+   Feed the Bear's and Munchling's certificates must NOT be
+   touched. NEVER revoke a certificate whose
+   app is in review - revoking invalidates that app's submitted
+   binary (ITMS-90035). The signing script's 409 fallback only
+   removes leftover "NyxSurvive CI" certificates, never the other
+   apps'.
 
-b) WWW FRESHNESS. The pack's www/ is a snapshot (made 2026-11-15
-   from the source that includes the iOS purchase-hiding change,
-   commit ed6df2f). If the app code changed since, re-snapshot
+b) WWW FRESHNESS. The pack's www/ is a snapshot (refreshed
+   2026-11-17 from the 2026-11-16 restyle + Field Guide source,
+   including nx-qr.js). If the app code changed since, re-snapshot
    before building: in the NyxSurvive repo run
    `node native/prepare-www.js`, then replace this pack's
    nyxsurvive-ios/www/ with the fresh native/www/.
 
-c) APP RECORD. There is no NyxSurvive record in App Store Connect
-   yet. At submission time, first register the bundle ID
-   com.nyxcollective.nyxsurvive in the developer portal
-   (Certificates, Identifiers & Profiles) and create the app record
-   in App Store Connect; the signing script refuses to make a
-   profile for an unregistered bundle ID, and the key check reports
-   "no app with bundle ID com.nyxcollective.nyxsurvive exists yet"
-   until the record is there. The listing copy lives in the
-   NyxSurvive goal folder (IOS-LISTING-DRAFT.md) until Connie
-   approves it at submission time.
+c) APP RECORD. The bundle ID com.nyxcollective.nyxsurvive is
+   registered and the App Store Connect app record exists
+   (app ID 6835149508, SKU nyxsurvive-ios, listing approved by
+   Connie). The signing script refuses to make a profile for an
+   unregistered bundle ID, and the key check reports the app it
+   finds for this bundle ID.
 
 d) DEMO ACCOUNT. App Review gets a demo account created during the
    submission session in the NyxSurvive Firebase project. Its

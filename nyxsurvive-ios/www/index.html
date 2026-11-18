@@ -19,7 +19,7 @@
   try {
     var s = JSON.parse(localStorage.getItem("nyxsurvive-v1") || "null");
     var v = s && s.settings && s.settings.theme;
-    if (["command", "nightvision", "desert", "whiteout", "blackout"].indexOf(v) !== -1) t = v;
+    if (["command", "nightvision", "desert", "whiteout", "blackout", "brassworks", "neonglass", "fullmetal", "woodland", "bunker", "schematic"].indexOf(v) !== -1) t = v;
   } catch (e) { /* no save yet - Command */ }
   document.documentElement.setAttribute("data-theme", t);
 })();
@@ -36,6 +36,26 @@
   </div>
 </div>
 
+<div id="nx-welcome" style="display:none;" role="dialog" aria-label="Welcome to NyxSurvive">
+  <div class="nx-welcome-box">
+    <div class="nx-welcome-brand">
+      <div class="nx-logo">NX</div>
+      <div>
+        <div class="nx-welcome-word">NyxSurvive<span class="nx-tm">&#8482;</span></div>
+        <div class="nx-subtitle">Tactical Command // Bug-Out Management</div>
+      </div>
+    </div>
+    <h2 class="nx-welcome-tag">How long would you last?</h2>
+    <p class="nx-welcome-line">NyxSurvive turns your stored water, food, gear and crew into one number - the days your household can last - and shows you exactly what to fix first.</p>
+    <div class="nx-welcome-actions">
+      <button type="button" class="nx-btn nx-btn-accent" id="nx-welcome-signin">Sign In</button>
+      <button type="button" class="nx-btn" id="nx-welcome-signup">Create Free Account</button>
+      <button type="button" class="nx-welcome-ghost" id="nx-welcome-continue">Continue without account</button>
+    </div>
+    <p class="nx-h-note nx-welcome-note">ACCOUNTS ARE OPTIONAL - THE APP WORKS FULLY SIGNED OUT. AN ACCOUNT ADDS CLOUD BACKUP OF YOUR SAVE AND CARRIES YOUR OPERATOR TIER BETWEEN DEVICES.</p>
+  </div>
+</div>
+
 <header class="nx-header">
   <div class="nx-brand-row">
     <div class="nx-logo">NX</div>
@@ -45,8 +65,10 @@
     </div>
     <div class="nx-header-status">
       <div class="nx-clock" id="nx-clock">--:--:--</div>
+      <div class="nx-zulu" id="nx-zulu">--:--:-- ZULU</div>
       <div>SYNC: <span id="nx-hdr-sync">ON DEVICE</span></div>
     </div>
+    <button type="button" class="nx-chip nx-chip-accent" id="nx-acct-chip" title="Sign in or create an account">Sign In</button>
   </div>
   <nav class="nx-nav" id="nx-nav">
     <button type="button" class="nx-tab nx-active" data-view="command">Command</button>
@@ -60,6 +82,8 @@
     <button type="button" class="nx-tab" data-view="crew">Crew</button>
     <button type="button" class="nx-tab" data-view="lists">Lists</button>
     <button type="button" class="nx-tab" data-view="intel">Intel</button>
+    <button type="button" class="nx-tab" data-view="maps">Maps</button>
+    <button type="button" class="nx-tab" data-view="guide">Guide</button>
     <button type="button" class="nx-tab" data-view="system">System</button>
   </nav>
 </header>
@@ -68,16 +92,101 @@
 
   <!-- ================= COMMAND ================= -->
   <section class="nx-view nx-on" id="view-command">
-    <div class="nx-panel" style="border-color:var(--nx-line2);">
+    <div class="nx-board" id="nx-board" role="group" aria-label="Station status">
+      <div class="nx-station nx-st-dim" id="nx-cell-water"><span class="nx-station-top"><span class="nx-led"></span><span class="nx-station-label">Water</span></span><span class="nx-station-val">--</span></div>
+      <div class="nx-station nx-st-dim" id="nx-cell-food"><span class="nx-station-top"><span class="nx-led"></span><span class="nx-station-label">Food</span></span><span class="nx-station-val">--</span></div>
+      <div class="nx-station nx-st-dim" id="nx-cell-alerts"><span class="nx-station-top"><span class="nx-led"></span><span class="nx-station-label">Alerts</span></span><span class="nx-station-val">--</span></div>
+      <div class="nx-station nx-st-dim" id="nx-cell-comms"><span class="nx-station-top"><span class="nx-led"></span><span class="nx-station-label">Comms</span></span><span class="nx-station-val">--</span></div>
+      <div class="nx-station nx-st-dim" id="nx-cell-vault"><span class="nx-station-top"><span class="nx-led"></span><span class="nx-station-label">Vault</span></span><span class="nx-station-val">--</span></div>
+    </div>
+    <div class="nx-panel nx-hero" id="nx-hero-panel" style="border-color:var(--nx-line2);">
+      <svg class="nx-hero-art" viewBox="0 0 400 260" preserveAspectRatio="xMidYMin slice" aria-hidden="true" focusable="false">
+        <g fill="none" stroke="var(--nx-line)" stroke-width="1" opacity="0.55">
+          <path d="M-10 40C60 20 110 55 180 38C250 21 320 50 410 30"/>
+          <path d="M-10 78C70 58 130 92 205 72C280 52 340 88 410 66"/>
+          <path d="M-10 210C80 190 150 224 230 204C300 186 350 214 410 196"/>
+          <path d="M-10 240C90 224 170 250 260 232C320 220 370 240 410 228"/>
+        </g>
+        <g fill="none" stroke="var(--nx-accent)">
+          <circle cx="200" cy="118" r="86" opacity="0.14"/>
+          <circle cx="200" cy="118" r="58" opacity="0.20"/>
+          <circle cx="200" cy="118" r="30" opacity="0.28"/>
+          <path d="M200 24v188M106 118h188" opacity="0.12"/>
+          <path d="M200 32v10M200 194v10M114 118h10M276 118h10" opacity="0.4"/>
+        </g>
+        <g class="nx-radar-sweep">
+          <path d="M200 118L200 32A86 86 0 0 1 255 52Z" fill="var(--nx-accent)" opacity="0.13" stroke="none"/>
+          <path d="M200 118L255 52" stroke="var(--nx-accent)" stroke-width="1.5" opacity="0.55" fill="none"/>
+        </g>
+        <circle cx="200" cy="118" r="2.6" fill="var(--nx-accent)" opacity="0.65"/>
+        <g fill="none" stroke="var(--nx-dim)" stroke-width="1.4" opacity="0.5">
+          <path d="M31 36h10M36 31v10M359 36h10M364 31v10M31 224h10M36 219v10M359 224h10M364 219v10"/>
+        </g>
+      </svg>
+      <div class="nx-cogs" aria-hidden="true">
+        <svg class="nx-cog nx-cog-a" viewBox="0 0 100 100" focusable="false">
+          <g fill="none" stroke="currentColor">
+            <circle cx="50" cy="50" r="29" stroke-width="8"/>
+            <circle cx="50" cy="50" r="9" stroke-width="6"/>
+            <path stroke-width="10" d="M50 4v15M50 81v15M4 50h15M81 50h15M17 17l11 11M72 72l11 11M83 17L72 28M28 72L17 83"/>
+          </g>
+        </svg>
+        <svg class="nx-cog nx-cog-b" viewBox="0 0 100 100" focusable="false">
+          <g fill="none" stroke="currentColor">
+            <circle cx="50" cy="50" r="29" stroke-width="8"/>
+            <circle cx="50" cy="50" r="9" stroke-width="6"/>
+            <path stroke-width="10" d="M50 4v15M50 81v15M4 50h15M81 50h15M17 17l11 11M72 72l11 11M83 17L72 28M28 72L17 83"/>
+          </g>
+        </svg>
+      </div>
+      <div class="nx-hero-scan"></div>
       <p class="nx-stat-label">Days Ready // Household Sustainment</p>
       <div style="display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-top:4px;">
-        <span id="nx-days-ready" style="font-family:var(--nx-mono); font-size:62px; font-weight:700; line-height:1;">--</span>
-        <span style="font-family:var(--nx-mono); font-size:16px; color:var(--nx-dim);">DAYS</span>
+        <span id="nx-days-ready" style="font-family:var(--nx-mono); font-size:clamp(84px, 26vw, 104px); font-weight:700; line-height:1;">--</span>
+        <span style="font-family:var(--nx-mono); font-size:20px; font-weight:700; color:var(--nx-dim);">DAYS</span>
       </div>
       <div class="nx-seg" id="nx-days-seg"></div>
       <p class="nx-kv" id="nx-days-breakdown" style="margin:10px 0 0 0;"></p>
       <p class="nx-kv" id="nx-days-gap" style="margin:2px 0 0 0;"></p>
       <p class="nx-row-meta" id="nx-days-household"></p>
+    </div>
+    <div class="nx-panel" id="nx-checkin-card" style="display:none; border-color:var(--nx-accent);">
+      <h2 class="nx-h">Readiness Check-In</h2>
+      <p class="nx-h-note">NEW TERMINAL, NO DATA. NINE QUESTIONS - YOUR HOUSEHOLD, YOUR STORES, YOUR GAPS. THE ANSWERS BUILD YOUR CREW, LOG YOUR STORES AND WRITE YOUR FIRST ORDERS. NOTHING IS PRE-FILLED.</p>
+      <div class="nx-btn-row"><button type="button" class="nx-btn nx-btn-accent" id="nx-checkin-start">Run Readiness Check-In</button><button type="button" class="nx-btn" id="nx-tour-start">Take the Walkthrough</button></div>
+    </div>
+    <div class="nx-panel" id="nx-priority-card" style="display:none;">
+      <p class="nx-stat-label" id="nx-priority-count">First Orders</p>
+      <p class="nx-kv" style="margin:8px 0 0 0;">NEXT ORDER: <b id="nx-priority-text"></b></p>
+      <div class="nx-btn-row"><button type="button" class="nx-btn" id="nx-priority-btn">Open First Orders</button></div>
+    </div>
+    <div class="nx-panel-flat" id="nx-expiry-watch" style="cursor:pointer; display:none;">
+      <p style="margin:0; font-family:var(--nx-mono); font-size:13px; letter-spacing:1px;" id="nx-expiry-watch-text"></p>
+    </div>
+    <div class="nx-panel" id="nx-weekly-panel">
+      <h2 class="nx-h">Weekly Sitrep</h2>
+      <p class="nx-h-note">Your readiness on the record. A snapshot lands every 7 days; the report below always reads live.</p>
+      <div id="nx-weekly-body"></div>
+      <div class="nx-msg" id="nx-weekly-msg"></div>
+      <div class="nx-btn-row"><button type="button" class="nx-btn nx-btn-small" id="nx-weekly-copy">Copy Sitrep</button></div>
+    </div>
+    <div class="nx-panel" id="nx-advisor-panel">
+      <h2 class="nx-h">Tactical Advisor</h2>
+      <p class="nx-h-note">Ask about your own numbers - what to buy next, what breaks first, how to reach 30 days. The advisor reads counts and categories only: never your vault, never your location, never crew names. You can also tell it what you bought and it will offer to log it.</p>
+      <div id="nx-adv-log"></div>
+      <div id="nx-adv-actions"></div>
+      <div class="nx-adv-quick">
+        <button type="button" class="nx-btn nx-btn-small" data-adv-q="What do I need most?">What do I need most?</button>
+        <button type="button" class="nx-btn nx-btn-small" data-adv-q="Power is out for a week - what breaks first?">Power is out for a week - what breaks first?</button>
+        <button type="button" class="nx-btn nx-btn-small" data-adv-q="Get me to 30 days ready">Get me to 30 days ready</button>
+      </div>
+      <form id="nx-adv-form">
+        <label class="nx-field" style="display:block;"><span class="nx-label">Ask the advisor</span>
+          <input class="nx-input" id="nx-adv-input" maxlength="500" autocomplete="off" placeholder="e.g. I just bought 20 cans of beans"></label>
+        <div class="nx-btn-row"><button type="submit" class="nx-btn nx-btn-accent" id="nx-adv-send">Ask</button></div>
+      </form>
+      <div class="nx-msg" id="nx-adv-msg"></div>
+      <p class="nx-h-note" id="nx-adv-count" style="margin-bottom:0;"></p>
     </div>
     <div class="nx-panel-flat nx-pulse" id="nx-incident-banner" style="cursor:pointer; display:none; border-color:var(--nx-accent);">
       <p style="margin:0; font-family:var(--nx-mono); font-size:13px; letter-spacing:1px; color:var(--nx-accent);" id="nx-incident-banner-text"></p>
@@ -198,6 +307,7 @@
         <span style="font-family:var(--nx-mono); font-size:18px; color:var(--nx-dim);">DAYS READY</span>
       </div>
       <p class="nx-grid-line" id="nx-grid-breakdown" style="margin:12px 0 0 0;"></p>
+      <p class="nx-grid-line" id="nx-grid-cash-note">WHEN THE GRID IS DOWN, CARD READERS AND ATMS ARE DOWN WITH IT. CASH ON HAND IS THE ONLY MONEY THAT STILL MOVES - LOG YOURS IN ROTATE.</p>
       <p class="nx-grid-line" id="nx-grid-rally"></p>
       <p class="nx-grid-line" id="nx-grid-batt">BATTERY: --</p>
       <div id="nx-grid-blackout-row" style="margin-top:14px;">
@@ -216,12 +326,28 @@
 
   <!-- ================= ALERTS ================= -->
   <section class="nx-view" id="view-alerts">
-    <div class="nx-panel-flat">
+    <div class="nx-panel-flat" id="nx-alerts-panel">
       <h2 class="nx-h">Emergency Alerts</h2>
       <p class="nx-h-note">Active National Weather Service alerts for your home coordinates (set them in System). Alerts need a signal to refresh - when offline, the last good fetch is shown with its age. Old data is marked STALE and is never passed off as live.</p>
       <p class="nx-totals-line" id="nx-alerts-status">NOT FETCHED YET</p>
       <div class="nx-btn-row" style="margin:0 0 12px 0;">
         <button type="button" class="nx-btn nx-btn-accent" id="nx-alerts-refresh">Refresh Alerts</button>
+      </div>
+      <div class="nx-map" id="nx-alerts-map" aria-hidden="true">
+        <svg viewBox="0 0 400 120" preserveAspectRatio="xMidYMid slice" focusable="false">
+          <g fill="none" stroke="var(--nx-line2)" stroke-width="1" opacity="0.5">
+            <path d="M-10 30C70 14 140 40 220 24C300 8 350 34 410 20"/>
+            <path d="M-10 96C80 82 170 104 250 88C320 74 370 96 410 86"/>
+            <path d="M60 -10C90 30 78 80 108 130" opacity="0.6"/>
+          </g>
+          <g fill="none" stroke="var(--nx-accent)">
+            <circle cx="200" cy="60" r="56" stroke-dasharray="4 5" opacity="0.16"/>
+            <circle cx="200" cy="60" r="32" stroke-dasharray="4 5" opacity="0.3"/>
+            <path d="M200 46v28M186 60h28" stroke-width="1.5" opacity="0.75"/>
+          </g>
+          <circle cx="200" cy="60" r="2.6" fill="var(--nx-accent)"/>
+        </svg>
+        <span class="nx-blip"></span>
       </div>
       <div id="nx-alerts-list"></div>
     </div>
@@ -283,7 +409,7 @@
 
   <!-- ================= GEAR ================= -->
   <section class="nx-view" id="view-gear">
-    <div class="nx-panel">
+    <div class="nx-panel" id="nx-gear-panel">
       <h2 class="nx-h" id="nx-gear-form-title">Add Gear Item</h2>
       <div class="nx-msg" id="nx-gear-msg"></div>
       <form id="nx-gear-form">
@@ -316,12 +442,22 @@
             <select class="nx-select" id="nx-g-assigned"></select></label>
           <label class="nx-field"><span class="nx-label">Location / bin</span>
             <input class="nx-input" id="nx-g-location" maxlength="60" placeholder="e.g. BOB - front pouch"></label>
+          <label class="nx-field"><span class="nx-label">Kit location</span>
+            <select class="nx-select" id="nx-g-loc">
+              <option value="Home">Home</option>
+              <option value="Car">Car</option>
+              <option value="Work">Work</option>
+              <option value="Go-Bag">Go-Bag</option>
+            </select></label>
           <div class="nx-field nx-field-wide"><span class="nx-label">Environmental utility</span>
             <div class="nx-checkrow" id="nx-g-env"></div>
           </div>
         </div>
         <div class="nx-btn-row">
           <button type="submit" class="nx-btn nx-btn-accent" id="nx-gear-save">Add Item</button>
+          <button type="button" class="nx-btn" id="nx-gear-scan">Scan Barcode</button>
+          <button type="button" class="nx-btn" id="nx-gear-photo-btn">Photo ID</button>
+          <input type="file" id="nx-gear-photo" accept="image/*" capture="environment" style="display:none;">
           <button type="button" class="nx-btn" id="nx-gear-cancel-edit" style="display:none;">Cancel Edit</button>
         </div>
       </form>
@@ -338,6 +474,13 @@
         <select class="nx-select" id="nx-gear-catfilter" style="width:auto; padding:6px 8px; font-size:12px;">
           <option value="ALL">ALL CATEGORIES</option>
         </select>
+      </div>
+      <div class="nx-filterbar" id="nx-gear-locfilter">
+        <button type="button" class="nx-fbtn nx-on" data-loc-filter="ALL">All Kits</button>
+        <button type="button" class="nx-fbtn" data-loc-filter="Home">Home Kit</button>
+        <button type="button" class="nx-fbtn" data-loc-filter="Car">Car Kit</button>
+        <button type="button" class="nx-fbtn" data-loc-filter="Work">Work Kit</button>
+        <button type="button" class="nx-fbtn" data-loc-filter="Go-Bag">Go-Bag</button>
       </div>
       <div id="nx-gear-list"></div>
     </div>
@@ -370,9 +513,17 @@
 
   <!-- ================= ROTATE ================= -->
   <section class="nx-view" id="view-rotate">
-    <div class="nx-panel">
+    <div class="nx-panel" id="nx-radar-panel">
+      <h2 class="nx-h">Expiry Radar</h2>
+      <p class="nx-h-note">Stores with expiry dates, soonest first - the five dates that matter next. Gear dates ride the rotation tracker below.</p>
+      <div id="nx-radar-list"></div>
+      <div id="nx-radar-note"></div>
+      <div id="nx-radar-alerts"></div>
+    </div>
+    <div class="nx-panel" id="nx-rotate-panel">
       <h2 class="nx-h">Quick-Add Store</h2>
-      <p class="nx-h-note">Bulk stores with expiry dates: water, food, meds, batteries. Individual expiring gear items (filters, IFAK supplies) are set in the Gear tab and tracked here too.</p>
+      <p class="nx-h-note">Bulk stores with expiry dates: water, food, meds, batteries. Pet food is logged in pounds - pet readiness plans at 1 lb per pet per day. Individual expiring gear items (filters, IFAK supplies) are set in the Gear tab and tracked here too.</p>
+      <div class="nx-msg" id="nx-store-msg"></div>
       <form id="nx-store-form">
         <div class="nx-form-grid">
           <label class="nx-field"><span class="nx-label">Store type</span>
@@ -381,6 +532,7 @@
               <option value="Food">Food</option>
               <option value="Meds">Meds</option>
               <option value="Batteries">Batteries</option>
+              <option value="PetFood">Pet Food</option>
             </select></label>
           <label class="nx-field"><span class="nx-label">Name</span>
             <input class="nx-input" id="nx-s-name" required maxlength="70" placeholder="e.g. Water brick - garage"></label>
@@ -396,10 +548,70 @@
             <input class="nx-input" id="nx-s-expiry" type="date" required></label>
           <label class="nx-field"><span class="nx-label">Total kcal (food stores - drives Food Days)</span>
             <input class="nx-input" id="nx-s-kcal" type="number" min="0" step="1" placeholder="optional, e.g. 41250"></label>
+          <label class="nx-field"><span class="nx-label">Kit location</span>
+            <select class="nx-select" id="nx-s-loc">
+              <option value="Home">Home</option>
+              <option value="Car">Car</option>
+              <option value="Work">Work</option>
+              <option value="Go-Bag">Go-Bag</option>
+            </select></label>
         </div>
-        <div class="nx-btn-row"><button type="submit" class="nx-btn nx-btn-accent">Add Store</button></div>
+        <div class="nx-btn-row"><button type="submit" class="nx-btn nx-btn-accent">Add Store</button><button type="button" class="nx-btn" id="nx-store-scan">Scan Barcode</button><button type="button" class="nx-btn" id="nx-store-photo-btn">Photo ID</button></div>
+        <input type="file" id="nx-store-photo" accept="image/*" capture="environment" style="display:none;">
       </form>
       <div id="nx-store-list" style="margin-top:14px;"></div>
+    </div>
+
+    <!-- Medications (Ready.gov build): per-person prescription
+         log. Supply days and dates ride the Expiry Radar via
+         medRadarRows in app.js. Factual log only. -->
+    <div class="nx-panel" id="nx-meds-panel">
+      <h2 class="nx-h" id="nx-med-form-title">Medications</h2>
+      <p class="nx-h-note">Every prescription in the house, who it belongs to, and how many days of supply are on hand. An emergency is exactly when a refill is hardest to get - a med lands on the Expiry Radar when it nears expiry or its supply runs out inside 14 days.</p>
+      <div class="nx-msg" id="nx-med-msg"></div>
+      <form id="nx-med-form">
+        <input type="hidden" id="nx-med-id">
+        <div class="nx-form-grid">
+          <label class="nx-field"><span class="nx-label">Person</span>
+            <input class="nx-input" id="nx-med-person" maxlength="60" placeholder="Crew name - or type any name" list="nx-med-person-list">
+            <datalist id="nx-med-person-list"></datalist></label>
+          <label class="nx-field"><span class="nx-label">Medication</span>
+            <input class="nx-input" id="nx-med-name" required maxlength="80" placeholder="e.g. Lisinopril"></label>
+          <label class="nx-field"><span class="nx-label">Dose / form (optional)</span>
+            <input class="nx-input" id="nx-med-dose" maxlength="80" placeholder="e.g. 10 mg tablets"></label>
+          <label class="nx-field"><span class="nx-label">Days of supply on hand</span>
+            <input class="nx-input" id="nx-med-supply" type="number" min="0" step="1" required placeholder="e.g. 30"></label>
+          <label class="nx-field"><span class="nx-label">Refill by (optional)</span>
+            <input class="nx-input" id="nx-med-refill" type="date"></label>
+          <label class="nx-field"><span class="nx-label">Expiry date (optional)</span>
+            <input class="nx-input" id="nx-med-expiry" type="date"></label>
+        </div>
+        <div class="nx-btn-row">
+          <button type="submit" class="nx-btn nx-btn-accent" id="nx-med-save">Add Medication</button>
+          <button type="button" class="nx-btn" id="nx-med-cancel-edit" style="display:none;">Cancel Edit</button>
+        </div>
+      </form>
+      <div id="nx-med-list" style="margin-top:14px;"></div>
+    </div>
+
+    <!-- Cash on hand (Ready.gov build): stashes by location.
+         Display only - the total rides the Command readiness
+         breakdown and never enters Days Ready math. -->
+    <div class="nx-panel" id="nx-cash-panel">
+      <h2 class="nx-h">Cash On Hand</h2>
+      <p class="nx-h-note">Small bills, stashed where you can reach them. When the grid is down, card readers and ATMs are down with it - cash is the only wallet that still works.</p>
+      <div class="nx-msg" id="nx-cash-msg"></div>
+      <form id="nx-cash-form">
+        <div class="nx-form-grid">
+          <label class="nx-field"><span class="nx-label">Amount ($)</span>
+            <input class="nx-input" id="nx-cash-amount" type="number" min="0" step="1" required placeholder="e.g. 200"></label>
+          <label class="nx-field"><span class="nx-label">Where it is kept</span>
+            <input class="nx-input" id="nx-cash-where" maxlength="80" placeholder="e.g. Go-bag / home safe"></label>
+        </div>
+        <div class="nx-btn-row"><button type="submit" class="nx-btn nx-btn-accent">Add Cash</button></div>
+      </form>
+      <div id="nx-cash-list" style="margin-top:14px;"></div>
+      <p class="nx-totals-line" id="nx-cash-total" style="margin-top:12px;"></p>
     </div>
 
     <div class="nx-panel-flat">
@@ -411,18 +623,20 @@
           <tbody id="nx-rotation-body"></tbody>
         </table>
       </div>
+      <p class="nx-shop-note nx-buy-ui" id="nx-rotate-shop-note" style="display:none;"></p>
     </div>
   </section>
 
   <!-- ================= VAULT ================= -->
   <section class="nx-view" id="view-vault">
-    <div class="nx-panel">
+    <div class="nx-panel" id="nx-vault-panel">
       <h2 class="nx-h">Encrypted Vault</h2>
       <p class="nx-h-note">Plans, rally points and document notes, sealed with AES-256-GCM. Your passphrase derives the key on this device only (PBKDF2). Only ciphertext is stored - if you forget the passphrase, the vault cannot be recovered. The vault seals itself every time the app loads.</p>
       <div class="nx-msg" id="nx-vault-msg"></div>
 
       <div id="nx-vault-setup" style="display:none;">
         <div class="nx-vault-sealed">
+          <svg class="nx-vault-art" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square" aria-hidden="true" focusable="false"><path d="M6 6h36v36H6Z"/><path d="M42 13h4M42 35h4"/><circle cx="24" cy="24" r="13.5" opacity="0.65"/><g class="nx-vault-wheel"><circle cx="24" cy="24" r="7.5"/><path d="M24 16.5v15M16.5 24h15M18.7 18.7l10.6 10.6M29.3 18.7L18.7 29.3"/></g><circle cx="24" cy="24" r="1.8" fill="currentColor" stroke="none"/></svg>
           <p class="nx-vault-state">NO VAULT SET</p>
           <p class="nx-dim" style="font-family:var(--nx-mono); font-size:12px;">CREATE A PASSPHRASE TO SEAL YOUR FIRST VAULT.</p>
         </div>
@@ -439,6 +653,7 @@
 
       <div id="nx-vault-locked" style="display:none;">
         <div class="nx-vault-sealed">
+          <svg class="nx-vault-art" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square" aria-hidden="true" focusable="false"><path d="M6 6h36v36H6Z"/><path d="M42 13h4M42 35h4"/><circle cx="24" cy="24" r="13.5" opacity="0.65"/><g class="nx-vault-wheel"><circle cx="24" cy="24" r="7.5"/><path d="M24 16.5v15M16.5 24h15M18.7 18.7l10.6 10.6M29.3 18.7L18.7 29.3"/></g><circle cx="24" cy="24" r="1.8" fill="currentColor" stroke="none"/></svg>
           <p class="nx-vault-state nx-sealed">VAULT SEALED</p>
           <p class="nx-dim" style="font-family:var(--nx-mono); font-size:12px;"><span id="nx-vault-count">0</span> ENTRIES ENCRYPTED ON THIS DEVICE. TITLES AND CONTENTS STAY SEALED UNTIL UNLOCK.</p>
         </div>
@@ -500,6 +715,28 @@
       </div>
     </div>
 
+    <!-- Family Plan (Ready.gov build): meeting places and the
+         out-of-town contact. Names only - no coordinates live
+         here; the primary rally point itself stays sealed in
+         the vault. Prints as a section of the GO-Book. -->
+    <div class="nx-panel" id="nx-family-panel">
+      <h2 class="nx-h">Family Plan</h2>
+      <p class="nx-h-note">Where you meet, and who outside the area everyone checks in with when local lines fail. Every member of the household should know this card cold. Names only - the primary rally point itself stays sealed in the vault.</p>
+      <p class="nx-kv" id="nx-family-primary" style="margin:0 0 10px 0;">PRIMARY RALLY POINT: <b>-</b></p>
+      <div class="nx-msg" id="nx-family-msg"></div>
+      <form id="nx-family-form">
+        <div class="nx-form-grid">
+          <label class="nx-field nx-field-wide"><span class="nx-label">Secondary meeting place (name only)</span>
+            <input class="nx-input" id="nx-fam-rally2" maxlength="120" placeholder="e.g. Aunt Rosa's house - Tucson"></label>
+          <label class="nx-field"><span class="nx-label">Out-of-town contact - name</span>
+            <input class="nx-input" id="nx-fam-outname" maxlength="80" placeholder="e.g. Uncle Ray"></label>
+          <label class="nx-field"><span class="nx-label">Out-of-town contact - phone</span>
+            <input class="nx-input" id="nx-fam-outphone" maxlength="40" placeholder="e.g. 555-014-2280"></label>
+        </div>
+        <div class="nx-btn-row"><button type="submit" class="nx-btn nx-btn-accent">Save Family Plan</button></div>
+      </form>
+    </div>
+
     <div class="nx-panel">
       <h2 class="nx-h">Broadcast</h2>
       <p class="nx-h-note">Build one compact message and push it out through this phone - share sheet, SMS, or clipboard. If the vault is unlocked and a primary rally point exists, its NAME is appended (never raw coordinates). Offline broadcasts are logged as QUEUED - they still need a manual send when signal returns.</p>
@@ -519,7 +756,10 @@
         <button type="button" class="nx-btn nx-btn-accent" id="nx-bc-send">Send Broadcast</button>
       </div>
       <div class="nx-msg" id="nx-bc-msg"></div>
-      <h3 class="nx-section-sub">Outbox Log</h3>
+      <div class="nx-sig-row">
+        <h3 class="nx-section-sub" style="margin:0;">Outbox Log</h3>
+        <div class="nx-sig" id="nx-bc-sig" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
       <div id="nx-outbox-list"></div>
       </div>
     </div>
@@ -527,7 +767,7 @@
 
   <!-- ================= CREW ================= -->
   <section class="nx-view" id="view-crew">
-    <div class="nx-panel">
+    <div class="nx-panel" id="nx-crew-panel">
       <h2 class="nx-h">Add Crew Member</h2>
       <div class="nx-msg" id="nx-crew-msg"></div>
       <form id="nx-crew-form">
@@ -547,16 +787,65 @@
         <div class="nx-btn-row"><button type="submit" class="nx-btn nx-btn-accent">Add Member</button></div>
       </form>
     </div>
+
+    <!-- Squad Sync (money build D): a $9.99 one-time add-on.
+         Show a QR code carrying this crew + loadout; another
+         user with the add-on scans it and imports the lot.
+         The payload is crew + gear only - no vault, no home
+         base, no account data. Locked and open states are
+         static markup toggled by renderSquad() so the canvas
+         and the paste box survive re-renders. -->
+    <div class="nx-panel" id="nx-squad-panel">
+      <h2 class="nx-h">Squad Sync</h2>
+      <div class="nx-msg" id="nx-squad-msg"></div>
+      <div id="nx-squad-locked">
+        <p class="nx-h-note">HAND YOUR WHOLE SQUAD TO ANOTHER PHONE IN ONE SCAN. YOUR CREW AND YOUR GEAR LOADOUT GO INTO A QR CODE; ANYONE WITH SQUAD SYNC SCANS IT AND IMPORTS THE LOT - CREW, GEAR, ASSIGNMENTS AND ALL. WORKS FULLY OFFLINE, PHONE TO PHONE. BOTH PHONES NEED THE ADD-ON.</p>
+        <p class="nx-upsell-prices nx-buy-ui">$9.99 ONE-TIME</p>
+        <div class="nx-btn-row">
+          <button type="button" class="nx-btn nx-btn-accent nx-buy-ui" data-checkout-plan="qr-sync">Get Squad Sync</button>
+        </div>
+        <p class="nx-h-note nx-ios-note">SQUAD SYNC MEMBERS: SIGN IN AND YOUR ADD-ON WORKS HERE AUTOMATICALLY.</p>
+      </div>
+      <div id="nx-squad-open" style="display:none;">
+        <p class="nx-totals-line" id="nx-squad-counts">0 CREW - 0 GEAR</p>
+        <p class="nx-h-note">THE CODE CARRIES CREW + GEAR ONLY - NEVER YOUR VAULT, YOUR HOME BASE OR YOUR ACCOUNT.</p>
+        <div class="nx-btn-row">
+          <button type="button" class="nx-btn nx-btn-accent" id="nx-squad-show">Show Squad Code</button>
+          <button type="button" class="nx-btn" id="nx-squad-import">Import Squad Code</button>
+        </div>
+        <div id="nx-squad-codewrap" style="display:none;">
+          <div class="nx-squad-codebox">
+            <canvas id="nx-squad-canvas" width="360" height="360"></canvas>
+          </div>
+          <p class="nx-totals-line" id="nx-squad-frame-line">ONE CODE CARRIES THE WHOLE SQUAD</p>
+          <div class="nx-btn-row">
+            <button type="button" class="nx-btn" id="nx-squad-prev">Prev</button>
+            <button type="button" class="nx-btn" id="nx-squad-next">Next</button>
+          </div>
+        </div>
+        <label class="nx-field"><span class="nx-label">Or paste a squad code</span>
+          <textarea class="nx-input nx-squad-paste" id="nx-squad-paste" rows="3" autocomplete="off" placeholder="Paste one code, or one frame per line (NXS1 1/3 ...)"></textarea></label>
+        <div class="nx-btn-row">
+          <button type="button" class="nx-btn" id="nx-squad-paste-btn">Import From Text</button>
+        </div>
+      </div>
+    </div>
     <div id="nx-crew-list"></div>
   </section>
 
   <!-- ================= LISTS ================= -->
   <section class="nx-view" id="view-lists">
-    <div class="nx-panel-flat">
+    <div class="nx-panel-flat" id="nx-lists-panel">
       <h2 class="nx-h">Scenario Checklists</h2>
       <p class="nx-h-note">Completion across all three lists drives the Readiness card on the Command dashboard.</p>
       <p class="nx-totals-line" id="nx-lists-total"></p>
       <div id="nx-lists-wrap"></div>
+    </div>
+
+    <div class="nx-panel" id="nx-resupply-panel">
+      <h2 class="nx-h">Resupply // Keep Your Number Up</h2>
+      <p class="nx-h-note">FIRST ORDERS, MADE PERMANENT. PICK HOW MANY DAYS YOU WANT TO HOLD; THE LINES BELOW ARE YOUR LIVE GAPS AGAINST THAT TARGET, RECOMPUTED FROM YOUR STORES AND GEAR EVERY TIME THEY CHANGE.</p>
+      <div id="nx-resupply-wrap"></div>
     </div>
 
     <div class="nx-panel">
@@ -582,7 +871,7 @@
 
   <!-- ================= INTEL ================= -->
   <section class="nx-view" id="view-intel">
-    <div class="nx-panel">
+    <div class="nx-panel" id="nx-intel-panel">
       <h2 class="nx-h">Intel - Field Notes from the Feed</h2>
       <p class="nx-h-note">Saw a loadout, a storage trick or a drill in a post? Paste the link - or share the post straight to NyxSurvive from TikTok, Instagram, YouTube or Facebook - and the post is read and filed here as a field note. Gear, supplies and steps it names can be filed into your real gear catalog or the Intel checklist in Lists with one tap. Reading a post needs a signal and a sign-in; a link pasted offline or signed out still saves, as a link-only card, so nothing is lost.</p>
       <form id="nx-intel-form">
@@ -595,6 +884,63 @@
       <p class="nx-totals-line" id="nx-intel-count" style="margin-bottom:0;">NO INTEL SAVED YET</p>
     </div>
     <div id="nx-intel-list"></div>
+  </section>
+
+  <!-- ================= MAPS ================= -->
+  <!-- Offline Map Packs (money build E): a per-state add-on,
+       $9.99 per state or $29.99 for all 50. A bought pack
+       downloads once into IndexedDB on this device and then
+       renders fully offline as a schematic SVG - state
+       outline, major cities, home-base marker. No map tiles,
+       no navigation claims. Locked and bundle blocks are
+       static markup toggled by renderMaps(); the state list
+       rows are rebuilt by renderMaps() and their buttons are
+       bound by delegation in bindMaps(). -->
+  <section class="nx-view" id="view-maps">
+    <div class="nx-panel" id="nx-maps-panel">
+      <h2 class="nx-h">Offline Map Packs</h2>
+      <div class="nx-msg" id="nx-maps-msg"></div>
+      <p class="nx-h-note">SCHEMATIC STATE MAPS FOR OFFLINE REFERENCE - STATE OUTLINE, MAJOR CITIES, AND YOUR HOME BASE MARKER WHEN IT FALLS IN THE STATE. A BOUGHT PACK DOWNLOADS ONCE AND LIVES ON THIS DEVICE; AFTER THAT IT WORKS WITH NO CONNECTION AT ALL. DOWNLOADING IS THE ONLY STEP THAT NEEDS A CONNECTION. VIEWING A DOWNLOADED PACK NEEDS NO ACCOUNT. SCHEMATIC STATE MAP - NOT FOR NAVIGATION.</p>
+      <div id="nx-maps-locked">
+        <p class="nx-h-note">WHEN THE GRID AND THE SIGNAL ARE GONE, A PAPER-THIN SCHEMATIC OF YOUR STATE IS STILL WORTH HAVING: THE OUTLINE, THE CITIES, AND WHERE HOME BASE SITS. BUY ONLY YOUR STATE, OR TAKE ALL 50 AND NEVER THINK ABOUT IT AGAIN.</p>
+        <p class="nx-upsell-prices nx-buy-ui">$9.99 PER STATE - $29.99 ALL 50</p>
+        <p class="nx-h-note nx-ios-note">MAP PACK MEMBERS: SIGN IN AND YOUR PACKS WORK HERE AUTOMATICALLY.</p>
+      </div>
+      <div id="nx-maps-bundle">
+        <div class="nx-btn-row">
+          <button type="button" class="nx-btn nx-btn-accent nx-buy-ui" id="nx-maps-buy-us">Get All 50 States - $29.99</button>
+        </div>
+      </div>
+      <p class="nx-totals-line" id="nx-maps-counts">0 OF 50 STATES UNLOCKED - 0 ON THIS DEVICE</p>
+      <div id="nx-maps-list"></div>
+    </div>
+    <div class="nx-panel" id="nx-map-screen-panel" style="display:none;">
+      <h2 class="nx-h" id="nx-map-screen-title">State Map</h2>
+      <div id="nx-map-screen"></div>
+      <p class="nx-h-note">SCHEMATIC STATE MAP - NOT FOR NAVIGATION. CITY POSITIONS AND THE HOME BASE MARKER ARE PLOTTED FROM THE PACK AND YOUR OWN SETTINGS, ON THIS DEVICE ONLY.</p>
+      <div class="nx-btn-row"><button type="button" class="nx-btn" id="nx-map-close">Back To Packs</button></div>
+    </div>
+  </section>
+
+  <!-- ================= FIELD GUIDE ================= -->
+  <!-- Offline first-aid and survival reference library.
+       All content is bundled in app.js (GUIDE_CATS) - no
+       network, no account, no plan gate, free for every
+       tier. The topic list is rendered by renderGuide();
+       one open topic renders into the detail panel. -->
+  <section class="nx-view" id="view-guide">
+    <div class="nx-panel" id="nx-guide-panel">
+      <h2 class="nx-h">Field Guide</h2>
+      <p class="nx-h-note">FIRST AID AND SURVIVAL REFERENCE, BUILT INTO THE APP. FULLY OFFLINE - NO SIGNAL, NO ACCOUNT AND NO PLAN NEEDED. FREE FOR EVERYONE, ALWAYS.</p>
+      <div class="nx-guide-alert">FIELD REFERENCE ONLY - NOT A SUBSTITUTE FOR FIRST AID TRAINING, MEDICAL ADVICE OR PROFESSIONAL CARE. IN AN EMERGENCY, CALL 911 FIRST WHEN YOU CAN, THEN USE THE GUIDE. IF A STEP HERE AND A 911 DISPATCHER EVER DIFFER, FOLLOW THE DISPATCHER.</div>
+      <input class="nx-input" id="nx-guide-search" type="text" autocomplete="off" maxlength="60" placeholder="Search the guide - try tourniquet, heatstroke, snake, choking...">
+      <p class="nx-totals-line" id="nx-guide-count" style="margin-bottom:0;">FIELD GUIDE</p>
+    </div>
+    <div id="nx-guide-list"></div>
+    <div class="nx-panel" id="nx-guide-topic" style="display:none;">
+      <div id="nx-guide-topic-body"></div>
+      <div class="nx-btn-row"><button type="button" class="nx-btn" id="nx-guide-back">Back To Guide</button></div>
+    </div>
   </section>
 
   <!-- ================= SYSTEM ================= -->
@@ -651,7 +997,7 @@
       <p class="nx-h-note nx-ios-note" style="margin-top:6px;">OPERATOR MEMBERS: SIGN IN AND YOUR TIER WORKS HERE AUTOMATICALLY.</p>
     </div>
 
-    <div class="nx-panel">
+    <div class="nx-panel" id="nx-settings-panel">
       <h2 class="nx-h">Station Settings</h2>
       <p class="nx-h-note">Home coordinates drive the Alerts feed and seismic range filter. Default is Phoenix, AZ. Your call sign rides on every broadcast.</p>
       <form id="nx-settings-form">
@@ -686,8 +1032,38 @@
       <p class="nx-h-note" style="margin-top:8px;">Key clicks, confirm blips, the radio squelch on a sent broadcast, one low sting when a warning alert lands. Synthesized on the spot - no audio files. Terminal Effects off silences the pack too.</p>
       <hr class="nx-divider">
       <div style="font-weight:700; letter-spacing:2px;">THEME</div>
-      <p class="nx-h-note" style="margin-top:4px;">Five terminal variants - texture, type and posture, not just color. Applies instantly and sticks to this device.</p>
+      <p class="nx-h-note" style="margin-top:4px;">Eleven variants - real materials, texture and posture, not just color. Applies instantly and sticks to this device.</p>
       <div class="nx-theme-grid" id="nx-theme-picker"></div>
+      <hr class="nx-divider">
+      <div style="font-weight:700; letter-spacing:2px;">READINESS CHECK-IN</div>
+      <p class="nx-h-note" style="margin-top:4px;">The questionnaire that built your crew, your check-in stores and your First Orders. Retake it after your situation changes - it updates the same entries, never duplicates them.</p>
+      <div class="nx-btn-row"><button type="button" class="nx-btn" id="nx-checkin-retake">Retake Readiness Check-In</button></div>
+      <hr class="nx-divider">
+      <div style="font-weight:700; letter-spacing:2px;">WALKTHROUGH</div>
+      <p class="nx-h-note" style="margin-top:4px;">The nine-stop guided tour of the whole terminal - what every tab does and where things live. It runs once on its own after your first check-in; replay it any time here.</p>
+      <div class="nx-btn-row"><button type="button" class="nx-btn" id="nx-tour-replay">Replay Walkthrough</button></div>
+    </div>
+
+    <!-- Home Systems (Ready.gov build): where this house's
+         shutoffs live and what tool each takes. The matching
+         KNOW YOUR SHUTOFFS checklist rides in the Lists tab. -->
+    <div class="nx-panel" id="nx-homesys-panel">
+      <h2 class="nx-h">Home Systems - Shutoffs</h2>
+      <p class="nx-h-note">Where the valves and panels live in this house, and what tool each one takes. When a pipe bursts at 3 AM, nobody should be guessing. The Know Your Shutoffs checklist rides in the Lists tab.</p>
+      <div class="nx-msg" id="nx-homesys-msg"></div>
+      <form id="nx-homesys-form">
+        <div class="nx-form-grid">
+          <label class="nx-field nx-field-wide"><span class="nx-label">Water shutoff - where + tool</span>
+            <input class="nx-input" id="nx-hs-water" maxlength="240" placeholder="e.g. Meter box at the curb - meter key; house valve in the garage"></label>
+          <label class="nx-field nx-field-wide"><span class="nx-label">Gas shutoff - where + tool</span>
+            <input class="nx-input" id="nx-hs-gas" maxlength="240" placeholder="e.g. At the meter, west wall - wrench lives on the meter pipe"></label>
+          <label class="nx-field nx-field-wide"><span class="nx-label">Electric panel - where</span>
+            <input class="nx-input" id="nx-hs-electric" maxlength="240" placeholder="e.g. Breaker panel in the laundry room, main breaker top left"></label>
+          <label class="nx-field nx-field-wide"><span class="nx-label">Propane - where + tool (if fitted)</span>
+            <input class="nx-input" id="nx-hs-propane" maxlength="240" placeholder="e.g. Tank valve behind the house - hand wheel, no tool"></label>
+        </div>
+        <div class="nx-btn-row"><button type="submit" class="nx-btn nx-btn-accent">Save Home Systems</button></div>
+      </form>
     </div>
 
     <div class="nx-panel">
@@ -700,9 +1076,9 @@
         <input type="file" id="nx-import-file" accept="application/json,.json" style="display:none;">
       </div>
       <hr class="nx-divider">
-      <p class="nx-h-note">STARTER DATA: the app ships with a small sample loadout, stores and comms plan so the dashboard is alive on first run. It is yours - edit or delete any of it. Reset restores it. Wipe removes everything, including the encrypted vault blob, and starts empty.</p>
+      <p class="nx-h-note">BLANK SLATE: the app ships empty - no sample loadout, no preset stores, nothing pre-filled. Reset clears gear, stores, comms, crew and lists back to that blank slate (the vault is NOT touched). Wipe removes everything, including the encrypted vault blob.</p>
       <div class="nx-btn-row">
-        <button type="button" class="nx-btn" id="nx-reset-btn">Reset to Starter Data</button>
+        <button type="button" class="nx-btn" id="nx-reset-btn">Reset to Blank Slate</button>
         <button type="button" class="nx-btn nx-btn-danger" id="nx-wipe-btn">Wipe Everything</button>
       </div>
     </div>
@@ -711,6 +1087,13 @@
       <h2 class="nx-h">About</h2>
       <p style="color:var(--nx-dim); line-height:1.6; margin-top:0;">NyxSurvive is an offline-first tactical survival and bug-out management system: gear loadouts with honest weights, an AES-encrypted vault for plans and rally points, rotation tracking for the stores that quietly expire, and a comms plan that still works on paper. V1 runs entirely on-device - no account, no cloud, no signal required.</p>
       <p class="nx-kv">VERSION: <b>1.0</b> // BUILD: <b>ON-DEVICE</b> // ENCRYPTION: <b>AES-256-GCM + PBKDF2</b></p>
+    </div>
+  </section>
+
+  <!-- ================= READINESS CHECK-IN ================= -->
+  <section class="nx-view" id="view-checkin">
+    <div class="nx-panel" style="border-color:var(--nx-line2);">
+      <div id="nx-checkin-body"></div>
     </div>
   </section>
 
@@ -725,11 +1108,71 @@
   <button type="button" class="nx-sos-stop" id="nx-sos-stop">Stop</button>
 </div>
 
+<!-- Guided walkthrough layer: accent frame + briefing card, driven
+     by app.js. Pointer-events none except the card itself, so the
+     tour never traps the app; Skip Tour is always on screen. -->
+<div id="nx-tour-layer" style="display:none;">
+  <div id="nx-tour-frame"><i class="nx-tfc nx-tfc-tl"></i><i class="nx-tfc nx-tfc-tr"></i><i class="nx-tfc nx-tfc-bl"></i><i class="nx-tfc nx-tfc-br"></i></div>
+  <div class="nx-tour-card" id="nx-tour-card">
+    <p class="nx-stat-label" id="nx-tour-kicker">Walkthrough</p>
+    <h2 class="nx-h" id="nx-tour-title" style="margin-top:2px;"></h2>
+    <div class="nx-seg" id="nx-tour-seg" style="margin:10px 0;"></div>
+    <p class="nx-tour-body" id="nx-tour-body"></p>
+    <div class="nx-btn-row" style="margin-bottom:0;">
+      <button type="button" class="nx-btn nx-btn-small" id="nx-tour-back">Back</button>
+      <button type="button" class="nx-btn nx-btn-small nx-btn-accent" id="nx-tour-next">Next</button>
+      <button type="button" class="nx-btn nx-btn-small" id="nx-tour-skip">Skip Tour</button>
+    </div>
+  </div>
+</div>
+
+<!-- Barcode scanner overlay: live camera + BarcodeDetector where
+     the platform offers them, a type-the-number fallback panel
+     everywhere else, so a scan never dead-ends. Driven by app.js. -->
+<div id="nx-scan" style="display:none;">
+  <div class="nx-scan-box">
+    <p class="nx-stat-label" id="nx-scan-kicker">Barcode Scan</p>
+    <h2 class="nx-h" id="nx-scan-title" style="margin-top:2px;">Point at a barcode</h2>
+    <div class="nx-scan-frame" id="nx-scan-frame">
+      <video id="nx-scan-video" playsinline muted></video>
+      <i class="nx-tfc nx-tfc-tl"></i><i class="nx-tfc nx-tfc-tr"></i><i class="nx-tfc nx-tfc-bl"></i><i class="nx-tfc nx-tfc-br"></i>
+      <div class="nx-scan-line"></div>
+    </div>
+    <p class="nx-scan-status" id="nx-scan-status">STARTING CAMERA...</p>
+    <div class="nx-scan-fallback" id="nx-scan-fallback" style="display:none;">
+      <label class="nx-field"><span class="nx-label" id="nx-scan-fallback-label">Type the barcode number</span>
+        <input class="nx-input" id="nx-scan-manual" inputmode="numeric" autocomplete="off" maxlength="32" placeholder="e.g. 3017620422003"></label>
+      <div class="nx-btn-row"><button type="button" class="nx-btn nx-btn-accent" id="nx-scan-lookup">Look Up</button></div>
+    </div>
+    <div class="nx-btn-row" style="margin-bottom:0;">
+      <button type="button" class="nx-btn" id="nx-scan-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Photo ID confirm overlay: the AI names what it saw as a
+     confirm-each list of prefilled rows. Nothing is filed until
+     the user taps Add on a row - the values stay editable in
+     the row until then. Driven by app.js. -->
+<div id="nx-photo" style="display:none;">
+  <div class="nx-scan-box">
+    <p class="nx-stat-label">AI Quick-Add</p>
+    <h2 class="nx-h" style="margin-top:2px;">Photo ID - Confirm Each Item</h2>
+    <p class="nx-scan-status" id="nx-photo-status">ESTIMATES FROM YOUR PHOTO - CHECK THEM, EDIT, THEN ADD. NOTHING IS SAVED UNTIL YOU TAP ADD.</p>
+    <div id="nx-photo-list"></div>
+    <div class="nx-msg" id="nx-photo-msg"></div>
+    <div class="nx-btn-row" style="margin-bottom:0;">
+      <button type="button" class="nx-btn" id="nx-photo-close">Close</button>
+    </div>
+  </div>
+</div>
+
 <footer class="nx-footer">
   <div class="nx-foot-brand">NyxSurvive&#8482;</div>
   <p>&copy; 2026 Nyx Collective LLC // <a href="https://nyxcollectivellc.com">nyxcollectivellc.com</a></p>
 </footer>
 
+<script src="nx-qr.js"></script>
 <script>
 /* Baked in by native/prepare-www.js: in the bundle there is no
    same-origin /api/config to fetch, so the public Firebase web
