@@ -140,10 +140,10 @@
         </svg>
       </div>
       <div class="nx-hero-scan"></div>
-      <p class="nx-stat-label">Days Ready // Household Sustainment</p>
+      <p class="nx-stat-label" id="nx-days-label">Days Ready // Household Sustainment</p>
       <div style="display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-top:4px;">
         <span id="nx-days-ready" style="font-family:var(--nx-mono); font-size:clamp(84px, 26vw, 104px); font-weight:700; line-height:1;">--</span>
-        <span style="font-family:var(--nx-mono); font-size:20px; font-weight:700; color:var(--nx-dim);">DAYS</span>
+        <span id="nx-days-unit" style="font-family:var(--nx-mono); font-size:20px; font-weight:700; color:var(--nx-dim);">DAYS</span>
       </div>
       <div class="nx-seg" id="nx-days-seg"></div>
       <p class="nx-kv" id="nx-days-breakdown" style="margin:10px 0 0 0;"></p>
@@ -846,6 +846,18 @@
       <h2 class="nx-h">Resupply // Keep Your Number Up</h2>
       <p class="nx-h-note">FIRST ORDERS, MADE PERMANENT. PICK HOW MANY DAYS YOU WANT TO HOLD; THE LINES BELOW ARE YOUR LIVE GAPS AGAINST THAT TARGET, RECOMPUTED FROM YOUR STORES AND GEAR EVERY TIME THEY CHANGE.</p>
       <div id="nx-resupply-wrap"></div>
+      <hr class="nx-divider">
+      <h3 class="nx-section-sub">Buy Later // Save It, Get It When You Can</h3>
+      <p class="nx-h-note">FOUND GEAR ON AMAZON YOU CANNOT GRAB YET? PASTE THE LINK HERE. IT WAITS ON YOUR LIST UNTIL THE MONEY IS RIGHT - THEN BUY IT IN ONE TAP AND TICK GOT IT.</p>
+      <form id="nx-buylater-form">
+        <label class="nx-field"><span class="nx-label">Amazon link</span>
+          <input class="nx-input" id="nx-buylater-url" type="url" placeholder="https://www.amazon.com/..." required></label>
+        <label class="nx-field"><span class="nx-label">Name (optional - filled in from the link when it can be)</span>
+          <input class="nx-input" id="nx-buylater-name" maxlength="120" placeholder="e.g. Water storage barrel"></label>
+        <div class="nx-btn-row"><button type="submit" class="nx-btn nx-btn-accent">Save For Later</button></div>
+      </form>
+      <div class="nx-msg" id="nx-buylater-msg"></div>
+      <div id="nx-buylater-wrap"></div>
     </div>
 
     <div class="nx-panel">
@@ -973,6 +985,14 @@
         <p class="nx-kv" style="margin:0;" id="nx-acct-email-line">ACCOUNT: <b>-</b></p>
         <p class="nx-kv" style="margin:0;" id="nx-acct-plan-line">PLAN: <b>-</b></p>
         <p class="nx-kv" style="margin:0;" id="nx-acct-sync-line">SYNC: <b>LOCAL ONLY</b></p>
+        <div id="nx-acct-verify" style="display:none;">
+          <p class="nx-h-note" style="margin-top:6px;">VERIFY YOUR EMAIL TO FINISH SETTING UP YOUR ACCOUNT. CLOUD BACKUP, YOUR PLAN AND CHECKOUT STAY OFF UNTIL YOU DO - THE APP ITSELF KEEPS WORKING ON THIS DEVICE. WE SENT A LINK TO <b id="nx-acct-verify-email"></b> - OPEN IT, THEN COME BACK AND TAP CHECK AGAIN.</p>
+          <div class="nx-msg" id="nx-acct-verify-msg"></div>
+          <div class="nx-btn-row">
+            <button type="button" class="nx-btn nx-btn-accent" id="nx-acct-verify-check">I Verified - Check Again</button>
+            <button type="button" class="nx-btn" id="nx-acct-verify-resend">Resend Email</button>
+          </div>
+        </div>
         <div id="nx-acct-owner" style="display:none;">
           <p class="nx-h-note" style="margin-top:6px;">OWNER ACCOUNT - EVERYTHING IS UNLOCKED FOR YOU.</p>
           <div class="nx-btn-row">
@@ -1030,6 +1050,14 @@
         </div>
       </div>
       <p class="nx-h-note" style="margin-top:8px;">Key clicks, confirm blips, the radio squelch on a sent broadcast, one low sting when a warning alert lands. Synthesized on the spot - no audio files. Terminal Effects off silences the pack too.</p>
+      <hr class="nx-divider">
+      <div style="font-weight:700; letter-spacing:2px;">DASHBOARD DISPLAY</div>
+      <p class="nx-h-note" style="margin-top:4px;">What the dashboard headline shows. Readiness Level swaps the raw day count for your level, your progress to the next one, and the one step that gets you there. The exact count still lives in the breakdown under the headline and in your reports. Exact Days is the original number, Both shows the number with your level alongside it.</p>
+      <div class="nx-btn-row" id="nx-dash-display-picker">
+        <button type="button" class="nx-btn" data-dash-display="level">Readiness Level</button>
+        <button type="button" class="nx-btn" data-dash-display="days">Exact Days</button>
+        <button type="button" class="nx-btn" data-dash-display="both">Both</button>
+      </div>
       <hr class="nx-divider">
       <div style="font-weight:700; letter-spacing:2px;">THEME</div>
       <p class="nx-h-note" style="margin-top:4px;">Eleven variants - real materials, texture and posture, not just color. Applies instantly and sticks to this device.</p>

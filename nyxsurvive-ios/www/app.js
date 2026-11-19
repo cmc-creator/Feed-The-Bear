@@ -156,6 +156,21 @@
   function isOwner() {
     return !!AUTH_USER && isOwnerEmail(AUTH_USER.email, AUTH_USER.emailVerified);
   }
+  /* Email verification gate (2026-11-17, Connie's call after a
+   * user signed up with a typo'd address - gmail.con - and the
+   * account worked anyway): a signed-in account whose email is
+   * not verified gets NO account features - no cloud sync, no
+   * plan refresh, no checkout - until the address owner clicks
+   * the verification link Firebase emailed at sign-up. The app
+   * itself keeps working locally; accounts are never a hard
+   * gate on the survival tools. Google sign-ins arrive with
+   * their address verified by Google, and owner accounts are
+   * exempt so the owner can never be locked out of her own app. */
+  function emailGateApplies() {
+    if (!authUser || !AUTH_USER) return false;
+    if (isOwner()) return false;
+    return AUTH_USER.emailVerified !== true;
+  }
   function planTier() {
     var p = state.plan;
     return (p === "operator" || p === "lifetime") ? p : "free";
@@ -279,8 +294,8 @@
   /* ---------------- state ---------------- */
   function emptyState() {
     return {
-      version: 1, gear: [], stores: [], comms: [], crew: [], checklists: {},
-      settings: { homeLat: 33.4484, homeLng: -112.0740, callsign: "", effects: true, theme: "command", sounds: true },
+      version: 1, gear: [], stores: [], buyLater: [], comms: [], crew: [], checklists: {},
+      settings: { homeLat: 33.4484, homeLng: -112.0740, callsign: "", effects: true, theme: "command", sounds: true, dashDisplay: "level" },
       outbox: [],
       icsRoles: {},
       incident: null,
@@ -498,7 +513,20 @@
     if (typeof parsed.settings.effects !== "boolean") parsed.settings.effects = true;
     if (["command", "nightvision", "desert", "whiteout", "blackout", "brassworks", "neonglass", "fullmetal", "woodland", "bunker", "schematic"].indexOf(parsed.settings.theme) === -1) parsed.settings.theme = "command";
     if (typeof parsed.settings.sounds !== "boolean") parsed.settings.sounds = true;
+    if (["level", "days", "both"].indexOf(parsed.settings.dashDisplay) === -1) parsed.settings.dashDisplay = "level";
     if (!Array.isArray(parsed.outbox)) parsed.outbox = [];
+    parsed.buyLater = Array.isArray(parsed.buyLater)
+      ? parsed.buyLater.filter(function (b) { return b && typeof b.url === "string" && /^https:\/\//i.test(b.url); }).map(function (b) {
+          return {
+            id: typeof b.id === "string" && b.id ? b.id : uid(),
+            title: String(b.title || "Amazon item").slice(0, 120),
+            url: b.url.slice(0, 2000),
+            asin: typeof b.asin === "string" ? b.asin.slice(0, 10) : "",
+            added: typeof b.added === "string" ? b.added : "",
+            got: !!b.got
+          };
+        }).slice(0, 200)
+      : [];
     if (!parsed.icsRoles || typeof parsed.icsRoles !== "object") parsed.icsRoles = {};
     if (parsed.incident === undefined) parsed.incident = null;
     if (!Array.isArray(parsed.pastIncidents)) parsed.pastIncidents = [];
@@ -778,6 +806,40 @@
     };
   }
 
+  /* ---------------- readiness levels (calmer headline) ----------------
+     User feedback: the raw day count reads like a countdown and
+     stresses people out. The dashboard headline can instead show
+     a readiness LEVEL with progress toward the next one and the
+     single next step that gets there. The exact count never goes
+     away - it stays in the breakdown, the SITREP and the reports,
+     and Settings can put it back on the headline (dashDisplay). */
+  var READY_LEVELS = [
+    { at: 0, name: "GETTING STARTED" },
+    { at: 3, name: "WEEKEND READY" },
+    { at: 7, name: "WEEK READY" },
+    { at: 14, name: "TWO-WEEK READY" },
+    { at: 30, name: "MONTH READY" }
+  ];
+  function readinessLevel(d) {
+    if (!d || d.headline == null) return null;
+    var cur = READY_LEVELS[0], next = null;
+    for (var i = 0; i < READY_LEVELS.length; i++) {
+      if (d.headline >= READY_LEVELS[i].at) cur = READY_LEVELS[i];
+      else { next = READY_LEVELS[i]; break; }
+    }
+    var pct = next ? ((d.headline - cur.at) / (next.at - cur.at)) * 100 : 100;
+    var hint = "";
+    if (next) {
+      if (d.limiting === "water") hint = "ADD " + fmt((next.at * d.household * 1.0) - d.waterGal, 1) + " GAL WATER";
+      else hint = "ADD " + fmt((next.at * d.household * 2000) - d.foodKcal, 0) + " KCAL FOOD";
+    }
+    return { name: cur.name, next: next, pct: pct, hint: hint };
+  }
+  function dashDisplayMode() {
+    var m = state.settings && state.settings.dashDisplay;
+    return (m === "days" || m === "both") ? m : "level";
+  }
+
   /* ---------------- pets + cash (Ready.gov build) ----------------
      Pets eat too, but they are NOT people: pet readiness is its
      own line and never touches the human Days Ready headline.
@@ -819,10 +881,27 @@
 
   function renderDaysReady(fxA) {
     var d = daysReady();
-    if (fxA && d.headline != null) countUp($("nx-days-ready"), d.headline, 1);
-    else $("nx-days-ready").textContent = d.headline == null ? "--" : fmt(d.headline, 1);
-    if (fxA) segAnimate($("nx-days-seg"), d.headline == null ? 0 : (d.headline / 30) * 100, false);
-    else $("nx-days-seg").innerHTML = segHtml(d.headline == null ? 0 : (d.headline / 30) * 100, false);
+    var mode = dashDisplayMode();
+    var lvl = readinessLevel(d);
+    var big = $("nx-days-ready"), unit = $("nx-days-unit"), label = $("nx-days-label");
+    if (mode === "level" && lvl) {
+      big.textContent = lvl.name;
+      big.style.fontSize = "clamp(30px, 8.5vw, 46px)";
+      big.style.letterSpacing = "1px";
+      if (unit) unit.style.display = "none";
+      if (label) label.textContent = "Readiness Level // Household Sustainment";
+      if (fxA) segAnimate($("nx-days-seg"), lvl.pct, false);
+      else $("nx-days-seg").innerHTML = segHtml(lvl.pct, false);
+    } else {
+      if (fxA && d.headline != null) countUp(big, d.headline, 1);
+      else big.textContent = d.headline == null ? "--" : fmt(d.headline, 1);
+      big.style.fontSize = "clamp(84px, 26vw, 104px)";
+      big.style.letterSpacing = "";
+      if (unit) unit.style.display = "";
+      if (label) label.textContent = "Days Ready // Household Sustainment";
+      if (fxA) segAnimate($("nx-days-seg"), d.headline == null ? 0 : (d.headline / 30) * 100, false);
+      else $("nx-days-seg").innerHTML = segHtml(d.headline == null ? 0 : (d.headline / 30) * 100, false);
+    }
     var wLine = "WATER <b>" + (d.waterDays == null ? "--" : fmt(d.waterDays, 1) + " DAYS") + "</b>" +
       (d.waterDays == null ? " - NO WATER STORES" : " (" + fmt(d.waterGal, 1) + " GAL)") +
       (d.waterExpired ? " <span class=\"nx-heavy\">// " + d.waterExpired + " STORE" + (d.waterExpired > 1 ? "S" : "") + " EXPIRED - NOT COUNTED</span>" : "");
@@ -840,9 +919,19 @@
       : "";
     var cLine = "<br>CASH ON HAND <b>$" + fmt(cashTotal(), 0) + "</b>";
     $("nx-days-breakdown").innerHTML = wLine + "<br>" + fLine + pLine + cLine;
-    $("nx-days-gap").innerHTML = d.headline == null
-      ? "ADD WATER AND FOOD STORES IN THE ROTATE TAB TO COMPUTE YOUR NUMBER."
-      : "GAP // <b>" + esc(d.gap) + "</b> // WEAKEST LINK: <b>" + esc((d.limiting || "").toUpperCase()) + "</b>";
+    if (d.headline == null) {
+      $("nx-days-gap").innerHTML = mode === "level"
+        ? "ADD WATER AND FOOD STORES IN THE ROTATE TAB TO SET YOUR LEVEL."
+        : "ADD WATER AND FOOD STORES IN THE ROTATE TAB TO COMPUTE YOUR NUMBER.";
+    } else if (mode === "level" && lvl) {
+      $("nx-days-gap").innerHTML = lvl.next
+        ? "NEXT LEVEL // <b>" + esc(lvl.next.name) + "</b> - " + esc(lvl.hint) + " // WEAKEST LINK: <b>" + esc((d.limiting || "").toUpperCase()) + "</b>"
+        : "TOP LEVEL // <b>MONTH READY</b> - ALL MILESTONES MET // WEAKEST LINK: <b>" + esc((d.limiting || "").toUpperCase()) + "</b>";
+    } else if (mode === "both" && lvl) {
+      $("nx-days-gap").innerHTML = "LEVEL // <b>" + esc(lvl.name) + "</b> // GAP // <b>" + esc(d.gap) + "</b> // WEAKEST LINK: <b>" + esc((d.limiting || "").toUpperCase()) + "</b>";
+    } else {
+      $("nx-days-gap").innerHTML = "GAP // <b>" + esc(d.gap) + "</b> // WEAKEST LINK: <b>" + esc((d.limiting || "").toUpperCase()) + "</b>";
+    }
     var crewSet = state.crew.some(function (c) { return c.role === "Adult" || c.role === "Child"; });
     $("nx-days-household").textContent = "HOUSEHOLD: " + d.household + (crewSet ? " PERSONS" : " (SOLO - NO CREW SET)") +
       " // WATER AT 1.0 GAL/PERSON/DAY // FOOD AT 2,000 KCAL/PERSON/DAY" +
@@ -3462,7 +3551,7 @@
      On iOS the buttons carry .nx-buy-ui and hide with every other
      buy surface, and openShop refuses outright (Guideline 3.1.1,
      same rule as checkout). */
-  var NX_SHOP_TAG = ""; // Connie's Amazon Associates tag goes here when she has one; empty = plain links.
+  var NX_SHOP_TAG = "nyxcollective-20"; // Connie's Amazon Associates tag (set 2026-11-18); empty = plain links.
   var SHOP_CATALOG = {
     "water-storage":    { label: "Water storage containers", query: "WaterBrick 3 gallon water storage" },
     "water-barrel":     { label: "55 gallon water barrel", query: "55 gallon water storage barrel" },
@@ -3652,6 +3741,7 @@
       if (lines.some(function (l) { return !!l.shopKey; })) h += shopDisclosureHtml();
     }
     wrap.innerHTML = h;
+    renderBuyLater();
   }
 
   function bindResupply() {
@@ -3695,6 +3785,98 @@
       saveState();
       renderResupply();
       renderDashboard();
+    });
+  }
+
+  /* ---------------- buy later: the Amazon parking lot ----------------
+     Connie's ask (2026-11-18): people find gear on Amazon before
+     they can afford it - let them park the link in the app and
+     buy it when the money is right. Amazon offers no wish-list
+     connection, so the link itself is the import: paste any
+     Amazon product link and it becomes a saved card with a BUY
+     button (carrying the Associates tag once NX_SHOP_TAG is set)
+     and a GOT IT tick. Lives in state.buyLater, so it syncs and
+     exports with everything else. */
+  function parseAmazonLink(raw) {
+    var url = String(raw || "").trim();
+    if (!url) return null;
+    if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+    var host = "";
+    try { host = new URL(url).hostname.toLowerCase(); } catch (e) { return null; }
+    if (!/(^|\.)amazon\.[a-z.]+$/.test(host) && host !== "amzn.to" && host !== "a.co") return null;
+    var asin = "";
+    var am = url.match(/\/(?:dp|gp\/product|gp\/aw\/d)\/([A-Z0-9]{10})/i);
+    if (am) asin = am[1].toUpperCase();
+    var title = "";
+    var slug = url.match(/amazon\.[a-z.]+\/([^\/\?#]+)\/(?:dp|gp\/)/i);
+    if (slug) {
+      try { title = decodeURIComponent(slug[1]).replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim(); } catch (e) { title = ""; }
+    }
+    return { url: url, asin: asin, title: title };
+  }
+  function findBuyLater(id) {
+    return (Array.isArray(state.buyLater) ? state.buyLater : []).filter(function (b) { return b.id === id; })[0] || null;
+  }
+  function buyLaterOpenUrl(item) {
+    var url = item.url;
+    if (NX_SHOP_TAG && !/[?&]tag=/.test(url)) url += (url.indexOf("?") === -1 ? "?" : "&") + "tag=" + encodeURIComponent(NX_SHOP_TAG);
+    return url;
+  }
+  function renderBuyLater() {
+    var wrap = $("nx-buylater-wrap");
+    if (!wrap) return;
+    var items = Array.isArray(state.buyLater) ? state.buyLater : [];
+    if (!items.length) {
+      wrap.innerHTML = "<p class=\"nx-kv\" style=\"margin:8px 0 0 0;\">NOTHING PARKED YET. FIND GEAR ON AMAZON, COPY THE LINK, SAVE IT HERE FOR WHEN THE MONEY IS RIGHT.</p>";
+      return;
+    }
+    var h = items.map(function (b) {
+      var btns = "<button type=\"button\" class=\"nx-btn nx-btn-small nx-shop-btn nx-buy-ui\" data-buylater-buy=\"" + esc(b.id) + "\">BUY</button>" +
+        "<button type=\"button\" class=\"nx-btn nx-btn-small\" data-buylater-got=\"" + esc(b.id) + "\">" + (b.got ? "UNDO" : "GOT IT") + "</button>" +
+        "<button type=\"button\" class=\"nx-btn nx-btn-small\" data-buylater-del=\"" + esc(b.id) + "\">REMOVE</button>";
+      return "<div class=\"nx-check-item" + (b.got ? " nx-done" : "") + "\"><span class=\"nx-check-text\">" + esc(b.title) + "</span><span class=\"nx-check-btns\">" + btns + "</span></div>";
+    }).join("");
+    wrap.innerHTML = h + shopDisclosureHtml();
+  }
+  function bindBuyLater() {
+    var form = $("nx-buylater-form");
+    if (form) form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var msg = $("nx-buylater-msg");
+      var parsed = parseAmazonLink($("nx-buylater-url").value);
+      if (!parsed) { showMsg(msg, "THAT DOES NOT LOOK LIKE AN AMAZON LINK.", "err"); return; }
+      var items = Array.isArray(state.buyLater) ? state.buyLater : (state.buyLater = []);
+      var dupe = items.some(function (b) { return (parsed.asin && b.asin === parsed.asin) || b.url === parsed.url; });
+      if (dupe) { showMsg(msg, "ALREADY ON YOUR LIST.", "err"); return; }
+      var name = $("nx-buylater-name").value.trim();
+      var title = name || parsed.title || (parsed.asin ? "Amazon item " + parsed.asin : "Amazon item");
+      items.unshift({ id: uid(), title: title.slice(0, 120), url: parsed.url, asin: parsed.asin, added: todayKeyLocal(), got: false });
+      saveState();
+      form.reset();
+      showMsg(msg, "SAVED. IT WAITS HERE UNTIL YOU ARE READY.", "good");
+      sfxConfirm();
+      renderBuyLater();
+    });
+    document.addEventListener("click", function (ev) {
+      var buy = ev.target.closest("[data-buylater-buy]");
+      if (buy) {
+        ev.preventDefault();
+        var it = findBuyLater(buy.getAttribute("data-buylater-buy"));
+        if (it && !IS_IOS_APP) window.open(buyLaterOpenUrl(it), "_blank", "noopener");
+        return;
+      }
+      var got = ev.target.closest("[data-buylater-got]");
+      if (got) {
+        var g = findBuyLater(got.getAttribute("data-buylater-got"));
+        if (g) { g.got = !g.got; if (g.got) sfxConfirm(); saveState(); renderBuyLater(); }
+        return;
+      }
+      var del = ev.target.closest("[data-buylater-del]");
+      if (del) {
+        state.buyLater = (Array.isArray(state.buyLater) ? state.buyLater : []).filter(function (b) { return b.id !== del.getAttribute("data-buylater-del"); });
+        saveState();
+        renderBuyLater();
+      }
     });
   }
 
@@ -5154,8 +5336,18 @@
       $("nx-sounds-state").textContent = !sOn ? "OFF"
         : (state.settings.effects === false ? "ON // HELD OFF BY TERMINAL EFFECTS" : "ON");
     }
+    renderDashDisplay();
     renderThemePicker();
     renderHomeSystems();
+  }
+
+  function renderDashDisplay() {
+    var wrap = $("nx-dash-display-picker");
+    if (!wrap) return;
+    var mode = dashDisplayMode();
+    wrap.querySelectorAll("[data-dash-display]").forEach(function (b) {
+      b.classList.toggle("nx-btn-accent", b.getAttribute("data-dash-display") === mode);
+    });
   }
 
   /* Home Systems (Ready.gov build): the shutoff location
@@ -5211,6 +5403,17 @@
     if (picker) picker.addEventListener("click", function (ev) {
       var b = ev.target.closest("[data-theme-pick]");
       if (b) setTheme(b.getAttribute("data-theme-pick"));
+    });
+
+    var dashPicker = $("nx-dash-display-picker");
+    if (dashPicker) dashPicker.addEventListener("click", function (ev) {
+      var b = ev.target.closest("[data-dash-display]");
+      if (!b) return;
+      state.settings.dashDisplay = b.getAttribute("data-dash-display");
+      saveState();
+      renderSettings();
+      renderDaysReady(false);
+      sfxConfirm();
     });
 
     $("nx-settings-form").addEventListener("submit", function (ev) {
@@ -6130,6 +6333,7 @@
   async function syncToCloud() {
     var user = authUser;
     if (!user) return;
+    if (emailGateApplies()) { syncState = "local"; return; }
     syncState = "syncing";
     renderAccount();
     try {
@@ -6247,6 +6451,7 @@
   async function refreshPlanStatus() {
     var user = authUser;
     if (!user) return;
+    if (emailGateApplies()) return;
     var session = authSession;
     if (isOwner()) {
       // Owner unlock is derived from the verified email at check
@@ -6290,6 +6495,22 @@
     var session = ++authSession;
     syncState = "syncing";
     renderAccount();
+    if (emailGateApplies()) {
+      /* Verification gate: no cloud touch at all until the
+       * address is proven - no save claim, no sync, no plan
+       * refresh. Local state stays exactly as it was, the app
+       * keeps working on this device, and the verify wall in
+       * the account panel carries the next step. The welcome
+       * still settles: the user DID sign in. */
+      syncState = "local";
+      renderAccount();
+      renderAll();
+      welcomeSettled = true;
+      markWelcomeSeen();
+      closeWelcome();
+      runDeferredCheckin();
+      return;
+    }
     /* Whose save is on this device? A save left behind by a
      * DIFFERENT account must never bleed into this one: set it
      * aside (state AND its vault blob) and start clean. An
@@ -6364,10 +6585,14 @@
     var fb = await ensureFirebase();
     if (!fb) throw new Error("Accounts are not switched on yet.");
     var cred = await nxAuth().createUserWithEmailAndPassword(email, password);
-    /* Hygiene: ask Firebase to verify the new email address.
-     * Fire-and-forget - nothing in the app waits on verification
-     * (see isOwnerEmail), and a failed send must never fail the
-     * sign-up, so errors are swallowed on purpose. */
+    /* Ask Firebase to verify the new email address. Since
+     * 2026-11-17 the account features stay gated until the
+     * address is verified (see emailGateApplies): a typo'd
+     * address (gmail.con) otherwise sails through sign-up and
+     * the account silently works with an email that does not
+     * exist. A failed send must never fail the sign-up itself,
+     * so errors are swallowed on purpose; the account panel's
+     * Resend button is the recovery. */
     try {
       if (cred.user && typeof cred.user.sendEmailVerification === "function") {
         cred.user.sendEmailVerification().catch(function () {});
@@ -6506,6 +6731,13 @@
       showMsg($("nx-acct-note"), "SIGN IN FIRST - YOUR TIER ATTACHES TO YOUR ACCOUNT.", "err");
       var panel = $("nx-account-panel");
       if (panel && panel.scrollIntoView) panel.scrollIntoView();
+      return;
+    }
+    if (emailGateApplies()) {
+      showView("system");
+      showMsg($("nx-plan-msg"), "VERIFY YOUR EMAIL FIRST - YOUR TIER ATTACHES TO YOUR ACCOUNT. THE ACCOUNT PANEL ABOVE HAS THE RESEND AND CHECK BUTTONS.", "err");
+      var apanel = $("nx-account-panel");
+      if (apanel && apanel.scrollIntoView) apanel.scrollIntoView();
       return;
     }
     var msg = $("nx-plan-msg");
@@ -6663,6 +6895,15 @@
       if (sy) sy.innerHTML = "SYNC: <b>" + esc(syncStatusText()) + "</b>";
       var ownerBox = $("nx-acct-owner");
       if (ownerBox) ownerBox.style.display = isOwner() ? "" : "none";
+      var verifyBox = $("nx-acct-verify");
+      if (verifyBox) {
+        var gated = emailGateApplies();
+        verifyBox.style.display = gated ? "" : "none";
+        if (gated) {
+          var ve = $("nx-acct-verify-email");
+          if (ve) ve.textContent = authUser.email || "";
+        }
+      }
     }
     // The header chip renders from here so it can never drift
     // out of sync with the panel: accent SIGN IN while signed
@@ -6765,6 +7006,29 @@
     });
     var signoutBtn = $("nx-acct-signout");
     if (signoutBtn) signoutBtn.addEventListener("click", function () { signOutUser(); });
+    var verifyResendBtn = $("nx-acct-verify-resend");
+    if (verifyResendBtn) verifyResendBtn.addEventListener("click", async function () {
+      if (!authUser) return;
+      try {
+        await authUser.sendEmailVerification();
+        showMsg($("nx-acct-verify-msg"), "VERIFICATION EMAIL SENT TO " + (authUser.email || "") + " - OPEN THE LINK IN IT, THEN TAP CHECK AGAIN.", "good");
+      } catch (e) {
+        showMsg($("nx-acct-verify-msg"), "THAT SEND DID NOT GO OUT - WAIT A MINUTE AND TRY AGAIN.", "err");
+      }
+    });
+    var verifyCheckBtn = $("nx-acct-verify-check");
+    if (verifyCheckBtn) verifyCheckBtn.addEventListener("click", async function () {
+      if (!authUser) return;
+      try { await authUser.reload(); } catch (e) {}
+      if (authUser && authUser.emailVerified) {
+        // The gate lifts inside handleSignedIn, which re-reads
+        // emailVerified and runs the full sign-in flow (cloud
+        // sync + plan refresh) that the gate held back.
+        handleSignedIn(authUser);
+      } else {
+        showMsg($("nx-acct-verify-msg"), "NOT VERIFIED YET - THE LINK IN THE EMAIL HAS TO BE OPENED FIRST. CHECK THE SPAM FOLDER TOO.", "err");
+      }
+    });
   }
   function initAuth() {
     renderAccount();
@@ -7409,6 +7673,7 @@
     bindCompass();
     bindLists();
     bindResupply();
+    bindBuyLater();
     bindCheckin();
     bindSitrep();
     bindTour();
@@ -7489,6 +7754,13 @@
       open: openShop,
       catalog: SHOP_CATALOG,
       disclosure: shopDisclosureText
+    },
+    // Buy Later surface for the suites: the Amazon link parser,
+    // the tagged open URL and the saved list.
+    buyLater: {
+      parse: parseAmazonLink,
+      openUrl: buyLaterOpenUrl,
+      list: function () { return state.buyLater; }
     },
     resupply: {
       lines: resupplyLines,
