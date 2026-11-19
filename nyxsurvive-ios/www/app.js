@@ -3742,6 +3742,7 @@
     }
     wrap.innerHTML = h;
     renderBuyLater();
+    renderPicks();
   }
 
   function bindResupply() {
@@ -3876,8 +3877,158 @@
         state.buyLater = (Array.isArray(state.buyLater) ? state.buyLater : []).filter(function (b) { return b.id !== del.getAttribute("data-buylater-del"); });
         saveState();
         renderBuyLater();
+        return;
+      }
+      var pbuy = ev.target.closest("[data-pick-buy]");
+      if (pbuy) {
+        ev.preventDefault();
+        var pk = NX_PICKS[Number(pbuy.getAttribute("data-pick-buy"))];
+        if (pk && !IS_IOS_APP) window.open(buyLaterOpenUrl(pk), "_blank", "noopener");
+        return;
+      }
+      var psave = ev.target.closest("[data-pick-save]");
+      if (psave) {
+        var sp = NX_PICKS[Number(psave.getAttribute("data-pick-save"))];
+        if (sp) {
+          var parsed = parseAmazonLink(sp.url);
+          var items = Array.isArray(state.buyLater) ? state.buyLater : (state.buyLater = []);
+          var dupe = !!parsed && items.some(function (b) { return (parsed.asin && b.asin === parsed.asin) || b.url === parsed.url; });
+          var msg = $("nx-buylater-msg");
+          if (dupe) { showMsg(msg, "ALREADY ON YOUR LIST.", "err"); }
+          else {
+            items.unshift({ id: uid(), title: sp.t.slice(0, 120), url: sp.url, asin: parsed ? parsed.asin : "", added: todayKeyLocal(), got: false });
+            saveState();
+            showMsg(msg, "SAVED TO YOUR BUY LATER LIST.", "good");
+            sfxConfirm();
+            renderBuyLater();
+          }
+        }
       }
     });
+  }
+
+  /* ---------------- operator picks: the curated gear list ----------------
+     Connie's hand-built favorites (rounds 1-7, 2026-11-18), shipped
+     inside the app so every user browses the same list: BUY opens
+     the exact product on Amazon with the Associates tag riding
+     along (buyLaterOpenUrl appends it), SAVE parks the item on
+     the user's own Buy Later list. Static data - no state, no
+     sync. On iOS the BUY buttons hide with every other buy
+     surface (nx-buy-ui) and the handler refuses outright. */
+  var NX_PICKS = [
+    { c: "WATER", t: "LifeStraw, 5-pack", url: "https://www.amazon.com/dp/B087D7K48X" },
+    { c: "WATER", t: "WaterBOB bathtub bladder, 100 gal", url: "https://www.amazon.com/dp/B001AXLUX2" },
+    { c: "WATER", t: "Sawyer MINI filter", url: "https://www.amazon.com/dp/B00FA2RLX2" },
+    { c: "WATER", t: "Datrex water pouches, 18-pack", url: "https://www.amazon.com/dp/B0134DAXJ2" },
+    { c: "FOOD SUPPLY", t: "Augason Farms 30-day bucket, 200 servings", url: "https://www.amazon.com/dp/B071KPGLBK" },
+    { c: "FOOD SUPPLY", t: "Mountain House Expedition Bucket, 30 servings", url: "https://www.amazon.com/dp/B082WZZ6SN" },
+    { c: "POWER & LIGHT", t: "Luci Outdoor 2.0 solar lantern", url: "https://www.amazon.com/dp/B074NQLRTF" },
+    { c: "POWER & LIGHT", t: "Black Diamond Spot 400 headlamp", url: "https://www.amazon.com/dp/B09NQK2581" },
+    { c: "COMMS", t: "Midland GXT1000VP4 GMRS pair", url: "https://www.amazon.com/dp/B001WMFYH4" },
+    { c: "COMMS", t: "Baofeng UV-5R", url: "https://www.amazon.com/dp/B007H4VT7A" },
+    { c: "SHELTER & WARMTH", t: "SOL Escape Bivvy with hood", url: "https://www.amazon.com/dp/B0CYTKW4JH" },
+    { c: "SHELTER & WARMTH", t: "Swiss Safe mylar blankets, 10-pack", url: "https://www.amazon.com/dp/B08MHGKMBH" },
+    { c: "SHELTER & WARMTH", t: "HotHands hand and toe warmers combo", url: "https://www.amazon.com/dp/B06ZYW6HDK" },
+    { c: "MEDICAL", t: "CAT tourniquet Gen 7", url: "https://www.amazon.com/dp/B07CP6Z1C4" },
+    { c: "MEDICAL", t: "3M Aura 9205+ N95, 10-pack", url: "https://www.amazon.com/dp/B095DVPTCT" },
+    { c: "TOOLS & FIRE", t: "Morakniv Companion", url: "https://www.amazon.com/dp/B005EOJAKI" },
+    { c: "TOOLS & FIRE", t: "Bushcraft Survival ferro rod kit", url: "https://www.amazon.com/dp/B08G1Z91MH" },
+    { c: "VEHICLE", t: "NOCO Boost GB40 jump starter", url: "https://www.amazon.com/dp/B015TKUPIC" },
+    { c: "VEHICLE", t: "VIAIR 88P tire inflator", url: "https://www.amazon.com/dp/B005ASY23I" },
+    { c: "VEHICLE", t: "resqme keychain escape tool", url: "https://www.amazon.com/dp/B000IE0EZO" },
+    { c: "VEHICLE", t: "SOG XL Entrenching Tool folding shovel", url: "https://www.amazon.com/dp/B0DVJBGF1F" },
+    { c: "MEDICAL", t: "Adventure Medical Kits Trauma Pak with QuikClot", url: "https://www.amazon.com/dp/B003BS2PW4" },
+    { c: "MEDICAL", t: "QuikClot Advanced Clotting Gauze", url: "https://www.amazon.com/dp/B0CYDY6ZC5" },
+    { c: "MEDICAL", t: "Israeli emergency bandage 6 inch, 2-pack", url: "https://www.amazon.com/dp/B01M3R6A6J" },
+    { c: "MEDICAL", t: "HyFin Vent Chest Seal twin pack", url: "https://www.amazon.com/dp/B00KQS2NGK" },
+    { c: "SHELTER & SLEEP", t: "Go Time Gear Life Bivy", url: "https://www.amazon.com/dp/B09WSN3DTX" },
+    { c: "SHELTER & SLEEP", t: "Arcturus military wool blanket", url: "https://www.amazon.com/dp/B01IJWUYLK" },
+    { c: "SHELTER & SLEEP", t: "Therm-a-Rest Z Lite Sol sleeping pad", url: "https://www.amazon.com/dp/B005I6R0WC" },
+    { c: "SHELTER & SLEEP", t: "Coleman Sundome 4-person tent", url: "https://www.amazon.com/dp/B09HN1W5K9" },
+    { c: "HOME & HEAT", t: "Mr. Heater Buddy 9,000 BTU propane heater", url: "https://www.amazon.com/dp/B002G51BZU" },
+    { c: "HOME & HEAT", t: "Kidde smoke and CO detector, AA battery", url: "https://www.amazon.com/dp/B0BZT85TLG" },
+    { c: "WATER", t: "Sawyer Squeeze filter SP129", url: "https://www.amazon.com/dp/B00B1OSU4W" },
+    { c: "TOOLS & FIRE", t: "Leatherman Wave+ multitool", url: "https://www.amazon.com/dp/B079MJ6MLV" },
+    { c: "TOOLS & FIRE", t: "Fenix PD36R Pro flashlight, 2800 lumen", url: "https://www.amazon.com/dp/B0BGMZ4YNC" },
+    { c: "KIDS & GRANDBABY", t: "Pedialyte electrolyte powder, 24-pack variety", url: "https://www.amazon.com/dp/B01JO4KWAU" },
+    { c: "KIDS & GRANDBABY", t: "Earth's Best organic baby food pouches, 12-pack", url: "https://www.amazon.com/Earths-Best-Organic-Banana-Raspberry/dp/B0083ZZG2G" },
+    { c: "KIDS & GRANDBABY", t: "Little Remedies New Baby Essentials Kit", url: "https://www.amazon.com/dp/B075G6XMSF" },
+    { c: "KIDS & GRANDBABY", t: "Foxelli USB-C rechargeable headlamp", url: "https://www.amazon.com/dp/B07B51FWLP" },
+    { c: "KIDS & GRANDBABY", t: "Dysaim dinosaur headlamp for kids", url: "https://www.amazon.com/dp/B0CYGJRB9T" },
+    { c: "PETS", t: "Vittles Vault airtight pet food container, 15 lb", url: "https://www.amazon.com/dp/B000A6UF4U" },
+    { c: "PETS", t: "EVERLIT Pet Medic first aid kit, 95 pc", url: "https://www.amazon.com/dp/B0DDXFZC4B" },
+    { c: "PETS", t: "SLSON collapsible travel bowls with lids, 2-pack", url: "https://www.amazon.com/dp/B0DXN7X5TS" },
+    { c: "PETS", t: "Amazon Basics soft-sided pet carrier, airline approved", url: "https://www.amazon.com/dp/B00QHC0050" },
+    { c: "PETS", t: "Critter Concepts 5-gallon gravity pet water dispenser", url: "https://www.amazon.com/dp/B00HZSOMPO" },
+    { c: "HOME FOOD STORAGE", t: "Mylar bags 1-gallon kit, 120 bags + oxygen absorbers", url: "https://www.amazon.com/dp/B09XN6TQLY" },
+    { c: "HOME FOOD STORAGE", t: "5-gallon mylar bags, 15-pack + 2000cc absorbers", url: "https://www.amazon.com/dp/B09XN6MQWP" },
+    { c: "HOME FOOD STORAGE", t: "Gamma Seal lid", url: "https://www.amazon.com/dp/B007KAY4S2" },
+    { c: "HOME FOOD STORAGE", t: "FoodSaver FM2100 vacuum sealer", url: "https://www.amazon.com/dp/B00LUGK5QW" },
+    { c: "HOME FOOD STORAGE", t: "Ball wide mouth mason jars 32 oz, 12-pack", url: "https://www.amazon.com/dp/B0DVLPR6CT" },
+    { c: "HOME FOOD STORAGE", t: "Freeze-dried strawberries, 1 lb resealable bucket", url: "https://www.amazon.com/dp/B0F21JXFS4" },
+    { c: "HOME FOOD STORAGE", t: "Augason Farms Country Fresh instant dry milk pouch", url: "https://www.amazon.com/dp/B0B44L28LN" },
+    { c: "HOME FOOD STORAGE", t: "Augason Farms Butter Powder #10 can", url: "https://www.amazon.com/dp/B0096I6XSU" },
+    { c: "HOME FOOD STORAGE", t: "Bucket lid opener wrench, aluminum", url: "https://www.amazon.com/dp/B0D1D7SYVB" },
+    { c: "VEHICLE", t: "Wykodra tire plug repair kit, 36 pc", url: "https://www.amazon.com/dp/B0FS21YHWT" },
+    { c: "VEHICLE", t: "METOWARE tow strap kit 3\" x 20 ft with D-ring shackles", url: "https://www.amazon.com/dp/B0BRN2FNB7" },
+    { c: "VEHICLE", t: "First Alert AUTO5 car fire extinguisher", url: "https://www.amazon.com/dp/B000P0DPGQ" },
+    { c: "VEHICLE", t: "XOOL warning triangle kit with vests and gloves", url: "https://www.amazon.com/dp/B07DCPWX99" },
+    { c: "VEHICLE", t: "TOPDC jumper cables, 4 gauge x 20 ft", url: "https://www.amazon.com/dp/B073VHBRFC" },
+    { c: "VEHICLE", t: "Foldable windshield sun shade, universal fit", url: "https://www.amazon.com/dp/B0GS8KL2PJ" },
+    { c: "ARIZONA HEAT", t: "Liquid I.V. Hydration Multiplier, lemon lime, 16 ct", url: "https://www.amazon.com/dp/B01IT9NLHW" },
+    { c: "ARIZONA HEAT", t: "Cooling towels, 4-pack", url: "https://www.amazon.com/dp/B0CBPBZGQV" },
+    { c: "ARIZONA HEAT", t: "RUNTOP rechargeable camping fan with LED light", url: "https://www.amazon.com/dp/B0BWJL49SL" },
+    { c: "ARIZONA HEAT", t: "BUZIO 64 oz insulated bottle, cold 48 hrs", url: "https://www.amazon.com/dp/B07SMGMRC1" },
+    { c: "MORALE & FUN", t: "Hoyle waterproof playing cards", url: "https://www.amazon.com/dp/B000J3Z7TC" },
+    { c: "MORALE & FUN", t: "Exploding Kittens, collectible tin edition", url: "https://www.amazon.com/dp/B0D9C251D4" },
+    { c: "MORALE & FUN", t: "JBL Flip 6 waterproof Bluetooth speaker", url: "https://www.amazon.com/dp/B09GJZKQ3K" },
+    { c: "MORALE & FUN", t: "Wise Owl Outfitters double hammock with tree straps", url: "https://www.amazon.com/dp/B01E3EHRVS" },
+    { c: "KITCHEN & COFFEE", t: "Lodge 12-inch cast iron skillet, pre-seasoned", url: "https://www.amazon.com/dp/B00006JSUB" },
+    { c: "KITCHEN & COFFEE", t: "Instant Pot Duo 7-in-1, 8 quart, with glass lid", url: "https://www.amazon.com/dp/B08F31T7MH" },
+    { c: "KITCHEN & COFFEE", t: "Ninja Air Fryer Pro 5-in-1, 5 quart", url: "https://www.amazon.com/dp/B0DW4KG8VM" },
+    { c: "KITCHEN & COFFEE", t: "ThermoPro TP03 instant read thermometer", url: "https://www.amazon.com/dp/B07Y51PCW7" },
+    { c: "KITCHEN & COFFEE", t: "Swing-A-Way portable can opener", url: "https://www.amazon.com/dp/B001CDEFK0" },
+    { c: "KITCHEN & COFFEE", t: "ESPRO P7 stainless French press, 32 oz", url: "https://www.amazon.com/dp/B011WTMV1I" },
+    { c: "KITCHEN & COFFEE", t: "Bialetti Moka Express, 6 cup", url: "https://www.amazon.com/dp/B00004RFRU" },
+    { c: "KITCHEN & COFFEE", t: "Bonavita 1L digital gooseneck kettle", url: "https://www.amazon.com/dp/B005YR0F40" },
+    { c: "KIDS & GRANDBABY", t: "One Fire rechargeable night light, 10 colors", url: "https://www.amazon.com/dp/B09ZX4TDTZ" },
+    { c: "KIDS & GRANDBABY", t: "iFunLong glow in the dark stars, 200 pc + moons", url: "https://www.amazon.com/dp/B0F174GRBC" },
+    { c: "KIDS & GRANDBABY", t: "Scotamalone kids binoculars, shock proof", url: "https://www.amazon.com/dp/B08QTQCQGR" },
+    { c: "KIDS & GRANDBABY", t: "Fimibuke kids insulated bottle 18 oz, 2-pack", url: "https://www.amazon.com/dp/B0DYJCJND7" },
+    { c: "FOOD SUPPLY", t: "Survival Garden Seeds home garden 30-pack, 18,500+ heirloom seeds", url: "https://www.amazon.com/dp/B08TB3T43F" },
+    { c: "POWER & LIGHT", t: "MPOWERD Luci Original inflatable solar lantern", url: "https://www.amazon.com/dp/B00DQ1RDWS" },
+    { c: "POWER & LIGHT", t: "BigBlue 28W foldable solar panel charger", url: "https://www.amazon.com/dp/B01EXWCPLC" },
+    { c: "GEAR & HOME DEFENSE", t: "Amazon Basics 550 paracord, 100 ft", url: "https://www.amazon.com/dp/B08HNZB3PZ" },
+    { c: "GEAR & HOME DEFENSE", t: "Darn Tough merino wool socks, 6-pack", url: "https://www.amazon.com/dp/B013WKUXP6" },
+    { c: "GEAR & HOME DEFENSE", t: "HotHands hand warmers, bulk 50 pairs", url: "https://www.amazon.com/dp/B0CM4H724R" },
+    { c: "GEAR & HOME DEFENSE", t: "Master Lock door security bar, 2-pack", url: "https://www.amazon.com/dp/B0BJ12T27J" },
+    { c: "GEAR & HOME DEFENSE", t: "FunOwlet fireproof document bags, 3-pack", url: "https://www.amazon.com/dp/B08PBCP6PG" },
+    { c: "GEAR & HOME DEFENSE", t: "SAS Survival Handbook, 3rd edition paperback", url: "https://www.amazon.com/dp/0062378074" },
+    { c: "SANITATION", t: "Camco bucket toilet seat with lid", url: "https://www.amazon.com/dp/B07NM39V51" },
+    { c: "SANITATION", t: "Solar shower bag, 5 gallon, temp display", url: "https://www.amazon.com/dp/B0FB3PP17Z" },
+    { c: "SANITATION", t: "MedPride nitrile exam gloves, 100 count", url: "https://www.amazon.com/dp/B00GS8VGP6" },
+    { c: "HEALTH & HOME", t: "3M 8210 N95 respirators, 20-pack", url: "https://www.amazon.com/dp/B008MCUZZS" },
+    { c: "HEALTH & HOME", t: "Where There Is No Doctor", url: "https://www.amazon.com/dp/0942364155" },
+    { c: "HEALTH & HOME", t: "Battery Daddy organizer with tester, holds 150", url: "https://www.amazon.com/dp/B0B4576YTZ" },
+    { c: "SKILLS & COMFORT", t: "Ball Complete Book of Home Preserving", url: "https://www.amazon.com/dp/0778801314" },
+    { c: "SKILLS & COMFORT", t: "ESTINGO heated throw blanket 50x60", url: "https://www.amazon.com/dp/B0FCLRY37L" }
+  ];
+  function renderPicks() {
+    var wrap = $("nx-picks-wrap");
+    if (!wrap) return;
+    var cats = [];
+    NX_PICKS.forEach(function (p) { if (cats.indexOf(p.c) < 0) cats.push(p.c); });
+    var h = cats.map(function (c) {
+      var rows = NX_PICKS.map(function (p, i) { return { p: p, i: i }; })
+        .filter(function (x) { return x.p.c === c; })
+        .map(function (x) {
+          return "<div class=\"nx-check-item\"><span class=\"nx-check-text\">" + esc(x.p.t) + "</span><span class=\"nx-check-btns\">" +
+            "<button type=\"button\" class=\"nx-btn nx-btn-small nx-shop-btn nx-buy-ui\" data-pick-buy=\"" + x.i + "\">BUY</button>" +
+            "<button type=\"button\" class=\"nx-btn nx-btn-small\" data-pick-save=\"" + x.i + "\">SAVE</button></span></div>";
+        }).join("");
+      return "<p class=\"nx-kv\" style=\"margin:16px 0 4px 0;\">" + esc(c) + "</p>" + rows;
+    }).join("");
+    wrap.innerHTML = h + shopDisclosureHtml();
   }
 
   /* ---------------- readiness check-in + first orders ----------------
