@@ -3506,6 +3506,11 @@ async function refreshPlaceInfo (r) {
       if (info.website && !r.website) r.website = info.website;
       if (info.mapsUrl) r.mapsUrl = info.mapsUrl;
       if (info.placeId) r.placeId = info.placeId;
+      // Google is the source of truth for "gone for good": flag the spot so
+      // it stops being suggested, and clear a Google-set flag if the place
+      // reopens. A flag the user set by hand is never cleared here.
+      if (info.businessStatus === 'CLOSED_PERMANENTLY') { r.permanentlyClosed = true; r.closedByGoogle = true; }
+      else if (r.closedByGoogle && info.businessStatus) { r.permanentlyClosed = false; r.closedByGoogle = false; }
       // Fill in where it is when we didn't know yet.
       if (info.address && !r.address) r.address = info.address;
       if (Number.isFinite(info.lat) && Number.isFinite(info.lng) && !(Number.isFinite(r.lat) && Number.isFinite(r.lng))) { r.lat = info.lat; r.lng = info.lng; }
@@ -3753,7 +3758,7 @@ const PLAY_URL = 'https://play.google.com/store/apps/details?id=com.feedthebear.
    back to it never reloads. When a newer version is live (sw.js names it),
    refresh: quietly if nothing is open, else Byte Cub offers an Update button.
    APP_BUILD must match CACHE in sw.js (tests/version.test.js checks). */
-const APP_BUILD = 'ftb-v189';
+const APP_BUILD = 'ftb-v190';
 let _freshCheckedAt = 0;
 async function checkForNewBuild () {
   if (Date.now() - _freshCheckedAt < 5 * 60 * 1000 || !navigator.onLine) return;

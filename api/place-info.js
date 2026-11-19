@@ -16,7 +16,7 @@ const { overLimit } = require('./_limit');
 const FIELDS = [
   'places.id', 'places.displayName', 'places.location', 'places.formattedAddress', 'places.rating', 'places.userRatingCount',
   'places.priceLevel', 'places.regularOpeningHours', 'places.nationalPhoneNumber',
-  'places.websiteUri', 'places.googleMapsUri',
+  'places.websiteUri', 'places.googleMapsUri', 'places.businessStatus',
 ].join(',');
 
 const PRICE = { PRICE_LEVEL_INEXPENSIVE: 1, PRICE_LEVEL_MODERATE: 2, PRICE_LEVEL_EXPENSIVE: 3, PRICE_LEVEL_VERY_EXPENSIVE: 4 };
@@ -58,6 +58,7 @@ function safeHttpUrl (value) {
 const SEARCH_FIELDS = [
   'places.id', 'places.displayName', 'places.formattedAddress', 'places.shortFormattedAddress',
   'places.location', 'places.primaryTypeDisplayName', 'places.rating', 'places.userRatingCount', 'places.priceLevel',
+  'places.businessStatus',
 ].join(',');
 
 async function searchPlaces (req, res, key) {
@@ -91,7 +92,8 @@ async function searchPlaces (req, res, key) {
       rating: Number(p.rating) || 0,
       reviews: Number(p.userRatingCount) || 0,
       priceLevel: PRICE[p.priceLevel] || 0,
-    })).filter(p => p.name);
+      businessStatus: String(p.businessStatus || ''),
+    })).filter(p => p.name && p.businessStatus !== 'CLOSED_PERMANENTLY');
     // Nearest first when we know where the user is: Google's text ranking
     // can bury a place that's right in front of you. Stable sort, so ties
     // and places without coordinates keep Google's order. Same shape out.
@@ -209,6 +211,7 @@ module.exports = async function handler (req, res) {
       close: p.close ? { day: p.close.day, hour: p.close.hour, minute: p.close.minute || 0 } : null,
     })) : [],
     phone: place.nationalPhoneNumber || '',
+    businessStatus: String(place.businessStatus || ''),
     website: safeHttpUrl(place.websiteUri),
     mapsUrl: safeHttpUrl(place.googleMapsUri),
   });
