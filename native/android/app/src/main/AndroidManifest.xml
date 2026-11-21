@@ -81,6 +81,15 @@
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
+        <!-- Android 11+ package visibility: without these, the WebView file
+             chooser cannot resolve a camera app, so Capacitor silently falls
+             back to the gallery picker when a page asks for capture. -->
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.media.action.VIDEO_CAPTURE" />
+        </intent>
     </queries>
     <!-- Photos of dishes -->
     <uses-permission android:name="android.permission.CAMERA" />
