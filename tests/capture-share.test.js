@@ -109,7 +109,13 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
     && (await p.locator('.sn-error').innerText()).includes('manually'),
     'blocked clipboard exposes the editable caption for manual copying');
   await p.evaluate(() => Cub.openAdd());
-  check(await p.locator('.share-nudge').count() === 0, 'a previous share prompt cannot cover the next Add flow');
+  check(await p.locator('.share-nudge').count() === 1, 'the share prompt stays up until Done or a post, even when the next Add flow opens');
+  check(await p.evaluate(() => {
+    const nudge = document.querySelector('.share-nudge');
+    const sheet = document.getElementById('quick-add-overlay');
+    return !!nudge && !!sheet && !sheet.classList.contains('hidden')
+      && Number(getComputedStyle(sheet).zIndex) > Number(getComputedStyle(nudge).zIndex);
+  }), 'and the Add sheet stacks above it, so the prompt cannot cover the Add flow');
 
   // A late photo from a closed form must not attach to its replacement.
   await p.fill('.qa-input', 'Old Cafe');

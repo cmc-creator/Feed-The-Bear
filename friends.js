@@ -1652,9 +1652,9 @@ function openFoodiePlan (restaurantId = '', friendKey = '') {
 
 /* ── Share moments: right after you log a meal ── */
 function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', note = '', media, rememberedVisit = false }) {
-  if (!r || !window.StoryCard) return;
+  if (!r) return;
   const momentMedia = media ?? mediaOf(r.visits?.at(-1) || r);
-  const momentPhotos = StoryCard.photosFor({ media: momentMedia }, photo);
+  const momentPhotos = window.StoryCard ? StoryCard.photosFor({ media: momentMedia }, photo) : [photo].filter(Boolean);
   video = video || momentMedia.find(m => m.video)?.video || '';
   const generation = _dataGeneration;
   document.querySelector('.share-nudge')?.remove();
@@ -1662,9 +1662,10 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
   el.className = 'share-nudge';
   el.setAttribute('role', 'status');
   el.innerHTML = `${safeUrl(photo) ? `<img src="${escHtml(safeUrl(photo))}" alt="" />` : '<span class="sn-emoji" aria-hidden="true">📸</span>'}
-    <span class="sn-text"><strong>${r.status === 'visited' ? 'Share this meal?' : 'Share this spot?'}</strong><span>${momentPhotos.length ? 'Your photos, your place. Preview your card before sharing.' : 'No personal photo yet. Your card uses text, never stock photos.'} Choose TikTok, Instagram, Facebook or a friend in your share sheet, when available.</span></span>
+    <span class="sn-text"><strong>${r.status === 'visited' ? 'Share this meal?' : 'Share this spot?'}</strong><span>${momentPhotos.length ? 'Your photos, your place. One tap posts this meal with your photo and caption.' : 'No personal photo yet. One tap posts this meal with a place card and your caption.'} Choose TikTok, Instagram, Facebook or a friend in your share sheet, when available.</span></span>
     <div class="sn-actions">
-      <button type="button" class="btn-sm btn-primary sn-go">Share my place card</button>
+      <button type="button" class="btn-sm btn-primary sn-post">Post this meal</button>
+      <button type="button" class="btn-sm sn-go">Share my place card</button>
       <button type="button" class="btn-sm sn-media" ${photo || video ? 'disabled' : ''}>${video ? 'Preparing video...' : photo ? 'Preparing photo...' : 'Share spot'}</button>
       <button type="button" class="btn-sm sn-plan">Go together</button>
       <button type="button" class="btn-sm sn-x">Done</button>
@@ -1681,7 +1682,7 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add('in'));
   const hide = () => { el.classList.remove('in'); setTimeout(() => el.remove(), 300); };
-  const text = `${dish ? `${dish} at ${r.name}` : `${r.status === 'visited' ? rememberedVisit ? 'Been to' : 'Just ate at' : 'Want to try'} ${r.name}`}${verdict === 'again' ? ' — 10/10 would order again' : ''}. Saved with Feed The Bear https://www.feed-the-bear.com`;
+  const text = `${dish ? `${dish} at ${r.name}` : `${r.status === 'visited' ? rememberedVisit ? 'Been to' : 'Just ate at' : 'Want to try'} ${r.name}`}${verdict === 'again' ? ' - 10/10 would order again' : ''}. Saved with Feed The Bear https://www.feed-the-bear.com`;
   const caption = el.querySelector('.sn-caption-text');
   caption.value = text;
   const error = message => { el.querySelector('.sn-error').textContent = message; };
@@ -1737,7 +1738,7 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
       error(err.message);
     }
   };
-  if (photo || video) prepare();
+  const preparePromise = (photo || video) ? prepare() : Promise.resolve();
   mediaButton.addEventListener('click', async () => {
     if (generation !== _dataGeneration) return;
     error('');
@@ -1765,6 +1766,67 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
         : 'Sharing was blocked. Copy your caption below and paste it into your social app or a message, or try the Story card.');
     }
   });
+  // One tap post: the share sheet opens with the meal photo (or the place
+  // card when there is no photo), with no preview step in between.
+  const shareTextOnly = async () => {
+    if (!navigator.share) return false;
+    try { await navigator.share({ title: r.name, text: caption.value.trim() }); return true; }
+    catch (err) {
+      if (err?.name === 'AbortError') return 'aborted';
+      console.warn('[FTB] Text share failed:', err);
+      return false;
+    }
+  };
+  const postFallback = () => {
+    if (file) { download(); return; }
+    el.querySelector('.sn-social-help').open = true;
+    el.querySelector('.sn-caption').open = true;
+    caption.focus(); caption.select();
+    error('This browser has no share sheet. Copy your caption below and paste it into TikTok, Instagram, Facebook or a message, or save your Story card.');
+  };
+  el.querySelector('.sn-post').addEventListener('click', async () => {
+    if (generation !== _dataGeneration) return;
+    error('');
+    trackProductEvent('share_meal_post_tapped', { hasPhoto: !!photo, hasVideo: !!video });
+    if (!photo && !video) {
+      let cardFile = null;
+      if (window.StoryCard) {
+        try {
+          const kicker = r.status === 'want-to-try' ? 'On my food bucket list' : verdict === 'again' ? 'Order this again' : verdict === 'skip' ? 'Skip this one' : rememberedVisit ? 'A bite worth remembering' : 'Just ate';
+          const blob = await StoryCard.drawStory({
+            kind: 'meal', kicker, title: dish || r.name, place: r.name, location: r.address || r.cuisine || '',
+            sub: dish ? `at ${r.name}` : (r.cuisine || ''), photo: '', photos: [],
+            stars: r.myRating || 0,
+            sections: note && el.querySelector('.sn-include-note')?.checked ? [{ label: 'My take', items: [note], tone: 'soft' }] : [],
+          });
+          if (blob) cardFile = new File([blob], `${r.name.replace(/[^a-z0-9-]/gi, '-')}-card.png`, { type: 'image/png' });
+        } catch (err) { console.warn('[FTB] Place card draw failed:', err); }
+      }
+      if (generation !== _dataGeneration || !el.isConnected) return;
+      if (cardFile && navigator.share && navigator.canShare?.({ files: [cardFile] })) {
+        try { await navigator.share({ title: r.name, text: caption.value.trim(), files: [cardFile] }); hide(); return; }
+        catch (err) { if (err?.name === 'AbortError') return; console.warn('[FTB] Card post failed:', err); }
+      }
+      const textResult = await shareTextOnly();
+      if (textResult === 'aborted') return;
+      if (textResult) { hide(); return; }
+      if (generation !== _dataGeneration || !el.isConnected) return;
+      if (window.StoryCard) el.querySelector('.sn-go').click();
+      else postFallback();
+      return;
+    }
+    await preparePromise;
+    if (generation !== _dataGeneration || !el.isConnected) return;
+    if (file && canShareFile()) {
+      try { await navigator.share({ title: r.name, text: caption.value.trim(), files: [file] }); hide(); return; }
+      catch (err) { if (err?.name === 'AbortError') return; console.warn('[FTB] One tap post failed:', err); }
+    }
+    const textResult = await shareTextOnly();
+    if (textResult === 'aborted') return;
+    if (textResult) { hide(); return; }
+    if (generation !== _dataGeneration || !el.isConnected) return;
+    postFallback();
+  });
   el.querySelector('.sn-x').addEventListener('click', hide);
   el.querySelector('.sn-plan').addEventListener('click', () => {
     if (generation !== _dataGeneration) return;
@@ -1773,6 +1835,7 @@ function offerShareMeal ({ r, dish = '', verdict = '', photo = '', video = '', n
   });
   el.querySelector('.sn-go').addEventListener('click', async () => {
     if (generation !== _dataGeneration) return;
+    if (!window.StoryCard) { error('Story cards are unavailable right now. Post this meal instead.'); return; }
     hide();
     trackProductEvent('share_meal_clicked', { hasPhoto: !!photo });
     const kicker = r.status === 'want-to-try' ? 'On my food bucket list' : verdict === 'again' ? 'Order this again' : verdict === 'skip' ? 'Skip this one' : rememberedVisit ? 'A bite worth remembering' : 'Just ate';

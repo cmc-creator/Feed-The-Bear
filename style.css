@@ -6250,7 +6250,7 @@ body.light-mode .today-vibe-pill {
 
 /* "Share this meal?" right after logging one */
 .share-nudge {
-  position: fixed; left: 12px; right: 12px; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); z-index: 9000;
+  position: fixed; left: 12px; right: 12px; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); z-index: 180;
   display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px;
   background: var(--surface); border: 1px solid rgba(var(--primary-rgb), .45); box-shadow: 0 12px 30px rgba(0,0,0,.35);
   transform: translateY(24px) scale(.96); opacity: 0; transition: transform .35s cubic-bezier(.34,1.56,.64,1), opacity .25s ease;
@@ -6267,7 +6267,6 @@ body.light-mode .today-vibe-pill {
 .food-media-status, .sn-error { font-size: .8rem; color: var(--text-dim); overflow-wrap: anywhere; }
 .share-nudge { flex-wrap: wrap; max-height: calc(100dvh - 120px); overflow-y: auto; }
 .share-nudge .sn-actions, .share-nudge .sn-error { flex-basis: 100%; }
-.overlay-open .share-nudge { display: none; }
 .backup-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px; margin: 8px 0; border: 1px solid var(--border); border-radius: 12px; color: var(--text); background: var(--card); }
 .backup-status span { flex: 1 1 200px; overflow-wrap: anywhere; }
 .backup-status button { min-height: 44px; }
