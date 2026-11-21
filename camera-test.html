@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feed The Bear - Camera Test</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: #14100c; color: #fff7ea;
+  }
+  h1 { font-size: 24px; margin: 4px 0 8px; }
+  p.intro { font-size: 16px; line-height: 1.45; color: #e8dcc8; }
+  .test {
+    background: #241b12; border: 2px solid #6b543a; border-radius: 14px;
+    padding: 16px; margin: 18px 0;
+  }
+  .test h2 { font-size: 20px; margin: 0 0 6px; }
+  .test p.desc { font-size: 15px; line-height: 1.4; color: #e8dcc8; margin: 0 0 12px; }
+  .bigbtn {
+    display: block; width: 100%; min-height: 76px;
+    padding: 18px 12px; margin: 6px 0;
+    font-size: 21px; font-weight: 700; text-align: center;
+    color: #1d1408; background: #ffb340; border: none; border-radius: 12px;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .bigbtn:active { background: #f59e1b; }
+  .bigbtn.secondary { background: #4a3520; color: #ffd9a0; }
+  .result {
+    margin-top: 12px; padding: 12px; border-radius: 10px;
+    background: #0d0a07; border: 1px dashed #8a6f47;
+    font-size: 16px; line-height: 1.45; word-break: break-word;
+    white-space: pre-wrap;
+  }
+  .result.ok { border-color: #57c465; }
+  .result.err { border-color: #e5534b; }
+  .result .label { font-weight: 700; color: #ffd9a0; }
+  img.thumb { display: block; max-width: 100%; margin-top: 10px; border-radius: 8px; }
+  video.preview { display: none; width: 100%; margin-top: 10px; border-radius: 8px; background: #000; }
+  canvas { display: none; }
+  .visually-hidden-input {
+    position: fixed; left: 0; top: 0; width: 1px; height: 1px;
+    opacity: 0; pointer-events: none;
+  }
+  .offscreen-input {
+    position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden;
+  }
+  .footer { font-size: 13px; color: #b8a888; margin-top: 24px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<h1>Camera Test</h1>
+<p class="intro">Four tests. Tap each one in order, do what it asks, and read the result box under it. Please tell me the number of each test and exactly what happened: did the camera open, did the photo gallery open, or did something else happen?</p>
+
+<p class="intro" id="sw-status">Checking page setup...</p>
+
+<!-- ================= TEST 1 ================= -->
+<div class="test">
+  <h2>TEST 1 - Direct camera button</h2>
+  <p class="desc">This button is a real tap target wired straight to a camera input. No script clicks anything. It SHOULD open your camera.</p>
+  <label class="bigbtn" for="t1-input">TEST 1 - Tap to open camera</label>
+  <input class="offscreen-input" id="t1-input" type="file" accept="image/*" capture="environment">
+  <div class="result" id="t1-result"><span class="label">Result:</span> not tried yet.</div>
+</div>
+
+<!-- ================= TEST 2 ================= -->
+<div class="test">
+  <h2>TEST 2 - In-page camera</h2>
+  <p class="desc">This opens a camera preview right here on the page, no file picker at all. Tap start, allow camera access if asked, then tap SNAP.</p>
+  <button class="bigbtn" id="t2-start" type="button">TEST 2 - Start camera</button>
+  <video class="preview" id="t2-video" playsinline muted></video>
+  <button class="bigbtn" id="t2-snap" type="button" style="display:none;">SNAP - Take the photo</button>
+  <canvas id="t2-canvas" width="1280" height="960"></canvas>
+  <div class="result" id="t2-result"><span class="label">Result:</span> not tried yet.</div>
+</div>
+
+<!-- ================= TEST 3 ================= -->
+<div class="test">
+  <h2>TEST 3 - Multi photo picker</h2>
+  <p class="desc">This SHOULD open your photo gallery and let you pick SEVERAL photos at once. Try to select 3 photos, then tap Done.</p>
+  <label class="bigbtn" for="t3-input">TEST 3 - Tap to pick photos</label>
+  <input class="offscreen-input" id="t3-input" type="file" accept="image/*" multiple>
+  <div class="result" id="t3-result"><span class="label">Result:</span> not tried yet.</div>
+</div>
+
+<!-- ================= TEST 4 ================= -->
+<div class="test">
+  <h2>TEST 4 - Current app method</h2>
+  <p class="desc">This copies exactly what the app does today: a script clicks a hidden camera input for you. We expect this one to open the gallery, same as the app. Tap it to confirm.</p>
+  <button class="bigbtn" id="t4-btn" type="button">TEST 4 - Tap to test app method</button>
+  <div class="result" id="t4-result"><span class="label">Result:</span> not tried yet.</div>
+</div>
+
+<p class="footer">When you are done, tell me for each test number: camera opened, gallery opened, how many photos you could pick (Test 3), and anything the result boxes said. Thank you.</p>
+
+<script>
+(function () {
+  "use strict";
+
+  // This page never registers a service worker. Report whether an
+  // existing one controls this page, for diagnosis only.
+  var swEl = document.getElementById("sw-status");
+  if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+    swEl.textContent = "Note: a service worker from the main site is controlling this page. That does not change how the camera buttons behave.";
+  } else {
+    swEl.textContent = "Page setup: no service worker is controlling this page. Good.";
+  }
+
+  function setResult(id, text, kind) {
+    var el = document.getElementById(id);
+    el.className = "result" + (kind ? " " + kind : "");
+    el.innerHTML = "";
+    var label = document.createElement("span");
+    label.className = "label";
+    label.textContent = "Result: ";
+    el.appendChild(label);
+    el.appendChild(document.createTextNode(text));
+    return el;
+  }
+
+  function showThumb(resultEl, file) {
+    try {
+      var url = URL.createObjectURL(file);
+      var img = document.createElement("img");
+      img.className = "thumb";
+      img.alt = "Chosen photo";
+      img.onload = function () { setTimeout(function () { URL.revokeObjectURL(url); }, 4000); };
+      img.src = url;
+      resultEl.appendChild(img);
+    } catch (e) { /* thumbnail is a bonus; the file name is the proof */ }
+  }
+
+  function fileLine(file) {
+    var kb = Math.max(1, Math.round(file.size / 1024));
+    return file.name + " (" + kb + " KB, " + (file.type || "unknown type") + ")";
+  }
+
+  // ---------- TEST 1: label bound to capture input, no JS click ----------
+  var t1 = document.getElementById("t1-input");
+  t1.addEventListener("change", function () {
+    if (t1.files && t1.files.length > 0) {
+      var el = setResult("t1-result", "You picked 1 file: " + fileLine(t1.files[0]), "ok");
+      showThumb(el, t1.files[0]);
+    } else {
+      setResult("t1-result", "No file was picked (picker closed with nothing chosen).", "err");
+    }
+    t1.value = "";
+  });
+
+  // ---------- TEST 2: getUserMedia in-page camera ----------
+  var t2stream = null;
+  var t2video = document.getElementById("t2-video");
+  var t2snap = document.getElementById("t2-snap");
+  var t2canvas = document.getElementById("t2-canvas");
+
+  document.getElementById("t2-start").addEventListener("click", function () {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setResult("t2-result", "This browser does not offer in-page camera access (getUserMedia missing).", "err");
+      return;
+    }
+    setResult("t2-result", "Asking the browser for camera access...", "");
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })
+      .then(function (stream) {
+        t2stream = stream;
+        t2video.srcObject = stream;
+        t2video.style.display = "block";
+        t2snap.style.display = "block";
+        return t2video.play();
+      })
+      .then(function () {
+        setResult("t2-result", "Camera is ON and showing a preview above. Now tap SNAP.", "ok");
+      })
+      .catch(function (err) {
+        setResult("t2-result", "Camera did not start. Error: " + err.name + " - " + err.message, "err");
+      });
+  });
+
+  t2snap.addEventListener("click", function () {
+    if (!t2stream) {
+      setResult("t2-result", "No camera is running. Tap Start camera first.", "err");
+      return;
+    }
+    try {
+      var w = t2video.videoWidth || 1280;
+      var h = t2video.videoHeight || 960;
+      t2canvas.width = w;
+      t2canvas.height = h;
+      var ctx = t2canvas.getContext("2d");
+      ctx.drawImage(t2video, 0, 0, w, h);
+      var dataUrl = t2canvas.toDataURL("image/jpeg", 0.85);
+      var el = setResult("t2-result", "SNAP worked. Captured a photo " + w + " x " + h + " right on this page:", "ok");
+      var img = document.createElement("img");
+      img.className = "thumb";
+      img.alt = "Captured photo";
+      img.src = dataUrl;
+      el.appendChild(img);
+      t2stream.getTracks().forEach(function (track) { track.stop(); });
+      t2stream = null;
+      t2video.style.display = "none";
+      t2snap.style.display = "none";
+    } catch (e) {
+      setResult("t2-result", "SNAP failed. Error: " + e.name + " - " + e.message, "err");
+    }
+  });
+
+  // ---------- TEST 3: label bound to multiple picker ----------
+  var t3 = document.getElementById("t3-input");
+  t3.addEventListener("change", function () {
+    if (t3.files && t3.files.length > 0) {
+      var names = [];
+      for (var i = 0; i < t3.files.length; i++) { names.push(fileLine(t3.files[i])); }
+      setResult("t3-result", "You picked " + t3.files.length + " file(s):\n" + names.join("\n"), "ok");
+    } else {
+      setResult("t3-result", "No files were picked (picker closed with nothing chosen).", "err");
+    }
+    t3.value = "";
+  });
+
+  // ---------- TEST 4: the v192 app pattern, replicated ----------
+  // One persistent input, rendered but invisible, capture set as
+  // BOTH attribute and property, clicked programmatically.
+  var t4 = document.createElement("input");
+  t4.type = "file";
+  t4.accept = "image/*";
+  t4.className = "visually-hidden-input";
+  t4.setAttribute("capture", "environment");
+  t4.capture = "environment";
+  document.body.appendChild(t4);
+  t4.addEventListener("change", function () {
+    if (t4.files && t4.files.length > 0) {
+      var el = setResult("t4-result", "You picked 1 file: " + fileLine(t4.files[0]), "ok");
+      showThumb(el, t4.files[0]);
+    } else {
+      setResult("t4-result", "No file was picked (picker closed with nothing chosen).", "err");
+    }
+    t4.value = "";
+  });
+  document.getElementById("t4-btn").addEventListener("click", function () {
+    t4.click();
+  });
+})();
+</script>
+</body>
+</html>
