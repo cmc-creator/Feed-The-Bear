@@ -10043,3 +10043,11 @@ body:has(.share-nudge, #save-diary-nudge, #rate-prompt, .photo-reveal) #toast-co
 /* Nearby (Near You) and Smart Discovery result cards: tapping a card
    opens the place on Google Maps (see openPlaceOnGoogle in app.js). */
 .disc-card, .discover-item { cursor: pointer; }
+
+/* Food picker controls are labels bound to the static file inputs in
+   app.html, so a tap lands on the input itself. The Android WebView only
+   honours the camera capture hint for that real tap; a script-driven
+   click on a reconfigured input falls back to the gallery. */
+.food-capture-buttons label.food-capture-btn { display: flex; align-items: center; justify-content: center; text-align: center; cursor: pointer; }
+.food-capture-actions.picker-busy .food-capture-btn { pointer-events: none; opacity: .55; }
+label.ja-photo-btn, label.yo-cam, label.yo-photo-btn, label#ai-photo-btn { cursor: pointer; }

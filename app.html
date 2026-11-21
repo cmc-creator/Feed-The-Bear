@@ -1504,7 +1504,7 @@
 
           <!-- Photo -->
           <div class="form-group form-full">
-            <label for="form-photo">Photos &amp; videos <span class="label-hint">(or paste a photo URL)</span> <button type="button" id="ai-photo-btn" class="btn-sm btn-ai"> AI Fill</button></label>
+            <label for="form-photo">Photos &amp; videos <span class="label-hint">(or paste a photo URL)</span> <label id="ai-photo-btn" class="btn-sm btn-ai" for="food-ai-file"> AI Fill</label></label>
             <input type="url" id="form-photo" placeholder="https://example.com/photo.jpg" />
             <label class="photo-upload-label">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -1642,15 +1642,19 @@
             Scan the menu: what should I get?<span class="gz-badge menu-scan-badge">GRIZZLY</span>
           </button>
           <input type="file" id="menu-scan-file" accept="image/*" capture="environment" hidden />
+          <input type="file" id="food-camera-file" accept="image/*" capture="environment" hidden />
+          <input type="file" id="food-video-file" accept="video/*" capture="environment" hidden />
+          <input type="file" id="food-library-file" accept="image/*,video/*" multiple hidden />
+          <input type="file" id="food-ai-file" accept="image/*" capture="environment" hidden />
           <div id="menu-scan-result" class="menu-scan-result hidden" aria-live="polite"></div>
           <div id="your-order-list" class="your-order-list"></div>
           <div class="your-order-add">
             <div class="yo-input-row">
               <input id="your-order-input" class="form-input" type="text" maxlength="80"
                 placeholder="What did you have? e.g. Birria tacos" aria-label="Dish name" enterkeyhint="done" />
-              <button type="button" id="your-order-photo" class="yo-cam" aria-label="Add photos or videos of the dish" title="Add photos or videos">
+              <label id="your-order-photo" class="yo-cam" for="food-library-file" aria-label="Add photos or videos of the dish" title="Add photos or videos">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
-              </button>
+              </label>
             </div>
             <div id="your-order-pending" class="yo-pending hidden"></div>
             <div class="your-order-verdicts" role="group" aria-label="How was it?">
@@ -2966,10 +2970,10 @@
         <input id="just-ate-dish" class="form-input" type="text" maxlength="80"
           placeholder="e.g. Spicy miso ramen" autocomplete="off" enterkeyhint="done" />
 
-        <button type="button" id="just-ate-photo" class="ja-photo-btn">
+        <label id="just-ate-photo" class="ja-photo-btn" for="food-library-file">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
           <span id="just-ate-photo-label">Add photos &amp; videos</span>
-        </button>
+        </label>
         <div id="just-ate-photo-preview" class="ja-photo-preview hidden"></div>
 
         <div class="ja-label" id="just-ate-verdict-label">How was that dish?</div>

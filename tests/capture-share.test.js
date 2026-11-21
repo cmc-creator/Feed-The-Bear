@@ -133,10 +133,10 @@ const { BASE, ROOT, check, launch, newPage, closeAllDialogs, finish } = require(
 
   // Both other primary entry points expose the same capture choices.
   await p.evaluate(() => openJustAte('r1'));
-  check(await p.locator('#just-ate-overlay .food-capture-buttons button').count() === 3, 'Just Ate exposes photo, video and gallery actions');
+  check(await p.locator('#just-ate-overlay .food-capture-buttons [data-source]').count() === 3, 'Just Ate exposes photo, video and gallery actions');
   await closeAllDialogs(p);
   await p.evaluate(() => openAddModal());
-  check(await p.locator('#restaurant-form .food-capture-buttons button').count() === 3, 'the full Add form exposes the same actions');
+  check(await p.locator('#restaurant-form .food-capture-buttons [data-source]').count() === 3, 'the full Add form exposes the same actions');
   [chooser] = await Promise.all([p.waitForEvent('filechooser'), p.click('#restaurant-form [data-source="photo"]')]);
   await chooser.setFiles(photo);
   await p.waitForFunction(() => !foodMediaBusy());
