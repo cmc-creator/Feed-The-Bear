@@ -1189,6 +1189,13 @@ button:focus-visible,
   padding: 20px;
   overflow-y: auto;
 }
+/* Stacking ladder for the cave flow: the cave setup opens on top of other
+   panels (the Foodie Friends panel carries the "Decorate my cave" button),
+   and the Cave Shop opens on top of the setup. At the shared z-index 200
+   the later overlay in the page won, so the setup opened hidden behind
+   the friends panel and the tap looked dead. */
+#handle-overlay { z-index: 250; }
+#cave-shop-overlay { z-index: 260; }
 .modal-card {
   background:
     radial-gradient(150% 110% at 100% 0%, rgba(109,143,84,.13), transparent 48%),
