@@ -1,0 +1,19 @@
+{
+  "android": {
+    "allowMixedContent": false
+  },
+  "appId": "com.nyxshift.app",
+  "appName": "NyxShift",
+  "server": {
+    "allowNavigation": [
+      "nyxshift.com",
+      "www.nyxshift.com",
+      "api.nyxshift.com",
+      "checkout.stripe.com",
+      "billing.stripe.com"
+    ],
+    "androidScheme": "https",
+    "url": "https://nyxshift.com/?shell=store"
+  },
+  "webDir": "www"
+}
