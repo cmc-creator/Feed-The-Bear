@@ -196,11 +196,25 @@
     if (kind === "intel") return state.intel.length >= INTEL_FREE_CAP;
     return false;
   }
+  /* Locked doors (phase 2): a gated feature presents as a
+   * designed locked panel - what it is, the one thing it does
+   * for the user, the price, and the existing GO OPERATOR route
+   * into checkout - never a bare refusal. Presentation only:
+   * the gates themselves (isOperator / hasAddon) do not move. */
+  var LOCK_LINES = {
+    "INCIDENT COMMAND": "Run a real incident on one board: roles, objectives and assignments for your whole crew, live while it unfolds.",
+    "BROADCAST": "Send one message out to every crew channel at once, the moment it matters most.",
+    "NEED CALCULATORS": "Exact water, food and staple math for any household size and any number of days - no guesswork, no spreadsheets.",
+    "GRID-DOWN MODE": "A stripped essentials screen for the night the grid goes: your number, your rally point, your battery, a light. Nothing else competes for power."
+  };
   function upsellHtml(feature) {
-    return "<div class=\"nx-upsell\">" +
-      "<p class=\"nx-upsell-tag\">OPERATOR TIER</p>" +
-      "<h3 class=\"nx-upsell-title\">" + esc(feature) + " IS AN OPERATOR FEATURE</h3>" +
-      "<p class=\"nx-upsell-body\">Free covers Days Ready, one loadout, rotation, the vault, compass, checklists and alerts - no caps on any of those. Operator removes every cap and unlocks Incident Command, broadcasts, the need calculators and the GO-Book.</p>" +
+    var line = LOCK_LINES[feature] ||
+      "Free covers Days Ready, one loadout, rotation, the vault, compass, checklists and alerts - no caps on any of those. Operator removes every cap and unlocks Incident Command, broadcasts, the need calculators and the GO-Book.";
+    return "<div class=\"nx-upsell nx-locked\">" +
+      "<div class=\"nx-lock-head\"><span class=\"nx-lock-ic\">" + artSm("lock") + "</span>" +
+      "<p class=\"nx-upsell-tag\">LOCKED // OPERATOR TIER</p></div>" +
+      "<h3 class=\"nx-upsell-title\">" + esc(feature) + "</h3>" +
+      "<p class=\"nx-upsell-body\">" + esc(line) + "</p>" +
       "<p class=\"nx-upsell-prices nx-buy-ui\">OPERATOR $6.99/MO - $49.99/YR // LIFETIME $149 ONE TIME // FOUNDING OPERATOR $99.99</p>" +
       "<button type=\"button\" class=\"nx-btn nx-btn-accent nx-go-operator nx-buy-ui\">GO OPERATOR</button>" +
       "<p class=\"nx-h-note nx-ios-note\">OPERATOR MEMBERS: SIGN IN AND YOUR TIER WORKS HERE AUTOMATICALLY.</p>" +
@@ -720,7 +734,8 @@
     shield: "<path d=\"M12 3l7 2.4V11c0 4.8-2.9 8.2-7 9.9C7.9 19.2 5 15.8 5 11V5.4Z M9.2 11.6l2 2 3.6-3.8\"/>",
     pack: "<path d=\"M7.5 20V9.8a4.5 4.5 0 0 1 9 0V20Z M10.3 5.6a1.8 1.8 0 0 1 3.4 0 M10 13.5h4V17h-4Z\"/>",
     intel: "<path d=\"M5 6h14v13H5Z M8.6 15.4a4.8 4.8 0 0 1 0-6.8 M15.4 8.6a4.8 4.8 0 0 1 0 6.8\"/><circle cx=\"12\" cy=\"12\" r=\"1.3\" fill=\"currentColor\" stroke=\"none\"/>",
-    lists: "<path d=\"M6 5h12v15H6Z M9 3.8h6V7H9Z M9.2 11h5.6M9.2 14.2h5.6 M9.2 17.4l1.6 1.6 2.8-3\"/>"
+    lists: "<path d=\"M6 5h12v15H6Z M9 3.8h6V7H9Z M9.2 11h5.6M9.2 14.2h5.6 M9.2 17.4l1.6 1.6 2.8-3\"/>",
+    lock: "<path d=\"M6 11h12v9H6Z M9 11V8a3 3 0 0 1 6 0v3 M12 14.5v2\"/>"
   };
   function artBig(name) { return nxSvg("0 0 48 48", 2.4, ART_BIG[name] || "", "nx-art-big"); }
   function artSm(name) { return nxSvg("0 0 24 24", 1.7, ART_SM[name] || "", "nx-art-sm"); }
@@ -737,7 +752,7 @@
     var el = $("view-" + name);
     if (el) el.classList.add("nx-on");
     document.querySelectorAll(".nx-tab").forEach(function (t) {
-      t.classList.toggle("nx-active", t.getAttribute("data-view") === name);
+      t.classList.toggle("nx-active", t.getAttribute("data-view") === name && !t.hasAttribute("data-picks-link"));
     });
     if (el && fxAnimate()) {
       el.classList.remove("nx-redraw");
@@ -879,6 +894,51 @@
     return (Array.isArray(state.cash) ? state.cash : []).reduce(function (sum, c) { return sum + (Number(c.amount) || 0); }, 0);
   }
 
+  /* Readiness ring + category gauges (phase 2): the ring reads
+   * the headline against the 30-day goal - the same scale the
+   * seg bar under it already used - and each gauge reads its
+   * own category against the same goal, the weaker one flagged.
+   * The denominator is a constant 30, and a null headline reads
+   * as a clean 0: an empty account can never divide by zero. */
+  var RING_CIRC = 2 * Math.PI * 84; // matches r=84 in app.html
+  function setRing(pct, animate) {
+    var arc = $("nx-ring-arc");
+    if (!arc) return;
+    var p = clamp(pct, 0, 100);
+    var target = RING_CIRC * (1 - p / 100);
+    arc.style.strokeDasharray = RING_CIRC.toFixed(1);
+    if (animate) {
+      arc.style.transition = "none";
+      arc.style.strokeDashoffset = RING_CIRC.toFixed(1);
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          arc.style.transition = "stroke-dashoffset 1.1s cubic-bezier(.22,.8,.3,1)";
+          arc.style.strokeDashoffset = target.toFixed(1);
+        });
+      });
+    } else {
+      arc.style.transition = "none";
+      arc.style.strokeDashoffset = target.toFixed(1);
+    }
+    var lbl = $("nx-ring-pct");
+    if (lbl) lbl.textContent = Math.round(p) + "%";
+  }
+  function setGauge(kind, days, weak, animate) {
+    var row = $("nx-gauge-" + kind);
+    if (!row) return;
+    var val = $("nx-gauge-" + kind + "-val");
+    if (val) val.textContent = days == null ? "-- DAYS" : fmt(days, 1) + " DAYS";
+    var seg = $("nx-gauge-" + kind + "-seg");
+    if (seg) {
+      var pct = days == null ? 0 : (days / 30) * 100;
+      if (animate) segAnimate(seg, pct, false);
+      else seg.innerHTML = segHtml(pct, false);
+    }
+    row.classList.toggle("nx-gauge-weak", !!weak);
+    var led = $("nx-gauge-" + kind + "-led");
+    if (led) led.className = "nx-gauge-led " + radarDaysClass(days);
+  }
+
   function renderDaysReady(fxA) {
     var d = daysReady();
     var mode = dashDisplayMode();
@@ -886,7 +946,7 @@
     var big = $("nx-days-ready"), unit = $("nx-days-unit"), label = $("nx-days-label");
     if (mode === "level" && lvl) {
       big.textContent = lvl.name;
-      big.style.fontSize = "clamp(30px, 8.5vw, 46px)";
+      big.style.fontSize = "clamp(24px, 6.8vw, 34px)";
       big.style.letterSpacing = "1px";
       if (unit) unit.style.display = "none";
       if (label) label.textContent = "Readiness Level // Household Sustainment";
@@ -895,13 +955,16 @@
     } else {
       if (fxA && d.headline != null) countUp(big, d.headline, 1);
       else big.textContent = d.headline == null ? "--" : fmt(d.headline, 1);
-      big.style.fontSize = "clamp(84px, 26vw, 104px)";
+      big.style.fontSize = "clamp(62px, 19vw, 82px)";
       big.style.letterSpacing = "";
       if (unit) unit.style.display = "";
       if (label) label.textContent = "Days Ready // Household Sustainment";
       if (fxA) segAnimate($("nx-days-seg"), d.headline == null ? 0 : (d.headline / 30) * 100, false);
       else $("nx-days-seg").innerHTML = segHtml(d.headline == null ? 0 : (d.headline / 30) * 100, false);
     }
+    setRing(d.headline == null ? 0 : (d.headline / 30) * 100, fxA);
+    setGauge("water", d.waterDays, d.limiting === "water" && d.headline != null, fxA);
+    setGauge("food", d.foodDays, d.limiting === "food" && d.headline != null, fxA);
     var wLine = "WATER <b>" + (d.waterDays == null ? "--" : fmt(d.waterDays, 1) + " DAYS") + "</b>" +
       (d.waterDays == null ? " - NO WATER STORES" : " (" + fmt(d.waterGal, 1) + " GAL)") +
       (d.waterExpired ? " <span class=\"nx-heavy\">// " + d.waterExpired + " STORE" + (d.waterExpired > 1 ? "S" : "") + " EXPIRED - NOT COUNTED</span>" : "");
@@ -4013,9 +4076,36 @@
     { c: "SKILLS & COMFORT", t: "Ball Complete Book of Home Preserving", url: "https://www.amazon.com/dp/0778801314" },
     { c: "SKILLS & COMFORT", t: "ESTINGO heated throw blanket 50x60", url: "https://www.amazon.com/dp/B0FCLRY37L" }
   ];
+  /* One tap to the picks from anywhere: the Command dashboard
+     card, the Gear view panel and the Picks nav tab all land
+     here. The picks themselves live at the bottom of the Lists
+     view's Resupply panel, which is exactly why they were being
+     missed - this switch plus the scroll puts them on screen. */
+  function gotoPicks() {
+    showView("lists");
+    setTimeout(function () {
+      var el = $("nx-picks-anchor") || $("nx-picks-wrap");
+      if (el) {
+        try { el.scrollIntoView({ behavior: fxAnimate() ? "smooth" : "auto", block: "start" }); }
+        catch (e) { el.scrollIntoView(); }
+      }
+      var panel = $("nx-resupply-panel");
+      if (panel && fxAnimate()) {
+        panel.classList.add("nx-picks-flash");
+        setTimeout(function () { panel.classList.remove("nx-picks-flash"); }, 1800);
+      }
+    }, 80);
+  }
+  function bindPicksNav() {
+    ["nx-picks-open", "nx-picks-open-gear"].forEach(function (id) {
+      var b = $(id);
+      if (b) b.addEventListener("click", function () { gotoPicks(); });
+    });
+  }
   function renderPicks() {
     var wrap = $("nx-picks-wrap");
     if (!wrap) return;
+    document.querySelectorAll(".nx-picks-count").forEach(function (el) { el.textContent = NX_PICKS.length; });
     var cats = [];
     NX_PICKS.forEach(function (p) { if (cats.indexOf(p.c) < 0) cats.push(p.c); });
     var h = cats.map(function (c) {
@@ -4023,7 +4113,7 @@
         .filter(function (x) { return x.p.c === c; })
         .map(function (x) {
           return "<div class=\"nx-check-item\"><span class=\"nx-check-text\">" + esc(x.p.t) + "</span><span class=\"nx-check-btns\">" +
-            "<button type=\"button\" class=\"nx-btn nx-btn-small nx-shop-btn nx-buy-ui\" data-pick-buy=\"" + x.i + "\">BUY</button>" +
+            "<a class=\"nx-btn nx-btn-small nx-shop-btn nx-buy-ui\" data-pick-buy=\"" + x.i + "\" href=\"" + esc(buyLaterOpenUrl(x.p)) + "\" target=\"_blank\" rel=\"noopener\">BUY</a>" +
             "<button type=\"button\" class=\"nx-btn nx-btn-small\" data-pick-save=\"" + x.i + "\">SAVE</button></span></div>";
         }).join("");
       return "<p class=\"nx-kv\" style=\"margin:16px 0 4px 0;\">" + esc(c) + "</p>" + rows;
@@ -4120,7 +4210,13 @@
     if (currentView === "checkin") showView("command");
   }
   function maybeOpenCheckin() {
-    if (!state.assessment || !state.assessment.done) openCheckin();
+    if (state.assessment && state.assessment.done) return;
+    // Signed in with an empty terminal: the three-question
+    // quick start is the faster door to a first number (see the
+    // quick start module below). The full check-in keeps every
+    // other path it ever had.
+    if (authUser && state.stores.length === 0 && !quickDismissed) { openQuickStart(); return; }
+    openCheckin();
   }
 
   /* Crew: entries the check-in created carry checkinRole
@@ -4405,6 +4501,308 @@
     if (priBtn) priBtn.addEventListener("click", function () { showView("lists"); });
     var retake = $("nx-checkin-retake");
     if (retake) retake.addEventListener("click", function () { openCheckin(); });
+  }
+
+  /* ---------------- quick start (phase 2) ----------------
+     The fast door into the same first-run data system. A
+     signed-in user whose terminal still holds no stores gets
+     three questions - household size, water in gallons, food
+     in calories - and a payoff screen with their number, in
+     under a minute. Nothing here is a parallel system: the
+     household lands through checkinCrewSync, the stores land
+     under the same check-in names in the same shapes (so a
+     later full check-in retake updates them in place), the
+     assessment is marked done with the closest bucket answers,
+     and First Orders generate through the same firstOrdersList.
+     Skipping dismisses it for the session; once any store
+     exists - or the check-in is done - it never auto-opens
+     again. The full nine-question check-in stays one tap away
+     from the payoff screen, the dashboard card and System. */
+  var quick = { open: false, step: 0, fromLanding: false,
+    vals: { household: 2, waterGal: 0, foodKcal: 0 } };
+  var quickDismissed = false;
+  var landingPrefill = null;
+
+  /* Landing calculator handoff: index.html links here with
+   * ?household=&water=&kcal= carrying the visitor's calculator
+   * numbers. Read them once, stash them for the quick start,
+   * and strip them from the URL so a refresh boots clean. */
+  function captureLandingParams() {
+    try {
+      var p = new URLSearchParams(window.location.search);
+      if (p.get("household") == null && p.get("water") == null && p.get("kcal") == null) return;
+      function num(v, max) {
+        var n = Math.round(Number(v));
+        return isFinite(n) && n > 0 ? Math.min(n, max) : 0;
+      }
+      landingPrefill = {
+        household: Math.max(1, num(p.get("household"), 20)),
+        waterGal: num(p.get("water"), 100000),
+        foodKcal: num(p.get("kcal"), 100000000)
+      };
+      var u = new URL(window.location.href);
+      ["household", "water", "kcal"].forEach(function (key) { u.searchParams.delete(key); });
+      window.history.replaceState(null, "", u.pathname + u.search + u.hash);
+    } catch (e) { /* the handoff is a bonus, never a boot risk */ }
+  }
+
+  function openQuickStart() {
+    if (quick.open || checkin.open) return;
+    if (landingPrefill) {
+      quick.vals.household = landingPrefill.household;
+      quick.vals.waterGal = landingPrefill.waterGal;
+      quick.vals.foodKcal = landingPrefill.foodKcal;
+      quick.fromLanding = true;
+    }
+    quick.step = 0;
+    quick.open = true;
+    showView("checkin");
+    renderQuick();
+  }
+  function closeQuickStart() {
+    if (!quick.open) return;
+    quick.open = false;
+    if (currentView === "checkin") showView("command");
+  }
+  /* The signed-in settle hook: after any sign-in completes, a
+   * user with no stores and no finished check-in meets the
+   * quick start - this is also the moment a landing handoff
+   * lands, because a join visit suppresses the deferred
+   * check-in for that visit by design. */
+  function maybeOpenQuickStart() {
+    if (!authUser) return;
+    if (quick.open || checkin.open || quickDismissed) return;
+    if (state.assessment && state.assessment.done) return;
+    if (state.stores.length > 0) return;
+    openQuickStart();
+  }
+
+  /* Exact-value twin of checkinStoreSync: same names, same
+   * shapes, same update-in-place rule - the quick start asks
+   * for real gallons and calories instead of buckets. */
+  function quickStoreSync(gal, kcal, hh) {
+    syncOne("Water", CHECKIN_STORE_WATER, gal, { amount: gal, unit: "gal", kcal: 0 });
+    var days = Math.round((kcal / (hh * 2000)) * 10) / 10;
+    syncOne("Food", CHECKIN_STORE_FOOD, kcal, { amount: days, unit: "days", kcal: kcal });
+    function syncOne(kind, name, value, f) {
+      var idx = -1;
+      state.stores.forEach(function (s, i) { if (idx < 0 && s.name === name && s.kind === kind) idx = i; });
+      if (value > 0) {
+        if (idx >= 0) {
+          var s = state.stores[idx];
+          Object.keys(f).forEach(function (k) { s[k] = f[k]; });
+          s.expiry = null;
+        } else {
+          var ns = { id: uid(), kind: kind, name: name, expiry: null };
+          Object.keys(f).forEach(function (k) { ns[k] = f[k]; });
+          state.stores.push(ns);
+        }
+      } else if (idx >= 0) state.stores.splice(idx, 1);
+    }
+  }
+
+  function applyQuickStart() {
+    var hh = clamp(Math.round(Number(quick.vals.household)) || 1, 1, 20);
+    var gal = clamp(Number(quick.vals.waterGal) || 0, 0, 100000);
+    var kcal = clamp(Math.round(Number(quick.vals.foodKcal) || 0), 0, 100000000);
+    var a = sanitizeAssessment(state.assessment);
+    a.adults = hh;
+    a.children = 0;
+    // The assessment records buckets; file the closest one so a
+    // later retake opens on an honest prefill. The stores below
+    // carry the exact numbers the user typed.
+    a.water = gal <= 0 ? "none" : gal <= 3 ? "g3" : gal <= 10 ? "g10" : gal <= 25 ? "g25" : "g55";
+    var foodDays = kcal / (hh * 2000);
+    a.food = kcal <= 0 ? "none" : foodDays <= 3 ? "few" : foodDays <= 7 ? "week" : foodDays <= 14 ? "twoWeeks" : "month";
+    checkinCrewSync(a);
+    quickStoreSync(gal, kcal, hh);
+    a.done = true;
+    state.assessment = a;
+    var prevDone = {};
+    (Array.isArray(state.firstOrders) ? state.firstOrders : []).forEach(function (o) { if (o && o.done) prevDone[o.text] = true; });
+    state.firstOrders = firstOrdersList(a).map(function (o) { return { text: o.text, done: !!prevDone[o.text], shopKey: o.shopKey || null }; });
+    var fresh = {};
+    state.firstOrders.forEach(function (o, i) { if (o.done) fresh[i] = true; });
+    state.checklists["firstOrders"] = fresh;
+    saveState();
+  }
+
+  var QUICK_STEPS = [
+    { key: "household", title: "Your Household", sub: "HOW MANY PEOPLE RIDE OUT THE EMERGENCY WITH YOU? DAYS READY IS COMPUTED PER PERSON - THIS COUNT BECOMES YOUR CREW." },
+    { key: "water", title: "Stored Water", sub: "DRINKING WATER ON HAND RIGHT NOW, IN GALLONS - BOTTLES, JUGS, BARRELS, ALL OF IT. TYPE IT, OR TAP A CLOSE GUESS." },
+    { key: "food", title: "Stored Food", sub: "FOOD SET ASIDE, IN CALORIES. THE MATH RUNS AT 2,000 KCAL PER PERSON PER DAY - OR TAP HOW MANY DAYS OF FOOD YOU HAVE AND WE CONVERT IT." }
+  ];
+  var QUICK_WATER_CHIPS = [0, 3, 10, 25, 55];
+  var QUICK_FOOD_DAY_CHIPS = [0, 3, 7, 14, 30];
+
+  function quickStepHtml() {
+    var step = QUICK_STEPS[quick.step];
+    var key = step.key;
+    var h = "<p class=\"nx-stat-label\">Quick Start // Step " + (quick.step + 1) + " of " + QUICK_STEPS.length + "</p>" +
+      "<div class=\"nx-seg\">" + segHtml(((quick.step + 1) / QUICK_STEPS.length) * 100, false) + "</div>" +
+      "<div class=\"nx-checkin-art\">" + artBig(key) + "</div>" +
+      "<h2 class=\"nx-h\" style=\"margin-top:14px;\">" + esc(step.title) + "</h2>" +
+      "<p class=\"nx-h-note\">" + esc(step.sub) + "</p>";
+    if (quick.fromLanding && quick.step === 0) {
+      h += "<p class=\"nx-kv\" style=\"margin-top:10px;\">YOUR LANDING NUMBERS CAME WITH YOU - ADJUST ANYTHING, THEN LOCK THEM IN.</p>";
+    }
+    if (key === "household") {
+      h += "<div class=\"nx-switch-row\" style=\"justify-content:space-between; margin:12px 0;\">" +
+        "<div style=\"font-weight:700; letter-spacing:2px;\">PEOPLE</div>" +
+        "<div class=\"nx-btn-row\" style=\"margin:0;\">" +
+        "<button type=\"button\" class=\"nx-btn nx-btn-small\" data-quick-step=\"household\" data-delta=\"-1\">-</button>" +
+        "<span class=\"nx-row-weight\" id=\"nx-quick-n-household\" style=\"min-width:36px; text-align:center;\">" + quick.vals.household + "</span>" +
+        "<button type=\"button\" class=\"nx-btn nx-btn-small\" data-quick-step=\"household\" data-delta=\"1\">+</button>" +
+        "</div></div>" +
+        "<p class=\"nx-h-note\" style=\"margin-top:10px;\">CREW ENTRIES ARE CREATED FROM THIS COUNT - RENAME THEM IN THE CREW TAB.</p>";
+    } else if (key === "water") {
+      h += "<label class=\"nx-field\" style=\"display:block; margin-top:12px;\"><span class=\"nx-label\">Gallons of water stored</span>" +
+        "<input class=\"nx-input\" id=\"nx-quick-water\" type=\"number\" min=\"0\" max=\"100000\" step=\"1\" inputmode=\"numeric\" value=\"" + quick.vals.waterGal + "\"></label>" +
+        "<div class=\"nx-checkin-opts\" style=\"margin-top:10px;\">" +
+        QUICK_WATER_CHIPS.map(function (g) {
+          return "<button type=\"button\" class=\"nx-fbtn" + (quick.vals.waterGal === g ? " nx-on" : "") + "\" data-quick-water=\"" + g + "\">" + (g === 0 ? "NONE" : "ABOUT " + g + " GAL") + "</button>";
+        }).join("") + "</div>";
+    } else {
+      h += "<label class=\"nx-field\" style=\"display:block; margin-top:12px;\"><span class=\"nx-label\">Calories of food stored</span>" +
+        "<input class=\"nx-input\" id=\"nx-quick-food\" type=\"number\" min=\"0\" max=\"100000000\" step=\"500\" inputmode=\"numeric\" value=\"" + quick.vals.foodKcal + "\"></label>" +
+        "<p class=\"nx-h-note\" id=\"nx-quick-food-hint\" style=\"margin-top:8px;\">" + esc(quickFoodHint()) + "</p>" +
+        "<div class=\"nx-checkin-opts\" style=\"margin-top:10px;\">" +
+        QUICK_FOOD_DAY_CHIPS.map(function (dy) {
+          return "<button type=\"button\" class=\"nx-fbtn" + (quickFoodChipOn(dy) ? " nx-on" : "") + "\" data-quick-food-days=\"" + dy + "\">" + (dy === 0 ? "NONE SET ASIDE" : "ABOUT " + dy + " DAYS") + "</button>";
+        }).join("") + "</div>";
+    }
+    var last = quick.step === QUICK_STEPS.length - 1;
+    h += "<div class=\"nx-btn-row\" style=\"margin-top:18px;\">" +
+      (quick.step > 0 ? "<button type=\"button\" class=\"nx-btn\" id=\"nx-quick-back\">Back</button>" : "") +
+      (last
+        ? "<button type=\"button\" class=\"nx-btn nx-btn-accent\" id=\"nx-quick-finish\">See My Number</button>"
+        : "<button type=\"button\" class=\"nx-btn nx-btn-accent\" id=\"nx-quick-next\">Next</button>") +
+      "<button type=\"button\" class=\"nx-btn\" id=\"nx-quick-exit\">Skip for Now</button>" +
+      "</div>";
+    return h;
+  }
+  function quickFoodHint() {
+    var hh = clamp(Math.round(Number(quick.vals.household)) || 1, 1, 20);
+    var kcal = Number(quick.vals.foodKcal) || 0;
+    if (kcal <= 0) return "NO FOOD COUNTED YET - EVEN ONE SHELF OF STAPLES MOVES THE NUMBER.";
+    return "THAT IS ABOUT " + fmt(kcal / (hh * 2000), 1) + " DAYS OF FOOD FOR A HOUSEHOLD OF " + hh + ".";
+  }
+  function quickFoodChipOn(days) {
+    var hh = clamp(Math.round(Number(quick.vals.household)) || 1, 1, 20);
+    return Math.round(Number(quick.vals.foodKcal) || 0) === days * hh * 2000;
+  }
+
+  function quickPayoffHtml() {
+    var d = daysReady();
+    var h = "<p class=\"nx-stat-label\">Quick Start // Your Number</p>" +
+      "<div style=\"display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-top:4px;\">" +
+      "<span id=\"nx-quick-days\" style=\"font-family:var(--nx-mono); font-size:62px; font-weight:700; line-height:1;\">" + (d.headline == null ? "--" : fmt(d.headline, 1)) + "</span>" +
+      "<span style=\"font-family:var(--nx-mono); font-size:16px; color:var(--nx-dim);\">DAYS READY</span></div>" +
+      "<div class=\"nx-seg\" id=\"nx-quick-seg\" style=\"margin-top:10px;\">" + segHtml(d.headline == null ? 0 : (d.headline / 30) * 100, false) + "</div>";
+    if (d.headline == null) {
+      h += "<p class=\"nx-kv\" style=\"margin:10px 0 0 0;\">NO STORES COUNTED YET - ADD WATER OR FOOD IN THE ROTATE TAB AND YOUR NUMBER APPEARS.</p>";
+    } else {
+      h += "<p class=\"nx-kv\" style=\"margin:10px 0 0 0;\">WATER <b>" + (d.waterDays == null ? "--" : fmt(d.waterDays, 1) + " DAYS") + "</b>" +
+        " // FOOD <b>" + (d.foodDays == null ? "--" : fmt(d.foodDays, 1) + " DAYS") + "</b>" +
+        " // HOUSEHOLD <b>" + d.household + "</b></p>" +
+        "<p class=\"nx-kv\" style=\"margin:2px 0 0 0;\">WEAKEST LINK: <b>" + esc((d.limiting || "").toUpperCase()) + "</b></p>" +
+        "<p class=\"nx-kv\" style=\"margin:2px 0 0 0;\">FIRST ADD // <b>" + esc(d.gap) + "</b></p>";
+    }
+    var orders = Array.isArray(state.firstOrders) ? state.firstOrders : [];
+    if (orders.length) {
+      h += "<p class=\"nx-h-note\" style=\"margin-top:12px;\">" + orders.length + " FIRST ORDER" + (orders.length > 1 ? "S ARE" : " IS") + " WAITING IN THE LISTS TAB - YOUR GAPS, IN FIX-FIRST ORDER.</p>";
+    }
+    h += "<p class=\"nx-h-note\" style=\"margin-top:8px;\">YOUR STORES ARE LOGGED - EDIT THEM ANY TIME IN THE ROTATE TAB. THE FULL CHECK-IN ADDS CLIMATE, MEDICAL, GO-BAG AND COMMS FOR THE COMPLETE PICTURE.</p>" +
+      "<div class=\"nx-btn-row\" style=\"margin-top:16px;\">" +
+      "<button type=\"button\" class=\"nx-btn nx-btn-accent\" id=\"nx-quick-done\">Enter Command</button>" +
+      (d.headline != null ? "<button type=\"button\" class=\"nx-btn\" id=\"nx-quick-share\">Share My Number</button>" : "") +
+      "<button type=\"button\" class=\"nx-btn\" id=\"nx-quick-full\">Run the Full Check-In</button>" +
+      "</div>";
+    return h;
+  }
+
+  function renderQuick() {
+    if (!quick.open) return;
+    var body = $("nx-checkin-body");
+    if (!body) return;
+    body.innerHTML = quick.step >= QUICK_STEPS.length ? quickPayoffHtml() : quickStepHtml();
+    if (quick.step >= QUICK_STEPS.length && fxAnimate()) {
+      var d = daysReady();
+      var big = $("nx-quick-days");
+      if (big && d.headline != null) countUp(big, d.headline, 1);
+      var seg = $("nx-quick-seg");
+      if (seg) segAnimate(seg, d.headline == null ? 0 : (d.headline / 30) * 100, false);
+    }
+  }
+
+  function syncQuickChips() {
+    document.querySelectorAll("[data-quick-water]").forEach(function (b) {
+      b.classList.toggle("nx-on", Number(b.getAttribute("data-quick-water")) === Number(quick.vals.waterGal));
+    });
+    document.querySelectorAll("[data-quick-food-days]").forEach(function (b) {
+      b.classList.toggle("nx-on", quickFoodChipOn(Number(b.getAttribute("data-quick-food-days"))));
+    });
+  }
+
+  function bindQuickStart() {
+    var body = $("nx-checkin-body");
+    if (!body) return;
+    body.addEventListener("click", function (ev) {
+      if (!quick.open) return;
+      var stepBtn = ev.target.closest("[data-quick-step]");
+      if (stepBtn) {
+        var delta = Number(stepBtn.getAttribute("data-delta")) || 0;
+        quick.vals.household = clamp((Number(quick.vals.household) || 1) + delta, 1, 20);
+        var n = $("nx-quick-n-household");
+        if (n) n.textContent = quick.vals.household;
+        return;
+      }
+      var wChip = ev.target.closest("[data-quick-water]");
+      if (wChip) {
+        quick.vals.waterGal = Number(wChip.getAttribute("data-quick-water")) || 0;
+        var wIn = $("nx-quick-water");
+        if (wIn) wIn.value = quick.vals.waterGal;
+        syncQuickChips();
+        return;
+      }
+      var fChip = ev.target.closest("[data-quick-food-days]");
+      if (fChip) {
+        var hh = clamp(Math.round(Number(quick.vals.household)) || 1, 1, 20);
+        quick.vals.foodKcal = (Number(fChip.getAttribute("data-quick-food-days")) || 0) * hh * 2000;
+        var fIn = $("nx-quick-food");
+        if (fIn) fIn.value = quick.vals.foodKcal;
+        var hint = $("nx-quick-food-hint");
+        if (hint) hint.textContent = quickFoodHint();
+        syncQuickChips();
+        return;
+      }
+      if (ev.target.closest("#nx-quick-next")) { sfxConfirm(); quick.step++; renderQuick(); return; }
+      if (ev.target.closest("#nx-quick-back")) { if (quick.step > 0) quick.step--; renderQuick(); return; }
+      if (ev.target.closest("#nx-quick-finish")) {
+        sfxConfirm();
+        applyQuickStart();
+        quick.step = QUICK_STEPS.length;
+        renderAll();
+        renderQuick();
+        return;
+      }
+      if (ev.target.closest("#nx-quick-exit")) { quickDismissed = true; closeQuickStart(); renderAll(); return; }
+      if (ev.target.closest("#nx-quick-done")) { closeQuickStart(); renderAll(); return; }
+      if (ev.target.closest("#nx-quick-share")) { closeQuickStart(); renderAll(); openShareCard(); return; }
+      if (ev.target.closest("#nx-quick-full")) { closeQuickStart(); openCheckin(); return; }
+    });
+    body.addEventListener("input", function (ev) {
+      if (!quick.open) return;
+      if (ev.target.id === "nx-quick-water") {
+        quick.vals.waterGal = clamp(Number(ev.target.value) || 0, 0, 100000);
+        syncQuickChips();
+      } else if (ev.target.id === "nx-quick-food") {
+        quick.vals.foodKcal = clamp(Math.round(Number(ev.target.value) || 0), 0, 100000000);
+        var hint = $("nx-quick-food-hint");
+        if (hint) hint.textContent = quickFoodHint();
+        syncQuickChips();
+      }
+    });
   }
 
   /* ---------------- guided walkthrough ----------------
@@ -6660,6 +7058,7 @@
       markWelcomeSeen();
       closeWelcome();
       runDeferredCheckin();
+      maybeOpenQuickStart();
       return;
     }
     /* Whose save is on this device? A save left behind by a
@@ -6730,6 +7129,7 @@
     markWelcomeSeen();
     closeWelcome();
     runDeferredCheckin();
+    maybeOpenQuickStart();
   }
   async function signUpWithEmail(email, password) {
     explicitSignOut = false;
@@ -7473,6 +7873,305 @@
     } catch (e) { save(); }
   }
 
+  /* ---------------- Phase 3: shareable Days Ready card ----------------
+     The brag sheet. A portrait PNG (1080x1350, the feed size
+     for Facebook, Instagram, Threads and TikTok photo posts)
+     rendered on a canvas from the same daysReady() and
+     readinessLevel() outputs the dashboard shows, so the card
+     can never disagree with the screen it came from. It always
+     renders in the Command palette, like the sitrep card, so
+     it reads the same in every feed it lands in. Privacy: the
+     card carries numbers and counts only - no name, no email,
+     no callsign, no account data of any kind. The headline
+     honors the dashDisplay setting exactly the way the
+     dashboard does: a level-mode user headlines their LEVEL
+     with the exact days smaller beneath, never a raw count. */
+  var SHARE_CARD_W = 1080, SHARE_CARD_H = 1350;
+  var shareCardUrl = null;
+
+  function shareCardModel() {
+    var d = daysReady();
+    var mode = dashDisplayMode();
+    var lvl = readinessLevel(d);
+    var now = new Date();
+    var m = {
+      d: d, mode: mode, lvl: lvl,
+      headlineKind: null, headline: null, daysLine: null, levelLine: null,
+      pct: 0,
+      waterVal: d.waterDays == null ? "--" : fmt(d.waterDays, 1) + " DAYS",
+      waterAmt: d.waterDays == null ? "NO WATER STORES" : fmt(d.waterGal, 1) + " GAL STORED",
+      foodVal: d.foodDays == null ? "--" : fmt(d.foodDays, 1) + " DAYS",
+      foodAmt: d.foodDays == null ? "ADD CALORIES TO A FOOD STORE" : fmt(d.foodKcal, 0) + " KCAL STORED",
+      householdLine: "HOUSEHOLD: " + d.household,
+      weakest: (d.limiting || "").toUpperCase(),
+      gap: d.gap || "",
+      dateLine: MONTHS_SHORT[now.getMonth()] + " " + now.getDate() + ", " + now.getFullYear()
+    };
+    if (d.headline == null) return m;
+    if (mode === "level" && lvl) {
+      m.headlineKind = "level";
+      m.headline = lvl.name;
+      m.daysLine = fmt(d.headline, 1) + " DAYS READY";
+      m.pct = lvl.pct;
+    } else {
+      m.headlineKind = "days";
+      m.headline = fmt(d.headline, 1);
+      if (mode === "both" && lvl) m.levelLine = "LEVEL // " + lvl.name;
+      m.pct = (d.headline / 30) * 100;
+    }
+    return m;
+  }
+
+  function shareChamfer(c, x, y, w, h, cut) {
+    c.beginPath();
+    c.moveTo(x + cut, y);
+    c.lineTo(x + w - cut, y);
+    c.lineTo(x + w, y + cut);
+    c.lineTo(x + w, y + h - cut);
+    c.lineTo(x + w - cut, y + h);
+    c.lineTo(x + cut, y + h);
+    c.lineTo(x, y + h - cut);
+    c.lineTo(x, y + cut);
+    c.closePath();
+  }
+  function shareFitFont(c, text, weight, size, family, maxW) {
+    var s = size;
+    c.font = weight + " " + s + "px " + family;
+    while (s > 30 && c.measureText(text).width > maxW) {
+      s -= 6;
+      c.font = weight + " " + s + "px " + family;
+    }
+    return s;
+  }
+  function shareSpacing(c, px) {
+    try { c.letterSpacing = px; } catch (e) { /* older canvas - spacing is a garnish, not a requirement */ }
+  }
+
+  function buildShareCardCanvas() {
+    var m = shareCardModel();
+    var d = m.d;
+    var W = SHARE_CARD_W, H = SHARE_CARD_H;
+    var cv = document.createElement("canvas");
+    cv.width = W; cv.height = H;
+    var c = cv.getContext("2d");
+    var INK = "#d8dbe0", DIM = "#8b9099", FAINT = "#5c6169", ORANGE = "#ff7300", LINE = "#3a3f48";
+    var SANS = "Rajdhani, 'Arial Narrow', sans-serif";
+    var MONO = "'JetBrains Mono', monospace";
+    // Backdrop: near-black, faint grid, faint radar rings.
+    c.fillStyle = "#0a0b0c"; c.fillRect(0, 0, W, H);
+    c.strokeStyle = "rgba(216,219,224,0.045)"; c.lineWidth = 1;
+    for (var gx = 90; gx < W; gx += 90) { c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, H); c.stroke(); }
+    for (var gy = 90; gy < H; gy += 90) { c.beginPath(); c.moveTo(0, gy); c.lineTo(W, gy); c.stroke(); }
+    c.strokeStyle = "rgba(255,115,0,0.09)"; c.lineWidth = 2;
+    [150, 250, 350, 450].forEach(function (r) { c.beginPath(); c.arc(W / 2, 455, r, 0, Math.PI * 2); c.stroke(); });
+    c.strokeStyle = "rgba(255,115,0,0.05)";
+    c.beginPath(); c.moveTo(W / 2, 5); c.lineTo(W / 2, 905); c.stroke();
+    c.beginPath(); c.moveTo(90, 455); c.lineTo(990, 455); c.stroke();
+    // Frame and top bar.
+    c.fillStyle = ORANGE; c.fillRect(0, 0, W, 12);
+    c.strokeStyle = LINE; c.lineWidth = 3; c.strokeRect(24, 24, W - 48, 1278);
+    // Wordmark.
+    c.textAlign = "center"; c.textBaseline = "alphabetic";
+    c.fillStyle = INK;
+    c.font = "700 68px " + SANS;
+    c.fillText("NYXSURVIVE\u2122", W / 2, 150);
+    shareSpacing(c, "6px");
+    c.font = "700 24px " + MONO; c.fillStyle = ORANGE;
+    c.fillText("OFFLINE SURVIVAL OS", W / 2, 198);
+    shareSpacing(c, "0px");
+    // Headline panel (chamfered, like the app's own panels).
+    shareChamfer(c, 66, 250, W - 132, 410, 26);
+    c.fillStyle = "rgba(216,219,224,0.03)"; c.fill();
+    c.strokeStyle = LINE; c.lineWidth = 2; c.stroke();
+    shareSpacing(c, "4px");
+    c.font = "26px " + MONO; c.fillStyle = DIM;
+    c.fillText(m.headlineKind === "level" ? "READINESS LEVEL" : "HOUSEHOLD SUSTAINMENT", W / 2, 320);
+    shareSpacing(c, "0px");
+    if (m.headlineKind === "level") {
+      c.fillStyle = INK;
+      shareFitFont(c, m.headline, "700", 96, SANS, 900);
+      c.fillText(m.headline, W / 2, 478);
+      c.font = "700 44px " + MONO; c.fillStyle = ORANGE;
+      c.fillText(m.daysLine, W / 2, 572);
+    } else {
+      c.fillStyle = INK;
+      shareFitFont(c, m.headline, "700", 250, MONO, 900);
+      c.fillText(m.headline, W / 2, 522);
+      shareSpacing(c, "6px");
+      c.font = "700 46px " + SANS; c.fillStyle = ORANGE;
+      c.fillText("DAYS READY", W / 2, 602);
+      shareSpacing(c, "0px");
+      if (m.levelLine) {
+        c.font = "28px " + MONO; c.fillStyle = DIM;
+        c.fillText(m.levelLine, W / 2, 646);
+      }
+    }
+    // Segmented readiness bar - same 10-block math as segHtml.
+    var segOn = Math.round(clamp(m.pct, 0, 100) / 10);
+    for (var si = 0; si < 10; si++) {
+      c.fillStyle = si < segOn ? ORANGE : "#23262c";
+      c.fillRect(66 + si * (84 + 12), 706, 84, 26);
+    }
+    // Water and food, mirroring the dashboard breakdown wording.
+    c.textAlign = "left";
+    shareSpacing(c, "3px");
+    c.font = "700 36px " + SANS; c.fillStyle = ORANGE;
+    c.fillText("WATER", 90, 812);
+    c.fillText("FOOD", 90, 946);
+    shareSpacing(c, "0px");
+    c.textAlign = "right";
+    c.font = "700 46px " + MONO; c.fillStyle = INK;
+    c.fillText(m.waterVal, 990, 812);
+    c.fillText(m.foodVal, 990, 946);
+    c.font = "26px " + MONO; c.fillStyle = DIM;
+    c.fillText(m.waterAmt, 990, 856);
+    c.fillText(m.foodAmt, 990, 990);
+    // Divider, household, date.
+    c.strokeStyle = LINE; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(90, 1036); c.lineTo(990, 1036); c.stroke();
+    c.textAlign = "left";
+    c.font = "32px " + MONO; c.fillStyle = INK;
+    c.fillText(m.householdLine, 90, 1090);
+    c.textAlign = "right"; c.fillStyle = DIM;
+    c.fillText(m.dateLine, 990, 1090);
+    // Weakest link and the next step, straight from daysReady().
+    c.textAlign = "left";
+    c.font = "32px " + MONO; c.fillStyle = DIM;
+    var weakLabel = "WEAKEST LINK: ";
+    c.fillText(weakLabel, 90, 1142);
+    var weakW = c.measureText(weakLabel).width;
+    c.font = "700 32px " + MONO; c.fillStyle = ORANGE;
+    c.fillText(m.weakest, 90 + weakW, 1142);
+    if (m.gap) {
+      c.font = "28px " + MONO; c.fillStyle = DIM;
+      shareFitFont(c, m.gap, "400", 28, MONO, 900);
+      c.fillText(m.gap, 90, 1192);
+    }
+    // The band that makes every shared card an ad.
+    c.fillStyle = ORANGE; c.fillRect(27, 1216, W - 54, 83);
+    c.textAlign = "center";
+    c.font = "700 44px " + SANS; c.fillStyle = "#0a0b0c";
+    shareFitFont(c, "GET YOUR NUMBER - NYXSURVIVE.COM", "700", 44, SANS, 980);
+    c.fillText("GET YOUR NUMBER - NYXSURVIVE.COM", W / 2, 1272);
+    c.font = "20px " + MONO; c.fillStyle = FAINT;
+    c.fillText("\u00A9 Nyx Collective LLC", W / 2, 1336);
+    return cv;
+  }
+
+  /* Draw once with whatever fonts are on hand, then redraw
+     when the webfonts land so the preview (and the cached
+     data URL) carry Rajdhani and JetBrains Mono, not the
+     fallbacks. Fully offline either way: nothing is fetched
+     here, the faces come from the page's own stylesheet. */
+  function renderSharePreview() {
+    var draw = function () {
+      try {
+        shareCardUrl = buildShareCardCanvas().toDataURL("image/png");
+        var img = $("nx-share-img");
+        if (img) {
+          img.src = shareCardUrl;
+          if (fxAnimate()) {
+            img.classList.remove("nx-share-pop");
+            void img.offsetWidth;
+            img.classList.add("nx-share-pop");
+          }
+        }
+      } catch (e) {
+        showMsg($("nx-share-msg"), "CARD GENERATION FAILED ON THIS DEVICE.", "err");
+      }
+    };
+    draw();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
+  }
+
+  /* One render path for both buttons: hand back a PNG blob,
+     waiting briefly for the fonts so the file that leaves the
+     device matches the preview. The timeout keeps a stuck
+     font promise from ever eating the tap. */
+  function shareCardBlob(cb) {
+    var finished = false;
+    var finish = function () {
+      if (finished) return;
+      finished = true;
+      var cv;
+      try { cv = buildShareCardCanvas(); } catch (e) { cb(null); return; }
+      try {
+        shareCardUrl = cv.toDataURL("image/png");
+        var img = $("nx-share-img");
+        if (img) img.src = shareCardUrl;
+      } catch (e) { /* the blob below is the deliverable; the preview refresh is a bonus */ }
+      if (cv.toBlob) cv.toBlob(function (b) { cb(b); }, "image/png");
+      else if (shareCardUrl) fetch(shareCardUrl).then(function (r) { return r.blob(); }).then(cb).catch(function () { cb(null); });
+      else cb(null);
+    };
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(finish);
+      setTimeout(finish, 600);
+    } else finish();
+  }
+  function downloadShareBlob(blob) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "nyxsurvive-days-ready.png";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  }
+  function sendShareCard() {
+    shareCardBlob(function (blob) {
+      if (!blob) { showMsg($("nx-share-msg"), "CARD GENERATION FAILED ON THIS DEVICE.", "err"); return; }
+      var file = null;
+      try { file = new File([blob], "nyxsurvive-days-ready.png", { type: "image/png" }); } catch (e) { /* no File constructor - download below */ }
+      if (file && navigator.canShare && navigator.share && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: "NyxSurvive Days Ready" }).then(function () {
+          showMsg($("nx-share-msg"), "CARD SHARED - YOUR NUMBER IS OUT THERE.", "good");
+        }, function (e) {
+          if (e && e.name === "AbortError") {
+            showMsg($("nx-share-msg"), "SHARE CANCELLED - NOTHING SENT.", "err");
+          } else {
+            downloadShareBlob(blob);
+            showMsg($("nx-share-msg"), "SHARE ROUTE FAILED - CARD DOWNLOADED INSTEAD.", "good");
+          }
+        });
+      } else {
+        downloadShareBlob(blob);
+        showMsg($("nx-share-msg"), "NO FILE SHARE ROUTE ON THIS DEVICE - CARD DOWNLOADED INSTEAD.", "good");
+      }
+    });
+  }
+  function downloadShareCard() {
+    shareCardBlob(function (blob) {
+      if (!blob) { showMsg($("nx-share-msg"), "CARD GENERATION FAILED ON THIS DEVICE.", "err"); return; }
+      downloadShareBlob(blob);
+      showMsg($("nx-share-msg"), "CARD DOWNLOADED - POST IT ANYWHERE.", "good");
+    });
+  }
+
+  /* The card only ever renders a real number. With no stores
+     counted, the tap routes to the fastest way to earn one:
+     the quick start (or the full check-in signed out), and
+     the Rotate tab when stores exist but none of them count. */
+  function routeShareEmpty() {
+    if (state.stores.length === 0 && !(state.assessment && state.assessment.done)) {
+      if (authUser) openQuickStart();
+      else openCheckin();
+    } else {
+      showView("rotate");
+    }
+  }
+  function openShareCard() {
+    var d = daysReady();
+    if (d.headline == null) { routeShareEmpty(); return; }
+    var p = $("nx-share-panel");
+    if (!p) return;
+    showMsg($("nx-share-msg"), "");
+    p.style.display = "";
+    renderSharePreview();
+    if (p.scrollIntoView) p.scrollIntoView({ block: "nearest" });
+  }
+
   /* ---------------- Phase 3B: grid-down mode ----------------
      Operator tier (a $9.99 add-on for free accounts, included
      in Operator). A stripped essentials screen for the night
@@ -7704,6 +8403,15 @@
     var sp = $("nx-sitrep-png");
     if (sp) sp.addEventListener("click", downloadSitrepPng);
 
+    var shb = $("nx-share-btn");
+    if (shb) shb.addEventListener("click", openShareCard);
+    var shc = $("nx-share-close");
+    if (shc) shc.addEventListener("click", function () { $("nx-share-panel").style.display = "none"; });
+    var shs = $("nx-share-send");
+    if (shs) shs.addEventListener("click", sendShareCard);
+    var shd = $("nx-share-download");
+    if (shd) shd.addEventListener("click", downloadShareCard);
+
     var ds = $("nx-drill-start");
     if (ds) ds.addEventListener("click", startDrill);
     var da = $("nx-drill-abort");
@@ -7776,6 +8484,24 @@
      the first-run check-in auto-open for that visit only (the
      check-in card still waits on Command and the check-in
      itself works normally afterward). No param, no change. */
+  /* A landing Operator Picks link arrives as app.html?picks=1.
+     Detecting the visit here lets init keep the check-in from
+     auto-opening over the picks; handling it after the share
+     params means the picks landing wins the view switch. */
+  function picksVisit() {
+    try { return new URLSearchParams(window.location.search).get("picks") === "1"; }
+    catch (e) { return false; }
+  }
+  function handlePicksParam() {
+    if (!picksVisit()) return;
+    try {
+      var u = new URL(window.location.href);
+      u.searchParams.delete("picks");
+      window.history.replaceState(null, "", u.pathname + u.search + u.hash);
+    } catch (e) { /* the landing still applies even if the URL cannot be rewritten */ }
+    gotoPicks();
+  }
+
   function handleJoinParam() {
     var join = null;
     try { join = new URLSearchParams(window.location.search).get("join"); } catch (e) { join = null; }
@@ -7805,8 +8531,12 @@
 
   function init() {
     document.querySelectorAll(".nx-tab").forEach(function (t) {
-      t.addEventListener("click", function () { showView(t.getAttribute("data-view")); });
+      t.addEventListener("click", function () {
+        if (t.hasAttribute("data-picks-link")) { gotoPicks(); return; }
+        showView(t.getAttribute("data-view"));
+      });
     });
+    bindPicksNav();
     bindSyncToggle();
     bindGear();
     bindRotation();
@@ -7826,6 +8556,7 @@
     bindResupply();
     bindBuyLater();
     bindCheckin();
+    bindQuickStart();
     bindSitrep();
     bindTour();
     bindIntel();
@@ -7851,12 +8582,15 @@
     renderAll();
     initAuth(); // resolves async; local-only deployments stay silent
     refreshAlerts(); // one fetch attempt per app load; cache covers offline
+    captureLandingParams(); // stash + strip any landing calculator numbers before the join handling rewrites the URL
     joinVisit = handleJoinParam(); // a landing sign-up / sign-in deep link beats the check-in auto-open for this visit only
-    if (!joinVisit) {
+    var picksDeep = picksVisit(); // a landing picks link beats the check-in auto-open the same way
+    if (!joinVisit && !picksDeep) {
       if (shareVisit()) maybeOpenCheckin(); // a share keeps the old order: check-in opens, the share switch lands on top
       else checkinPending = true; // first run: the check-in auto-open waits until the welcome question settles (see settleWelcome)
     }
     handleShareParams(); // a post shared into the app files itself in Intel - its view switch lands last on purpose, so a share beats the check-in auto-open
+    handlePicksParam(); // a landing picks link lands on Operator Picks - it runs after the share handling so the picks win the landing
     runBoot(function () { nxDashAnimated = false; renderDashboard(); });
     if ("serviceWorker" in navigator && /^https?:$/.test(window.location.protocol)) {
       navigator.serviceWorker.register("sw.js").catch(function () { /* offline shell is a bonus, not a requirement */ });
@@ -7888,6 +8622,23 @@
       answers: function () { return state.assessment; },
       orders: function () { return state.firstOrders; },
       areas: function () { return assessmentAreas(sanitizeAssessment(state.assessment)); }
+    },
+    // Quick start surface for the suites (phase 2): open the
+    // flow, read its state, and read any landing handoff.
+    quick: {
+      open: openQuickStart,
+      close: closeQuickStart,
+      flow: function () { return quick; },
+      prefill: function () { return landingPrefill; }
+    },
+    // Share card surface for the suites (phase 3): the model
+    // the card draws from, a direct canvas render, the opener
+    // and the last rendered data URL.
+    shareCard: {
+      model: shareCardModel,
+      canvas: buildShareCardCanvas,
+      open: openShareCard,
+      url: function () { return shareCardUrl; }
     },
     // Guided walkthrough surface for the suites.
     tour: {

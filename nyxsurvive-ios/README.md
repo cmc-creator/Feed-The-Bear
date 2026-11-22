@@ -60,8 +60,9 @@ a) CERTIFICATE SLOT + DURABLE SIGNING. The workflow no longer
    apps'.
 
 b) WWW FRESHNESS. The pack's www/ is a snapshot (refreshed
-   2026-11-17 from the 2026-11-16 restyle + Field Guide source,
-   including nx-qr.js). If the app code changed since, re-snapshot
+   2026-11-22 from the NyxSurvive web shell v32 source - the
+   Share My Number card and Operator Picks visibility included,
+   plus nx-qr.js). If the app code changed since, re-snapshot
    before building: in the NyxSurvive repo run
    `node native/prepare-www.js`, then replace this pack's
    nyxsurvive-ios/www/ with the fresh native/www/.

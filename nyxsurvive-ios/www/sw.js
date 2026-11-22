@@ -1,7 +1,7 @@
 /* NyxSurvive service worker - caches the app shell so the app
    installs and opens with zero connection. Data itself lives in
    localStorage and never passes through here. */
-var NX_CACHE = "nyxsurvive-shell-v29";
+var NX_CACHE = "nyxsurvive-shell-v32";
 var NX_SHELL = [
   "./",
   "index.html",

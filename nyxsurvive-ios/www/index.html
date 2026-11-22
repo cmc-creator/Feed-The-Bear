@@ -81,6 +81,7 @@
     <button type="button" class="nx-tab" data-view="comms">Comms</button>
     <button type="button" class="nx-tab" data-view="crew">Crew</button>
     <button type="button" class="nx-tab" data-view="lists">Lists</button>
+    <button type="button" class="nx-tab" data-view="lists" data-picks-link="1">Picks</button>
     <button type="button" class="nx-tab" data-view="intel">Intel</button>
     <button type="button" class="nx-tab" data-view="maps">Maps</button>
     <button type="button" class="nx-tab" data-view="guide">Guide</button>
@@ -141,14 +142,49 @@
       </div>
       <div class="nx-hero-scan"></div>
       <p class="nx-stat-label" id="nx-days-label">Days Ready // Household Sustainment</p>
-      <div style="display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-top:4px;">
-        <span id="nx-days-ready" style="font-family:var(--nx-mono); font-size:clamp(84px, 26vw, 104px); font-weight:700; line-height:1;">--</span>
-        <span id="nx-days-unit" style="font-family:var(--nx-mono); font-size:20px; font-weight:700; color:var(--nx-dim);">DAYS</span>
+      <div class="nx-ring-wrap">
+        <svg class="nx-ring" viewBox="0 0 200 200" aria-hidden="true" focusable="false">
+          <circle class="nx-ring-track" cx="100" cy="100" r="84"></circle>
+          <circle class="nx-ring-arc" id="nx-ring-arc" cx="100" cy="100" r="84"></circle>
+        </svg>
+        <div class="nx-ring-center">
+          <span id="nx-days-ready" style="font-family:var(--nx-mono); font-size:clamp(62px, 19vw, 82px); font-weight:700; line-height:1;">--</span>
+          <span id="nx-days-unit" style="font-family:var(--nx-mono); font-size:17px; font-weight:700; color:var(--nx-dim); letter-spacing:3px;">DAYS</span>
+          <span class="nx-ring-cap"><span id="nx-ring-pct">0%</span> OF 30-DAY GOAL</span>
+        </div>
       </div>
       <div class="nx-seg" id="nx-days-seg"></div>
+      <div class="nx-gauges">
+        <div class="nx-gauge" id="nx-gauge-water">
+          <div class="nx-gauge-head">
+            <span class="nx-gauge-led nx-radar-warn" id="nx-gauge-water-led"></span>
+            <span class="nx-gauge-name">WATER</span>
+            <span class="nx-gauge-val" id="nx-gauge-water-val">-- DAYS</span>
+            <span class="nx-gauge-weak-tag">WEAKEST LINK</span>
+          </div>
+          <div class="nx-seg" id="nx-gauge-water-seg"></div>
+        </div>
+        <div class="nx-gauge" id="nx-gauge-food">
+          <div class="nx-gauge-head">
+            <span class="nx-gauge-led nx-radar-warn" id="nx-gauge-food-led"></span>
+            <span class="nx-gauge-name">FOOD</span>
+            <span class="nx-gauge-val" id="nx-gauge-food-val">-- DAYS</span>
+            <span class="nx-gauge-weak-tag">WEAKEST LINK</span>
+          </div>
+          <div class="nx-seg" id="nx-gauge-food-seg"></div>
+        </div>
+      </div>
       <p class="nx-kv" id="nx-days-breakdown" style="margin:10px 0 0 0;"></p>
       <p class="nx-kv" id="nx-days-gap" style="margin:2px 0 0 0;"></p>
       <p class="nx-row-meta" id="nx-days-household"></p>
+      <div class="nx-btn-row" style="margin-top:12px;">
+        <button type="button" class="nx-btn nx-btn-small" id="nx-share-btn">Share My Number</button>
+      </div>
+    </div>
+    <div class="nx-panel" id="nx-picks-card" style="border-color:var(--nx-accent);">
+      <p class="nx-stat-label">Operator Picks // The Curated Gear List</p>
+      <p class="nx-kv" style="margin:8px 0 0 0;"><span class="nx-picks-count">96</span> HAND-PICKED ITEMS ON AMAZON, GROUPED BY JOB. BUY OPENS THE EXACT ITEM; SAVE PARKS IT ON YOUR BUY LATER LIST.</p>
+      <div class="nx-btn-row"><button type="button" class="nx-btn nx-btn-accent" id="nx-picks-open">Shop Operator Picks</button></div>
     </div>
     <div class="nx-panel" id="nx-checkin-card" style="display:none; border-color:var(--nx-accent);">
       <h2 class="nx-h">Readiness Check-In</h2>
@@ -208,6 +244,17 @@
         <button type="button" class="nx-btn nx-btn-accent" id="nx-sitrep-share">Share / Copy</button>
         <button type="button" class="nx-btn" id="nx-sitrep-png">Download PNG Card</button>
         <button type="button" class="nx-btn" id="nx-sitrep-close">Close</button>
+      </div>
+    </div>
+    <div class="nx-panel" id="nx-share-panel" style="display:none;">
+      <h2 class="nx-h">Share My Number</h2>
+      <p class="nx-h-note">Your Days Ready on a card, sized for posting. Numbers only - no name, no email, nothing private ever rides on it.</p>
+      <div class="nx-share-preview"><img id="nx-share-img" alt="Your Days Ready card"></div>
+      <div class="nx-msg" id="nx-share-msg"></div>
+      <div class="nx-btn-row">
+        <button type="button" class="nx-btn nx-btn-accent" id="nx-share-send">Share</button>
+        <button type="button" class="nx-btn" id="nx-share-download">Download PNG</button>
+        <button type="button" class="nx-btn" id="nx-share-close">Close</button>
       </div>
     </div>
     <div class="nx-grid nx-grid-4">
@@ -483,6 +530,12 @@
         <button type="button" class="nx-fbtn" data-loc-filter="Go-Bag">Go-Bag</button>
       </div>
       <div id="nx-gear-list"></div>
+    </div>
+
+    <div class="nx-panel">
+      <h2 class="nx-h">Operator Picks</h2>
+      <p class="nx-h-note">GEAR WORTH OWNING, HAND PICKED AND GROUPED BY JOB. THE FULL LIST OF <span class="nx-picks-count">96</span> PICKS LIVES WITH RESUPPLY: BUY OPENS THE EXACT ITEM ON AMAZON, SAVE PARKS IT ON YOUR BUY LATER LIST.</p>
+      <div class="nx-btn-row"><button type="button" class="nx-btn nx-btn-accent" id="nx-picks-open-gear">Open Operator Picks</button></div>
     </div>
   </section>
 
@@ -798,7 +851,8 @@
     <div class="nx-panel" id="nx-squad-panel">
       <h2 class="nx-h">Squad Sync</h2>
       <div class="nx-msg" id="nx-squad-msg"></div>
-      <div id="nx-squad-locked">
+      <div id="nx-squad-locked" class="nx-locked">
+        <div class="nx-lock-head"><span class="nx-lock-ic"><svg class="nx-lock-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true" focusable="false"><path d="M6 11h12v9H6Z M9 11V8a3 3 0 0 1 6 0v3 M12 14.5v2"/></svg></span><p class="nx-upsell-tag">LOCKED // SQUAD SYNC ADD-ON</p></div>
         <p class="nx-h-note">HAND YOUR WHOLE SQUAD TO ANOTHER PHONE IN ONE SCAN. YOUR CREW AND YOUR GEAR LOADOUT GO INTO A QR CODE; ANYONE WITH SQUAD SYNC SCANS IT AND IMPORTS THE LOT - CREW, GEAR, ASSIGNMENTS AND ALL. WORKS FULLY OFFLINE, PHONE TO PHONE. BOTH PHONES NEED THE ADD-ON.</p>
         <p class="nx-upsell-prices nx-buy-ui">$9.99 ONE-TIME</p>
         <div class="nx-btn-row">
@@ -859,7 +913,7 @@
       <div class="nx-msg" id="nx-buylater-msg"></div>
       <div id="nx-buylater-wrap"></div>
       <hr class="nx-divider">
-      <h3 class="nx-section-sub">Operator Picks // The Curated Gear List</h3>
+      <h3 class="nx-section-sub" id="nx-picks-anchor">Operator Picks // The Curated Gear List</h3>
       <p class="nx-h-note">HAND-PICKED GEAR WORTH OWNING, GROUPED BY JOB. BUY OPENS THE EXACT ITEM ON AMAZON; SAVE PARKS IT ON YOUR BUY LATER LIST UNTIL THE MONEY IS RIGHT.</p>
       <div id="nx-picks-wrap"></div>
     </div>
@@ -882,6 +936,10 @@
         </div>
       </div>
       <div id="nx-drill-result" style="margin-top:12px;"></div>
+      <div class="nx-locked nx-drill-pack">
+        <div class="nx-lock-head"><span class="nx-lock-ic"><svg class="nx-lock-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true" focusable="false"><path d="M6 11h12v9H6Z M9 11V8a3 3 0 0 1 6 0v3 M12 14.5v2"/></svg></span><p class="nx-upsell-tag">LOCKED // DRILL PACK</p></div>
+        <p class="nx-h-note" style="margin-bottom:0;">THE EVAC DRILL ABOVE IS THE FREE TASTE. THE DRILL PACK EXPANDS THE PROGRAM WITH MORE DRILLS TO RUN WITH YOUR CREW - IT IS STILL IN DEVELOPMENT AND ARRIVES WHEN IT IS FINISHED. NO PRE-ORDERS.</p>
+      </div>
     </div>
   </section>
 
@@ -917,7 +975,8 @@
       <h2 class="nx-h">Offline Map Packs</h2>
       <div class="nx-msg" id="nx-maps-msg"></div>
       <p class="nx-h-note">SCHEMATIC STATE MAPS FOR OFFLINE REFERENCE - STATE OUTLINE, MAJOR CITIES, AND YOUR HOME BASE MARKER WHEN IT FALLS IN THE STATE. A BOUGHT PACK DOWNLOADS ONCE AND LIVES ON THIS DEVICE; AFTER THAT IT WORKS WITH NO CONNECTION AT ALL. DOWNLOADING IS THE ONLY STEP THAT NEEDS A CONNECTION. VIEWING A DOWNLOADED PACK NEEDS NO ACCOUNT. SCHEMATIC STATE MAP - NOT FOR NAVIGATION.</p>
-      <div id="nx-maps-locked">
+      <div id="nx-maps-locked" class="nx-locked">
+        <div class="nx-lock-head"><span class="nx-lock-ic"><svg class="nx-lock-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true" focusable="false"><path d="M6 11h12v9H6Z M9 11V8a3 3 0 0 1 6 0v3 M12 14.5v2"/></svg></span><p class="nx-upsell-tag">LOCKED // MAP PACKS</p></div>
         <p class="nx-h-note">WHEN THE GRID AND THE SIGNAL ARE GONE, A PAPER-THIN SCHEMATIC OF YOUR STATE IS STILL WORTH HAVING: THE OUTLINE, THE CITIES, AND WHERE HOME BASE SITS. BUY ONLY YOUR STATE, OR TAKE ALL 50 AND NEVER THINK ABOUT IT AGAIN.</p>
         <p class="nx-upsell-prices nx-buy-ui">$9.99 PER STATE - $29.99 ALL 50</p>
         <p class="nx-h-note nx-ios-note">MAP PACK MEMBERS: SIGN IN AND YOUR PACKS WORK HERE AUTOMATICALLY.</p>
