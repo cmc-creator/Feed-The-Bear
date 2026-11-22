@@ -7,7 +7,7 @@ asGrizzly(); // uses Grizzly-only features
   const browser = await launch();
   const p = await newPage(browser, { seed: [{ id: 'r1', name: 'The Mission', cuisine: 'Mexican', status: 'visited', tags: [], visits: [] }] });
   await p.route(/wikimedia|overpass|nominatim/, r => r.abort());
-  let offer = { trial: true, days: 7 };
+  let offer = { trial: true, days: 14 };
   let checkoutBody = null;
   let rewards = { grizzlyUntil: null, invites: 0 };
   await p.route('**/api/create-checkout**', async r => {
@@ -44,7 +44,7 @@ asGrizzly(); // uses Grizzly-only features
   });
   await p.evaluate(() => openUpgradeModal());
   await p.waitForTimeout(500);
-  check((await p.locator('#upgrade-cta-btn').innerText()) === 'Start my 7-day free trial' && /7 days free/i.test(await p.locator('#upgrade-plan-badge').innerText()), 'a new member is offered 7 days free');
+  check((await p.locator('#upgrade-cta-btn').innerText()) === 'Start my 14-day free trial' && /14 days free/i.test(await p.locator('#upgrade-plan-badge').innerText()), 'a new member is offered 14 days free');
   await p.click('#upgrade-monthly-btn');
   check(/then \$4\.99 a month/.test(await p.locator('#upgrade-footer').innerText()), 'switching to monthly updates the price after the trial');
   await p.evaluate(() => closeUpgradeModal());

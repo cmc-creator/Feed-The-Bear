@@ -4,7 +4,7 @@
    GET  ?uid=…&email=…&ref=…  → { trial, days }  (is a free trial on offer, and how long?)
    POST { uid, email, priceId, ref, playToken, promo } → { url, trial, days }  (Stripe Checkout link)
    promo: a discount code from an owner's VIP link (owner.js); applied for them.
-   ref is the uid from a friend's invite link: 30 days instead of 7.
+   ref is the uid from a friend's invite link: 30 days instead of 14.
    playToken: from Google in the Play app, so the sale is reported to Google (_play.js).
    ios: true from the iPhone app, which opens checkout in Safari; Stripe then
    sends them to native-return.html, whose button reopens the app.
@@ -24,7 +24,7 @@ const { validInviter } = require('./_referral');
 const ALLOWED_PRICES = (process.env.STRIPE_PRICE_IDS || 'price_1UW2DmLzFIsRCvKRfFexC3P8,price_1UW2F1LzFIsRCvKRvztAuCOE')
   .split(',').map(s => s.trim()).filter(Boolean);
 
-const TRIAL_DAYS = 7;
+const TRIAL_DAYS = 14;
 const INVITED_TRIAL_DAYS = 30; // came from a friend's invite link (see _referral.js)
 
 function getAdmin () {

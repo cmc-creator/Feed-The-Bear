@@ -1,4 +1,4 @@
-// Free trial and invite rewards on the server: one 7-day trial per person,
+// Free trial and invite rewards on the server: one 14-day trial per person,
 // 30 days from a friend's invite, and the inviter's free month once the friend pays.
 const Module = require('module');
 const { Readable } = require('stream');
@@ -86,12 +86,12 @@ const PRICE = 'price_1UW2DmLzFIsRCvKRfFexC3P8';
   process.env.FIREBASE_SERVICE_ACCOUNT = '{}';
   process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
 
-  // A brand new account gets the 7-day trial.
+  // A brand new account gets the 14-day trial.
   docs['users/newbie0000001/meta/profile'] = { name: 'New' };
   let r = await call(checkout, { query: { uid: 'newbie0000001', email: 'new@example.com' } });
-  check(r.data.trial === true && r.data.days === 7, `a new account is offered a 7-day free trial (${JSON.stringify(r.data)})`);
+  check(r.data.trial === true && r.data.days === 14, `a new account is offered a 14-day free trial (${JSON.stringify(r.data)})`);
   r = await call(checkout, { method: 'POST', body: { uid: 'newbie0000001', email: 'new@example.com', priceId: PRICE } });
-  check(stripeCalls.sessions.at(-1).subscription_data.trial_period_days === 7, 'checkout starts with 7 free days');
+  check(stripeCalls.sessions.at(-1).subscription_data.trial_period_days === 14, 'checkout starts with 14 free days');
 
   // A trial checkout completes with nothing charged: still unlocks Grizzly, and the trial is used up.
   sessionsById.cs_t1 = { id: 'cs_t1', status: 'complete', payment_status: 'no_payment_required', customer: 'cus_t1', subscription: 'sub_t1', metadata: { uid: 'newbie0000001' } };
@@ -132,9 +132,9 @@ const PRICE = 'price_1UW2DmLzFIsRCvKRfFexC3P8';
   r = await call(checkout, { query: { uid: 'friend00000001', email: 'friend@example.com', ref: 'inviterfree001' } });
   check(r.data.days === 30, 'an invited friend gets a 30-day trial');
   r = await call(checkout, { query: { uid: 'friend00000001', email: 'friend@example.com', ref: 'nobody00000000' } });
-  check(r.data.days === 7, 'a made-up invite code gives the normal 7 days');
+  check(r.data.days === 14, 'a made-up invite code gives the normal 14 days');
   r = await call(checkout, { query: { uid: 'friend00000001', email: 'friend@example.com', ref: 'friend00000001' } });
-  check(r.data.days === 7, 'you cannot invite yourself');
+  check(r.data.days === 14, 'you cannot invite yourself');
   await call(checkout, { method: 'POST', body: { uid: 'friend00000001', email: 'friend@example.com', priceId: PRICE, ref: 'inviterfree001' } });
   const sess = stripeCalls.sessions.at(-1);
   check(sess.subscription_data.trial_period_days === 30 && sess.metadata.ref === 'inviterfree001' && sess.subscription_data.metadata.ref === 'inviterfree001', 'the invite is carried through checkout onto the subscription');

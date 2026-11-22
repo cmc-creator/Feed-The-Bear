@@ -1652,10 +1652,10 @@ function _setUpgradePlan (period) {
 }
 
 // ─── FREE TRIAL & INVITES ─────────────────────────────────────
-// New members get 7 days free (30 from a friend's invite link). The server
+// New members get 14 days free (30 from a friend's invite link). The server
 // decides who is eligible (api/create-checkout.js); signed out, we assume yes.
 const REF_KEY = 'ftb_ref_v1';
-let _trialOffer = { trial: true, days: 7 };
+let _trialOffer = { trial: true, days: 14 };
 
 function _inviteRef () {
   try { return localStorage.getItem(REF_KEY) || ''; } catch { return ''; }
@@ -1734,7 +1734,7 @@ function _renderTrialOffer () {
 async function _refreshTrialOffer () {
   const user = _auth?.currentUser;
   const ref = _inviteRef();
-  if (!user) { _trialOffer = { trial: true, days: ref ? 30 : 7 }; _renderTrialOffer(); return; }
+  if (!user) { _trialOffer = { trial: true, days: ref ? 30 : 14 }; _renderTrialOffer(); return; }
   try {
     const q = new URLSearchParams({ uid: user.uid, email: user.email || '', ref });
     const data = await (await fetch(`/api/create-checkout?${q}`)).json();
