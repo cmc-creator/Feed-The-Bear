@@ -1,0 +1,271 @@
+# Builds the NYXHICSLAB iPhone app (bundle com.nyxcollective.nyxhicslab)
+# from the build pack in nyxhicslab-ios/ (package.json, package-lock.json,
+# capacitor.config.json, www/, icon, signing scripts). This workflow
+# lives in the Feed-The-Bear repo because this repo's GitHub secrets
+# already hold the working App Store Connect key ("GitHub builds");
+# the HICS repo has no Apple secrets of its own (Apple's one-time .p8
+# download would not save in the browser used to set it up). Run it
+# manually: Actions -> "NyxHICSlab iPhone app" -> Run workflow. It
+# generates the Xcode project with `npx cap add ios`, applies the
+# NyxHICSlab icon, signs with this repo's four APPSTORE_/APPLE_
+# secrets, and uploads to App Store Connect, where the build lands
+# on the NyxHICSlab app record once that record is created (bundle
+# ID registration + app record happen in App Store Connect first;
+# the signing script refuses to make a profile for an unregistered
+# bundle ID). Unlike NyxSurvive, whose pack bundles a web snapshot,
+# NyxHICSlab is a server.url shell like Feed the Bear: the pack's
+# www/ is only the placeholder Capacitor requires, and the app loads
+# https://www.nyxhicslab.com live.
+#
+# SIGNING - SHARED CERTIFICATE, OWN PROFILE (the deliberate
+# difference from nyxsurvive-ios.yml): Apple caps the account at 3
+# distribution certificates and all 3 slots are in use, so this
+# workflow NEVER mints a certificate and fails loudly if the saved
+# signing store is missing. It restores the shared distribution key
+# + certificate from the "ios-signing-store" branch (folder
+# ios-signing/, fingerprint-checked), exactly like the NyxSurvive
+# workflow - but it does NOT restore or touch the
+# profile.mobileprovision stored there, which belongs to NyxSurvive
+# (com.nyxcollective.nyxsurvive). Provisioning profiles are per
+# bundle ID, so NyxHICSlab keeps its own App Store profile in a
+# SEPARATE folder on the same branch, ios-signing-hicslab/ (its own
+# base64 pieces, SHA256SUMS and meta.env). The first run mints only
+# that profile, against the shared certificate, and saves it there;
+# later runs restore and reuse it. The save step writes ONLY
+# ios-signing-hicslab/ and can never overwrite the NyxSurvive
+# profile. Further differences from nyxsurvive-ios.yml: pack folder
+# and workflow name, bundle ID, MARKETING_VERSION 1.0 (first
+# release; build number is still 1000 + run number), the CSR /
+# certificate-mint branch is gone (asc-sign.js is called in its
+# "profile" mode with CERT_ID from the shared store's meta.env),
+# and the cleanup step keeps the shared certificate and this app's
+# profile, same as the sister workflow.
+name: NyxHICSlab iPhone app
+
+on:
+  workflow_dispatch:
+
+permissions:
+  # write (not read) so the "Save the NyxHICSlab profile" step can
+  # push the ios-signing-store branch. Nothing else pushes.
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      HAS_KEY: ${{ secrets.APPSTORE_KEY_P8 != '' && secrets.APPSTORE_KEY_ID != '' && secrets.APPSTORE_ISSUER_ID != '' && secrets.APPLE_TEAM_ID != '' }}
+    defaults:
+      run:
+        working-directory: nyxhicslab-ios
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for the saved signing store
+        id: storecheck
+        working-directory: .
+        run: |
+          if git ls-remote --exit-code --heads origin ios-signing-store >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "The shared signing store exists on the ios-signing-store branch."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No ios-signing-store branch: NyxHICSlab cannot sign (it must never mint a certificate). Failing on purpose."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          ref: ios-signing-store
+          path: .signing-store
+      - name: Restore the shared identity and (if saved) this app's profile
+        working-directory: .
+        run: |
+          set -euo pipefail
+          STORE="$GITHUB_WORKSPACE/.signing-store/ios-signing"
+          test -d "$STORE" || { echo "ios-signing-store branch has no ios-signing/ folder - refusing to guess."; exit 1; }
+          RESTORE="$RUNNER_TEMP/sign-restore"; mkdir -p "$RESTORE"
+          # Shared key + certificate ONLY. The profile.mobileprovision in
+          # ios-signing/ is NyxSurvive's and is deliberately not restored.
+          for f in key.pem cert.pem; do
+            cat "$STORE/$f.b64."* > "$RESTORE/$f.b64"
+            /usr/bin/openssl base64 -d -A -in "$RESTORE/$f.b64" -out "$RESTORE/$f"
+            rm -f "$RESTORE/$f.b64"
+          done
+          grep -E ' (key|cert)\.pem$' "$STORE/SHA256SUMS" > "$RESTORE/SHA256SUMS"
+          (cd "$RESTORE" && shasum -a 256 -c SHA256SUMS)
+          cp "$STORE/meta.env" "$RESTORE/meta.env"
+          echo "SIGN_RESTORE_DIR=$RESTORE" >> "$GITHUB_ENV"
+          echo "SIGN_RESTORED=true" >> "$GITHUB_ENV"
+          echo "Restored the shared signing identity; fingerprints verified. No new certificate will be made."
+          # This app's own profile, if a previous run saved one.
+          HSTORE="$GITHUB_WORKSPACE/.signing-store/ios-signing-hicslab"
+          if [ -d "$HSTORE" ]; then
+            PRESTORE="$RUNNER_TEMP/profile-restore"; mkdir -p "$PRESTORE"
+            cat "$HSTORE/profile.mobileprovision.b64."* > "$PRESTORE/profile.mobileprovision.b64"
+            /usr/bin/openssl base64 -d -A -in "$PRESTORE/profile.mobileprovision.b64" -out "$PRESTORE/profile.mobileprovision"
+            rm -f "$PRESTORE/profile.mobileprovision.b64"
+            cp "$HSTORE/SHA256SUMS" "$PRESTORE/SHA256SUMS"
+            (cd "$PRESTORE" && shasum -a 256 -c SHA256SUMS)
+            cp "$HSTORE/meta.env" "$PRESTORE/meta.env"
+            echo "PROFILE_RESTORE_DIR=$PRESTORE" >> "$GITHUB_ENV"
+            echo "PROFILE_RESTORED=true" >> "$GITHUB_ENV"
+            echo "Restored the saved NyxHICSlab profile; fingerprints verified."
+          else
+            echo "No saved NyxHICSlab profile yet: this run mints one against the shared certificate and saves it."
+          fi
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Capacitor
+        run: npm ci
+      - name: Generate the iOS project (not kept in the repo)
+        run: |
+          if [ ! -d ios ]; then
+            npx cap add ios
+          fi
+      - name: Apply the NyxHICSlab launcher icon
+        run: cp icon-1024.png ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
+      - name: Sync web shell and plugins
+        run: npx cap sync ios
+      - name: Check it builds (simulator, unsigned)
+        working-directory: nyxhicslab-ios/ios/App
+        run: |
+          xcodebuild -project App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/dd-sim" CODE_SIGNING_ALLOWED=NO build | tail -40
+          test "${PIPESTATUS[0]}" -eq 0
+      - name: Check the App Store Connect key with Apple
+        if: ${{ env.HAS_KEY == 'true' && github.ref == 'refs/heads/main' }}
+        working-directory: .
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          KEY_P8: ${{ secrets.APPSTORE_KEY_P8 }}
+          KEY_OUT: ${{ runner.temp }}/AuthKey.p8
+        run: node nyxhicslab-ios/scripts/asc-check.js
+      - name: Sign and send to App Store Connect (TestFlight)
+        id: ship
+        if: ${{ env.HAS_KEY == 'true' && github.ref == 'refs/heads/main' }}
+        working-directory: nyxhicslab-ios/ios/App
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          BUNDLE_ID: com.nyxcollective.nyxhicslab
+        run: |
+          set -o pipefail
+          KEY_ID=$(echo "$KEY_ID" | tr -d '[:space:]'); ISSUER_ID=$(echo "$ISSUER_ID" | tr -d '[:space:]'); TEAM_ID=$(echo "$TEAM_ID" | tr -d '[:space:]')
+          export KEY_ID ISSUER_ID TEAM_ID
+          # The key check step saved a cleaned-up copy of the key.
+          KEY="$RUNNER_TEMP/AuthKey_$KEY_ID.p8"
+          mv "$RUNNER_TEMP/AuthKey.p8" "$KEY"
+          export KEY_FILE="$KEY"
+          SIGN="$RUNNER_TEMP/sign"; mkdir -p "$SIGN"
+
+          # 1. The shared distribution certificate always comes from the
+          #    signing store (this workflow never mints one). The App
+          #    Store profile is this app's own: restored when a previous
+          #    run saved one, otherwise minted now against the shared
+          #    certificate (profile mode) and saved by the step below.
+          test "${SIGN_RESTORED:-}" = "true" || { echo "Shared signing identity was not restored - refusing to mint a certificate."; exit 1; }
+          cp "$SIGN_RESTORE_DIR/key.pem" "$SIGN_RESTORE_DIR/cert.pem" "$SIGN/"
+          SHARED_CERT_ID=$(sed -n 's/^CERT_ID=//p' "$SIGN_RESTORE_DIR/meta.env")
+          test -n "$SHARED_CERT_ID" || { echo "Shared meta.env has no CERT_ID - refusing to guess."; exit 1; }
+          if [ "${PROFILE_RESTORED:-}" = "true" ] && [ -f "$PROFILE_RESTORE_DIR/profile.mobileprovision" ]; then
+            cp "$PROFILE_RESTORE_DIR/profile.mobileprovision" "$SIGN/"
+            cp "$PROFILE_RESTORE_DIR/meta.env" "$SIGN/out.txt"
+            echo "Signing with the shared identity (cert $SHARED_CERT_ID) and the saved NyxHICSlab profile."
+          else
+            CERT_ID="$SHARED_CERT_ID" node "$GITHUB_WORKSPACE/nyxhicslab-ios/scripts/asc-sign.js" profile "$SIGN" | tee "$SIGN/out.txt"
+            echo "PROFILE_MINTED=true" >> "$GITHUB_ENV"
+          fi
+          PROFILE_NAME=$(sed -n 's/^NAME=//p' "$SIGN/out.txt"); PROFILE_UUID=$(sed -n 's/^UUID=//p' "$SIGN/out.txt")
+          export PROFILE_NAME
+          echo "CERT_ID=$(sed -n 's/^CERT_ID=//p' "$SIGN/out.txt")" >> "$GITHUB_ENV"
+          echo "PROFILE_ID=$(sed -n 's/^PROFILE_ID=//p' "$SIGN/out.txt")" >> "$GITHUB_ENV"
+
+          # 2. Into a keychain and Xcode's profile folders.
+          /usr/bin/openssl pkcs12 -export -inkey "$SIGN/key.pem" -in "$SIGN/cert.pem" -out "$SIGN/cert.p12" -passout pass:nxci
+          KC="$RUNNER_TEMP/nx.keychain-db"
+          security create-keychain -p nxci "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p nxci "$KC"
+          security import "$SIGN/cert.p12" -k "$KC" -P nxci -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k nxci "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          for d in "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"; do
+            mkdir -p "$d"; cp "$SIGN/profile.mobileprovision" "$d/$PROFILE_UUID.mobileprovision"
+          done
+
+          # 3. The app target signs with them (release builds use production notifications).
+          perl -0pi -e 's/(504EC3181FED79650016851F \/\* Release \*\/ = \{.*?)CODE_SIGN_STYLE = Automatic;/$1CODE_SIGN_STYLE = Manual;\n\t\t\t\tCODE_SIGN_IDENTITY = "Apple Distribution";\n\t\t\t\tDEVELOPMENT_TEAM = $ENV{TEAM_ID};\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "$ENV{PROFILE_NAME}";/s' App.xcodeproj/project.pbxproj
+
+          # 4. Build, sign and upload. Each upload needs a higher build number.
+          BUILD=$((1000 + ${{ github.run_number }}))
+          xcodebuild -project App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -derivedDataPath "$RUNNER_TEMP/dd" CURRENT_PROJECT_VERSION="$BUILD" MARKETING_VERSION="1.0" archive | tail -60
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$TEAM_ID</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>provisioningProfiles</key><dict><key>com.nyxcollective.nyxhicslab</key><string>$PROFILE_NAME</string></dict>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          EOF
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates -authenticationKeyPath "$KEY" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID" | tail -60
+          echo "Sent build $BUILD to App Store Connect. It appears in TestFlight after Apple processes it (about 10-30 minutes)."
+      - name: Save the NyxHICSlab profile for future builds
+        if: ${{ steps.ship.outcome == 'success' && env.PROFILE_MINTED == 'true' }}
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          SIGN="$RUNNER_TEMP/sign"
+          test -f "$SIGN/profile.mobileprovision" || { echo "Profile missing - nothing to save."; exit 1; }
+          WORK="$RUNNER_TEMP/store-repo"; rm -rf "$WORK"; mkdir -p "$WORK"; cd "$WORK"
+          git init -q
+          git config user.email "actions@github.com"
+          git config user.name "github-actions"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch -q --depth 1 origin ios-signing-store
+          git checkout -q -b ios-signing-store FETCH_HEAD
+          # ONLY the ios-signing-hicslab/ folder is written. ios-signing/
+          # (the shared key + certificate + the NyxSurvive profile) is
+          # never touched by this step.
+          mkdir -p ios-signing-hicslab
+          rm -f ios-signing-hicslab/*
+          /usr/bin/openssl base64 -A -in "$SIGN/profile.mobileprovision" -out "$RUNNER_TEMP/profile.mobileprovision.b64"
+          split -b 50000 -d -a 3 "$RUNNER_TEMP/profile.mobileprovision.b64" "ios-signing-hicslab/profile.mobileprovision.b64."
+          rm -f "$RUNNER_TEMP/profile.mobileprovision.b64"
+          (cd "$SIGN" && shasum -a 256 profile.mobileprovision) > ios-signing-hicslab/SHA256SUMS
+          cp "$SIGN/out.txt" ios-signing-hicslab/meta.env
+          git add ios-signing-hicslab
+          git commit -q -m "Save NyxHICSlab App Store profile (profile ${PROFILE_ID})"
+          git push -q origin ios-signing-store
+          echo "Saved the NyxHICSlab profile to ios-signing-hicslab/ on the ios-signing-store branch; future builds reuse it."
+      - name: Remove this build's temporary key material
+        if: ${{ always() && env.CERT_ID != '' }}
+        working-directory: .
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          KEY_P8: ${{ secrets.APPSTORE_KEY_P8 }}
+          KEY_OUT: ${{ runner.temp }}/AuthKey-cleanup.p8
+        run: |
+          node .github/scripts/asc-check.js >/dev/null
+          KEY_FILE="$RUNNER_TEMP/AuthKey-cleanup.p8" node nyxhicslab-ios/scripts/asc-sign.js cleanup
+          security delete-keychain "$RUNNER_TEMP/nx.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP"/AuthKey*.p8
