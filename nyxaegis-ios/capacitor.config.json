@@ -1,0 +1,18 @@
+{
+  "android": {
+    "allowMixedContent": false
+  },
+  "appId": "com.nyxcollective.nyxaegis",
+  "appName": "NyxAegis",
+  "server": {
+    "allowNavigation": [
+      "www.nyxaegis.com",
+      "nyxaegis.com",
+      "checkout.stripe.com",
+      "billing.stripe.com"
+    ],
+    "androidScheme": "https",
+    "url": "https://www.nyxaegis.com/?shell=store"
+  },
+  "webDir": "www"
+}
