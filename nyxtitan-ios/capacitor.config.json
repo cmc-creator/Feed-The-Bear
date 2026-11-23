@@ -1,0 +1,18 @@
+{
+  "android": {
+    "allowMixedContent": false
+  },
+  "appId": "com.nyxcollectivellc.nyxtitan",
+  "appName": "NyxTitan",
+  "server": {
+    "allowNavigation": [
+      "nyxtitan.com",
+      "www.nyxtitan.com",
+      "checkout.stripe.com",
+      "billing.stripe.com"
+    ],
+    "androidScheme": "https",
+    "url": "https://www.nyxtitan.com/?shell=store"
+  },
+  "webDir": "www"
+}
