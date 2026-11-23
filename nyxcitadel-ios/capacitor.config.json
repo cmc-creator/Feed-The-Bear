@@ -1,0 +1,20 @@
+{
+  "android": {
+    "allowMixedContent": false
+  },
+  "appId": "com.nyxcollective.nyxcitadel",
+  "appName": "NyxCitadel",
+  "server": {
+    "allowNavigation": [
+      "nyxcitadel.com",
+      "www.nyxcitadel.com",
+      "checkout.stripe.com",
+      "billing.stripe.com",
+      "*.firebaseapp.com",
+      "accounts.google.com"
+    ],
+    "androidScheme": "https",
+    "url": "https://nyxcitadel.com/?shell=store"
+  },
+  "webDir": "www"
+}
