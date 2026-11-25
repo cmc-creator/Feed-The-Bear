@@ -730,7 +730,7 @@ function showFollowQr () {
   box.classList.remove('hidden');
   const ok = drawQr(document.getElementById('friends-qr-canvas'), buildFollowLink());
   box.querySelector('.friends-qr-note').textContent = ok
-    ? "Point a friend's phone camera at this. They follow you (and get 30 days of Grizzly free)."
+    ? "Point a friend's phone camera at this. They follow you (and get 14 days of Grizzly free)."
     : "The QR code couldn't load. Use Invite a friend to send your link instead.";
   trackProductEvent('friend_qr_shown');
 }
@@ -878,7 +878,7 @@ async function sendFriendInvite (who, ref) {
     + (hasPicks
       ? 'Tap my link to join free. You\'ll follow me and can add any of my spots to your list with one tap.'
       : 'Tap my link to join free and follow me, so we can share spots.')
-    + (ref ? ' (You get 30 days of Grizzly free with it.)' : '');
+    + (ref ? ' (You get 14 days of Grizzly free with it.)' : '');
   startSharingLive();
   trackProductEvent('friend_invite', { withProfile: hasPicks, withRef: !!ref, named: !!name, tracked: !!code, via });
   if (via === 'sms') {
@@ -2054,7 +2054,7 @@ function openFriendSpots (data, { invited = false } = {}) {
         ? `You're following ${who}. Tap Been there or Want to try on any spot to save it.`
         : `You're following ${who}.`)
       : `Follow ${who} to see where they eat and what they order.`)
-      + (invited && ref ? ' You also get 30 days of Grizzly free.' : '');
+      + (invited && ref ? ' You also get 14 days of Grizzly free.' : '');
     list.innerHTML = !items.length
       ? `<div class="guest-empty">${escHtml(who)} is just getting started. As they save spots, they'll show up on your home screen under Friends' Feed, ready to add to your list.</div>`
       : items.map((p, i) => {

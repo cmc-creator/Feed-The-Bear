@@ -58,7 +58,7 @@ asGrizzly(); // uses Grizzly-only features
   await f.waitForTimeout(2500);
   check(await f.locator('#guest-profile-overlay').isVisible(), 'the friend sees the invite even though Connie has no ratings yet');
   check((await f.locator('#guest-profile-name').innerText()) === 'Connie invited you 🐻', 'it names who sent it');
-  check(/following Connie.*30 days of Grizzly free/.test(await f.locator('#guest-profile-sub').innerText()), 'says they follow Connie now, and the free month');
+  check(/following Connie.*14 days of Grizzly free/.test(await f.locator('#guest-profile-sub').innerText()), 'says they follow Connie now, and the free month');
   check(/just getting started/.test(await f.locator('#guest-profile-list').innerText()), 'an empty profile explains itself');
   check(await f.evaluate(() => localStorage.getItem('ftb_ref_v1')) === 'inviterUid1234567890', 'the free-month invite is remembered');
   // Accepting followed Connie, even on a free account (one friend is free).

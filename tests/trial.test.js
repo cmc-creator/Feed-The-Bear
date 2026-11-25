@@ -1,5 +1,5 @@
 // Free trial and invite rewards on the server: one 14-day trial per person,
-// 30 days from a friend's invite, and the inviter's free month once the friend pays.
+// the same 14 days from a friend's invite, and the inviter's free month once the friend pays.
 const Module = require('module');
 const { Readable } = require('stream');
 const path = require('path');
@@ -130,14 +130,14 @@ const PRICE = 'price_1UW2DmLzFIsRCvKRfFexC3P8';
   docs['users/inviterfree001/meta/profile'] = { name: 'Inviter' };
   docs['users/friend00000001/meta/profile'] = { name: 'Friend' };
   r = await call(checkout, { query: { uid: 'friend00000001', email: 'friend@example.com', ref: 'inviterfree001' } });
-  check(r.data.days === 30, 'an invited friend gets a 30-day trial');
+  check(r.data.days === 14, 'an invited friend gets the standard 14-day trial');
   r = await call(checkout, { query: { uid: 'friend00000001', email: 'friend@example.com', ref: 'nobody00000000' } });
   check(r.data.days === 14, 'a made-up invite code gives the normal 14 days');
   r = await call(checkout, { query: { uid: 'friend00000001', email: 'friend@example.com', ref: 'friend00000001' } });
   check(r.data.days === 14, 'you cannot invite yourself');
   await call(checkout, { method: 'POST', body: { uid: 'friend00000001', email: 'friend@example.com', priceId: PRICE, ref: 'inviterfree001' } });
   const sess = stripeCalls.sessions.at(-1);
-  check(sess.subscription_data.trial_period_days === 30 && sess.metadata.ref === 'inviterfree001' && sess.subscription_data.metadata.ref === 'inviterfree001', 'the invite is carried through checkout onto the subscription');
+  check(sess.subscription_data.trial_period_days === 14 && sess.metadata.ref === 'inviterfree001' && sess.subscription_data.metadata.ref === 'inviterfree001', 'the invite is carried through checkout onto the subscription');
 
   // Starting the free trial gives the inviter nothing yet: trials cancelled straight away can't farm free months.
   subMeta.sub_f1 = { uid: 'friend00000001', ref: 'inviterfree001' };

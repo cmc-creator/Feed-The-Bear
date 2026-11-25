@@ -1332,10 +1332,10 @@ function _requiredAuthSub () {
   const by = typeof window.pendingInviteName === 'function' ? window.pendingInviteName() : '';
   if (by) {
     return `${by} invited you! Create your free account and you'll follow ${by} and see their favorite spots.`
-      + (invited ? ' You also get 30 days of Grizzly free.' : '');
+      + (invited ? ' You also get 14 days of Grizzly free.' : '');
   }
   if (_lastAccount()) return 'Welcome back! Sign in to see your spots.';
-  if (invited) return 'A friend invited you! Create your free account, then get 30 days of Grizzly free.';
+  if (invited) return 'A friend invited you! Create your free account, then get 14 days of Grizzly free.';
   if (hasSpots) return 'Create your free account to keep going. The spots on this phone come with you.';
   return 'Create your free account to start saving the places you want to eat.';
 }
@@ -1671,7 +1671,7 @@ function _setUpgradePlan (period) {
 }
 
 // ─── FREE TRIAL & INVITES ─────────────────────────────────────
-// New members get 14 days free (30 from a friend's invite link). The server
+// New members get 14 days free (the same 14 from a friend's invite link). The server
 // decides who is eligible (api/create-checkout.js); signed out, we assume yes.
 const REF_KEY = 'ftb_ref_v1';
 let _trialOffer = { trial: true, days: 14 };
@@ -1728,7 +1728,7 @@ function _captureInviteRef () {
   history.replaceState({}, '', window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash);
   // The profile preview already says who invited them and about the free month.
   if (!window.location.hash.startsWith('#profile=')) {
-    setTimeout(() => showToast?.('A friend invited you!', 'You get 30 days of Grizzly free when you upgrade.', 'success'), 1500);
+    setTimeout(() => showToast?.('A friend invited you!', 'You get 14 days of Grizzly free when you upgrade.', 'success'), 1500);
   }
 }
 
@@ -1753,7 +1753,7 @@ function _renderTrialOffer () {
 async function _refreshTrialOffer () {
   const user = _auth?.currentUser;
   const ref = _inviteRef();
-  if (!user) { _trialOffer = { trial: true, days: ref ? 30 : 14 }; _renderTrialOffer(); return; }
+  if (!user) { _trialOffer = { trial: true, days: 14 }; _renderTrialOffer(); return; }
   try {
     const q = new URLSearchParams({ uid: user.uid, email: user.email || '', ref });
     const data = await (await fetch(`/api/create-checkout?${q}`)).json();
@@ -1772,7 +1772,7 @@ async function shareInvite () {
   if (!url) { openAuthModal(); return; }
   // Same link as Invite in Friends: your picks to follow plus the free month.
   if (typeof inviteFriend === 'function') { await inviteFriend({ ref: _auth.currentUser.uid }); return; }
-  const text = 'I track every restaurant I want to try with Feed The Bear. Join with my link and get 30 days of Grizzly free:';
+  const text = 'I track every restaurant I want to try with Feed The Bear. Join with my link and get 14 days of Grizzly free:';
   if (typeof trackProductEvent === 'function') trackProductEvent('invite_shared');
   try {
     if (navigator.share) { await navigator.share({ title: 'Feed The Bear', text, url }); return; }

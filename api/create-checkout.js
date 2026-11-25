@@ -4,7 +4,9 @@
    GET  ?uid=…&email=…&ref=…  → { trial, days }  (is a free trial on offer, and how long?)
    POST { uid, email, priceId, ref, playToken, promo } → { url, trial, days }  (Stripe Checkout link)
    promo: a discount code from an owner's VIP link (owner.js); applied for them.
-   ref is the uid from a friend's invite link: 30 days instead of 14.
+   ref is the uid from a friend's invite link: the friend gets the same
+   14-day trial as everyone else, and the inviter earns a free month
+   when the friend first pays (see _referral.js).
    playToken: from Google in the Play app, so the sale is reported to Google (_play.js).
    ios: true from the iPhone app, which opens checkout in Safari; Stripe then
    sends them to native-return.html, whose button reopens the app.
@@ -25,7 +27,7 @@ const ALLOWED_PRICES = (process.env.STRIPE_PRICE_IDS || 'price_1UW2DmLzFIsRCvKRf
   .split(',').map(s => s.trim()).filter(Boolean);
 
 const TRIAL_DAYS = 14;
-const INVITED_TRIAL_DAYS = 30; // came from a friend's invite link (see _referral.js)
+const INVITED_TRIAL_DAYS = 14; // came from a friend's invite link (see _referral.js); matches TRIAL_DAYS
 
 function getAdmin () {
   if (!admin.apps.length) {
@@ -59,10 +61,18 @@ async function trialEligible (stripe, uid, email) {
   }
 }
 
-async function trialDays (uid, ref) {
+// Who invited this buyer: the inviter's uid, or '' when the ref is missing,
+// made up, or the buyer themselves. Kept separate from the trial length:
+// invited friends get the same 14 days as everyone else, so the day count
+// alone no longer says who invited them.
+async function invitedRef (uid, ref) {
   try {
-    return ref && await validInviter(getAdmin().auth(), String(ref), uid) ? INVITED_TRIAL_DAYS : TRIAL_DAYS;
-  } catch { return TRIAL_DAYS; }
+    return ref && await validInviter(getAdmin().auth(), String(ref), uid) ? String(ref) : '';
+  } catch { return ''; }
+}
+
+async function trialDays (uid, ref) {
+  return (await invitedRef(uid, ref)) ? INVITED_TRIAL_DAYS : TRIAL_DAYS;
 }
 
 module.exports = async function handler (req, res) {
@@ -110,7 +120,7 @@ module.exports = async function handler (req, res) {
   try {
     const trial = await trialEligible(stripe, uid, email);
     const days = trial ? await trialDays(uid, ref) : 0;
-    const invitedBy = days === INVITED_TRIAL_DAYS ? ref : '';
+    const invitedBy = trial ? await invitedRef(uid, ref) : '';
     // A VIP link's code, applied up front (Stripe takes either this or the code box).
     let promoId = '';
     if (typeof promo === 'string' && /^[A-Za-z0-9_-]{3,30}$/.test(promo)) {

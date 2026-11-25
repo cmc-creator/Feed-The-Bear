@@ -2,8 +2,8 @@
    Feed The Bear - Invite a friend rewards (shared helper, not an endpoint:
    Vercel skips files in api/ that start with "_")
    ════════════════════════════════════════════════════════════
-   A friend who opens an invite link (app.html?ref=<uid>) gets a 30-day
-   Grizzly trial instead of 14 days. When they first pay (the trial ends and
+   A friend who opens an invite link (app.html?ref=<uid>) gets the same
+   14-day Grizzly trial as everyone else. When they first pay (the trial ends and
    their card is charged; stripe-webhook.js invoice.paid), the person who
    invited them gets a free month:
      - paying already: a $4.99 credit on their next Stripe bill

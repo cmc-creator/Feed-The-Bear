@@ -643,7 +643,7 @@ window.Cub = (() => {
     try { by = localStorage.getItem('ftb_invited_by_v1') || ''; ref = localStorage.getItem('ftb_ref_v1') || ''; } catch { /* private mode */ }
     if (!by && !ref) return body;
     const who = by || 'A friend';
-    return `${who} invited you!${ref ? ' You get 30 days of Grizzly free when you upgrade.' : ''} ${body}`;
+    return `${who} invited you!${ref ? ' You get 14 days of Grizzly free when you upgrade.' : ''} ${body}`;
   }
 
   function showWelcomeStep (i) {

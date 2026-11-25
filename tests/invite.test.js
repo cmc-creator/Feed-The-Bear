@@ -25,13 +25,13 @@ asGrizzly(); // uses Grizzly-only features
   await p.waitForTimeout(2500);
   check(await p.evaluate(() => localStorage.getItem('ftb_ref_v1')) === 'inviterABC123', 'the invite is remembered');
   check(!/ref=/.test(p.url()), 'the address bar is cleaned up');
-  check(/A friend invited you/.test(await p.locator('body').innerText()), 'they are told about the 30 free days');
+  check(/A friend invited you/.test(await p.locator('body').innerText()), 'they are told about the 14 free days');
 
-  // Signed out: the 30-day trial is offered.
+  // Signed out: the standard 14-day trial is offered, invited or not.
   await p.evaluate(() => { document.querySelectorAll('.toast').forEach(t => t.remove()); openUpgradeModal(); });
   await p.waitForTimeout(300);
-  check((await p.locator('#upgrade-cta-btn').innerText()) === 'Start my 30-day free trial', 'an invited friend sees a 30-day free trial');
-  check(/Free for 30 days, then \$53\.89 a year/.test(await p.locator('#upgrade-footer').innerText()), 'the footer says when billing starts');
+  check((await p.locator('#upgrade-cta-btn').innerText()) === 'Start my 14-day free trial', 'an invited friend sees the standard 14-day free trial');
+  check(/Free for 14 days, then \$53\.89 a year/.test(await p.locator('#upgrade-footer').innerText()), 'the footer says when billing starts');
   await p.evaluate(() => closeUpgradeModal());
 
   // ── Signed in ──
@@ -72,7 +72,7 @@ asGrizzly(); // uses Grizzly-only features
   await p.click('#invite-who .invite-who-skip');
   const shared = await sharing;
   // One link: the free-month code plus your profile so they can follow you.
-  check(/invite\.html\?ref=me000000001(&i=[a-z0-9]{16,32})?#profile=/.test(shared?.url || '') && /30 days of Grizzly free/.test(shared?.text || ''), `the invite shares your personal link (${shared?.url})`);
+  check(/invite\.html\?ref=me000000001(&i=[a-z0-9]{16,32})?#profile=/.test(shared?.url || '') && /14 days of Grizzly free/.test(shared?.text || ''), `the invite shares your personal link (${shared?.url})`);
 
   // A free month from invites shows on the account.
   rewards = { grizzlyUntil: new Date(Date.now() + 20 * 864e5).toISOString(), invites: 2 };

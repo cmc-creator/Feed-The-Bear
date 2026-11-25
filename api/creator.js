@@ -6,7 +6,7 @@
    publicPage) gets a page anyone can open, no account needed: their top
    spots and what to order. Made for a TikTok or Instagram bio.
    One button: join free, follow them, and add their spots. It carries
-   ?ref=<their uid> (the friend's 30-day trial, and a free month for the
+   ?ref=<their uid> (the friend's 14-day trial, and a free month for the
    creator when that friend pays: _referral.js) and ?src=<handle> (counted
    as a join on their page: handle.js pageJoined).
    Off, or no such username: a plain "not found" page (never says which).
@@ -586,7 +586,7 @@ document.addEventListener('DOMContentLoaded', function () {
 </main>
 <div class="cta">
   <a href="${esc(join)}">Follow ${esc(name)} &amp; save these spots</a>
-  <small>Free · You also get 30 days of Grizzly free</small>
+  <small>Free · You also get 14 days of Grizzly free</small>
 </div>
 <script>
 // You can't follow your own cave: hide the follow CTA when the viewer
