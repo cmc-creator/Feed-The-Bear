@@ -42,7 +42,7 @@ const shown = p => p.evaluate(() => !!document.querySelector('#cub-welcome:not(.
   check(!p.errors.length, `no page errors ${p.errors.join(' | ')}`);
 
   // A new visitor can try it first: the sheet offers it, setup follows, and
-  // the 3rd saved spot asks for the free account (and can't be skipped).
+  // the 3rd saved spot asks for the free account.
   p = await fresh();
   await p.goto(`${BASE}/app.html`);
   await p.waitForTimeout(1500);
@@ -57,7 +57,7 @@ const shown = p => p.evaluate(() => !!document.querySelector('#cub-welcome:not(.
     await p.waitForTimeout(1200);
     if (i < 3) check(await p.locator('#auth-overlay').isHidden(), `spot ${i} saves without an account`);
   }
-  check(await p.locator('#auth-overlay').isVisible() && await p.evaluate(() => document.getElementById('auth-overlay').classList.contains('auth-required')), 'the 3rd spot asks for the free account, and it stays until they sign up');
+  check(await p.locator('#auth-overlay').isVisible() && await p.evaluate(() => document.getElementById('auth-overlay').classList.contains('auth-required')), 'the 3rd spot asks for the free account');
   check(/come with you/.test(await p.textContent('#auth-overlay .auth-sub')), 'it says their spots come with them');
   await browser.close();
   finish('reinstall');

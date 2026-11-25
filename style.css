@@ -9492,7 +9492,6 @@ body.light-mode .gz-perks li::before { color: #24663e; }
 
 /* Signed out, the sign-in sheet covers the app and can't be closed. */
 #auth-overlay.auth-required { z-index: 10000; background: var(--bg, #14100c); }
-#auth-overlay.auth-required #auth-close-btn { display: none; }
 
 /* Android app out of date: one tap to the newest build (app.js checkAndroidAppVersion). */
 .app-update-banner {

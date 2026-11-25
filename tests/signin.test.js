@@ -1,6 +1,7 @@
 // An account is required, and the free plan is small: signed out, the sign-in
-// sheet can't be closed; a free account gets 25 spots, and Friends, Dinner
-// Vote, Bear Swipe and Today's Pick pitch Grizzly instead of opening.
+// sheet covers the app, but its close button lets a visitor look around first
+// (it asks again on the next visit); a free account gets 25 spots, and
+// Friends, Dinner Vote, Bear Swipe and Today's Pick pitch Grizzly instead of opening.
 const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib');
 
 const SEED = [
@@ -24,13 +25,13 @@ async function upgradeTitle (p) {
   await p.waitForSelector('#auth-overlay.auth-required:not(.hidden)', { timeout: 15000 }).catch(() => {});
   const auth = p.locator('#auth-overlay');
   check(await auth.isVisible() && await auth.evaluate(el => el.classList.contains('auth-required')), 'signed out, the sign-in sheet covers the app');
-  check(await p.locator('#auth-close-btn').isHidden(), 'it has no close button');
+  check(await p.locator('#auth-close-btn').isVisible(), 'it has a close button');
   check(/Create/.test(await p.locator('#auth-title').innerText()), 'it starts on creating an account');
   check(/spots on this phone come with you/.test(await p.locator('#auth-overlay .auth-sub').innerText()), 'someone with spots on the phone is told they come along');
-  await p.keyboard.press('Escape');
-  await p.mouse.click(5, 5);
-  await p.evaluate(() => closeAuthModal());
-  check(await auth.isVisible(), 'Escape, tapping outside or closing it in code does not dismiss it');
+  await p.locator('#auth-close-btn').click();
+  check(await auth.isHidden(), 'the close button dismisses it without creating a profile');
+  await p.evaluate(() => openAuthModal());
+  check(await auth.isVisible(), 'and it can be opened again to sign up');
   check(await p.locator('.auth-tab[data-auth-mode="signup"]').evaluate(e => e.classList.contains('active')), 'the Create account tab is highlighted');
   await p.locator('.auth-tab[data-auth-mode="signin"]').click();
   check(await p.locator('#auth-title').innerText() === 'Welcome back' && await p.locator('#auth-submit-btn').innerText() === 'Sign In', 'the Sign in tab switches to signing in');

@@ -963,7 +963,13 @@ function initFirebaseAuth () {
     _sessionTask = handleFirebaseUser(user);
   }, err => {
     console.error('[FTB] Auth observer failed:', err);
-    setBackupStatus('error', 'Could not restore your sign-in. Reload or sign in again.');
+    // A first visit has no sign-in to restore and nothing backed up, so an
+    // auth storage hiccup (for example IndexedDB unavailable) is not a
+    // backup problem worth alarming them with. Only surface it when this
+    // phone has an account or a diary to lose.
+    let hasSpots = false;
+    try { hasSpots = (JSON.parse(localStorage.getItem('ftb_restaurants_v2') || '[]') || []).length > 0; } catch { /* private mode */ }
+    if (_lastAccount() || hasSpots) setBackupStatus('error', 'Could not restore your sign-in. Reload or sign in again.');
   });
 }
 
@@ -1204,7 +1210,7 @@ async function handleFirebaseUser (user) {
         showToast('Payment received!', 'Sign in to the account you upgraded to finish turning on Grizzly.', 'success');
         setTimeout(() => { if (isCurrent()) openAuthModal({ forUpgrade: true }); }, 400);
       } else if (_signInRequired()) {
-        openAuthModal();
+        if (!_authDismissed()) openAuthModal();
       } else if (_tryingFirst() && _gateOn()) {
         // A new phone (or a reinstall): sign in, or try it first.
         let seen = false;
@@ -1217,8 +1223,12 @@ async function handleFirebaseUser (user) {
     if (!isCurrent()) return;
     console.error('[FTB] Account restore failed:', err);
     updateAuthUI(user);
-    setBackupStatus('error', window._ftbAccountSwitching ? err.message : 'Your local diary is available, but cloud backup could not be restored. Check your connection and retry.');
-    showToast('Backup needs attention', 'Your saved data has not been deleted. Use Retry backup when connected.', 'error');
+    // A signed-out visitor with no diary on this phone has nothing backed
+    // up, so a failure in the signed-out path is not a backup error.
+    if (user || hasOwnedData) {
+      setBackupStatus('error', window._ftbAccountSwitching ? err.message : 'Your local diary is available, but cloud backup could not be restored. Check your connection and retry.');
+      showToast('Backup needs attention', 'Your saved data has not been deleted. Use Retry backup when connected.', 'error');
+    }
   }
 }
 
@@ -1280,6 +1290,11 @@ function _signInRequired () {
   if (_auth?.currentUser) return false;
   return _gateOn() && !_tryingFirst();
 }
+// The visitor closed the required sign-in sheet to look around first:
+// don't keep reopening it for the rest of this visit.
+function _authDismissed () {
+  try { return !!sessionStorage.getItem('ftb_auth_dismissed'); } catch { return false; }
+}
 // Accounts are required on the site; the local test server skips it unless a test sets ftb_test_auth_gate.
 function _gateOn () {
   if (location.hostname !== '127.0.0.1') return true;
@@ -1303,7 +1318,7 @@ function _tryingFirst () {
 window.ftbAfterSave = function () {
   if (!window._ftbAuthReady || _auth?.currentUser) return;
   const overlay = document.getElementById('auth-overlay');
-  if (!_signInRequired() || !overlay?.classList.contains('hidden')) return;
+  if (!_signInRequired() || _authDismissed() || !overlay?.classList.contains('hidden')) return;
   if (typeof trackProductEvent === 'function') trackProductEvent('try_limit_signup');
   setTimeout(openAuthModal, 900);
 };
@@ -1365,7 +1380,11 @@ function closeAuthModal () {
   // "Continue to my diary" — then the reminder is dismissed for this
   // sign-in (it shows again next time until they verify).
   if (window._ftbNeedsVerification && !window._ftbVerifyDismissed) return;
-  if (overlay?.classList.contains('auth-required') && _signInRequired()) return;
+  // Closing the required sheet without an account lets them look around
+  // first; it asks again on the next visit, not again in this one.
+  if (overlay?.classList.contains('auth-required') && !_auth?.currentUser) {
+    try { sessionStorage.setItem('ftb_auth_dismissed', '1'); } catch { /* private mode */ }
+  }
   overlay?.classList.remove('auth-required');
   overlay?.classList.add('hidden');
   maybeHideOverlay();
