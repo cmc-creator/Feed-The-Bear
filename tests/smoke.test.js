@@ -6,7 +6,7 @@ const { BASE, check, launch, newPage, closeAllDialogs, finish } = require('./lib
 // Need arguments or leave the page, so they are covered by focused flow tests.
 const SKIP = new Set(['openDirections', 'openDirectionsForSwipeItem', 'openWebsite', 'openMapsSearch', 'openLightbox',
   'openEditModal', 'openDetailModal', 'openAddModalPreFilled', 'openSwipeChoiceDetails', 'openCheckinWithPhoto',
-  'openDishTracker', 'openVisitDebrief', 'openDecisionDirections', 'openPhotoGallery', 'openFoodEventDetail',
+  'openDishTracker', 'openRecipeModal', 'openVisitDebrief', 'openDecisionDirections', 'openPhotoGallery', 'openFoodEventDetail',
   'openOwnerPortal']); // leaves the app for owner.html
 
 const SEED = [
